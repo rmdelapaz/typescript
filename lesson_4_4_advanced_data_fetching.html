@@ -1,0 +1,3560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Master Advanced Data Fetching in React with TypeScript - Learn race condition handling, debouncing, pagination, infinite scroll, caching strategies, and React Query basics. Build production-ready data fetching solutions.">
+    <meta name="author" content="PracticalAce">
+    <title>Advanced Data Fetching - React TypeScript Course</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#f0f0f0',
+                primaryTextColor: '#333',
+                primaryBorderColor: '#667eea'
+            }
+        });
+    </script>
+</head>
+<body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+    
+    <!-- Progress indicator -->
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React TypeScript Course</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">
+                ☰
+            </button>
+            <div class="nav-links" id="nav-links" aria-hidden="false">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <button id="theme-toggle" aria-label="Toggle theme">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#module4">Module 4: Side Effects and Data Fetching</a></li>
+            <li aria-current="page">Lesson 4.4: Advanced Data Fetching</li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main-content">
+        <div class="container">
+            <!-- Lesson Header -->
+            <header>
+                <h1>🚀 Advanced Data Fetching</h1>
+                <p class="lead">You've learned the basics of data fetching with useEffect and the Fetch API. But real-world applications face challenges like race conditions, slow API responses, and large datasets. How do you build a search that doesn't overwhelm the server with requests? How do you handle pagination elegantly? What about when users navigate away before data loads? In this lesson, we'll explore advanced data fetching patterns that make your React apps fast, efficient, and production-ready. Get ready to level up your data game! 🎯</p>
+                
+                <!-- Learning objectives -->
+                <div class="card">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Understand and prevent race conditions in data fetching</li>
+                        <li>Implement debouncing and throttling for user input</li>
+                        <li>Build paginated data displays with proper state management</li>
+                        <li>Create infinite scroll components</li>
+                        <li>Implement client-side caching strategies</li>
+                        <li>Use AbortController for request cancellation</li>
+                        <li>Handle stale data and revalidation</li>
+                        <li>Understand React Query fundamentals</li>
+                        <li>Type complex async operations properly</li>
+                        <li>Build production-ready data fetching solutions</li>
+                    </ul>
+                    <p><strong>Estimated Time:</strong> 75-90 minutes</p>
+                    <p><strong>Project:</strong> Build a searchable, paginated product catalog with caching</p>
+                </div>
+            </header>
+
+            <!-- Sticky Table of Contents -->
+            <details class="card" open style="position: sticky; top: 80px; z-index: 100; background: var(--card-bg, white); box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+                <summary style="cursor: pointer; font-weight: bold; padding: 0.5rem 1rem; user-select: none;">
+                    <h2 style="display: inline; margin: 0;">📑 In This Lesson</h2>
+                </summary>
+                <nav aria-label="Table of Contents" style="padding: 0 1rem 1rem 1rem;">
+                    <ol>
+                        <li><a href="#section1" class="toc-link">Race Conditions: The Silent Bug</a></li>
+                        <li><a href="#section2" class="toc-link">Debouncing and Throttling</a></li>
+                        <li><a href="#section3" class="toc-link">Request Cancellation with AbortController</a></li>
+                        <li><a href="#section4" class="toc-link">Pagination Patterns</a></li>
+                        <li><a href="#section5" class="toc-link">Infinite Scroll</a></li>
+                        <li><a href="#section6" class="toc-link">Client-Side Caching</a></li>
+                        <li><a href="#section7" class="toc-link">Introduction to React Query</a></li>
+                        <li><a href="#section8" class="toc-link">Optimistic Updates</a></li>
+                        <li><a href="#section9" class="toc-link">Hands-on Practice</a></li>
+                        <li><a href="#section10" class="toc-link">Best Practices</a></li>
+                        <li><a href="#section11" class="toc-link">Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <!-- Section 1: Race Conditions -->
+            <section id="section1" class="lesson-section">
+                <h2>🏁 Race Conditions: The Silent Bug</h2>
+                <p>Race conditions are one of the trickiest bugs in data fetching. They occur when multiple async operations complete out of order, causing your UI to display stale or incorrect data. Let's understand and fix them!</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">📖 Definition</h4>
+                    <p style="color: white;"><strong>Race Condition:</strong> A bug that occurs when the outcome depends on the unpredictable timing of multiple operations. In data fetching, this happens when a later request completes before an earlier one, displaying outdated data.</p>
+                </div>
+
+                <h3>The Problem: Out-of-Order Responses</h3>
+                <p>Imagine a user typing in a search box: "react" → "react typescript" → "react query". Three requests fire off, but the network is unpredictable—the "react" request might finish last, showing old results!</p>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Broken Code: Race Condition</h4>
+                    <pre><code class="language-typescript">interface SearchProps {
+    query: string;
+}
+
+interface SearchResult {
+    id: number;
+    title: string;
+}
+
+const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
+    const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!query) return;
+        
+        setLoading(true);
+        
+        // Problem: No way to know if this is still the latest query!
+        fetch(`/api/search?q=${query}`)
+            .then(res => res.json())
+            .then(data => {
+                setResults(data); // ❌ Might be stale data!
+                setLoading(false);
+            });
+    }, [query]);
+
+    return (
+        &lt;div&gt;
+            {loading && &lt;p&gt;Loading...&lt;/p&gt;}
+            {results.map(result => (
+                &lt;div key={result.id}&gt;{result.title}&lt;/div&gt;
+            ))}
+        &lt;/div&gt;
+    );
+};
+
+// Scenario:
+// User types: "react" → fires request A
+// User types: "react typescript" → fires request B  
+// Request B finishes first → shows correct results
+// Request A finishes second → overwrites with old "react" results ❌</code></pre>
+                </div>
+
+                <h3>Solution 1: Ignore Flag</h3>
+                <p>Use a boolean flag to track whether the effect is still active:</p>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Fixed with Ignore Flag</h4>
+                    <pre><code class="language-typescript">const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
+    const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!query) return;
+        
+        let ignore = false; // Flag to track if this effect is still active
+        
+        setLoading(true);
+        
+        fetch(`/api/search?q=${query}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!ignore) { // ✅ Only update if still the latest query
+                    setResults(data);
+                    setLoading(false);
+                }
+            });
+
+        // Cleanup: Set ignore to true when effect is cleaned up
+        return () => {
+            ignore = true;
+        };
+    }, [query]);
+
+    return (
+        &lt;div&gt;
+            {loading && &lt;p&gt;Loading...&lt;/p&gt;}
+            {results.map(result => (
+                &lt;div key={result.id}&gt;{result.title}&lt;/div&gt;
+            ))}
+        &lt;/div&gt;
+    );
+};
+
+// How it works:
+// 1. User types "react" → request A starts, ignore = false
+// 2. User types "react typescript" → effect cleanup runs, sets ignore = true for A
+// 3. New request B starts with its own ignore = false
+// 4. If request A finishes, it sees ignore = true and skips updating ✅
+// 5. Request B finishes, sees ignore = false, updates state ✅</code></pre>
+                </div>
+
+                <h3>Solution 2: AbortController (Better!)</h3>
+                <p>AbortController lets you actually cancel the in-flight request, not just ignore it:</p>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Best Solution: AbortController</h4>
+                    <pre><code class="language-typescript">const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
+    const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!query) return;
+        
+        // Create AbortController for this request
+        const controller = new AbortController();
+        
+        setLoading(true);
+        
+        fetch(`/api/search?q=${query}`, {
+            signal: controller.signal // Pass the signal to fetch
+        })
+            .then(res => res.json())
+            .then(data => {
+                setResults(data);
+                setLoading(false);
+            })
+            .catch(err => {
+                if (err.name === 'AbortError') {
+                    // Request was cancelled - this is expected!
+                    console.log('Request cancelled');
+                } else {
+                    // Real error
+                    console.error('Error:', err);
+                    setLoading(false);
+                }
+            });
+
+        // Cleanup: Abort the request if component unmounts or query changes
+        return () => {
+            controller.abort();
+        };
+    }, [query]);
+
+    return (
+        &lt;div&gt;
+            {loading && &lt;p&gt;Loading...&lt;/p&gt;}
+            {results.map(result => (
+                &lt;div key={result.id}&gt;{result.title}&lt;/div&gt;
+            ))}
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Why AbortController is Better</h4>
+                    <ul>
+                        <li><strong>Actually cancels the request</strong> - Saves bandwidth and server resources</li>
+                        <li><strong>Browser stops processing</strong> - No wasted CPU parsing JSON from cancelled requests</li>
+                        <li><strong>Cleaner code</strong> - The intent is clear: "cancel this request"</li>
+                        <li><strong>Standard Web API</strong> - Works with fetch, axios (with adapters), and other libraries</li>
+                    </ul>
+                </div>
+
+                <h3>Visualizing the Race Condition</h3>
+                <div class="mermaid">
+sequenceDiagram
+    participant User
+    participant Component
+    participant Server
+    
+    User->>Component: Types "react"
+    Component->>Server: Request A: "react"
+    Note over Server: Slow network...
+    
+    User->>Component: Types "react typescript"
+    Component->>Server: Request B: "react typescript"
+    
+    Server->>Component: Response B arrives first ✅
+    Note over Component: Shows correct results
+    
+    Server->>Component: Response A arrives second ❌
+    Note over Component: Without fix: Shows old results!
+    Note over Component: With AbortController: Request A was cancelled ✅
+                </div>
+
+                <h3>Race Conditions in Custom Hooks</h3>
+                <p>Let's build a reusable hook that handles race conditions automatically:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">interface UseFetchOptions {
+    immediate?: boolean;
+}
+
+interface UseFetchReturn&lt;T&gt; {
+    data: T | null;
+    loading: boolean;
+    error: Error | null;
+    refetch: () => Promise&lt;void&gt;;
+}
+
+function useFetch&lt;T&gt;(
+    url: string,
+    options: UseFetchOptions = {}
+): UseFetchReturn&lt;T&gt; {
+    const [data, setData] = useState&lt;T | null&gt;(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState&lt;Error | null&gt;(null);
+
+    const fetchData = useCallback(async () => {
+        const controller = new AbortController();
+        
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(url, {
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            setData(result);
+        } catch (err) {
+            if (err instanceof Error && err.name !== 'AbortError') {
+                setError(err);
+            }
+        } finally {
+            setLoading(false);
+        }
+
+        return controller;
+    }, [url]);
+
+    useEffect(() => {
+        if (options.immediate ?? true) {
+            const controller = fetchData();
+            
+            return () => {
+                controller.then(c => c.abort());
+            };
+        }
+    }, [fetchData, options.immediate]);
+
+    const refetch = useCallback(async () => {
+        await fetchData();
+    }, [fetchData]);
+
+    return { data, loading, error, refetch };
+}
+
+// Usage - race conditions handled automatically!
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+    const { data: user, loading, error } = useFetch&lt;User&gt;(
+        `/api/users/${userId}`
+    );
+
+    if (loading) return &lt;div&gt;Loading...&lt;/div&gt;;
+    if (error) return &lt;div&gt;Error: {error.message}&lt;/div&gt;;
+    if (!user) return null;
+
+    return &lt;div&gt;{user.name}&lt;/div&gt;;
+};</code></pre>
+                </div>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Key Takeaways: Race Conditions</h4>
+                    <ul>
+                        <li>Race conditions happen when async operations complete out of order</li>
+                        <li>Always use AbortController to cancel old requests</li>
+                        <li>Return cleanup functions from useEffect that abort requests</li>
+                        <li>Build reusable hooks that handle cancellation automatically</li>
+                        <li>Test with slow network conditions (Chrome DevTools throttling!)</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 2: Debouncing and Throttling -->
+            <section id="section2" class="lesson-section">
+                <h2>⏱️ Debouncing and Throttling</h2>
+                <p>When users type in a search box, do you really want to make an API call for every single keystroke? That's a lot of unnecessary requests! Debouncing and throttling are techniques to limit how often a function runs. Let's master them!</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">📖 Definitions</h4>
+                    <p style="color: white;"><strong>Debouncing:</strong> Delays executing a function until after a certain time has passed since the last call. Perfect for search inputs—wait until the user stops typing.</p>
+                    <p style="color: white; margin-top: 1rem;"><strong>Throttling:</strong> Limits how often a function can execute (e.g., at most once every 500ms). Great for scroll handlers or window resize events.</p>
+                </div>
+
+                <h3>The Problem: Too Many Requests</h3>
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Without Debouncing</h4>
+                    <pre><code class="language-typescript">const Search: React.FC = () => {
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState&lt;string[]&gt;([]);
+
+    useEffect(() => {
+        if (!query) return;
+        
+        // ❌ Fires on EVERY keystroke!
+        fetch(`/api/search?q=${query}`)
+            .then(res => res.json())
+            .then(setResults);
+    }, [query]);
+
+    return (
+        &lt;input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search..."
+        /&gt;
+    );
+};
+
+// User types: "r e a c t"
+// Fires 5 requests: "r", "re", "rea", "reac", "react"
+// Only the last one matters! ❌</code></pre>
+                </div>
+
+                <h3>Solution: Debouncing</h3>
+                <p>Let's build a custom <code>useDebounce</code> hook:</p>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ useDebounce Hook</h4>
+                    <pre><code class="language-typescript">function useDebounce&lt;T&gt;(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState&lt;T&gt;(value);
+
+    useEffect(() => {
+        // Set up a timer to update the debounced value
+        const timer = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        // Clean up the timer if value changes before delay expires
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [value, delay]); // Re-run effect when value or delay changes
+
+    return debouncedValue;
+}
+
+// Usage
+const Search: React.FC = () => {
+    const [query, setQuery] = useState('');
+    const debouncedQuery = useDebounce(query, 500); // Wait 500ms after typing stops
+    const [results, setResults] = useState&lt;string[]&gt;([]);
+
+    useEffect(() => {
+        if (!debouncedQuery) return;
+        
+        const controller = new AbortController();
+        
+        // ✅ Only fires after user stops typing for 500ms!
+        fetch(`/api/search?q=${debouncedQuery}`, {
+            signal: controller.signal
+        })
+            .then(res => res.json())
+            .then(setResults)
+            .catch(err => {
+                if (err.name !== 'AbortError') {
+                    console.error(err);
+                }
+            });
+
+        return () => controller.abort();
+    }, [debouncedQuery]);
+
+    return (
+        &lt;div&gt;
+            &lt;input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search..."
+            /&gt;
+            &lt;div&gt;
+                {results.map(result => (
+                    &lt;div key={result}&gt;{result}&lt;/div&gt;
+                ))}
+            &lt;/div&gt;
+        &lt;/div&gt;
+    );
+};
+
+// User types: "r e a c t"
+// Only fires 1 request: "react" (after 500ms pause) ✅
+// Much better!</code></pre>
+                </div>
+
+                <h3>How Debouncing Works</h3>
+                <div class="mermaid">
+sequenceDiagram
+    participant User
+    participant Input
+    participant Timer
+    participant API
+    
+    User->>Input: Types "r"
+    Input->>Timer: Start 500ms timer
+    Note over Timer: Waiting...
+    
+    User->>Input: Types "e" (100ms later)
+    Input->>Timer: Cancel old timer, start new 500ms timer
+    Note over Timer: Waiting...
+    
+    User->>Input: Types "a" (100ms later)
+    Input->>Timer: Cancel old timer, start new 500ms timer
+    Note over Timer: Waiting...
+    
+    User->>Input: Types "c" (100ms later)
+    Input->>Timer: Cancel old timer, start new 500ms timer
+    Note over Timer: Waiting...
+    
+    User->>Input: Types "t" (100ms later)
+    Input->>Timer: Cancel old timer, start new 500ms timer
+    Note over Timer: Waiting 500ms...
+    
+    Note over User: User stops typing
+    Timer->>API: 500ms passed! Fire request "react" ✅
+                </div>
+
+                <h3>Throttling for Scroll Events</h3>
+                <p>Throttling is different—it guarantees a function runs at most once per time period:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">function useThrottle&lt;T&gt;(value: T, limit: number): T {
+    const [throttledValue, setThrottledValue] = useState&lt;T&gt;(value);
+    const lastRan = useRef(Date.now());
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (Date.now() - lastRan.current >= limit) {
+                setThrottledValue(value);
+                lastRan.current = Date.now();
+            }
+        }, limit - (Date.now() - lastRan.current));
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [value, limit]);
+
+    return throttledValue;
+}
+
+// Usage: Infinite scroll
+const InfiniteList: React.FC = () => {
+    const [scrollY, setScrollY] = useState(0);
+    const throttledScrollY = useThrottle(scrollY, 200); // At most every 200ms
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setScrollY(window.scrollY);
+        };
+
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    useEffect(() => {
+        // Check if we need to load more data
+        // This only runs at most once every 200ms ✅
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        
+        if (throttledScrollY + windowHeight >= documentHeight - 100) {
+            console.log('Load more data!');
+            // Fetch more data...
+        }
+    }, [throttledScrollY]);
+
+    return &lt;div&gt;Scroll down...&lt;/div&gt;;
+};</code></pre>
+                </div>
+
+                <h3>Debounce vs Throttle: When to Use Which?</h3>
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Quick Guide</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Technique</th>
+                                <th>When to Use</th>
+                                <th>Examples</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Debounce</strong></td>
+                                <td>Wait until user stops doing something</td>
+                                <td>Search input, form validation, window resize</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Throttle</strong></td>
+                                <td>Limit frequency of continuous events</td>
+                                <td>Scroll handlers, mouse move, window resize (continuous feedback)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Pro Tips</h4>
+                    <ul>
+                        <li><strong>Debounce delays:</strong> 300-500ms is typical for search, 1000ms+ for autosave</li>
+                        <li><strong>Show loading indicators:</strong> Users should know their input is being processed</li>
+                        <li><strong>Combine with AbortController:</strong> Cancel old requests when new debounced value arrives</li>
+                        <li><strong>Consider lodash:</strong> Libraries like lodash provide battle-tested implementations</li>
+                    </ul>
+                </div>
+            </section>
+
+
+            <!-- Section 3: Request Cancellation with AbortController -->
+            <section id="section3" class="lesson-section">
+                <h2>🛑 Request Cancellation with AbortController</h2>
+                <p>We've touched on AbortController for race conditions, but let's dive deeper. Properly cancelling requests is crucial for building responsive, efficient applications. Let's master this powerful API!</p>
+
+                <h3>AbortController Deep Dive</h3>
+                <p>The AbortController API consists of two parts:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">// 1. The Controller - creates and controls the signal
+const controller = new AbortController();
+
+// 2. The Signal - passed to fetch, can be "aborted"
+const signal = controller.signal;
+
+// Check if aborted
+console.log(signal.aborted); // false
+
+// Listen for abort events
+signal.addEventListener('abort', () => {
+    console.log('Request was aborted!');
+});
+
+// Abort the request
+controller.abort();
+
+console.log(signal.aborted); // true</code></pre>
+                </div>
+
+                <h3>Pattern 1: User-Triggered Cancellation</h3>
+                <p>Let users cancel long-running requests:</p>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Cancellable Request</h4>
+                    <pre><code class="language-typescript">interface Report {
+    id: string;
+    data: any;
+}
+
+const ReportGenerator: React.FC = () => {
+    const [loading, setLoading] = useState(false);
+    const [report, setReport] = useState&lt;Report | null&gt;(null);
+    const [error, setError] = useState&lt;string | null&gt;(null);
+    const controllerRef = useRef&lt;AbortController | null&gt;(null);
+
+    const generateReport = async () => {
+        // Cancel any existing request
+        if (controllerRef.current) {
+            controllerRef.current.abort();
+        }
+
+        // Create new controller
+        controllerRef.current = new AbortController();
+        
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch('/api/generate-report', {
+                method: 'POST',
+                signal: controllerRef.current.signal,
+                body: JSON.stringify({ type: 'annual' })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate report');
+            }
+
+            const data = await response.json();
+            setReport(data);
+        } catch (err) {
+            if (err instanceof Error) {
+                if (err.name === 'AbortError') {
+                    console.log('Report generation cancelled');
+                } else {
+                    setError(err.message);
+                }
+            }
+        } finally {
+            setLoading(false);
+            controllerRef.current = null;
+        }
+    };
+
+    const cancelGeneration = () => {
+        if (controllerRef.current) {
+            controllerRef.current.abort();
+            setLoading(false);
+        }
+    };
+
+    return (
+        &lt;div&gt;
+            &lt;button onClick={generateReport} disabled={loading}&gt;
+                Generate Report
+            &lt;/button&gt;
+            
+            {loading && (
+                &lt;div&gt;
+                    &lt;p&gt;Generating report...&lt;/p&gt;
+                    &lt;button onClick={cancelGeneration}&gt;Cancel&lt;/button&gt;
+                &lt;/div&gt;
+            )}
+            
+            {error && &lt;p style={{ color: 'red' }}&gt;Error: {error}&lt;/p&gt;}
+            {report && &lt;pre&gt;{JSON.stringify(report, null, 2)}&lt;/pre&gt;}
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 2: Timeout with AbortController</h3>
+                <p>Implement request timeouts to prevent hanging forever:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">async function fetchWithTimeout(
+    url: string,
+    options: RequestInit = {},
+    timeout: number = 5000 // 5 second default
+): Promise&lt;Response&gt; {
+    const controller = new AbortController();
+    
+    // Set up timeout
+    const timeoutId = setTimeout(() => {
+        controller.abort();
+    }, timeout);
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        return response;
+    } catch (err) {
+        clearTimeout(timeoutId);
+        
+        if (err instanceof Error && err.name === 'AbortError') {
+            throw new Error(`Request timeout after ${timeout}ms`);
+        }
+        throw err;
+    }
+}
+
+// Usage
+const DataFetcher: React.FC = () => {
+    const [data, setData] = useState(null);
+    const [error, setError] = useState&lt;string | null&gt;(null);
+
+    useEffect(() => {
+        fetchWithTimeout('/api/slow-endpoint', {}, 3000)
+            .then(res => res.json())
+            .then(setData)
+            .catch(err => setError(err.message));
+    }, []);
+
+    if (error) return &lt;div&gt;Error: {error}&lt;/div&gt;;
+    return &lt;div&gt;{data ? JSON.stringify(data) : 'Loading...'}&lt;/div&gt;;
+};</code></pre>
+                </div>
+
+                <h3>Pattern 3: Multiple Request Cancellation</h3>
+                <p>Cancel multiple related requests at once:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">interface DashboardData {
+    users: User[];
+    posts: Post[];
+    analytics: Analytics;
+}
+
+const Dashboard: React.FC = () => {
+    const [data, setData] = useState&lt;Partial&lt;DashboardData&gt;&gt;({});
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        const signal = controller.signal;
+
+        setLoading(true);
+
+        // Fire multiple requests with the same signal
+        Promise.all([
+            fetch('/api/users', { signal }).then(r => r.json()),
+            fetch('/api/posts', { signal }).then(r => r.json()),
+            fetch('/api/analytics', { signal }).then(r => r.json())
+        ])
+            .then(([users, posts, analytics]) => {
+                setData({ users, posts, analytics });
+            })
+            .catch(err => {
+                if (err.name !== 'AbortError') {
+                    console.error('Error loading dashboard:', err);
+                }
+            })
+            .finally(() => {
+                setLoading(false);
+            });
+
+        // Cleanup: abort ALL requests when component unmounts
+        return () => {
+            controller.abort();
+        };
+    }, []);
+
+    if (loading) return &lt;div&gt;Loading dashboard...&lt;/div&gt;;
+
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;Dashboard&lt;/h2&gt;
+            {data.users && &lt;UsersList users={data.users} /&gt;}
+            {data.posts && &lt;PostsList posts={data.posts} /&gt;}
+            {data.analytics && &lt;Analytics data={data.analytics} /&gt;}
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 4: AbortController in Custom Hooks</h3>
+                <p>Build a robust, reusable fetch hook with cancellation:</p>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Production-Ready useFetch Hook</h4>
+                    <pre><code class="language-typescript">interface UseFetchOptions extends RequestInit {
+    immediate?: boolean;
+    timeout?: number;
+}
+
+interface UseFetchReturn&lt;T&gt; {
+    data: T | null;
+    loading: boolean;
+    error: Error | null;
+    refetch: () => Promise&lt;void&gt;;
+    abort: () => void;
+}
+
+function useFetch&lt;T&gt;(
+    url: string,
+    options: UseFetchOptions = {}
+): UseFetchReturn&lt;T&gt; {
+    const [data, setData] = useState&lt;T | null&gt;(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState&lt;Error | null&gt;(null);
+    const controllerRef = useRef&lt;AbortController | null&gt;(null);
+
+    const abort = useCallback(() => {
+        if (controllerRef.current) {
+            controllerRef.current.abort();
+            controllerRef.current = null;
+        }
+    }, []);
+
+    const fetchData = useCallback(async () => {
+        // Abort any existing request
+        abort();
+
+        // Create new controller
+        controllerRef.current = new AbortController();
+        const { immediate, timeout, ...fetchOptions } = options;
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            // Set up timeout if specified
+            let timeoutId: NodeJS.Timeout | undefined;
+            if (timeout) {
+                timeoutId = setTimeout(() => {
+                    controllerRef.current?.abort();
+                }, timeout);
+            }
+
+            const response = await fetch(url, {
+                ...fetchOptions,
+                signal: controllerRef.current.signal
+            });
+
+            if (timeoutId) clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            setData(result);
+        } catch (err) {
+            if (err instanceof Error && err.name !== 'AbortError') {
+                setError(err);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [url, options, abort]);
+
+    useEffect(() => {
+        if (options.immediate ?? true) {
+            fetchData();
+        }
+
+        // Cleanup: abort on unmount or dependency change
+        return () => {
+            abort();
+        };
+    }, [fetchData, options.immediate, abort]);
+
+    return {
+        data,
+        loading,
+        error,
+        refetch: fetchData,
+        abort
+    };
+}
+
+// Usage
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+    const { data: user, loading, error, refetch, abort } = useFetch&lt;User&gt;(
+        `/api/users/${userId}`,
+        { timeout: 5000 }
+    );
+
+    if (loading) {
+        return (
+            &lt;div&gt;
+                Loading...
+                &lt;button onClick={abort}&gt;Cancel&lt;/button&gt;
+            &lt;/div&gt;
+        );
+    }
+
+    if (error) return &lt;div&gt;Error: {error.message}&lt;/div&gt;;
+    if (!user) return null;
+
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;{user.name}&lt;/h2&gt;
+            &lt;button onClick={refetch}&gt;Refresh&lt;/button&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 AbortController Best Practices</h4>
+                    <ul>
+                        <li><strong>Always clean up:</strong> Abort requests in useEffect cleanup functions</li>
+                        <li><strong>Store in refs:</strong> Use useRef to keep controller references across renders</li>
+                        <li><strong>Handle AbortError:</strong> Don't treat cancelled requests as real errors</li>
+                        <li><strong>Provide user feedback:</strong> Show cancel buttons for long operations</li>
+                        <li><strong>Timeout pattern:</strong> Combine with setTimeout for automatic timeouts</li>
+                        <li><strong>One signal, many requests:</strong> Use the same signal for related requests</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 4: Pagination Patterns -->
+            <section id="section4" class="lesson-section">
+                <h2>📄 Pagination Patterns</h2>
+                <p>Large datasets can't be loaded all at once—pagination splits data into manageable chunks. Let's explore different pagination strategies and build a complete pagination system!</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">📖 Definition</h4>
+                    <p style="color: white;"><strong>Pagination:</strong> A technique for dividing large datasets into discrete pages, loading only the data needed for the current page. This improves performance, reduces bandwidth, and enhances user experience.</p>
+                </div>
+
+                <h3>Pagination Strategies</h3>
+                <div class="card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Strategy</th>
+                                <th>How It Works</th>
+                                <th>Best For</th>
+                                <th>API Pattern</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Offset/Limit</strong></td>
+                                <td>Skip N items, take M items</td>
+                                <td>Static data, known total count</td>
+                                <td><code>?page=2&limit=20</code> or <code>?offset=20&limit=20</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Cursor-Based</strong></td>
+                                <td>Use last item's ID as cursor</td>
+                                <td>Real-time data, social feeds</td>
+                                <td><code>?cursor=abc123&limit=20</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Page Numbers</strong></td>
+                                <td>Request specific page number</td>
+                                <td>Traditional pagination UI</td>
+                                <td><code>?page=3&per_page=20</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Pattern 1: Offset-Based Pagination</h3>
+                <p>The most common pagination pattern:</p>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Complete Pagination Component</h4>
+                    <pre><code class="language-typescript">interface Product {
+    id: number;
+    name: string;
+    price: number;
+}
+
+interface PaginationInfo {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+}
+
+interface ApiResponse {
+    data: Product[];
+    pagination: PaginationInfo;
+}
+
+const ProductList: React.FC = () => {
+    const [products, setProducts] = useState&lt;Product[]&gt;([]);
+    const [pagination, setPagination] = useState&lt;PaginationInfo&gt;({
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: 20
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState&lt;string | null&gt;(null);
+
+    const fetchProducts = useCallback(async (page: number) => {
+        const controller = new AbortController();
+        
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(
+                `/api/products?page=${page}&limit=${pagination.itemsPerPage}`,
+                { signal: controller.signal }
+            );
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch products');
+            }
+
+            const data: ApiResponse = await response.json();
+            setProducts(data.data);
+            setPagination(data.pagination);
+        } catch (err) {
+            if (err instanceof Error && err.name !== 'AbortError') {
+                setError(err.message);
+            }
+        } finally {
+            setLoading(false);
+        }
+
+        return controller;
+    }, [pagination.itemsPerPage]);
+
+    useEffect(() => {
+        const controller = fetchProducts(pagination.currentPage);
+        return () => {
+            controller.then(c => c.abort());
+        };
+    }, [pagination.currentPage, fetchProducts]);
+
+    const goToPage = (page: number) => {
+        setPagination(prev => ({ ...prev, currentPage: page }));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const nextPage = () => {
+        if (pagination.currentPage < pagination.totalPages) {
+            goToPage(pagination.currentPage + 1);
+        }
+    };
+
+    const previousPage = () => {
+        if (pagination.currentPage > 1) {
+            goToPage(pagination.currentPage - 1);
+        }
+    };
+
+    if (loading && products.length === 0) {
+        return &lt;div&gt;Loading products...&lt;/div&gt;;
+    }
+
+    if (error) {
+        return &lt;div&gt;Error: {error}&lt;/div&gt;;
+    }
+
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;Products&lt;/h2&gt;
+            
+            {/* Product Grid */}
+            &lt;div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '1rem'
+            }}&gt;
+                {products.map(product => (
+                    &lt;div key={product.id} style={{
+                        border: '1px solid #ddd',
+                        padding: '1rem',
+                        borderRadius: '8px'
+                    }}&gt;
+                        &lt;h3&gt;{product.name}&lt;/h3&gt;
+                        &lt;p&gt;${product.price}&lt;/p&gt;
+                    &lt;/div&gt;
+                ))}
+            &lt;/div&gt;
+
+            {loading && &lt;div style={{ textAlign: 'center', margin: '2rem' }}&gt;Loading...&lt;/div&gt;}
+
+            {/* Pagination Controls */}
+            &lt;div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '1rem',
+                marginTop: '2rem'
+            }}&gt;
+                &lt;button 
+                    onClick={previousPage} 
+                    disabled={pagination.currentPage === 1 || loading}
+                &gt;
+                    Previous
+                &lt;/button&gt;
+
+                &lt;span&gt;
+                    Page {pagination.currentPage} of {pagination.totalPages}
+                    &lt;br /&gt;
+                    ({pagination.totalItems} total items)
+                &lt;/span&gt;
+
+                &lt;button 
+                    onClick={nextPage}
+                    disabled={pagination.currentPage === pagination.totalPages || loading}
+                &gt;
+                    Next
+                &lt;/button&gt;
+            &lt;/div&gt;
+
+            {/* Page Numbers */}
+            &lt;div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                marginTop: '1rem'
+            }}&gt;
+                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(page => (
+                    &lt;button
+                        key={page}
+                        onClick={() => goToPage(page)}
+                        disabled={loading}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            backgroundColor: page === pagination.currentPage ? '#667eea' : 'white',
+                            color: page === pagination.currentPage ? 'white' : 'black',
+                            border: '1px solid #667eea',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                        }}
+                    &gt;
+                        {page}
+                    &lt;/button&gt;
+                ))}
+            &lt;/div&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 2: Reusable Pagination Hook</h3>
+                <p>Extract pagination logic into a custom hook:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">interface UsePaginationOptions&lt;T&gt; {
+    fetchFunction: (page: number, limit: number) => Promise&lt;{
+        data: T[];
+        pagination: PaginationInfo;
+    }&gt;;
+    initialPage?: number;
+    itemsPerPage?: number;
+}
+
+interface UsePaginationReturn&lt;T&gt; {
+    data: T[];
+    pagination: PaginationInfo;
+    loading: boolean;
+    error: Error | null;
+    goToPage: (page: number) => void;
+    nextPage: () => void;
+    previousPage: () => void;
+    refresh: () => void;
+}
+
+function usePagination&lt;T&gt;(
+    options: UsePaginationOptions&lt;T&gt;
+): UsePaginationReturn&lt;T&gt; {
+    const { fetchFunction, initialPage = 1, itemsPerPage = 20 } = options;
+    
+    const [data, setData] = useState&lt;T[]&gt;([]);
+    const [pagination, setPagination] = useState&lt;PaginationInfo&gt;({
+        currentPage: initialPage,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState&lt;Error | null&gt;(null);
+
+    const fetchData = useCallback(async (page: number) => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const result = await fetchFunction(page, itemsPerPage);
+            setData(result.data);
+            setPagination(result.pagination);
+        } catch (err) {
+            setError(err as Error);
+        } finally {
+            setLoading(false);
+        }
+    }, [fetchFunction, itemsPerPage]);
+
+    useEffect(() => {
+        fetchData(pagination.currentPage);
+    }, [pagination.currentPage, fetchData]);
+
+    const goToPage = useCallback((page: number) => {
+        if (page >= 1 && page <= pagination.totalPages) {
+            setPagination(prev => ({ ...prev, currentPage: page }));
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, [pagination.totalPages]);
+
+    const nextPage = useCallback(() => {
+        goToPage(pagination.currentPage + 1);
+    }, [pagination.currentPage, goToPage]);
+
+    const previousPage = useCallback(() => {
+        goToPage(pagination.currentPage - 1);
+    }, [pagination.currentPage, goToPage]);
+
+    const refresh = useCallback(() => {
+        fetchData(pagination.currentPage);
+    }, [pagination.currentPage, fetchData]);
+
+    return {
+        data,
+        pagination,
+        loading,
+        error,
+        goToPage,
+        nextPage,
+        previousPage,
+        refresh
+    };
+}
+
+// Usage - Much cleaner!
+const ProductList: React.FC = () => {
+    const fetchProducts = async (page: number, limit: number) => {
+        const response = await fetch(`/api/products?page=${page}&limit=${limit}`);
+        return response.json();
+    };
+
+    const {
+        data: products,
+        pagination,
+        loading,
+        error,
+        nextPage,
+        previousPage,
+        goToPage
+    } = usePagination({ fetchFunction: fetchProducts });
+
+    if (error) return &lt;div&gt;Error: {error.message}&lt;/div&gt;;
+
+    return (
+        &lt;div&gt;
+            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
+            
+            &lt;div&gt;
+                {products.map(product => (
+                    &lt;div key={product.id}&gt;{product.name}&lt;/div&gt;
+                ))}
+            &lt;/div&gt;
+
+            &lt;PaginationControls
+                pagination={pagination}
+                onNext={nextPage}
+                onPrevious={previousPage}
+                onGoToPage={goToPage}
+            /&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 3: URL-Based Pagination</h3>
+                <p>Sync pagination state with the URL for shareable links:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">import { useSearchParams } from 'react-router-dom';
+
+const ProductList: React.FC = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentPage = Number(searchParams.get('page')) || 1;
+    
+    const [products, setProducts] = useState&lt;Product[]&gt;([]);
+    const [totalPages, setTotalPages] = useState(1);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        
+        setLoading(true);
+        
+        fetch(`/api/products?page=${currentPage}&limit=20`, {
+            signal: controller.signal
+        })
+            .then(res => res.json())
+            .then(data => {
+                setProducts(data.data);
+                setTotalPages(data.pagination.totalPages);
+            })
+            .catch(err => {
+                if (err.name !== 'AbortError') {
+                    console.error(err);
+                }
+            })
+            .finally(() => setLoading(false));
+
+        return () => controller.abort();
+    }, [currentPage]);
+
+    const goToPage = (page: number) => {
+        setSearchParams({ page: page.toString() });
+    };
+
+    return (
+        &lt;div&gt;
+            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
+            
+            {products.map(product => (
+                &lt;div key={product.id}&gt;{product.name}&lt;/div&gt;
+            ))}
+
+            &lt;div&gt;
+                &lt;button 
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                &gt;
+                    Previous
+                &lt;/button&gt;
+                
+                &lt;span&gt;Page {currentPage} of {totalPages}&lt;/span&gt;
+                
+                &lt;button 
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                &gt;
+                    Next
+                &lt;/button&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    );
+};
+
+// Now users can share URLs like:
+// /products?page=5
+// And the page state is preserved! ✅</code></pre>
+                </div>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Pagination Best Practices</h4>
+                    <ul>
+                        <li><strong>Show total count:</strong> Users want to know how much data exists</li>
+                        <li><strong>Disable during loading:</strong> Prevent double-clicks and race conditions</li>
+                        <li><strong>Scroll to top:</strong> When changing pages, scroll the user to the top</li>
+                        <li><strong>URL sync:</strong> Store page in URL for shareable, bookmarkable links</li>
+                        <li><strong>Loading states:</strong> Show skeleton screens or spinners during fetch</li>
+                        <li><strong>Smart page numbers:</strong> Don't show all 1000 pages—use ellipsis (...)</li>
+                        <li><strong>Cancel old requests:</strong> Always use AbortController for pagination</li>
+                    </ul>
+                </div>
+            </section>
+
+
+            <!-- Section 5: Infinite Scroll -->
+            <section id="section5" class="lesson-section">
+                <h2>♾️ Infinite Scroll</h2>
+                <p>Instead of clicking "Next Page," what if content just loaded as you scroll down? That's infinite scroll—popular on social media and modern web apps. Let's build it!</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">📖 Definition</h4>
+                    <p style="color: white;"><strong>Infinite Scroll:</strong> A UX pattern where new content automatically loads as the user scrolls down the page. Instead of pagination controls, scrolling triggers data fetching, creating a seamless, continuous browsing experience.</p>
+                </div>
+
+                <h3>How Infinite Scroll Works</h3>
+                <div class="mermaid">
+sequenceDiagram
+    participant User
+    participant Component
+    participant Scroll Detector
+    participant API
+    
+    User->>Component: Views page
+    Component->>API: Load page 1
+    API->>Component: Returns items 1-20
+    Component->>User: Displays items
+    
+    User->>Scroll Detector: Scrolls down
+    Note over Scroll Detector: Near bottom detected!
+    Scroll Detector->>Component: Trigger load more
+    Component->>API: Load page 2
+    API->>Component: Returns items 21-40
+    Component->>User: Appends new items
+    
+    User->>Scroll Detector: Continues scrolling
+    Note over Scroll Detector: Near bottom again!
+    Scroll Detector->>Component: Trigger load more
+    Component->>API: Load page 3
+    Note over API: No more data
+    API->>Component: Returns empty array
+    Component->>User: Shows "No more items"
+                </div>
+
+                <h3>Detecting When to Load More</h3>
+                <p>We need to detect when the user is near the bottom of the page:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">// Method 1: Scroll position calculation
+function isNearBottom(threshold: number = 100): boolean {
+    const windowHeight = window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+    const scrollTop = window.scrollY;
+    
+    // Distance from bottom
+    const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+    
+    return distanceFromBottom < threshold;
+}
+
+// Method 2: Using Intersection Observer (better!)
+function useInfiniteScroll(callback: () => void) {
+    const observerRef = useRef&lt;IntersectionObserver | null&gt;(null);
+    const loadMoreRef = useRef&lt;HTMLDivElement | null&gt;(null);
+
+    useEffect(() => {
+        observerRef.current = new IntersectionObserver(
+            (entries) => {
+                // If the sentinel element is visible, load more
+                if (entries[0].isIntersecting) {
+                    callback();
+                }
+            },
+            { threshold: 1.0 } // Fully visible
+        );
+
+        if (loadMoreRef.current) {
+            observerRef.current.observe(loadMoreRef.current);
+        }
+
+        return () => {
+            if (observerRef.current) {
+                observerRef.current.disconnect();
+            }
+        };
+    }, [callback]);
+
+    return loadMoreRef;
+}</code></pre>
+                </div>
+
+                <h3>Pattern 1: Basic Infinite Scroll</h3>
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Complete Infinite Scroll Component</h4>
+                    <pre><code class="language-typescript">interface Post {
+    id: number;
+    title: string;
+    content: string;
+}
+
+const InfinitePostFeed: React.FC = () => {
+    const [posts, setPosts] = useState&lt;Post[]&gt;([]);
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const [error, setError] = useState&lt;string | null&gt;(null);
+
+    const loadMorePosts = useCallback(async () => {
+        if (loading || !hasMore) return;
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`/api/posts?page=${page}&limit=20`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch posts');
+            }
+
+            const data = await response.json();
+            
+            if (data.posts.length === 0) {
+                setHasMore(false);
+            } else {
+                setPosts(prev => [...prev, ...data.posts]);
+                setPage(prev => prev + 1);
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unknown error');
+        } finally {
+            setLoading(false);
+        }
+    }, [page, loading, hasMore]);
+
+    // Load initial data
+    useEffect(() => {
+        loadMorePosts();
+    }, []); // Empty deps - only load once on mount
+
+    // Intersection Observer for infinite scroll
+    const observerTarget = useRef&lt;HTMLDivElement&gt;(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loading) {
+                    loadMorePosts();
+                }
+            },
+            { threshold: 1.0 }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => {
+            if (observerTarget.current) {
+                observer.unobserve(observerTarget.current);
+            }
+        };
+    }, [loadMorePosts, hasMore, loading]);
+
+    return (
+        &lt;div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}&gt;
+            &lt;h1&gt;Infinite Post Feed&lt;/h1&gt;
+
+            {/* Posts */}
+            &lt;div&gt;
+                {posts.map(post => (
+                    &lt;article 
+                        key={post.id}
+                        style={{
+                            border: '1px solid #ddd',
+                            borderRadius: '8px',
+                            padding: '1.5rem',
+                            marginBottom: '1rem'
+                        }}
+                    &gt;
+                        &lt;h2&gt;{post.title}&lt;/h2&gt;
+                        &lt;p&gt;{post.content}&lt;/p&gt;
+                    &lt;/article&gt;
+                ))}
+            &lt;/div&gt;
+
+            {/* Loading indicator */}
+            {loading && (
+                &lt;div style={{ textAlign: 'center', padding: '2rem' }}&gt;
+                    &lt;p&gt;Loading more posts...&lt;/p&gt;
+                &lt;/div&gt;
+            )}
+
+            {/* Error message */}
+            {error && (
+                &lt;div style={{ color: 'red', textAlign: 'center', padding: '2rem' }}&gt;
+                    Error: {error}
+                &lt;/div&gt;
+            )}
+
+            {/* End of content message */}
+            {!hasMore && (
+                &lt;div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}&gt;
+                    &lt;p&gt;🎉 You've reached the end!&lt;/p&gt;
+                &lt;/div&gt;
+            )}
+
+            {/* Intersection Observer target (sentinel element) */}
+            &lt;div 
+                ref={observerTarget}
+                style={{ height: '20px' }}
+            /&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 2: Reusable Infinite Scroll Hook</h3>
+                <p>Extract infinite scroll logic into a custom hook:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">interface UseInfiniteScrollOptions&lt;T&gt; {
+    fetchFunction: (page: number) => Promise&lt;T[]&gt;;
+    initialPage?: number;
+    threshold?: number;
+}
+
+interface UseInfiniteScrollReturn&lt;T&gt; {
+    items: T[];
+    loading: boolean;
+    error: Error | null;
+    hasMore: boolean;
+    loadMore: () => void;
+    reset: () => void;
+    observerTarget: React.RefObject&lt;HTMLDivElement&gt;;
+}
+
+function useInfiniteScroll&lt;T&gt;(
+    options: UseInfiniteScrollOptions&lt;T&gt;
+): UseInfiniteScrollReturn&lt;T&gt; {
+    const { fetchFunction, initialPage = 1, threshold = 1.0 } = options;
+
+    const [items, setItems] = useState&lt;T[]&gt;([]);
+    const [page, setPage] = useState(initialPage);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState&lt;Error | null&gt;(null);
+    const [hasMore, setHasMore] = useState(true);
+    const observerTarget = useRef&lt;HTMLDivElement&gt;(null);
+
+    const loadMore = useCallback(async () => {
+        if (loading || !hasMore) return;
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const newItems = await fetchFunction(page);
+            
+            if (newItems.length === 0) {
+                setHasMore(false);
+            } else {
+                setItems(prev => [...prev, ...newItems]);
+                setPage(prev => prev + 1);
+            }
+        } catch (err) {
+            setError(err as Error);
+        } finally {
+            setLoading(false);
+        }
+    }, [fetchFunction, page, loading, hasMore]);
+
+    const reset = useCallback(() => {
+        setItems([]);
+        setPage(initialPage);
+        setHasMore(true);
+        setError(null);
+    }, [initialPage]);
+
+    // Intersection Observer setup
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loading) {
+                    loadMore();
+                }
+            },
+            { threshold }
+        );
+
+        const currentTarget = observerTarget.current;
+        if (currentTarget) {
+            observer.observe(currentTarget);
+        }
+
+        return () => {
+            if (currentTarget) {
+                observer.unobserve(currentTarget);
+            }
+        };
+    }, [loadMore, hasMore, loading, threshold]);
+
+    // Load initial data
+    useEffect(() => {
+        if (items.length === 0 && page === initialPage) {
+            loadMore();
+        }
+    }, []);
+
+    return {
+        items,
+        loading,
+        error,
+        hasMore,
+        loadMore,
+        reset,
+        observerTarget
+    };
+}
+
+// Usage - Much cleaner!
+const PostFeed: React.FC = () => {
+    const fetchPosts = async (page: number) => {
+        const response = await fetch(`/api/posts?page=${page}&limit=20`);
+        const data = await response.json();
+        return data.posts;
+    };
+
+    const {
+        items: posts,
+        loading,
+        error,
+        hasMore,
+        observerTarget
+    } = useInfiniteScroll&lt;Post&gt;({ fetchFunction: fetchPosts });
+
+    return (
+        &lt;div&gt;
+            {posts.map(post => (
+                &lt;article key={post.id}&gt;
+                    &lt;h2&gt;{post.title}&lt;/h2&gt;
+                    &lt;p&gt;{post.content}&lt;/p&gt;
+                &lt;/article&gt;
+            ))}
+
+            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
+            {error && &lt;div&gt;Error: {error.message}&lt;/div&gt;}
+            {!hasMore && &lt;div&gt;No more posts!&lt;/div&gt;}
+
+            &lt;div ref={observerTarget} style={{ height: '20px' }} /&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 3: Infinite Scroll with Search/Filter</h3>
+                <p>Combine infinite scroll with search or filters:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">const SearchablePostFeed: React.FC = () => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const debouncedQuery = useDebounce(searchQuery, 500);
+
+    const fetchPosts = useCallback(async (page: number) => {
+        const params = new URLSearchParams({
+            page: page.toString(),
+            limit: '20',
+            q: debouncedQuery
+        });
+
+        const response = await fetch(`/api/posts?${params}`);
+        const data = await response.json();
+        return data.posts;
+    }, [debouncedQuery]);
+
+    const {
+        items: posts,
+        loading,
+        error,
+        hasMore,
+        reset,
+        observerTarget
+    } = useInfiniteScroll&lt;Post&gt;({ fetchFunction: fetchPosts });
+
+    // Reset when search query changes
+    useEffect(() => {
+        reset();
+    }, [debouncedQuery, reset]);
+
+    return (
+        &lt;div&gt;
+            &lt;input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search posts..."
+                style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    fontSize: '1rem',
+                    marginBottom: '2rem'
+                }}
+            /&gt;
+
+            {posts.length === 0 && !loading && (
+                &lt;div&gt;No posts found.&lt;/div&gt;
+            )}
+
+            {posts.map(post => (
+                &lt;article key={post.id}&gt;
+                    &lt;h2&gt;{post.title}&lt;/h2&gt;
+                    &lt;p&gt;{post.content}&lt;/p&gt;
+                &lt;/article&gt;
+            ))}
+
+            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
+            {error && &lt;div&gt;Error: {error.message}&lt;/div&gt;}
+            {!hasMore && posts.length > 0 && &lt;div&gt;No more results!&lt;/div&gt;}
+
+            &lt;div ref={observerTarget} style={{ height: '20px' }} /&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Infinite Scroll Best Practices</h4>
+                    <ul>
+                        <li><strong>Use Intersection Observer:</strong> More performant than scroll event listeners</li>
+                        <li><strong>Show loading states:</strong> Users need feedback that more content is loading</li>
+                        <li><strong>Handle "no more data":</strong> Show a clear end message</li>
+                        <li><strong>Provide "Back to Top" button:</strong> For long scrolls</li>
+                        <li><strong>Reset on filter change:</strong> Clear items when search/filter changes</li>
+                        <li><strong>Consider accessibility:</strong> Provide keyboard navigation alternatives</li>
+                        <li><strong>Throttle loading:</strong> Prevent rapid-fire requests</li>
+                        <li><strong>Save scroll position:</strong> When navigating back, restore position</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ When NOT to Use Infinite Scroll</h4>
+                    <ul>
+                        <li><strong>Footer is important:</strong> Users can never reach a footer with infinite scroll!</li>
+                        <li><strong>Specific items needed:</strong> Finding item #237 is frustrating with infinite scroll</li>
+                        <li><strong>Goal-oriented tasks:</strong> E-commerce checkout flows work better with pagination</li>
+                        <li><strong>Print/export needed:</strong> Paginated data is easier to export</li>
+                    </ul>
+                    <p><strong>Solution:</strong> Provide pagination as an alternative, or use "Load More" button instead of automatic loading.</p>
+                </div>
+            </section>
+
+            <!-- Section 6: Client-Side Caching -->
+            <section id="section6" class="lesson-section">
+                <h2>💾 Client-Side Caching</h2>
+                <p>Why fetch the same data multiple times? Caching stores fetched data so you can reuse it without making redundant API calls. Let's build a smart caching system!</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">📖 Definition</h4>
+                    <p style="color: white;"><strong>Client-Side Caching:</strong> Storing API responses in memory (or browser storage) to avoid redundant network requests. This improves performance, reduces server load, and provides instant data access for frequently accessed resources.</p>
+                </div>
+
+                <h3>Why Caching Matters</h3>
+                <div class="card">
+                    <h4>Without Caching:</h4>
+                    <pre><code class="language-typescript">// User visits /users/1 → API call
+// User clicks "Back" → API call
+// User visits /users/1 again → API call
+// User switches tabs, comes back → API call
+// 
+// Result: 4 identical API calls for the same data! ❌</code></pre>
+
+                    <h4>With Caching:</h4>
+                    <pre><code class="language-typescript">// User visits /users/1 → API call, cache result
+// User clicks "Back" → Use cached data (instant!)
+// User visits /users/1 again → Use cached data (instant!)
+// User switches tabs, comes back → Use cached data (instant!)
+// 
+// Result: 1 API call, 3 instant cache hits! ✅</code></pre>
+                </div>
+
+                <h3>Pattern 1: Simple In-Memory Cache</h3>
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Basic Cache Implementation</h4>
+                    <pre><code class="language-typescript">// Simple cache object
+const cache = new Map&lt;string, any&gt;();
+
+function useCachedFetch&lt;T&gt;(url: string) {
+    const [data, setData] = useState&lt;T | null&gt;(() => {
+        // Check cache first
+        return cache.get(url) || null;
+    });
+    const [loading, setLoading] = useState(!cache.has(url));
+    const [error, setError] = useState&lt;Error | null&gt;(null);
+
+    useEffect(() => {
+        // If data is in cache, don't fetch
+        if (cache.has(url)) {
+            return;
+        }
+
+        const controller = new AbortController();
+        
+        setLoading(true);
+
+        fetch(url, { signal: controller.signal })
+            .then(res => res.json())
+            .then(result => {
+                cache.set(url, result); // Store in cache
+                setData(result);
+            })
+            .catch(err => {
+                if (err.name !== 'AbortError') {
+                    setError(err);
+                }
+            })
+            .finally(() => {
+                setLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [url]);
+
+    return { data, loading, error };
+}
+
+// Usage
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+    const { data: user, loading } = useCachedFetch&lt;User&gt;(`/api/users/${userId}`);
+
+    // First visit: loading = true, fetches data
+    // Subsequent visits: loading = false, instant data! ✅
+
+    if (loading) return &lt;div&gt;Loading...&lt;/div&gt;;
+    return &lt;div&gt;{user?.name}&lt;/div&gt;;
+};</code></pre>
+                </div>
+
+                <h3>Pattern 2: Cache with Expiration</h3>
+                <p>Cached data can become stale. Let's add expiration:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">interface CacheEntry&lt;T&gt; {
+    data: T;
+    timestamp: number;
+}
+
+class Cache {
+    private cache = new Map&lt;string, CacheEntry&lt;any&gt;&gt;();
+    private defaultTTL = 5 * 60 * 1000; // 5 minutes
+
+    set&lt;T&gt;(key: string, data: T, ttl?: number): void {
+        this.cache.set(key, {
+            data,
+            timestamp: Date.now()
+        });
+    }
+
+    get&lt;T&gt;(key: string, ttl?: number): T | null {
+        const entry = this.cache.get(key);
+        
+        if (!entry) return null;
+
+        const age = Date.now() - entry.timestamp;
+        const maxAge = ttl || this.defaultTTL;
+
+        // Check if expired
+        if (age > maxAge) {
+            this.cache.delete(key);
+            return null;
+        }
+
+        return entry.data;
+    }
+
+    has(key: string, ttl?: number): boolean {
+        return this.get(key, ttl) !== null;
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+
+    delete(key: string): void {
+        this.cache.delete(key);
+    }
+}
+
+// Global cache instance
+const apiCache = new Cache();
+
+function useCachedFetch&lt;T&gt;(url: string, ttl?: number) {
+    const [data, setData] = useState&lt;T | null&gt;(() => apiCache.get&lt;T&gt;(url, ttl));
+    const [loading, setLoading] = useState(!apiCache.has(url, ttl));
+    const [error, setError] = useState&lt;Error | null&gt;(null);
+
+    useEffect(() => {
+        // Check if valid cache exists
+        const cached = apiCache.get&lt;T&gt;(url, ttl);
+        if (cached) {
+            setData(cached);
+            setLoading(false);
+            return;
+        }
+
+        const controller = new AbortController();
+        
+        setLoading(true);
+
+        fetch(url, { signal: controller.signal })
+            .then(res => res.json())
+            .then(result => {
+                apiCache.set(url, result, ttl);
+                setData(result);
+            })
+            .catch(err => {
+                if (err.name !== 'AbortError') {
+                    setError(err);
+                }
+            })
+            .finally(() => {
+                setLoading(false);
+            });
+
+        return () => controller.abort();
+    }, [url, ttl]);
+
+    const invalidate = useCallback(() => {
+        apiCache.delete(url);
+        setData(null);
+    }, [url]);
+
+    return { data, loading, error, invalidate };
+}
+
+// Usage
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+    const { 
+        data: user, 
+        loading, 
+        invalidate 
+    } = useCachedFetch&lt;User&gt;(
+        `/api/users/${userId}`,
+        2 * 60 * 1000 // 2 minute cache
+    );
+
+    return (
+        &lt;div&gt;
+            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
+            {user && (
+                &lt;div&gt;
+                    &lt;h2&gt;{user.name}&lt;/h2&gt;
+                    &lt;button onClick={invalidate}&gt;Refresh&lt;/button&gt;
+                &lt;/div&gt;
+            )}
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 3: Persistent Cache with localStorage</h3>
+                <p>Persist cache across page reloads:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">class PersistentCache extends Cache {
+    private storageKey = 'api_cache';
+
+    constructor() {
+        super();
+        this.loadFromStorage();
+    }
+
+    private loadFromStorage(): void {
+        try {
+            const stored = localStorage.getItem(this.storageKey);
+            if (stored) {
+                const data = JSON.parse(stored);
+                // Restore cache from localStorage
+                Object.entries(data).forEach(([key, value]) => {
+                    this.cache.set(key, value as CacheEntry&lt;any&gt;);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load cache from storage:', error);
+        }
+    }
+
+    private saveToStorage(): void {
+        try {
+            const data = Object.fromEntries(this.cache.entries());
+            localStorage.setItem(this.storageKey, JSON.stringify(data));
+        } catch (error) {
+            console.error('Failed to save cache to storage:', error);
+        }
+    }
+
+    set&lt;T&gt;(key: string, data: T, ttl?: number): void {
+        super.set(key, data, ttl);
+        this.saveToStorage();
+    }
+
+    delete(key: string): void {
+        super.delete(key);
+        this.saveToStorage();
+    }
+
+    clear(): void {
+        super.clear();
+        localStorage.removeItem(this.storageKey);
+    }
+}
+
+// Now cache persists across page reloads! ✅
+const persistentCache = new PersistentCache();</code></pre>
+                </div>
+
+                <h3>Cache Invalidation Strategies</h3>
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 When to Invalidate Cache</h4>
+                    <ul>
+                        <li><strong>Time-based (TTL):</strong> Expire after X minutes</li>
+                        <li><strong>On mutation:</strong> Clear cache after POST/PUT/DELETE</li>
+                        <li><strong>Manual refresh:</strong> User clicks "Refresh" button</li>
+                        <li><strong>Background revalidation:</strong> Fetch in background, update when ready</li>
+                        <li><strong>Optimistic updates:</strong> Update cache immediately, sync with server</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <pre><code class="language-typescript">// Invalidate on mutation
+const useUpdateUser = () => {
+    const updateUser = async (userId: string, updates: Partial&lt;User&gt;) => {
+        const response = await fetch(`/api/users/${userId}`, {
+            method: 'PUT',
+            body: JSON.stringify(updates)
+        });
+
+        if (response.ok) {
+            // Invalidate cache for this user
+            apiCache.delete(`/api/users/${userId}`);
+            // Could also invalidate list caches
+            apiCache.delete('/api/users');
+        }
+
+        return response.json();
+    };
+
+    return { updateUser };
+};</code></pre>
+                </div>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Caching Best Practices</h4>
+                    <ul>
+                        <li><strong>Use appropriate TTLs:</strong> Frequently changing data needs shorter TTLs</li>
+                        <li><strong>Invalidate on mutations:</strong> Clear cache after creating/updating/deleting</li>
+                        <li><strong>Cache key strategy:</strong> Include query params in cache keys</li>
+                        <li><strong>Memory limits:</strong> Don't cache everything—prioritize frequently accessed data</li>
+                        <li><strong>Show stale data:</strong> Display cached data while revalidating in background</li>
+                        <li><strong>Handle cache errors:</strong> Gracefully degrade if cache fails</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Cache Pitfalls to Avoid</h4>
+                    <ul>
+                        <li><strong>Caching user-specific data globally:</strong> User A sees User B's data!</li>
+                        <li><strong>No expiration:</strong> Stale data forever</li>
+                        <li><strong>Caching errors:</strong> Don't cache failed requests</li>
+                        <li><strong>Memory leaks:</strong> Unlimited cache growth crashes browser</li>
+                    </ul>
+                </div>
+            </section>
+
+
+            <!-- Section 7: Introduction to React Query -->
+            <section id="section7" class="lesson-section">
+                <h2>🔮 Introduction to React Query</h2>
+                <p>We've built custom hooks for caching, pagination, and infinite scroll. But what if there was a library that handled all of this (and more) out of the box? Meet React Query (TanStack Query)—the most powerful data fetching library for React!</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">📖 What is React Query?</h4>
+                    <p style="color: white;"><strong>React Query (TanStack Query):</strong> A powerful data synchronization library that handles caching, background updates, stale data revalidation, pagination, and more—all with minimal code. It treats server state as fundamentally different from client state and provides tools specifically for managing it.</p>
+                </div>
+
+                <h3>Why React Query?</h3>
+                <div class="card">
+                    <h4>What We've Built vs React Query:</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Feature</th>
+                                <th>Custom Hooks</th>
+                                <th>React Query</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Caching</strong></td>
+                                <td>50+ lines of code</td>
+                                <td>Built-in, automatic</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Stale data</strong></td>
+                                <td>Manual TTL management</td>
+                                <td>Automatic revalidation</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Background refetch</strong></td>
+                                <td>Custom implementation</td>
+                                <td>Automatic on window focus</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Pagination</strong></td>
+                                <td>Custom state management</td>
+                                <td>Built-in helpers</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Infinite scroll</strong></td>
+                                <td>Complex state logic</td>
+                                <td>useInfiniteQuery hook</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Optimistic updates</strong></td>
+                                <td>Manual cache updates</td>
+                                <td>Built-in mutation tools</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Request deduplication</strong></td>
+                                <td>Not handled</td>
+                                <td>Automatic</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Setup React Query</h3>
+                <div class="card">
+                    <pre><code class="language-typescript">// Install
+npm install @tanstack/react-query
+
+// Setup in your app
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+// Create a query client
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            staleTime: 5 * 60 * 1000, // 5 minutes
+            cacheTime: 10 * 60 * 1000, // 10 minutes
+            retry: 3,
+            refetchOnWindowFocus: true,
+        },
+    },
+});
+
+// Wrap your app
+function App() {
+    return (
+        &lt;QueryClientProvider client={queryClient}&gt;
+            &lt;YourApp /&gt;
+            &lt;ReactQueryDevtools initialIsOpen={false} /&gt;
+        &lt;/QueryClientProvider&gt;
+    );
+}</code></pre>
+                </div>
+
+                <h3>Basic Usage: useQuery</h3>
+                <p>Replace your custom fetch hooks with <code>useQuery</code>:</p>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Before (Custom Hook)</h4>
+                    <pre><code class="language-typescript">const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+    const [user, setUser] = useState&lt;User | null&gt;(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState&lt;Error | null&gt;(null);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        
+        fetch(`/api/users/${userId}`, { signal: controller.signal })
+            .then(res => res.json())
+            .then(setUser)
+            .catch(setError)
+            .finally(() => setLoading(false));
+
+        return () => controller.abort();
+    }, [userId]);
+
+    if (loading) return &lt;div&gt;Loading...&lt;/div&gt;;
+    if (error) return &lt;div&gt;Error: {error.message}&lt;/div&gt;;
+    return &lt;div&gt;{user?.name}&lt;/div&gt;;
+};</code></pre>
+
+                    <h4>✅ After (React Query)</h4>
+                    <pre><code class="language-typescript">import { useQuery } from '@tanstack/react-query';
+
+const fetchUser = async (userId: string): Promise&lt;User&gt; => {
+    const response = await fetch(`/api/users/${userId}`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch user');
+    }
+    return response.json();
+};
+
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+    const { data: user, isLoading, error } = useQuery({
+        queryKey: ['user', userId], // Unique key for this query
+        queryFn: () => fetchUser(userId), // Function to fetch data
+    });
+
+    if (isLoading) return &lt;div&gt;Loading...&lt;/div&gt;;
+    if (error) return &lt;div&gt;Error: {error.message}&lt;/div&gt;;
+    return &lt;div&gt;{user?.name}&lt;/div&gt;;
+};
+
+// Benefits:
+// ✅ Automatic caching
+// ✅ Automatic request cancellation
+// ✅ Automatic background refetch
+// ✅ Request deduplication
+// ✅ Much less code!</code></pre>
+                </div>
+
+                <h3>Mutations with useMutation</h3>
+                <p>Handle POST/PUT/DELETE operations:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+interface UpdateUserData {
+    name: string;
+    email: string;
+}
+
+const updateUser = async (userId: string, data: UpdateUserData): Promise&lt;User&gt; => {
+    const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    
+    if (!response.ok) {
+        throw new Error('Failed to update user');
+    }
+    
+    return response.json();
+};
+
+const UserEditForm: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+    const queryClient = useQueryClient();
+    
+    const mutation = useMutation({
+        mutationFn: (data: UpdateUserData) => updateUser(userId, data),
+        onSuccess: (updatedUser) => {
+            // Invalidate and refetch user query
+            queryClient.invalidateQueries({ queryKey: ['user', userId] });
+            
+            // Or update cache directly (optimistic update)
+            queryClient.setQueryData(['user', userId], updatedUser);
+        },
+    });
+
+    const handleSubmit = (e: React.FormEvent&lt;HTMLFormElement&gt;) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        
+        mutation.mutate({
+            name: formData.get('name') as string,
+            email: formData.get('email') as string,
+        });
+    };
+
+    return (
+        &lt;form onSubmit={handleSubmit}&gt;
+            &lt;input name="name" placeholder="Name" /&gt;
+            &lt;input name="email" type="email" placeholder="Email" /&gt;
+            &lt;button type="submit" disabled={mutation.isPending}&gt;
+                {mutation.isPending ? 'Saving...' : 'Save'}
+            &lt;/button&gt;
+            
+            {mutation.isError && (
+                &lt;div style={{ color: 'red' }}&gt;
+                    Error: {mutation.error.message}
+                &lt;/div&gt;
+            )}
+            
+            {mutation.isSuccess && (
+                &lt;div style={{ color: 'green' }}&gt;
+                    User updated successfully!
+                &lt;/div&gt;
+            )}
+        &lt;/form&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pagination with React Query</h3>
+                <div class="card">
+                    <pre><code class="language-typescript">const ProductList: React.FC = () => {
+    const [page, setPage] = useState(1);
+
+    const { data, isLoading, isPlaceholderData } = useQuery({
+        queryKey: ['products', page],
+        queryFn: () => fetchProducts(page),
+        placeholderData: (previousData) => previousData, // Keep old data while loading
+    });
+
+    return (
+        &lt;div&gt;
+            {isLoading ? (
+                &lt;div&gt;Loading...&lt;/div&gt;
+            ) : (
+                &lt;div&gt;
+                    {data?.products.map(product => (
+                        &lt;div key={product.id}&gt;{product.name}&lt;/div&gt;
+                    ))}
+                &lt;/div&gt;
+            )}
+
+            &lt;div&gt;
+                &lt;button 
+                    onClick={() => setPage(p => p - 1)}
+                    disabled={page === 1}
+                &gt;
+                    Previous
+                &lt;/button&gt;
+                
+                &lt;span&gt;Page {page}&lt;/span&gt;
+                
+                &lt;button
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={isPlaceholderData || !data?.hasMore}
+                &gt;
+                    Next
+                &lt;/button&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Infinite Scroll with React Query</h3>
+                <div class="card">
+                    <pre><code class="language-typescript">import { useInfiniteQuery } from '@tanstack/react-query';
+
+interface PageParam {
+    pageParam: number;
+}
+
+const PostFeed: React.FC = () => {
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading,
+    } = useInfiniteQuery({
+        queryKey: ['posts'],
+        queryFn: ({ pageParam = 1 }) => fetchPosts(pageParam),
+        getNextPageParam: (lastPage, allPages) => {
+            return lastPage.hasMore ? allPages.length + 1 : undefined;
+        },
+        initialPageParam: 1,
+    });
+
+    const observerTarget = useRef&lt;HTMLDivElement&gt;(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+                    fetchNextPage();
+                }
+            },
+            { threshold: 1.0 }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => observer.disconnect();
+    }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+    if (isLoading) return &lt;div&gt;Loading...&lt;/div&gt;;
+
+    return (
+        &lt;div&gt;
+            {data?.pages.map((page, i) => (
+                &lt;div key={i}&gt;
+                    {page.posts.map(post => (
+                        &lt;article key={post.id}&gt;
+                            &lt;h2&gt;{post.title}&lt;/h2&gt;
+                            &lt;p&gt;{post.content}&lt;/p&gt;
+                        &lt;/article&gt;
+                    ))}
+                &lt;/div&gt;
+            ))}
+
+            {isFetchingNextPage && &lt;div&gt;Loading more...&lt;/div&gt;}
+            {!hasNextPage && &lt;div&gt;No more posts!&lt;/div&gt;}
+
+            &lt;div ref={observerTarget} style={{ height: '20px' }} /&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 React Query Superpowers</h4>
+                    <ul>
+                        <li><strong>Automatic caching:</strong> No manual cache management needed</li>
+                        <li><strong>Background refetching:</strong> Keep data fresh automatically</li>
+                        <li><strong>Window focus refetch:</strong> Refetch when user returns to tab</li>
+                        <li><strong>Request deduplication:</strong> Multiple components requesting same data? One request.</li>
+                        <li><strong>Retry logic:</strong> Automatic retries with exponential backoff</li>
+                        <li><strong>Prefetching:</strong> Load data before user needs it</li>
+                        <li><strong>DevTools:</strong> Beautiful debugging interface</li>
+                        <li><strong>TypeScript first:</strong> Excellent type inference</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ When to Use React Query</h4>
+                    <ul>
+                        <li>Any app that fetches data from APIs</li>
+                        <li>Apps with frequent data updates</li>
+                        <li>Apps with complex caching requirements</li>
+                        <li>When you need pagination or infinite scroll</li>
+                        <li>When you want optimistic updates</li>
+                        <li>When you need background data synchronization</li>
+                    </ul>
+                    <p style="margin-top: 1rem;"><strong>Bottom line:</strong> If you're fetching data in React, React Query will make your life easier!</p>
+                </div>
+            </section>
+
+            <!-- Section 8: Optimistic Updates -->
+            <section id="section8" class="lesson-section">
+                <h2>⚡ Optimistic Updates</h2>
+                <p>Why make users wait to see their changes? Optimistic updates instantly show changes in the UI before the server responds, creating a lightning-fast user experience!</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">📖 Definition</h4>
+                    <p style="color: white;"><strong>Optimistic Update:</strong> A UX pattern where the UI is immediately updated to reflect a user's action, assuming the server operation will succeed. If it fails, the UI rolls back to the previous state. This creates the illusion of instant responses.</p>
+                </div>
+
+                <h3>How Optimistic Updates Work</h3>
+                <div class="mermaid">
+sequenceDiagram
+    participant User
+    participant UI
+    participant Cache
+    participant Server
+    
+    User->>UI: Clicks "Like" button
+    UI->>Cache: Update count: 5 → 6 (instant!)
+    UI->>User: Shows liked state immediately ⚡
+    
+    UI->>Server: Send like request
+    Note over Server: Processing...
+    
+    alt Success
+        Server->>UI: 200 OK
+        Note over UI: Keep optimistic update ✅
+    else Failure
+        Server->>UI: 500 Error
+        UI->>Cache: Rollback: 6 → 5
+        UI->>User: Show error, revert button ❌
+    end
+                </div>
+
+                <h3>Pattern 1: Manual Optimistic Update</h3>
+                <div class="card">
+                    <pre><code class="language-typescript">const LikeButton: React.FC&lt;{ postId: string; initialLikes: number }&gt; = ({
+    postId,
+    initialLikes
+}) => {
+    const [likes, setLikes] = useState(initialLikes);
+    const [isLiked, setIsLiked] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
+
+    const handleLike = async () => {
+        // Save previous state for rollback
+        const previousLikes = likes;
+        const previousIsLiked = isLiked;
+
+        // Optimistic update - instant UI change!
+        setLikes(prev => isLiked ? prev - 1 : prev + 1);
+        setIsLiked(prev => !prev);
+        setIsUpdating(true);
+
+        try {
+            // Send request to server
+            const response = await fetch(`/api/posts/${postId}/like`, {
+                method: 'POST',
+                body: JSON.stringify({ liked: !isLiked })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update like');
+            }
+
+            // Success! Keep the optimistic update
+            const data = await response.json();
+            setLikes(data.likes); // Sync with server's actual count
+        } catch (error) {
+            // Failure! Rollback to previous state
+            setLikes(previousLikes);
+            setIsLiked(previousIsLiked);
+            console.error('Failed to like post:', error);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    return (
+        &lt;button 
+            onClick={handleLike} 
+            disabled={isUpdating}
+            style={{
+                backgroundColor: isLiked ? '#667eea' : '#ccc',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: isUpdating ? 'not-allowed' : 'pointer'
+            }}
+        &gt;
+            👍 {likes} {isLiked ? 'Liked' : 'Like'}
+        &lt;/button&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 2: Optimistic Updates with React Query</h3>
+                <p>React Query makes optimistic updates much easier:</p>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ React Query Optimistic Update</h4>
+                    <pre><code class="language-typescript">import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+interface Post {
+    id: string;
+    likes: number;
+    isLiked: boolean;
+}
+
+const LikeButton: React.FC&lt;{ post: Post }&gt; = ({ post }) => {
+    const queryClient = useQueryClient();
+
+    const likeMutation = useMutation({
+        mutationFn: async (postId: string) => {
+            const response = await fetch(`/api/posts/${postId}/like`, {
+                method: 'POST',
+            });
+            return response.json();
+        },
+        
+        // Called before mutation
+        onMutate: async (postId) => {
+            // Cancel outgoing queries
+            await queryClient.cancelQueries({ queryKey: ['post', postId] });
+
+            // Snapshot previous value for rollback
+            const previousPost = queryClient.getQueryData&lt;Post&gt;(['post', postId]);
+
+            // Optimistically update cache
+            queryClient.setQueryData&lt;Post&gt;(['post', postId], (old) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    likes: old.isLiked ? old.likes - 1 : old.likes + 1,
+                    isLiked: !old.isLiked
+                };
+            });
+
+            // Return context with previous value for rollback
+            return { previousPost };
+        },
+
+        // Called on error
+        onError: (err, postId, context) => {
+            // Rollback to previous value
+            if (context?.previousPost) {
+                queryClient.setQueryData(['post', postId], context.previousPost);
+            }
+        },
+
+        // Always refetch after error or success
+        onSettled: (data, error, postId) => {
+            queryClient.invalidateQueries({ queryKey: ['post', postId] });
+        },
+    });
+
+    return (
+        &lt;button 
+            onClick={() => likeMutation.mutate(post.id)}
+            disabled={likeMutation.isPending}
+            style={{
+                backgroundColor: post.isLiked ? '#667eea' : '#ccc',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                border: 'none',
+                borderRadius: '4px'
+            }}
+        &gt;
+            👍 {post.likes} {post.isLiked ? 'Liked' : 'Like'}
+        &lt;/button&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 3: Optimistic List Updates</h3>
+                <p>Adding/removing items from lists optimistically:</p>
+
+                <div class="card">
+                    <pre><code class="language-typescript">interface Todo {
+    id: string;
+    text: string;
+    completed: boolean;
+}
+
+const TodoList: React.FC = () => {
+    const queryClient = useQueryClient();
+
+    // Add todo optimistically
+    const addMutation = useMutation({
+        mutationFn: async (text: string) => {
+            const response = await fetch('/api/todos', {
+                method: 'POST',
+                body: JSON.stringify({ text })
+            });
+            return response.json();
+        },
+        
+        onMutate: async (text) => {
+            await queryClient.cancelQueries({ queryKey: ['todos'] });
+            const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
+
+            // Create temporary todo with fake ID
+            const optimisticTodo: Todo = {
+                id: `temp-${Date.now()}`,
+                text,
+                completed: false
+            };
+
+            // Add to cache immediately
+            queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old = []) => 
+                [...old, optimisticTodo]
+            );
+
+            return { previousTodos };
+        },
+
+        onError: (err, text, context) => {
+            if (context?.previousTodos) {
+                queryClient.setQueryData(['todos'], context.previousTodos);
+            }
+        },
+
+        onSuccess: (newTodo) => {
+            // Replace temporary todo with real one from server
+            queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old = []) =>
+                old.map(todo => 
+                    todo.id.startsWith('temp-') ? newTodo : todo
+                )
+            );
+        },
+    });
+
+    // Delete todo optimistically
+    const deleteMutation = useMutation({
+        mutationFn: async (id: string) => {
+            await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+        },
+        
+        onMutate: async (id) => {
+            await queryClient.cancelQueries({ queryKey: ['todos'] });
+            const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
+
+            // Remove from cache immediately
+            queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old = []) =>
+                old.filter(todo => todo.id !== id)
+            );
+
+            return { previousTodos };
+        },
+
+        onError: (err, id, context) => {
+            if (context?.previousTodos) {
+                queryClient.setQueryData(['todos'], context.previousTodos);
+            }
+        },
+    });
+
+    const { data: todos = [] } = useQuery({
+        queryKey: ['todos'],
+        queryFn: fetchTodos,
+    });
+
+    return (
+        &lt;div&gt;
+            {todos.map(todo => (
+                &lt;div key={todo.id}&gt;
+                    &lt;span&gt;{todo.text}&lt;/span&gt;
+                    &lt;button onClick={() => deleteMutation.mutate(todo.id)}&gt;
+                        Delete
+                    &lt;/button&gt;
+                &lt;/div&gt;
+            ))}
+            
+            &lt;button onClick={() => addMutation.mutate('New todo')}&gt;
+                Add Todo
+            &lt;/button&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Optimistic Update Best Practices</h4>
+                    <ul>
+                        <li><strong>Always provide rollback:</strong> If the mutation fails, restore previous state</li>
+                        <li><strong>Show pending states:</strong> Disable buttons or show spinners during mutations</li>
+                        <li><strong>Handle errors gracefully:</strong> Show clear error messages when rollback occurs</li>
+                        <li><strong>Cancel in-flight queries:</strong> Prevent race conditions with query cancellation</li>
+                        <li><strong>Sync with server:</strong> Always refetch after mutations to ensure data consistency</li>
+                        <li><strong>Use temporary IDs:</strong> For new items, use temp IDs until server responds</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ When NOT to Use Optimistic Updates</h4>
+                    <ul>
+                        <li><strong>Critical operations:</strong> Financial transactions, medical records</li>
+                        <li><strong>Complex validations:</strong> When server might reject for non-obvious reasons</li>
+                        <li><strong>Multi-user conflicts:</strong> When concurrent edits are likely</li>
+                        <li><strong>Slow rollback UX:</strong> When reverting would be jarring or confusing</li>
+                    </ul>
+                    <p><strong>Rule of thumb:</strong> Use optimistic updates for simple, likely-to-succeed operations where instant feedback improves UX!</p>
+                </div>
+            </section>
+
+
+            <!-- Section 9: Hands-on Practice -->
+            <section id="section9" class="lesson-section">
+                <h2>🏋️ Hands-on Practice</h2>
+                <p>Time to apply everything you've learned! These exercises will solidify your advanced data fetching skills.</p>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>🏋️ Exercise 1: Debounced Search with Cache</h3>
+                    <p>Build a search component that debounces user input and caches results.</p>
+                    
+                    <h4>Requirements:</h4>
+                    <ul>
+                        <li>Search input that debounces by 500ms</li>
+                        <li>Fetch search results from an API</li>
+                        <li>Cache results for each search query</li>
+                        <li>Show loading state while fetching</li>
+                        <li>Handle race conditions with AbortController</li>
+                        <li>Display search results in a list</li>
+                        <li>Type everything properly with TypeScript</li>
+                    </ul>
+
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <div class="card">
+                            <p>Combine your <code>useDebounce</code> hook with a caching strategy. Use the debounced value as the cache key. Don't forget to abort old requests when the query changes!</p>
+                        </div>
+                    </details>
+
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card">
+                            <pre><code class="language-typescript">interface SearchResult {
+    id: number;
+    title: string;
+    description: string;
+}
+
+// Simple cache
+const searchCache = new Map&lt;string, SearchResult[]&gt;();
+
+const SearchComponent: React.FC = () => {
+    const [query, setQuery] = useState('');
+    const debouncedQuery = useDebounce(query, 500);
+    const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState&lt;string | null&gt;(null);
+
+    useEffect(() => {
+        if (!debouncedQuery) {
+            setResults([]);
+            return;
+        }
+
+        // Check cache first
+        const cached = searchCache.get(debouncedQuery);
+        if (cached) {
+            setResults(cached);
+            return;
+        }
+
+        const controller = new AbortController();
+        setLoading(true);
+        setError(null);
+
+        fetch(`/api/search?q=${debouncedQuery}`, {
+            signal: controller.signal
+        })
+            .then(res => res.json())
+            .then(data => {
+                searchCache.set(debouncedQuery, data.results);
+                setResults(data.results);
+            })
+            .catch(err => {
+                if (err.name !== 'AbortError') {
+                    setError('Search failed');
+                }
+            })
+            .finally(() => setLoading(false));
+
+        return () => controller.abort();
+    }, [debouncedQuery]);
+
+    return (
+        &lt;div&gt;
+            &lt;input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search..."
+                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem' }}
+            /&gt;
+
+            {loading && &lt;div&gt;Searching...&lt;/div&gt;}
+            {error && &lt;div style={{ color: 'red' }}&gt;{error}&lt;/div&gt;}
+
+            &lt;div&gt;
+                {results.map(result => (
+                    &lt;div key={result.id} style={{ padding: '1rem', borderBottom: '1px solid #ddd' }}&gt;
+                        &lt;h3&gt;{result.title}&lt;/h3&gt;
+                        &lt;p&gt;{result.description}&lt;/p&gt;
+                    &lt;/div&gt;
+                ))}
+            &lt;/div&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>🏋️ Exercise 2: Paginated Product Catalog</h3>
+                    <p>Build a product catalog with pagination and URL state management.</p>
+                    
+                    <h4>Requirements:</h4>
+                    <ul>
+                        <li>Display products in a grid layout</li>
+                        <li>Implement pagination (previous/next buttons)</li>
+                        <li>Show page numbers with the current page highlighted</li>
+                        <li>Sync page number with URL query params</li>
+                        <li>Disable buttons appropriately (first/last page)</li>
+                        <li>Show loading state while fetching</li>
+                        <li>Handle errors gracefully</li>
+                        <li>Cancel old requests when page changes</li>
+                    </ul>
+
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <div class="card">
+                            <p>Use React Router's <code>useSearchParams</code> to sync the page with the URL. Use <code>AbortController</code> in your useEffect cleanup. Keep track of total pages from the API response.</p>
+                        </div>
+                    </details>
+
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card">
+                            <pre><code class="language-typescript">import { useSearchParams } from 'react-router-dom';
+
+interface Product {
+    id: number;
+    name: string;
+    price: number;
+    image: string;
+}
+
+interface PaginationData {
+    products: Product[];
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+}
+
+const ProductCatalog: React.FC = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentPage = Number(searchParams.get('page')) || 1;
+    
+    const [data, setData] = useState&lt;PaginationData | null&gt;(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState&lt;string | null&gt;(null);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        
+        setLoading(true);
+        setError(null);
+
+        fetch(`/api/products?page=${currentPage}&limit=12`, {
+            signal: controller.signal
+        })
+            .then(res => res.json())
+            .then(setData)
+            .catch(err => {
+                if (err.name !== 'AbortError') {
+                    setError('Failed to load products');
+                }
+            })
+            .finally(() => setLoading(false));
+
+        return () => controller.abort();
+    }, [currentPage]);
+
+    const goToPage = (page: number) => {
+        setSearchParams({ page: page.toString() });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    if (error) return &lt;div style={{ color: 'red' }}&gt;{error}&lt;/div&gt;;
+
+    return (
+        &lt;div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}&gt;
+            &lt;h1&gt;Product Catalog&lt;/h1&gt;
+
+            {loading && &lt;div&gt;Loading products...&lt;/div&gt;}
+
+            {data && (
+                &lt;&gt;
+                    &lt;div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                        gap: '1.5rem',
+                        marginBottom: '2rem'
+                    }}&gt;
+                        {data.products.map(product => (
+                            &lt;div key={product.id} style={{
+                                border: '1px solid #ddd',
+                                borderRadius: '8px',
+                                padding: '1rem',
+                                textAlign: 'center'
+                            }}&gt;
+                                &lt;img 
+                                    src={product.image} 
+                                    alt={product.name}
+                                    style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+                                /&gt;
+                                &lt;h3&gt;{product.name}&lt;/h3&gt;
+                                &lt;p style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#667eea' }}&gt;
+                                    ${product.price}
+                                &lt;/p&gt;
+                            &lt;/div&gt;
+                        ))}
+                    &lt;/div&gt;
+
+                    &lt;div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '1rem',
+                        marginTop: '2rem'
+                    }}&gt;
+                        &lt;button
+                            onClick={() => goToPage(currentPage - 1)}
+                            disabled={currentPage === 1 || loading}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                backgroundColor: currentPage === 1 ? '#ccc' : '#667eea',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                            }}
+                        &gt;
+                            Previous
+                        &lt;/button&gt;
+
+                        &lt;div style={{ display: 'flex', gap: '0.5rem' }}&gt;
+                            {Array.from({ length: data.totalPages }, (_, i) => i + 1).map(page => (
+                                &lt;button
+                                    key={page}
+                                    onClick={() => goToPage(page)}
+                                    disabled={loading}
+                                    style={{
+                                        padding: '0.5rem 1rem',
+                                        backgroundColor: page === currentPage ? '#667eea' : 'white',
+                                        color: page === currentPage ? 'white' : '#667eea',
+                                        border: '1px solid #667eea',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontWeight: page === currentPage ? 'bold' : 'normal'
+                                    }}
+                                &gt;
+                                    {page}
+                                &lt;/button&gt;
+                            ))}
+                        &lt;/div&gt;
+
+                        &lt;button
+                            onClick={() => goToPage(currentPage + 1)}
+                            disabled={currentPage === data.totalPages || loading}
+                            style={{
+                                padding: '0.5rem 1rem',
+                                backgroundColor: currentPage === data.totalPages ? '#ccc' : '#667eea',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: currentPage === data.totalPages ? 'not-allowed' : 'pointer'
+                            }}
+                        &gt;
+                            Next
+                        &lt;/button&gt;
+                    &lt;/div&gt;
+
+                    &lt;p style={{ textAlign: 'center', marginTop: '1rem', color: '#666' }}&gt;
+                        Page {currentPage} of {data.totalPages} ({data.totalItems} total products)
+                    &lt;/p&gt;
+                &lt;/&gt;
+            )}
+        &lt;/div&gt;
+    );
+};</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>🏋️ Exercise 3: Infinite Scroll Feed</h3>
+                    <p>Create an infinite scroll social media feed with loading states.</p>
+                    
+                    <h4>Requirements:</h4>
+                    <ul>
+                        <li>Load initial 20 posts on mount</li>
+                        <li>Automatically load more when user scrolls near bottom</li>
+                        <li>Use Intersection Observer for scroll detection</li>
+                        <li>Show loading indicator while fetching</li>
+                        <li>Display "No more posts" when all data is loaded</li>
+                        <li>Prevent duplicate requests</li>
+                        <li>Type all data properly</li>
+                    </ul>
+
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <div class="card">
+                            <p>Use the <code>useInfiniteScroll</code> hook pattern we built earlier. Track <code>hasMore</code> state and check for empty responses. Place a sentinel <code>div</code> at the bottom to observe.</p>
+                        </div>
+                    </details>
+
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card">
+                            <pre><code class="language-typescript">interface Post {
+    id: string;
+    author: string;
+    content: string;
+    timestamp: string;
+}
+
+const SocialFeed: React.FC = () => {
+    const [posts, setPosts] = useState&lt;Post[]&gt;([]);
+    const [page, setPage] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
+    const observerTarget = useRef&lt;HTMLDivElement&gt;(null);
+
+    const loadMorePosts = useCallback(async () => {
+        if (loading || !hasMore) return;
+
+        setLoading(true);
+
+        try {
+            const response = await fetch(`/api/posts?page=${page}&limit=20`);
+            const data = await response.json();
+
+            if (data.posts.length === 0) {
+                setHasMore(false);
+            } else {
+                setPosts(prev => [...prev, ...data.posts]);
+                setPage(prev => prev + 1);
+            }
+        } catch (error) {
+            console.error('Failed to load posts:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [page, loading, hasMore]);
+
+    // Load initial posts
+    useEffect(() => {
+        loadMorePosts();
+    }, []);
+
+    // Set up Intersection Observer
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !loading) {
+                    loadMorePosts();
+                }
+            },
+            { threshold: 1.0 }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => {
+            if (observerTarget.current) {
+                observer.unobserve(observerTarget.current);
+            }
+        };
+    }, [loadMorePosts, hasMore, loading]);
+
+    return (
+        &lt;div style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem' }}&gt;
+            &lt;h1&gt;Social Feed&lt;/h1&gt;
+
+            {posts.map(post => (
+                &lt;article 
+                    key={post.id}
+                    style={{
+                        border: '1px solid #ddd',
+                        borderRadius: '8px',
+                        padding: '1.5rem',
+                        marginBottom: '1rem'
+                    }}
+                &gt;
+                    &lt;div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.5rem' }}&gt;
+                        &lt;strong&gt;{post.author}&lt;/strong&gt;
+                        &lt;span style={{ marginLeft: 'auto', color: '#666', fontSize: '0.875rem' }}&gt;
+                            {new Date(post.timestamp).toLocaleDateString()}
+                        &lt;/span&gt;
+                    &lt;/div&gt;
+                    &lt;p&gt;{post.content}&lt;/p&gt;
+                &lt;/article&gt;
+            ))}
+
+            {loading && (
+                &lt;div style={{ textAlign: 'center', padding: '2rem' }}&gt;
+                    &lt;p&gt;Loading more posts...&lt;/p&gt;
+                &lt;/div&gt;
+            )}
+
+            {!hasMore && posts.length > 0 && (
+                &lt;div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}&gt;
+                    &lt;p&gt;🎉 You've reached the end!&lt;/p&gt;
+                &lt;/div&gt;
+            )}
+
+            &lt;div ref={observerTarget} style={{ height: '20px' }} /&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>🏋️ Challenge: React Query Data Dashboard</h3>
+                    <p>Build a data dashboard using React Query with multiple queries, mutations, and optimistic updates.</p>
+                    
+                    <h4>Requirements:</h4>
+                    <ul>
+                        <li>Fetch and display user statistics (useQuery)</li>
+                        <li>Fetch and display recent activity (useQuery)</li>
+                        <li>Add action button with optimistic update (useMutation)</li>
+                        <li>Implement background refetching</li>
+                        <li>Show loading and error states</li>
+                        <li>Add manual refresh button</li>
+                        <li>Display last updated timestamp</li>
+                        <li>Use React Query DevTools</li>
+                    </ul>
+
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <div class="card">
+                            <p>Set up QueryClientProvider at the app root. Use separate useQuery calls for different data. Use useMutation with onMutate for optimistic updates. Remember to invalidate queries after mutations!</p>
+                        </div>
+                    </details>
+                </div>
+            </section>
+
+            <!-- Section 10: Best Practices -->
+            <section id="section10" class="lesson-section">
+                <h2>🌟 Best Practices</h2>
+
+                <h3>✅ Do's</h3>
+                <ul>
+                    <li><strong>Always handle race conditions</strong> - Use AbortController or cleanup flags in every data fetching effect to prevent stale data from displaying.</li>
+                    <li><strong>Debounce user input</strong> - For search and autocomplete, wait 300-500ms after typing stops before firing requests. Saves bandwidth and improves UX.</li>
+                    <li><strong>Show loading states</strong> - Users need feedback. Show spinners, skeleton screens, or progress indicators during data fetching.</li>
+                    <li><strong>Cache intelligently</strong> - Cache frequently accessed, slowly changing data. Use appropriate TTLs based on how often data changes.</li>
+                    <li><strong>Invalidate cache on mutations</strong> - After POST/PUT/DELETE, clear related cache entries to ensure data consistency.</li>
+                    <li><strong>Use React Query for complex needs</strong> - Don't reinvent the wheel. React Query handles caching, refetching, and state management better than custom solutions.</li>
+                    <li><strong>Implement proper error handling</strong> - Show meaningful error messages. Provide retry buttons. Don't just console.log errors!</li>
+                    <li><strong>Type everything</strong> - Use TypeScript interfaces for API responses, cache entries, and hook return values.</li>
+                </ul>
+
+                <h3>❌ Don'ts</h3>
+                <ul>
+                    <li><strong>Don't ignore cleanup</strong> - Always return cleanup functions from useEffect. Cancel requests, remove listeners, clear timers.</li>
+                    <li><strong>Don't fetch in render</strong> - Never call fetch directly in component body. Always use useEffect or event handlers.</li>
+                    <li><strong>Don't cache everything</strong> - User-specific data, real-time data, and large datasets often shouldn't be cached. Be selective.</li>
+                    <li><strong>Don't use infinite scroll everywhere</strong> - It's not appropriate for all UIs. Pagination works better when users need to find specific items.</li>
+                    <li><strong>Don't forget about mobile</strong> - Test debouncing delays and pagination on mobile devices. Network conditions vary widely.</li>
+                    <li><strong>Don't make assumptions about network speed</strong> - Always handle slow networks and timeouts gracefully.</li>
+                    <li><strong>Don't ignore failed optimistic updates</strong> - Always rollback and show errors when optimistic updates fail.</li>
+                </ul>
+
+                <h3>💡 Pro Tips</h3>
+                <ul>
+                    <li><strong>Use request deduplication</strong> - If 5 components request the same data simultaneously, make only one request. React Query does this automatically!</li>
+                    <li><strong>Prefetch data</strong> - On hover or route navigation intent, prefetch data before it's needed for instant perceived performance.</li>
+                    <li><strong>Implement background revalidation</strong> - Show cached data immediately while fetching fresh data in the background.</li>
+                    <li><strong>Use polling for real-time updates</strong> - For data that updates frequently, implement smart polling with exponential backoff.</li>
+                    <li><strong>Add request timeouts</strong> - Combine AbortController with setTimeout for automatic request timeouts (e.g., 10 seconds).</li>
+                    <li><strong>Test with network throttling</strong> - Chrome DevTools lets you simulate slow 3G. Test your loading states and race conditions!</li>
+                    <li><strong>Monitor cache size</strong> - In memory-constrained environments, implement LRU (Least Recently Used) cache eviction.</li>
+                    <li><strong>Use skeleton screens</strong> - Instead of spinners, show content-shaped placeholders for better perceived performance.</li>
+                </ul>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Data Fetching Checklist</h4>
+                    <ul>
+                        <li>✅ AbortController used for request cancellation</li>
+                        <li>✅ Debouncing implemented for search inputs</li>
+                        <li>✅ Loading states shown to users</li>
+                        <li>✅ Error handling with retry options</li>
+                        <li>✅ Cache strategy defined (TTL, invalidation)</li>
+                        <li>✅ Race conditions prevented</li>
+                        <li>✅ TypeScript types for all API responses</li>
+                        <li>✅ Pagination or infinite scroll implemented properly</li>
+                        <li>✅ Optimistic updates have rollback logic</li>
+                        <li>✅ Mobile experience tested</li>
+                    </ul>
+                </div>
+
+                <h3>Performance Optimization Tips</h3>
+                <div class="card">
+                    <h4>Reducing Network Requests:</h4>
+                    <ul>
+                        <li><strong>Batch requests:</strong> Combine multiple small requests into one larger request</li>
+                        <li><strong>GraphQL:</strong> For complex data needs, consider GraphQL to fetch exactly what you need</li>
+                        <li><strong>HTTP/2:</strong> Multiple concurrent requests are cheaper with HTTP/2</li>
+                        <li><strong>Compression:</strong> Ensure gzip/brotli compression is enabled on your API</li>
+                    </ul>
+
+                    <h4>Improving Perceived Performance:</h4>
+                    <ul>
+                        <li><strong>Show cached data first:</strong> Display stale data while fetching fresh</li>
+                        <li><strong>Skeleton screens:</strong> Better than spinners for perceived speed</li>
+                        <li><strong>Optimistic updates:</strong> Make UI changes feel instant</li>
+                        <li><strong>Progressive loading:</strong> Load critical content first, lazy load the rest</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 11: Summary -->
+            <section id="section11" class="lesson-section">
+                <h2>📚 Summary</h2>
+                
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h3>🎉 Key Takeaways</h3>
+                    <ul>
+                        <li><strong>Race conditions are silent bugs</strong> - Always use AbortController to cancel old requests when new ones start.</li>
+                        <li><strong>Debouncing saves bandwidth</strong> - Wait for users to stop typing before making API calls. 300-500ms is typical.</li>
+                        <li><strong>Request cancellation is essential</strong> - Cancel requests when components unmount or dependencies change.</li>
+                        <li><strong>Pagination comes in flavors</strong> - Offset-based, cursor-based, and page numbers each have their use cases.</li>
+                        <li><strong>Infinite scroll needs careful implementation</strong> - Use Intersection Observer, handle "no more data," and provide accessibility alternatives.</li>
+                        <li><strong>Client-side caching improves performance</strong> - Cache with TTL, invalidate on mutations, and use localStorage for persistence.</li>
+                        <li><strong>React Query is a game changer</strong> - It handles caching, refetching, pagination, and more with minimal code.</li>
+                        <li><strong>Optimistic updates feel instant</strong> - Update UI immediately, then sync with server. Always provide rollback for failures.</li>
+                        <li><strong>TypeScript makes data fetching safer</strong> - Type your API responses, cache entries, and hook return values.</li>
+                        <li><strong>Test with slow networks</strong> - Use Chrome DevTools throttling to test loading states and race conditions.</li>
+                    </ul>
+                </div>
+                
+                <h3>📚 Additional Resources</h3>
+                <ul>
+                    <li><a href="https://tanstack.com/query/latest" target="_blank">TanStack Query (React Query) Documentation</a></li>
+                    <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/AbortController" target="_blank">MDN: AbortController</a></li>
+                    <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API" target="_blank">MDN: Intersection Observer API</a></li>
+                    <li><a href="https://web.dev/fetch-api/" target="_blank">Web.dev: Fetch API Best Practices</a></li>
+                    <li><a href="https://kentcdodds.com/blog/stop-using-isloading-booleans" target="_blank">Kent C. Dodds: Better Loading States</a></li>
+                    <li><a href="https://www.patterns.dev/posts/client-side-caching" target="_blank">Patterns.dev: Client-Side Caching</a></li>
+                </ul>
+                
+                <h3>🚀 What's Next?</h3>
+                <p>Congratulations! You've mastered advanced data fetching patterns that are used in production applications at major companies. You can now build fast, efficient, user-friendly applications that handle data like a pro.</p>
+                
+                <p>In the next lesson, we'll work on the <strong>Module 4 Project: Weather Dashboard</strong>, where you'll apply everything you've learned:</p>
+                <ul>
+                    <li>Data fetching with proper error handling</li>
+                    <li>Search with debouncing</li>
+                    <li>Caching weather data</li>
+                    <li>Loading and error states</li>
+                    <li>Real-world API integration</li>
+                </ul>
+
+                <!-- Quiz Section -->
+                <div class="card quiz-container">
+                    <h3>🎯 Quick Quiz</h3>
+                    
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> What is a race condition in data fetching?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That's a network error">
+                                A) When the API returns an error
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Correct! Race conditions occur when requests complete out of order, causing stale data to be displayed.">
+                                B) When requests complete out of order, displaying stale data
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That's just slow loading">
+                                C) When data takes too long to load
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That's a different issue">
+                                D) When multiple components fetch the same data
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> What's the purpose of debouncing in search inputs?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Debouncing is about timing">
+                                A) To make the search faster
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Correct! Debouncing waits until the user stops typing before making a request, reducing unnecessary API calls.">
+                                B) To wait until user stops typing before making requests
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That's not what debouncing does">
+                                C) To cache search results
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Debouncing reduces requests">
+                                D) To make more requests per second
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> What's the main advantage of using React Query over custom hooks?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Size isn't the main advantage">
+                                A) Smaller bundle size
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Custom hooks can be fast too">
+                                B) Faster data fetching
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Correct! React Query provides automatic caching, background refetching, request deduplication, and more out of the box.">
+                                C) Built-in caching, refetching, and state management
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript works with both">
+                                D) Better TypeScript support
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> When should you use infinite scroll instead of pagination?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Actually the opposite!">
+                                A) When users need to find specific items quickly
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Correct! Infinite scroll works best for continuous browsing experiences like social media feeds.">
+                                B) For social media feeds and continuous browsing
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Pagination is better here">
+                                C) When a footer is important
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Pagination is better for exporting">
+                                D) When data needs to be printed or exported
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> What's an optimistic update?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That's just good UX">
+                                A) Showing a success message before the request completes
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Correct! Optimistic updates immediately update the UI assuming success, then rollback if the server request fails.">
+                                B) Updating UI immediately, then rolling back if it fails
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That's caching, not optimistic updates">
+                                C) Caching data to avoid server requests
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That's background refetching">
+                                D) Refetching data in the background
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+
+                <!-- Encouragement Card -->
+                <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-align: center; padding: 2rem; margin-top: 2rem;">
+                    <h3 style="color: white;">🎉 Congratulations!</h3>
+                    <p style="color: white; font-size: 1.1rem;">You've completed Lesson 4.4: Advanced Data Fetching! You now have professional-grade data fetching skills that will serve you throughout your React career.</p>
+                    <p style="color: white; margin-top: 1rem;">You've learned techniques used by major tech companies to build fast, efficient, user-friendly applications. Keep practicing! 🚀</p>
+                </div>
+            </section>
+
+            <!-- Lesson Navigation -->
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_4_3_custom_hooks.html" class="prev-lesson">← Previous: Custom Hooks</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_4_5_working_with_apis.html" class="next-lesson">Next: Working with APIs →</a>
+            </nav>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: var(--primary-gradient); color: white; padding: 2rem; text-align: center; margin-top: 4rem;">
+        <p>&copy; 2024 PracticalAce. All rights reserved.</p>
+        <p style="margin-top: 0.5rem; opacity: 0.9;">Empowering learners to achieve their goals.</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

@@ -1,0 +1,2266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Master the useEffect Hook in React - Learn how to handle side effects, understand dependency arrays, implement cleanup functions, and manage component lifecycle with TypeScript.">
+    <meta name="author" content="PracticalAce">
+    <title>The useEffect Hook - React TypeScript Course</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#f0f0f0',
+                primaryTextColor: '#333',
+                primaryBorderColor: '#667eea'
+            }
+        });
+    </script>
+</head>
+<body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+    
+    <!-- Progress indicator -->
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React TypeScript Course</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">
+                ☰
+            </button>
+            <div class="nav-links" id="nav-links" aria-hidden="false">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <button id="theme-toggle" aria-label="Toggle theme">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#module4">Module 4: Side Effects and Data Fetching</a></li>
+            <li aria-current="page">Lesson 4.1: The useEffect Hook</li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main-content">
+        <div class="container">
+            <!-- Lesson Header -->
+            <header>
+                <h1>⚡ The useEffect Hook</h1>
+                <p class="lead">So far, your React components have been pure functions—they take props and state, and they render JSX. But real applications need to do more than just render. They need to fetch data from APIs, subscribe to events, update the document title, set timers, and interact with the browser. These are called "side effects," and React's useEffect hook is how you handle them. Think of useEffect as your component's way of saying "after you render, do this extra thing." Let's master this essential hook! 🚀</p>
+                
+                <!-- Learning objectives -->
+                <div class="card">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Understand what side effects are and why they need special handling</li>
+                        <li>Use the useEffect hook to perform side effects</li>
+                        <li>Master dependency arrays and when effects run</li>
+                        <li>Implement cleanup functions to prevent memory leaks</li>
+                        <li>Understand effect execution timing</li>
+                        <li>Handle common effect patterns (timers, subscriptions, document updates)</li>
+                        <li>Debug effects and avoid infinite loops</li>
+                        <li>Type effects properly with TypeScript</li>
+                        <li>Know when to use useEffect vs other solutions</li>
+                    </ul>
+                    <p><strong>Estimated Time:</strong> 70-85 minutes</p>
+                    <p><strong>Project:</strong> Build a timer, document title updater, and event listener examples</p>
+                </div>
+            </header>
+
+            <!-- Sticky Table of Contents -->
+            <details class="card" open style="position: sticky; top: 80px; z-index: 100; background: var(--card-bg, white); box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+                <summary style="cursor: pointer; font-weight: bold; padding: 0.5rem 1rem; user-select: none;">
+                    <h2 style="display: inline; margin: 0;">📑 In This Lesson</h2>
+                </summary>
+                <nav aria-label="Table of Contents" style="padding: 0 1rem 1rem 1rem;">
+                    <ol>
+                        <li><a href="#section1" class="toc-link">What Are Side Effects?</a></li>
+                        <li><a href="#section2" class="toc-link">Introduction to useEffect</a></li>
+                        <li><a href="#section3" class="toc-link">Basic useEffect Syntax</a></li>
+                        <li><a href="#section4" class="toc-link">Dependency Arrays Explained</a></li>
+                        <li><a href="#section5" class="toc-link">Cleanup Functions</a></li>
+                        <li><a href="#section6" class="toc-link">Effect Execution Timing</a></li>
+                        <li><a href="#section7" class="toc-link">Common Effect Patterns</a></li>
+                        <li><a href="#section8" class="toc-link">Avoiding Infinite Loops</a></li>
+                        <li><a href="#section9" class="toc-link">Hands-on Practice</a></li>
+                        <li><a href="#section10" class="toc-link">Best Practices</a></li>
+                        <li><a href="#section11" class="toc-link">Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <!-- Section 1: What Are Side Effects? -->
+            <section id="section1" class="lesson-section">
+                <h2>🎭 What Are Side Effects?</h2>
+                <p>Before we dive into useEffect, we need to understand what side effects are and why they need special handling in React.</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">📖 Definition</h4>
+                    <p style="color: white;"><strong>Side Effect:</strong> Any operation that affects something outside the scope of the function being executed. In React, this means anything beyond calculating and returning JSX.</p>
+                </div>
+
+                <h3>Pure Functions vs Side Effects</h3>
+                <div class="card">
+                    <h4>Understanding Purity</h4>
+                    <pre><code class="language-typescript">// ✅ PURE Function (no side effects)
+function add(a: number, b: number): number {
+    return a + b; // Only returns a value, no external changes
+}
+
+// ✅ PURE React Component
+const Greeting: React.FC&lt;{ name: string }&gt; = ({ name }) => {
+    return &lt;h1&gt;Hello, {name}!&lt;/h1&gt;; // Only renders JSX
+};
+
+// ❌ IMPURE (has side effects)
+function addAndLog(a: number, b: number): number {
+    console.log('Adding numbers'); // Side effect: logging
+    return a + b;
+}
+
+// ❌ IMPURE React Component (DON'T DO THIS)
+const BadComponent: React.FC = () => {
+    document.title = 'My App'; // Side effect in render!
+    fetch('/api/data'); // Side effect in render!
+    return &lt;h1&gt;Hello&lt;/h1&gt;;
+};</code></pre>
+                </div>
+
+                <h3>Common Side Effects in React</h3>
+                <div class="card">
+                    <h4>What Counts as a Side Effect?</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Side Effect Type</th>
+                                <th>Examples</th>
+                                <th>Why It's a Side Effect</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Data Fetching</strong></td>
+                                <td>fetch(), axios.get()</td>
+                                <td>Network request affects external world</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Subscriptions</strong></td>
+                                <td>addEventListener, WebSocket</td>
+                                <td>Registers external listeners</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Timers</strong></td>
+                                <td>setTimeout, setInterval</td>
+                                <td>Schedules future code execution</td>
+                            </tr>
+                            <tr>
+                                <td><strong>DOM Manipulation</strong></td>
+                                <td>document.title, focus()</td>
+                                <td>Directly modifies the DOM</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Logging</strong></td>
+                                <td>console.log()</td>
+                                <td>Outputs to console (external)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Browser APIs</strong></td>
+                                <td>localStorage, navigator</td>
+                                <td>Interacts with browser APIs</td>
+                            </tr>
+                            <tr>
+                                <td><strong>External Libraries</strong></td>
+                                <td>Google Analytics, charts</td>
+                                <td>Calls external code</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Why Side Effects Need Special Handling</h3>
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ The Problem with Side Effects During Render</h4>
+                    <pre><code class="language-typescript">// ❌ BAD: Side effect during render
+const BadTimer: React.FC = () => {
+    const [count, setCount] = useState(0);
+    
+    // Problem: This runs on EVERY render!
+    setInterval(() => {
+        setCount(prev => prev + 1);
+    }, 1000);
+    // Result: Hundreds of timers created, app crashes!
+    
+    return &lt;div&gt;Count: {count}&lt;/div&gt;;
+};
+
+// ❌ BAD: Fetch during render
+const BadFetch: React.FC = () => {
+    const [data, setData] = useState(null);
+    
+    // Problem: Fetches on every render, infinite loop!
+    fetch('/api/data')
+        .then(res => res.json())
+        .then(setData); // Setting state triggers re-render!
+    
+    return &lt;div&gt;{data}&lt;/div&gt;;
+};</code></pre>
+                </div>
+
+                <h3>React's Rendering Model</h3>
+                <pre class="mermaid">
+graph TD
+    A[Component Function Called] --> B[Calculate JSX]
+    B --> C[Return JSX]
+    C --> D[React Updates DOM]
+    D --> E[Browser Paints Screen]
+    E --> F[User Sees Update]
+    
+    G[Side Effects] -.->|Should happen AFTER| D
+    
+    style A fill:#667eea,color:#fff
+    style G fill:#f44336,color:#fff
+    style D fill:#4CAF50,color:#fff
+</pre>
+
+                <p><strong>The key insight:</strong> Render functions should be pure. Side effects should happen <em>after</em> rendering completes. That's what useEffect is for!</p>
+            </section>
+
+            <!-- Section 2: Introduction to useEffect -->
+            <section id="section2" class="lesson-section">
+                <h2>🎣 Introduction to useEffect</h2>
+                <p>The useEffect hook tells React "after you finish rendering this component, run this code." It's your escape hatch from pure rendering into the world of side effects.</p>
+
+                <div class="card">
+                    <h4>The Concept</h4>
+                    <pre><code class="language-typescript">useEffect(() => {
+    // This code runs AFTER the component renders
+    console.log('Component rendered!');
+    
+    // Perform side effects here:
+    // - Fetch data
+    // - Set up subscriptions
+    // - Update document
+    // - Start timers
+});</code></pre>
+                </div>
+
+                <h3>When Does useEffect Run?</h3>
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Effect Timing</h4>
+                    <pre class="mermaid">
+graph LR
+    A[Component Mounts] --> B[Render JSX]
+    B --> C[React Updates DOM]
+    C --> D[Browser Paints]
+    D --> E[useEffect Runs]
+    
+    F[State Changes] --> G[Re-render]
+    G --> H[React Updates DOM]
+    H --> I[Browser Paints]
+    I --> J[useEffect Runs Again]
+    
+    style E fill:#4CAF50,color:#fff
+    style J fill:#4CAF50,color:#fff
+</pre>
+                </div>
+
+                <h3>Your First useEffect</h3>
+                <div class="card">
+                    <h4>Simple Example: Document Title</h4>
+                    <pre><code class="language-typescript">import { useState, useEffect } from 'react';
+
+const PageTitle: React.FC = () => {
+    const [count, setCount] = useState(0);
+    
+    // ✅ Effect runs after every render
+    useEffect(() => {
+        document.title = `Count: ${count}`;
+        console.log('Effect ran!');
+    });
+    
+    return (
+        &lt;div&gt;
+            &lt;p&gt;Count: {count}&lt;/p&gt;
+            &lt;button onClick={() => setCount(count + 1)}&gt;
+                Increment
+            &lt;/button&gt;
+        &lt;/div&gt;
+    );
+};
+
+// What happens:
+// 1. Component renders with count = 0
+// 2. Effect runs, sets title to "Count: 0"
+// 3. User clicks button
+// 4. Component re-renders with count = 1
+// 5. Effect runs again, sets title to "Count: 1"</code></pre>
+                </div>
+
+                <h3>Effect Flow Diagram</h3>
+                <pre class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant C as Component
+    participant R as React
+    participant E as useEffect
+    participant B as Browser
+    
+    U->>C: Open page
+    C->>R: Render JSX (count=0)
+    R->>B: Update DOM
+    B->>B: Paint screen
+    B->>E: Trigger effect
+    E->>B: Set document.title
+    
+    U->>C: Click button
+    C->>C: setCount(1)
+    C->>R: Re-render JSX (count=1)
+    R->>B: Update DOM
+    B->>B: Paint screen
+    B->>E: Trigger effect again
+    E->>B: Set document.title again
+</pre>
+
+                <h3>Importing useEffect</h3>
+                <div class="card">
+                    <h4>Where It Comes From</h4>
+                    <pre><code class="language-typescript">// Import from React
+import { useEffect } from 'react';
+
+// Or with other hooks
+import { useState, useEffect } from 'react';
+
+// It's a hook, so:
+// ✅ Call it at the top level of your component
+// ❌ Don't call it inside loops, conditions, or nested functions</code></pre>
+                </div>
+            </section>
+
+            <!-- Section 3: Basic useEffect Syntax -->
+            <section id="section3" class="lesson-section">
+                <h2>📝 Basic useEffect Syntax</h2>
+                <p>Let's break down the anatomy of useEffect and understand each part.</p>
+
+                <h3>The Complete Syntax</h3>
+                <div class="card">
+                    <h4>Full Form</h4>
+                    <pre><code class="language-typescript">useEffect(
+    // 1. Effect function (required)
+    () => {
+        // Side effect code goes here
+        console.log('Effect running');
+        
+        // 2. Cleanup function (optional)
+        return () => {
+            console.log('Cleanup running');
+        };
+    },
+    // 3. Dependency array (optional but important!)
+    [dependency1, dependency2]
+);</code></pre>
+                </div>
+
+                <h3>Part 1: The Effect Function</h3>
+                <div class="card">
+                    <h4>What Goes Inside?</h4>
+                    <pre><code class="language-typescript">useEffect(() => {
+    // This is the effect function
+    // Put your side effects here
+    
+    // Examples:
+    console.log('Component rendered');
+    document.title = 'My App';
+    fetch('/api/data');
+    const timer = setTimeout(() => {}, 1000);
+    
+    // Any code that should run after render
+});</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>Effect Function Examples</h4>
+                    <pre><code class="language-typescript">// Example 1: Update document title
+useEffect(() => {
+    document.title = `You clicked ${count} times`;
+});
+
+// Example 2: Log when component renders
+useEffect(() => {
+    console.log('Component rendered with props:', props);
+});
+
+// Example 3: Focus an input
+useEffect(() => {
+    inputRef.current?.focus();
+});
+
+// Example 4: Set up analytics
+useEffect(() => {
+    analytics.track('Page viewed', { page: 'Home' });
+});</code></pre>
+                </div>
+
+                <h3>Part 2: The Cleanup Function (Optional)</h3>
+                <div class="card">
+                    <h4>Returning a Cleanup Function</h4>
+                    <pre><code class="language-typescript">useEffect(() => {
+    // Set up
+    const timer = setInterval(() => {
+        console.log('Tick');
+    }, 1000);
+    
+    // Cleanup (optional but often needed)
+    return () => {
+        clearInterval(timer);
+        console.log('Timer cleaned up');
+    };
+});
+
+// When does cleanup run?
+// 1. Before the effect runs again (on re-render)
+// 2. When the component unmounts (is removed)</code></pre>
+                </div>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Why Cleanup Matters</h4>
+                    <pre><code class="language-typescript">// ❌ WITHOUT cleanup: Memory leak!
+useEffect(() => {
+    const timer = setInterval(() => {
+        console.log('Tick');
+    }, 1000);
+    // Timer keeps running even after component unmounts!
+});
+
+// ✅ WITH cleanup: Proper resource management
+useEffect(() => {
+    const timer = setInterval(() => {
+        console.log('Tick');
+    }, 1000);
+    
+    return () => {
+        clearInterval(timer); // Stop timer when done
+    };
+});</code></pre>
+                </div>
+
+                <h3>Part 3: The Dependency Array (Critical!)</h3>
+                <div class="card">
+                    <h4>Three Ways to Use Dependencies</h4>
+                    <pre><code class="language-typescript">// 1. No dependency array: Runs after EVERY render
+useEffect(() => {
+    console.log('Runs on every render');
+}); // ⚠️ Usually not what you want!
+
+// 2. Empty dependency array: Runs ONCE on mount
+useEffect(() => {
+    console.log('Runs once when component mounts');
+}, []); // ✅ Common pattern
+
+// 3. With dependencies: Runs when dependencies change
+useEffect(() => {
+    console.log('Runs when count changes');
+}, [count]); // ✅ Most common pattern</code></pre>
+                </div>
+
+                <h3>Visualizing Dependency Behavior</h3>
+             <div class="mermaid">
+flowchart TD
+    A[Component renders] --> B{Dependency array}
+
+    B -->|"No array"| C[Run effect on EVERY render]
+    B -->|"Empty []"| D{Is this the first render?}
+    D -->|"Yes"| E[Run effect]
+    D -->|"No"| F[Skip effect]
+
+    B -->|"With deps [x, y]"| G{Did any dependency change?}
+    G -->|"Yes"| H[Run effect]
+    G -->|"No"| I[Skip effect]
+</div>
+
+
+                <h3>TypeScript with useEffect</h3>
+                <div class="card">
+                    <h4>Typing Effects</h4>
+                    <pre><code class="language-typescript">import { useEffect } from 'react';
+
+// Effect function doesn't return anything (except cleanup)
+useEffect(() => {
+    // TypeScript infers this returns void
+    console.log('Hello');
+});
+
+// Cleanup function must return void
+useEffect(() => {
+    const timer = setInterval(() => {}, 1000);
+    
+    // ✅ Correct: returns void
+    return () => {
+        clearInterval(timer);
+    };
+    
+    // ❌ Wrong: can't return other values
+    // return 42; // TypeScript error!
+});
+
+// Dependencies must be array
+useEffect(() => {
+    console.log(count);
+}, [count]); // ✅ Array of dependencies
+
+// Common TypeScript pattern
+interface Props {
+    userId: string;
+}
+
+const UserProfile: React.FC&lt;Props&gt; = ({ userId }) => {
+    useEffect(() => {
+        // userId is properly typed as string
+        console.log(`Fetching data for user: ${userId}`);
+    }, [userId]); // TypeScript checks userId is in scope
+    
+    return &lt;div&gt;User Profile&lt;/div&gt;;
+};</code></pre>
+                </div>
+            </section>
+
+            <!-- Section 4: Dependency Arrays Explained -->
+            <section id="section4" class="lesson-section">
+                <h2>🎯 Dependency Arrays Explained</h2>
+                <p>The dependency array is the most important and confusing part of useEffect. Let's master it completely!</p>
+
+                <h3>How Dependencies Work</h3>
+                <div class="card">
+                    <h4>The Rule</h4>
+                    <p>React compares each dependency with its previous value. If any dependency changed, the effect runs.</p>
+                    <pre><code class="language-typescript">const [count, setCount] = useState(0);
+const [name, setName] = useState('Alice');
+
+useEffect(() => {
+    console.log(`Count: ${count}, Name: ${name}`);
+}, [count, name]);
+
+// Scenario 1: count changes from 0 to 1
+// Result: Effect runs ✅
+
+// Scenario 2: name changes from 'Alice' to 'Bob'
+// Result: Effect runs ✅
+
+// Scenario 3: Neither changes
+// Result: Effect doesn't run ❌
+
+// Scenario 4: Both change
+// Result: Effect runs once ✅ (not twice!)</code></pre>
+                </div>
+
+                <h3>Three Dependency Patterns</h3>
+                <div class="card">
+                    <h4>Pattern 1: No Dependency Array</h4>
+                    <pre><code class="language-typescript">// Runs after EVERY render
+useEffect(() => {
+    console.log('Every render');
+}); // No second argument
+
+// Use case: Rarely needed
+// Usually indicates you should use a dependency array instead</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>Pattern 2: Empty Dependency Array</h4>
+                    <pre><code class="language-typescript">// Runs ONCE when component mounts
+useEffect(() => {
+    console.log('Component mounted');
+    
+    return () => {
+        console.log('Component unmounted');
+    };
+}, []); // Empty array
+
+// Use cases:
+// - Initialize data on mount
+// - Set up subscriptions
+// - Start timers
+// - Fetch initial data
+
+// Example: Fetch data once
+useEffect(() => {
+    fetch('/api/user')
+        .then(res => res.json())
+        .then(data => setUser(data));
+}, []); // Runs once on mount</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>Pattern 3: With Dependencies</h4>
+                    <pre><code class="language-typescript">// Runs when specified values change
+useEffect(() => {
+    console.log(`User ${userId} selected`);
+    fetchUserData(userId);
+}, [userId]); // Runs when userId changes
+
+// Use cases:
+// - Sync with prop changes
+// - React to state changes
+// - Re-fetch when parameters change
+
+// Example: Search as user types
+const [searchTerm, setSearchTerm] = useState('');
+const [results, setResults] = useState([]);
+
+useEffect(() => {
+    if (searchTerm) {
+        fetch(`/api/search?q=${searchTerm}`)
+            .then(res => res.json())
+            .then(data => setResults(data));
+    }
+}, [searchTerm]); // Re-run when search term changes</code></pre>
+                </div>
+
+                <h3>What Should Go in Dependencies?</h3>
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ The Golden Rule</h4>
+                    <p><strong>Every value from the component scope that's used inside the effect MUST be in the dependency array.</strong></p>
+                    <pre><code class="language-typescript">const [count, setCount] = useState(0);
+const [multiplier, setMultiplier] = useState(2);
+
+// ✅ CORRECT: Both count and multiplier are dependencies
+useEffect(() => {
+    const result = count * multiplier;
+    console.log(`Result: ${result}`);
+}, [count, multiplier]);
+
+// ❌ WRONG: Missing multiplier from dependencies
+useEffect(() => {
+    const result = count * multiplier; // Uses multiplier
+    console.log(`Result: ${result}`);
+}, [count]); // But doesn't list it!
+// This will use stale values of multiplier!</code></pre>
+                </div>
+
+                <h3>Common Dependency Mistakes</h3>
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Watch Out For These</h4>
+                    <pre><code class="language-typescript">// ❌ Mistake 1: Forgetting dependencies
+const [userId, setUserId] = useState(1);
+
+useEffect(() => {
+    fetchUser(userId); // Uses userId
+}, []); // But empty array! Will always fetch user 1
+
+// ✅ Fix: Include userId
+useEffect(() => {
+    fetchUser(userId);
+}, [userId]);
+
+// ❌ Mistake 2: Including functions that change every render
+const handleClick = () => {
+    console.log('Clicked');
+};
+
+useEffect(() => {
+    document.addEventListener('click', handleClick);
+}, [handleClick]); // handleClick is new every render!
+
+// ✅ Fix: Define function inside effect
+useEffect(() => {
+    const handleClick = () => {
+        console.log('Clicked');
+    };
+    document.addEventListener('click', handleClick);
+}, []);
+
+// ❌ Mistake 3: Object dependencies
+const config = { theme: 'dark', lang: 'en' };
+
+useEffect(() => {
+    applyConfig(config);
+}, [config]); // config is new object every render!
+
+// ✅ Fix: Depend on individual properties
+useEffect(() => {
+    applyConfig({ theme: 'dark', lang: 'en' });
+}, []); // Or use theme and lang as separate dependencies</code></pre>
+                </div>
+
+                <h3>Reference vs Value Dependencies</h3>
+                <div class="card">
+                    <h4>Understanding Comparison</h4>
+                    <pre><code class="language-typescript">// Primitives: Compared by value
+const [count, setCount] = useState(0);
+useEffect(() => {
+    console.log(count);
+}, [count]); // ✅ count compared by value (0 === 0)
+
+// Objects: Compared by reference
+const [user, setUser] = useState({ name: 'Alice' });
+useEffect(() => {
+    console.log(user.name);
+}, [user]); // ⚠️ user compared by reference (may cause extra runs)
+
+// Better: Depend on specific properties
+useEffect(() => {
+    console.log(user.name);
+}, [user.name]); // ✅ Compare only name property
+
+// Arrays: Also compared by reference
+const [items, setItems] = useState([1, 2, 3]);
+useEffect(() => {
+    console.log('Items changed');
+}, [items]); // New array reference triggers effect
+
+// Functions: Always new reference
+const handleSubmit = () => {
+    console.log('Submit');
+};
+useEffect(() => {
+    // ...
+}, [handleSubmit]); // ⚠️ Different function every render!</code></pre>
+                </div>
+
+                <h3>ESLint Rule: exhaustive-deps</h3>
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Let ESLint Help You</h4>
+                    <p>React provides an ESLint rule that automatically checks your dependencies:</p>
+                    <pre><code class="language-bash"># Install if not already installed
+npm install eslint-plugin-react-hooks --save-dev</code></pre>
+                    <pre><code class="language-json">// .eslintrc.json
+{
+  "plugins": ["react-hooks"],
+  "rules": {
+    "react-hooks/exhaustive-deps": "warn"
+  }
+}</code></pre>
+                    <p>This rule will warn you when:</p>
+                    <ul>
+                        <li>You're missing dependencies</li>
+                        <li>You have unnecessary dependencies</li>
+                        <li>Your effect might cause infinite loops</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 5: Cleanup Functions -->
+            <section id="section5" class="lesson-section">
+                <h2>🧹 Cleanup Functions</h2>
+                <p>Cleanup functions are essential for preventing memory leaks and ensuring your effects don't cause problems when components unmount or re-render.</p>
+
+                <h3>Why Cleanup Is Needed</h3>
+                <div class="card">
+                    <h4>The Problem</h4>
+                    <pre><code class="language-typescript">// ❌ WITHOUT cleanup
+const Timer: React.FC = () => {
+    const [seconds, setSeconds] = useState(0);
+    
+    useEffect(() => {
+        setInterval(() => {
+            setSeconds(prev => prev + 1);
+        }, 1000);
+    }, []);
+    
+    return &lt;div&gt;Seconds: {seconds}&lt;/div&gt;;
+};
+
+// Problem: When component unmounts, interval keeps running!
+// setSeconds tries to update non-existent component
+// Memory leak! 💥</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>✅ WITH Cleanup</h4>
+                    <pre><code class="language-typescript">const Timer: React.FC = () => {
+    const [seconds, setSeconds] = useState(0);
+    
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            setSeconds(prev => prev + 1);
+        }, 1000);
+        
+        // Cleanup function
+        return () => {
+            clearInterval(intervalId);
+            console.log('Timer cleaned up');
+        };
+    }, []);
+    
+    return &lt;div&gt;Seconds: {seconds}&lt;/div&gt;;
+};
+
+// Now: When component unmounts, interval is cleared ✅
+// No memory leak! 🎉</code></pre>
+                </div>
+
+                <h3>When Cleanup Runs</h3>
+                <pre class="mermaid">
+sequenceDiagram
+    participant C as Component
+    participant E as Effect
+    participant Cl as Cleanup
+    
+    Note over C,Cl: First Mount
+    C->>E: Run effect
+    
+    Note over C,Cl: Dependency Changes
+    E->>Cl: Run cleanup first
+    Cl->>E: Then run effect again
+    
+    Note over C,Cl: Component Unmounts
+    E->>Cl: Run cleanup
+    Cl->>C: Component removed
+</pre>
+
+                <div class="card">
+                    <h4>Cleanup Timing Example</h4>
+                    <pre><code class="language-typescript">const EffectLifecycle: React.FC = () => {
+    const [count, setCount] = useState(0);
+    
+    useEffect(() => {
+        console.log(`Effect running for count: ${count}`);
+        
+        return () => {
+            console.log(`Cleanup running for count: ${count}`);
+        };
+    }, [count]);
+    
+    return (
+        &lt;button onClick={() => setCount(count + 1)}&gt;
+            Count: {count}
+        &lt;/button&gt;
+    );
+};
+
+// Console output:
+// Mount: "Effect running for count: 0"
+// Click: "Cleanup running for count: 0"
+//        "Effect running for count: 1"
+// Click: "Cleanup running for count: 1"
+//        "Effect running for count: 2"
+// Unmount: "Cleanup running for count: 2"</code></pre>
+                </div>
+
+                <h3>Common Cleanup Scenarios</h3>
+                <div class="card">
+                    <h4>1. Timers</h4>
+                    <pre><code class="language-typescript">// setTimeout
+useEffect(() => {
+    const timeoutId = setTimeout(() => {
+        console.log('Delayed action');
+    }, 3000);
+    
+    return () => {
+        clearTimeout(timeoutId);
+    };
+}, []);
+
+// setInterval
+useEffect(() => {
+    const intervalId = setInterval(() => {
+        console.log('Repeating action');
+    }, 1000);
+    
+    return () => {
+        clearInterval(intervalId);
+    };
+}, []);</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>2. Event Listeners</h4>
+                    <pre><code class="language-typescript">useEffect(() => {
+    const handleResize = () => {
+        console.log('Window resized');
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+        window.removeEventListener('resize', handleResize);
+    };
+}, []);
+
+// Mouse events
+useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+        console.log(`Mouse: ${e.clientX}, ${e.clientY}`);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+    };
+}, []);</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>3. Subscriptions</h4>
+                    <pre><code class="language-typescript">// WebSocket
+useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8080');
+    
+    ws.onmessage = (event) => {
+        console.log('Message:', event.data);
+    };
+    
+    return () => {
+        ws.close();
+        console.log('WebSocket closed');
+    };
+}, []);
+
+// EventSource (Server-Sent Events)
+useEffect(() => {
+    const eventSource = new EventSource('/api/events');
+    
+    eventSource.onmessage = (event) => {
+        console.log('Event:', event.data);
+    };
+    
+    return () => {
+        eventSource.close();
+    };
+}, []);</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>4. Async Operations</h4>
+                    <pre><code class="language-typescript">useEffect(() => {
+    let cancelled = false;
+    
+    const fetchData = async () => {
+        const response = await fetch('/api/data');
+        const data = await response.json();
+        
+        // Only update if not cancelled
+        if (!cancelled) {
+            setData(data);
+        }
+    };
+    
+    fetchData();
+    
+    return () => {
+        cancelled = true; // Mark as cancelled
+    };
+}, []);
+
+// AbortController (modern approach)
+useEffect(() => {
+    const controller = new AbortController();
+    
+    fetch('/api/data', { signal: controller.signal })
+        .then(res => res.json())
+        .then(data => setData(data))
+        .catch(err => {
+            if (err.name === 'AbortError') {
+                console.log('Fetch aborted');
+            }
+        });
+    
+    return () => {
+        controller.abort(); // Cancel fetch
+    };
+}, []);</code></pre>
+                </div>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Cleanup Checklist</h4>
+                    <p>Always clean up these resources:</p>
+                    <ul>
+                        <li>✅ Timers (setTimeout, setInterval)</li>
+                        <li>✅ Event listeners (addEventListener)</li>
+                        <li>✅ WebSockets and SSE connections</li>
+                        <li>✅ Subscriptions (RxJS, etc.)</li>
+                        <li>✅ Animation frames (requestAnimationFrame)</li>
+                        <li>✅ Async operations (fetch with AbortController)</li>
+                        <li>✅ Third-party library instances</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 6: Effect Execution Timing -->
+            <section id="section6" class="lesson-section">
+                <h2>⏱️ Effect Execution Timing</h2>
+                <p>Understanding exactly when effects run is crucial for avoiding bugs and writing correct code.</p>
+
+                <h3>The Render-Effect Cycle</h3>
+                <pre class="mermaid">
+graph TD
+    A[Component Function Runs] --> B[Calculate JSX]
+    B --> C[Return JSX to React]
+    C --> D[React Compares with Previous]
+    D --> E[React Updates Real DOM]
+    E --> F[Browser Paints Screen]
+    F --> G[useEffect Runs]
+    G --> H{Dependencies Changed?}
+    H -->|Yes| I[Run Effect Again]
+    H -->|No| J[Skip Effect]
+    
+    style A fill:#667eea,color:#fff
+    style G fill:#4CAF50,color:#fff
+    style I fill:#FF9800,color:#fff
+</pre>
+
+                <h3>useEffect vs useLayoutEffect</h3>
+                <div class="card">
+                    <h4>Two Types of Effects</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Aspect</th>
+                                <th>useEffect</th>
+                                <th>useLayoutEffect</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>When It Runs</strong></td>
+                                <td>After browser paint</td>
+                                <td>Before browser paint</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Blocks Painting?</strong></td>
+                                <td>No (asynchronous)</td>
+                                <td>Yes (synchronous)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Use Case</strong></td>
+                                <td>Most side effects</td>
+                                <td>DOM measurements, preventing flicker</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Performance</strong></td>
+                                <td>Better (non-blocking)</td>
+                                <td>Can cause jank if slow</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Default Choice</strong></td>
+                                <td>✅ Yes</td>
+                                <td>❌ Only when needed</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <h4>useEffect Timing (Standard)</h4>
+                    <pre><code class="language-typescript">const TimingExample: React.FC = () => {
+    const [count, setCount] = useState(0);
+    
+    console.log('1. Component rendering, count:', count);
+    
+    useEffect(() => {
+        console.log('3. Effect running, count:', count);
+    });
+    
+    console.log('2. About to return JSX');
+    
+    return &lt;button onClick={() => setCount(count + 1)}&gt;{count}&lt;/button&gt;;
+};
+
+// Console output when component mounts:
+// 1. Component rendering, count: 0
+// 2. About to return JSX
+// 3. Effect running, count: 0
+
+// User clicks button:
+// 1. Component rendering, count: 1
+// 2. About to return JSX
+// 3. Effect running, count: 1</code></pre>
+                </div>
+
+                <h3>Multiple Effects Execution Order</h3>
+                <div class="card">
+                    <h4>When You Have Multiple Effects</h4>
+                    <pre><code class="language-typescript">const MultipleEffects: React.FC = () => {
+    useEffect(() => {
+        console.log('Effect 1');
+        return () => console.log('Cleanup 1');
+    }, []);
+    
+    useEffect(() => {
+        console.log('Effect 2');
+        return () => console.log('Cleanup 2');
+    }, []);
+    
+    useEffect(() => {
+        console.log('Effect 3');
+        return () => console.log('Cleanup 3');
+    }, []);
+    
+    return &lt;div&gt;Hello&lt;/div&gt;;
+};
+
+// On Mount:
+// Effect 1
+// Effect 2
+// Effect 3
+
+// On Unmount:
+// Cleanup 1
+// Cleanup 2
+// Cleanup 3
+
+// Effects run in the order they're defined!</code></pre>
+                </div>
+
+                <h3>Effects and State Updates</h3>
+                <div class="card">
+                    <h4>Setting State Inside Effects</h4>
+                    <pre><code class="language-typescript">const EffectWithState: React.FC = () => {
+    const [count, setCount] = useState(0);
+    const [doubled, setDoubled] = useState(0);
+    
+    // Effect that updates state
+    useEffect(() => {
+        console.log('Effect: Doubling count');
+        setDoubled(count * 2);
+    }, [count]);
+    
+    return (
+        &lt;div&gt;
+            &lt;p&gt;Count: {count}&lt;/p&gt;
+            &lt;p&gt;Doubled: {doubled}&lt;/p&gt;
+            &lt;button onClick={() => setCount(count + 1)}&gt;Increment&lt;/button&gt;
+        &lt;/div&gt;
+    );
+};
+
+// Timeline when user clicks:
+// 1. setCount(1) called
+// 2. Component re-renders with count = 1
+// 3. Effect runs, sees count changed
+// 4. setDoubled(2) called
+// 5. Component re-renders again with doubled = 2</code></pre>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Be Careful: Effects Can Trigger More Renders</h4>
+                    <pre><code class="language-typescript">// ❌ This causes infinite loop!
+const InfiniteLoop: React.FC = () => {
+    const [count, setCount] = useState(0);
+    
+    useEffect(() => {
+        setCount(count + 1); // Updates state
+    }); // No dependency array!
+    // Effect runs after every render
+    // setCount causes render
+    // Render causes effect
+    // Effect causes render... 💥
+    
+    return &lt;div&gt;{count}&lt;/div&gt;;
+};
+
+// ✅ Fix: Add proper dependencies
+useEffect(() => {
+    // Only run once on mount
+}, []);</code></pre>
+                </div>
+
+                <h3>Timing with Async Effects</h3>
+                <div class="card">
+                    <h4>Effects Can't Be Async Functions</h4>
+                    <pre><code class="language-typescript">// ❌ WRONG: Can't make effect function async
+useEffect(async () => {
+    const data = await fetch('/api/data');
+    // TypeScript error: Effect must return cleanup or void
+}, []);
+
+// ✅ CORRECT: Define async function inside
+useEffect(() => {
+    const fetchData = async () => {
+        const response = await fetch('/api/data');
+        const data = await response.json();
+        setData(data);
+    };
+    
+    fetchData();
+}, []);
+
+// ✅ CORRECT: Use .then()
+useEffect(() => {
+    fetch('/api/data')
+        .then(res => res.json())
+        .then(data => setData(data))
+        .catch(err => console.error(err));
+}, []);</code></pre>
+                </div>
+            </section>
+
+            <!-- Section 7: Common Effect Patterns -->
+            <section id="section7" class="lesson-section">
+                <h2>🎨 Common Effect Patterns</h2>
+                <p>Let's explore the most common patterns you'll use with useEffect in real applications.</p>
+
+                <h3>Pattern 1: Document Title Updates</h3>
+                <div class="card">
+                    <h4>Updating the Browser Tab Title</h4>
+                    <pre><code class="language-typescript">const DocumentTitle: React.FC = () => {
+    const [count, setCount] = useState(0);
+    const [unread, setUnread] = useState(0);
+    
+    useEffect(() => {
+        if (unread > 0) {
+            document.title = `(${unread}) You have notifications`;
+        } else {
+            document.title = 'My App';
+        }
+    }, [unread]);
+    
+    return (
+        &lt;div&gt;
+            &lt;h1&gt;Notifications&lt;/h1&gt;
+            &lt;p&gt;Unread: {unread}&lt;/p&gt;
+            &lt;button onClick={() => setUnread(unread + 1)}&gt;
+                New Notification
+            &lt;/button&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 2: Timers and Intervals</h3>
+                <div class="card">
+                    <h4>Countdown Timer</h4>
+                    <pre><code class="language-typescript">const Countdown: React.FC&lt;{ seconds: number }&gt; = ({ seconds: initialSeconds }) => {
+    const [seconds, setSeconds] = useState(initialSeconds);
+    const [isActive, setIsActive] = useState(false);
+    
+    useEffect(() => {
+        if (!isActive) return;
+        
+        if (seconds === 0) {
+            setIsActive(false);
+            alert('Time is up!');
+            return;
+        }
+        
+        const intervalId = setInterval(() => {
+            setSeconds(prev => prev - 1);
+        }, 1000);
+        
+        return () => clearInterval(intervalId);
+    }, [seconds, isActive]);
+    
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;{seconds} seconds&lt;/h2&gt;
+            &lt;button onClick={() => setIsActive(!isActive)}&gt;
+                {isActive ? 'Pause' : 'Start'}
+            &lt;/button&gt;
+            &lt;button onClick={() => setSeconds(initialSeconds)}&gt;
+                Reset
+            &lt;/button&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>Stopwatch</h4>
+                    <pre><code class="language-typescript">const Stopwatch: React.FC = () => {
+    const [time, setTime] = useState(0);
+    const [isRunning, setIsRunning] = useState(false);
+    
+    useEffect(() => {
+        if (!isRunning) return;
+        
+        const startTime = Date.now() - time;
+        
+        const intervalId = setInterval(() => {
+            setTime(Date.now() - startTime);
+        }, 10);
+        
+        return () => clearInterval(intervalId);
+    }, [isRunning]);
+    
+    const formatTime = (ms: number) => {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        
+        return `${hours.toString().padStart(2, '0')}:${(minutes % 60)
+            .toString()
+            .padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+    };
+    
+    return (
+        &lt;div&gt;
+            &lt;h1&gt;{formatTime(time)}&lt;/h1&gt;
+            &lt;button onClick={() => setIsRunning(!isRunning)}&gt;
+                {isRunning ? 'Pause' : 'Start'}
+            &lt;/button&gt;
+            &lt;button onClick={() => { setTime(0); setIsRunning(false); }}&gt;
+                Reset
+            &lt;/button&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 3: Event Listeners</h3>
+                <div class="card">
+                    <h4>Window Resize Listener</h4>
+                    <pre><code class="language-typescript">const WindowSize: React.FC = () => {
+    const [windowSize, setWindowSize] = useState({
+        width: window.innerWidth,
+        height: window.innerHeight
+    });
+    
+    useEffect(() => {
+        const handleResize = () => {
+            setWindowSize({
+                width: window.innerWidth,
+                height: window.innerHeight
+            });
+        };
+        
+        window.addEventListener('resize', handleResize);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, []);
+    
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;Window Size&lt;/h2&gt;
+            &lt;p&gt;Width: {windowSize.width}px&lt;/p&gt;
+            &lt;p&gt;Height: {windowSize.height}px&lt;/p&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>Keyboard Shortcuts</h4>
+                    <pre><code class="language-typescript">const KeyboardShortcuts: React.FC = () => {
+    const [lastKey, setLastKey] = useState('');
+    
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ctrl+S to save
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                console.log('Save triggered');
+                setLastKey('Ctrl+S');
+            }
+            
+            // Escape to close
+            if (e.key === 'Escape') {
+                console.log('Close triggered');
+                setLastKey('Escape');
+            }
+        };
+        
+        document.addEventListener('keydown', handleKeyDown);
+        
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
+    
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;Try Keyboard Shortcuts&lt;/h2&gt;
+            &lt;p&gt;Press Ctrl+S or Escape&lt;/p&gt;
+            &lt;p&gt;Last key: {lastKey}&lt;/p&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 4: Local Storage Sync</h3>
+                <div class="card">
+                    <h4>Persist State to localStorage</h4>
+                    <pre><code class="language-typescript">const PersistentCounter: React.FC = () => {
+    const [count, setCount] = useState(() => {
+        // Load from localStorage on mount
+        const saved = localStorage.getItem('count');
+        return saved ? parseInt(saved, 10) : 0;
+    });
+    
+    // Save to localStorage whenever count changes
+    useEffect(() => {
+        localStorage.setItem('count', count.toString());
+    }, [count]);
+    
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;Count: {count}&lt;/h2&gt;
+            &lt;button onClick={() => setCount(count + 1)}&gt;Increment&lt;/button&gt;
+            &lt;p&gt;Refresh the page - count persists!&lt;/p&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 5: Focus Management</h3>
+                <div class="card">
+                    <h4>Auto-focus Input on Mount</h4>
+                    <pre><code class="language-typescript">import { useRef, useEffect } from 'react';
+
+const AutoFocusInput: React.FC = () => {
+    const inputRef = useRef&lt;HTMLInputElement&gt;(null);
+    
+    useEffect(() => {
+        // Focus input when component mounts
+        inputRef.current?.focus();
+    }, []);
+    
+    return (
+        &lt;div&gt;
+            &lt;label htmlFor="search"&gt;Search:&lt;/label&gt;
+            &lt;input
+                ref={inputRef}
+                type="text"
+                id="search"
+                placeholder="Start typing..."
+            /&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 6: Click Outside Detection</h3>
+                <div class="card">
+                    <h4>Detect Clicks Outside Element</h4>
+                    <pre><code class="language-typescript">const DropdownMenu: React.FC = () => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef&lt;HTMLDivElement&gt;(null);
+    
+    useEffect(() => {
+        if (!isOpen) return;
+        
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && 
+                !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        
+        document.addEventListener('mousedown', handleClickOutside);
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen]);
+    
+    return (
+        &lt;div ref={dropdownRef}&gt;
+            &lt;button onClick={() => setIsOpen(!isOpen)}&gt;
+                Toggle Menu
+            &lt;/button&gt;
+            {isOpen && (
+                &lt;ul className="dropdown-menu"&gt;
+                    &lt;li&gt;Option 1&lt;/li&gt;
+                    &lt;li&gt;Option 2&lt;/li&gt;
+                    &lt;li&gt;Option 3&lt;/li&gt;
+                &lt;/ul&gt;
+            )}
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+
+                <h3>Pattern 7: Debouncing</h3>
+                <div class="card">
+                    <h4>Debounce Search Input</h4>
+                    <pre><code class="language-typescript">const SearchWithDebounce: React.FC = () => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedTerm, setDebouncedTerm] = useState('');
+    const [results, setResults] = useState&lt;string[]&gt;([]);
+    
+    // Debounce the search term
+    useEffect(() => {
+        const timerId = setTimeout(() => {
+            setDebouncedTerm(searchTerm);
+        }, 500); // Wait 500ms after user stops typing
+        
+        return () => {
+            clearTimeout(timerId);
+        };
+    }, [searchTerm]);
+    
+    // Fetch results when debounced term changes
+    useEffect(() => {
+        if (debouncedTerm) {
+            console.log('Searching for:', debouncedTerm);
+            // Simulate API call
+            setResults([
+                `Result 1 for "${debouncedTerm}"`,
+                `Result 2 for "${debouncedTerm}"`,
+                `Result 3 for "${debouncedTerm}"`
+            ]);
+        } else {
+            setResults([]);
+        }
+    }, [debouncedTerm]);
+    
+    return (
+        &lt;div&gt;
+            &lt;input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search..."
+            /&gt;
+            &lt;ul&gt;
+                {results.map((result, i) => (
+                    &lt;li key={i}&gt;{result}&lt;/li&gt;
+                ))}
+            &lt;/ul&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                </div>
+            </section>
+
+            <!-- Section 8: Avoiding Infinite Loops -->
+            <section id="section8" class="lesson-section">
+                <h2>🔄 Avoiding Infinite Loops</h2>
+                <p>One of the most common mistakes with useEffect is creating infinite loops. Let's learn how to recognize and avoid them!</p>
+
+                <h3>How Infinite Loops Happen</h3>
+                <pre class="mermaid">
+graph TD
+    A[Component Renders] --> B[Effect Runs]
+    B --> C[Effect Updates State]
+    C --> D[State Change Triggers Re-render]
+    D --> A
+    
+    style A fill:#667eea,color:#fff
+    style B fill:#f44336,color:#fff
+    style C fill:#f44336,color:#fff
+    style D fill:#f44336,color:#fff
+</pre>
+
+                <h3>Common Infinite Loop Scenarios</h3>
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Scenario 1: No Dependency Array</h4>
+                    <pre><code class="language-typescript">// ❌ INFINITE LOOP!
+const BadComponent: React.FC = () => {
+    const [count, setCount] = useState(0);
+    
+    useEffect(() => {
+        setCount(count + 1); // Updates state
+    }); // No dependency array = runs after EVERY render
+    
+    return &lt;div&gt;{count}&lt;/div&gt;;
+};
+
+// What happens:
+// 1. Component renders
+// 2. Effect runs, updates count
+// 3. State change causes re-render
+// 4. Effect runs again (no deps)
+// 5. Back to step 2... forever! 💥
+
+// ✅ FIX: Add empty dependency array
+useEffect(() => {
+    setCount(count + 1);
+}, []); // Runs once on mount only</code></pre>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Scenario 2: Missing Dependencies (with state update)</h4>
+                    <pre><code class="language-typescript">// ❌ INFINITE LOOP!
+const BadComponent: React.FC = () => {
+    const [count, setCount] = useState(0);
+    const [data, setData] = useState(null);
+    
+    useEffect(() => {
+        fetch('/api/data')
+            .then(res => res.json())
+            .then(result => setData(result));
+    }, [data]); // data is a dependency!
+    
+    return &lt;div&gt;{data}&lt;/div&gt;;
+};
+
+// What happens:
+// 1. Effect runs, fetches data
+// 2. setData updates data
+// 3. data changed, so effect runs again
+// 4. Fetches again, updates data again
+// 5. Infinite loop! 💥
+
+// ✅ FIX: Remove data from dependencies
+useEffect(() => {
+    fetch('/api/data')
+        .then(res => res.json())
+        .then(result => setData(result));
+}, []); // Fetch only once on mount</code></pre>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Scenario 3: Object/Array Dependencies</h4>
+                    <pre><code class="language-typescript">// ❌ INFINITE LOOP!
+const BadComponent: React.FC = () => {
+    const [user, setUser] = useState({ name: 'Alice', age: 30 });
+    
+    useEffect(() => {
+        // Create new object
+        setUser({ name: 'Alice', age: 30 });
+    }, [user]); // user is new object every time!
+    
+    return &lt;div&gt;{user.name}&lt;/div&gt;;
+};
+
+// What happens:
+// 1. Effect runs
+// 2. setUser creates NEW object
+// 3. New object !== old object (different reference)
+// 4. Effect sees change, runs again
+// 5. Creates another new object... 💥
+
+// ✅ FIX 1: Only depend on specific properties
+useEffect(() => {
+    setUser({ name: 'Alice', age: 30 });
+}, [user.name, user.age]); // Primitives, not object
+
+// ✅ FIX 2: Don't include in dependencies if not needed
+useEffect(() => {
+    // If user doesn't actually trigger the effect...
+    console.log('Component mounted');
+}, []); // Empty array</code></pre>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Scenario 4: Function Dependencies</h4>
+                    <pre><code class="language-typescript">// ❌ INFINITE LOOP!
+const BadComponent: React.FC = () => {
+    const [count, setCount] = useState(0);
+    
+    const incrementCount = () => {
+        setCount(prev => prev + 1);
+    };
+    
+    useEffect(() => {
+        incrementCount();
+    }, [incrementCount]); // New function every render!
+    
+    return &lt;div&gt;{count}&lt;/div&gt;;
+};
+
+// ✅ FIX 1: Define function inside effect
+useEffect(() => {
+    const incrementCount = () => {
+        setCount(prev => prev + 1);
+    };
+    incrementCount();
+}, []); // No external dependencies
+
+// ✅ FIX 2: Use useCallback for function
+const incrementCount = useCallback(() => {
+    setCount(prev => prev + 1);
+}, []); // Memoized function
+
+useEffect(() => {
+    incrementCount();
+}, [incrementCount]); // Same function reference</code></pre>
+                </div>
+
+                <h3>Debugging Infinite Loops</h3>
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 How to Find the Problem</h4>
+                    <ol>
+                        <li><strong>Check the Console:</strong> Look for "Maximum update depth exceeded" error</li>
+                        <li><strong>Add Logging:</strong> Log when effect runs
+                            <pre><code class="language-typescript">useEffect(() => {
+    console.log('Effect running with deps:', { count, data });
+    // Your effect code
+}, [count, data]);</code></pre>
+                        </li>
+                        <li><strong>Check Dependencies:</strong> Are you updating something in the dependency array?</li>
+                        <li><strong>Use React DevTools:</strong> Profiler can show re-render patterns</li>
+                        <li><strong>Comment Out Code:</strong> Temporarily disable state updates to isolate the issue</li>
+                    </ol>
+                </div>
+
+                <h3>Prevention Strategies</h3>
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Best Practices to Avoid Loops</h4>
+                    <ul>
+                        <li><strong>Always use dependency arrays:</strong> Never omit the second argument</li>
+                        <li><strong>Be careful with state updates:</strong> Don't update states that are dependencies</li>
+                        <li><strong>Use functional updates:</strong> <code>setState(prev => ...)</code> when depending on previous state</li>
+                        <li><strong>Memoize objects/arrays:</strong> Use useMemo/useCallback for complex dependencies</li>
+                        <li><strong>Depend on primitives:</strong> Use specific properties instead of whole objects</li>
+                        <li><strong>Understand reference equality:</strong> Objects/arrays/functions are compared by reference</li>
+                        <li><strong>Let ESLint help:</strong> Enable exhaustive-deps rule</li>
+                    </ul>
+                </div>
+
+                <h3>Safe Pattern Examples</h3>
+                <div class="card">
+                    <h4>✅ Correct Patterns</h4>
+                    <pre><code class="language-typescript">// Pattern 1: Fetch data once
+useEffect(() => {
+    fetch('/api/data')
+        .then(res => res.json())
+        .then(setData);
+}, []); // Empty array = once on mount
+
+// Pattern 2: Update based on prop
+useEffect(() => {
+    if (userId) {
+        fetchUser(userId);
+    }
+}, [userId]); // Only when userId changes
+
+// Pattern 3: Conditional state update
+useEffect(() => {
+    if (count > 10 && !hasShownAlert) {
+        alert('Count is over 10!');
+        setHasShownAlert(true); // Update different state
+    }
+}, [count, hasShownAlert]); // Won't loop if condition prevents it
+
+// Pattern 4: Effect doesn't update its dependencies
+const [input, setInput] = useState('');
+const [debouncedInput, setDebouncedInput] = useState('');
+
+useEffect(() => {
+    const timer = setTimeout(() => {
+        setDebouncedInput(input); // Updates different state
+    }, 500);
+    return () => clearTimeout(timer);
+}, [input]); // input changes, but we don't update it</code></pre>
+                </div>
+            </section>
+
+            <!-- Section 9: Hands-on Practice -->
+            <section id="section9" class="lesson-section">
+                <h2>🏋️ Hands-on Practice</h2>
+                <p>Let's put everything together with comprehensive exercises!</p>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>🏋️ Exercise 1: Real-Time Clock</h3>
+                    <p>Build a clock component that shows the current time and updates every second.</p>
+                    
+                    <h4>Requirements:</h4>
+                    <ul>
+                        <li>Display current time in HH:MM:SS format</li>
+                        <li>Update every second</li>
+                        <li>Clean up interval when component unmounts</li>
+                        <li>Show date as well</li>
+                    </ul>
+
+                    <h4>Starter Code:</h4>
+                    <pre><code class="language-typescript">const Clock: React.FC = () => {
+    const [time, setTime] = useState(new Date());
+    
+    // Your code here!
+    
+    const formatTime = (date: Date): string => {
+        return date.toLocaleTimeString();
+    };
+    
+    const formatDate = (date: Date): string => {
+        return date.toLocaleDateString();
+    };
+    
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;{formatTime(time)}&lt;/h2&gt;
+            &lt;p&gt;{formatDate(time)}&lt;/p&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <div class="card">
+                            <p>Use setInterval to update the time state every second. Don't forget to clean up!</p>
+                            <pre><code class="language-typescript">useEffect(() => {
+    const intervalId = setInterval(() => {
+        // Update time
+    }, 1000);
+    
+    return () => {
+        // Cleanup
+    };
+}, []);</code></pre>
+                        </div>
+                    </details>
+
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card">
+                            <pre><code class="language-typescript">const Clock: React.FC = () => {
+    const [time, setTime] = useState(new Date());
+    
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            setTime(new Date());
+        }, 1000);
+        
+        return () => {
+            clearInterval(intervalId);
+        };
+    }, []);
+    
+    const formatTime = (date: Date): string => {
+        return date.toLocaleTimeString();
+    };
+    
+    const formatDate = (date: Date): string => {
+        return date.toLocaleDateString();
+    };
+    
+    return (
+        &lt;div className="clock"&gt;
+            &lt;h2&gt;{formatTime(time)}&lt;/h2&gt;
+            &lt;p&gt;{formatDate(time)}&lt;/p&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>🏋️ Exercise 2: Mouse Tracker</h3>
+                    <p>Create a component that tracks and displays mouse position.</p>
+                    
+                    <h4>Requirements:</h4>
+                    <ul>
+                        <li>Show X and Y coordinates of mouse</li>
+                        <li>Update as mouse moves</li>
+                        <li>Clean up event listener on unmount</li>
+                        <li>Display if mouse is inside a specific area</li>
+                    </ul>
+
+                    <h4>Starter Code:</h4>
+                    <pre><code class="language-typescript">interface MousePosition {
+    x: number;
+    y: number;
+}
+
+const MouseTracker: React.FC = () => {
+    const [position, setPosition] = useState&lt;MousePosition&gt;({ x: 0, y: 0 });
+    
+    // Your code here!
+    
+    return (
+        &lt;div style={{ height: '400px', border: '2px solid #667eea', padding: '20px' }}&gt;
+            &lt;h2&gt;Mouse Position&lt;/h2&gt;
+            &lt;p&gt;X: {position.x}&lt;/p&gt;
+            &lt;p&gt;Y: {position.y}&lt;/p&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card">
+                            <pre><code class="language-typescript">const MouseTracker: React.FC = () => {
+    const [position, setPosition] = useState&lt;MousePosition&gt;({ x: 0, y: 0 });
+    
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            setPosition({
+                x: e.clientX,
+                y: e.clientY
+            });
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+        };
+    }, []);
+    
+    return (
+        &lt;div style={{ height: '400px', border: '2px solid #667eea', padding: '20px' }}&gt;
+            &lt;h2&gt;Mouse Position&lt;/h2&gt;
+            &lt;p&gt;X: {position.x}px&lt;/p&gt;
+            &lt;p&gt;Y: {position.y}px&lt;/p&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>🏋️ Exercise 3: Page Title Manager</h3>
+                    <p>Build a component that updates the document title based on different states.</p>
+                    
+                    <h4>Requirements:</h4>
+                    <ul>
+                        <li>Update title when notification count changes</li>
+                        <li>Show "(N) Notifications" if there are unread items</li>
+                        <li>Show app name when count is 0</li>
+                        <li>Include page name in title</li>
+                    </ul>
+
+                    <h4>Starter Code:</h4>
+                    <pre><code class="language-typescript">const TitleManager: React.FC = () => {
+    const [notifications, setNotifications] = useState(0);
+    const [pageName, setPageName] = useState('Home');
+    
+    // Your code here!
+    
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;Title Manager&lt;/h2&gt;
+            &lt;p&gt;Notifications: {notifications}&lt;/p&gt;
+            &lt;button onClick={() => setNotifications(notifications + 1)}&gt;
+                Add Notification
+            &lt;/button&gt;
+            &lt;button onClick={() => setNotifications(0)}&gt;
+                Clear Notifications
+            &lt;/button&gt;
+            &lt;select value={pageName} onChange={(e) => setPageName(e.target.value)}&gt;
+                &lt;option value="Home"&gt;Home&lt;/option&gt;
+                &lt;option value="Profile"&gt;Profile&lt;/option&gt;
+                &lt;option value="Settings"&gt;Settings&lt;/option&gt;
+            &lt;/select&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card">
+                            <pre><code class="language-typescript">const TitleManager: React.FC = () => {
+    const [notifications, setNotifications] = useState(0);
+    const [pageName, setPageName] = useState('Home');
+    
+    useEffect(() => {
+        let title = 'My App';
+        
+        if (notifications > 0) {
+            title = `(${notifications}) ${title}`;
+        }
+        
+        title = `${title} - ${pageName}`;
+        
+        document.title = title;
+    }, [notifications, pageName]);
+    
+    return (
+        &lt;div&gt;
+            &lt;h2&gt;Title Manager&lt;/h2&gt;
+            &lt;p&gt;Notifications: {notifications}&lt;/p&gt;
+            &lt;button onClick={() => setNotifications(notifications + 1)}&gt;
+                Add Notification
+            &lt;/button&gt;
+            &lt;button onClick={() => setNotifications(0)}&gt;
+                Clear Notifications
+            &lt;/button&gt;
+            &lt;select value={pageName} onChange={(e) => setPageName(e.target.value)}&gt;
+                &lt;option value="Home"&gt;Home&lt;/option&gt;
+                &lt;option value="Profile"&gt;Profile&lt;/option&gt;
+                &lt;option value="Settings"&gt;Settings&lt;/option&gt;
+            &lt;/select&gt;
+        &lt;/div&gt;
+    );
+};</code></pre>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>🏋️ Challenge Exercise: Pomodoro Timer</h3>
+                    <p>Build a complete Pomodoro timer with work and break sessions.</p>
+                    
+                    <h4>Requirements:</h4>
+                    <ul>
+                        <li>25-minute work sessions</li>
+                        <li>5-minute break sessions</li>
+                        <li>Auto-switch between work and break</li>
+                        <li>Play sound when timer completes</li>
+                        <li>Show notification when switching</li>
+                        <li>Pause/resume functionality</li>
+                        <li>Reset functionality</li>
+                    </ul>
+                    
+                    <p><strong>Bonus:</strong> Update document title with remaining time, save state to localStorage, add customizable durations!</p>
+                </div>
+            </section>
+
+            <!-- Section 10: Best Practices -->
+            <section id="section10" class="lesson-section">
+                <h2>✨ Best Practices</h2>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h3>✅ Do's</h3>
+                    <ul>
+                        <li><strong>Always use dependency arrays:</strong> Make effect behavior explicit</li>
+                        <li><strong>Clean up side effects:</strong> Remove listeners, clear timers, cancel requests</li>
+                        <li><strong>Keep effects focused:</strong> One effect per concern</li>
+                        <li><strong>Use early returns:</strong> Exit effect early when condition isn't met</li>
+                        <li><strong>Extract to custom hooks:</strong> Reuse effect logic across components</li>
+                        <li><strong>Type your effects:</strong> Use TypeScript for better safety</li>
+                        <li><strong>Use ESLint rule:</strong> Enable exhaustive-deps for automatic checks</li>
+                        <li><strong>Log during development:</strong> Add console.logs to understand execution</li>
+                        <li><strong>Consider effect timing:</strong> Use useLayoutEffect when DOM measurements needed</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h3>❌ Don'ts</h3>
+                    <ul>
+                        <li><strong>Don't omit dependency arrays:</strong> Leads to unpredictable behavior</li>
+                        <li><strong>Don't ignore ESLint warnings:</strong> They usually indicate real problems</li>
+                        <li><strong>Don't make effect function async:</strong> Define async function inside instead</li>
+                        <li><strong>Don't update state dependencies:</strong> Causes infinite loops</li>
+                        <li><strong>Don't forget cleanup:</strong> Memory leaks are hard to debug</li>
+                        <li><strong>Don't put too much in one effect:</strong> Split into multiple focused effects</li>
+                        <li><strong>Don't depend on objects/arrays directly:</strong> Use specific properties</li>
+                        <li><strong>Don't use effects for derived state:</strong> Calculate during render instead</li>
+                    </ul>
+                </div>
+
+                <h3>Effect Organization</h3>
+                <div class="card">
+                    <h4>✅ Good: Separate Concerns</h4>
+                    <pre><code class="language-typescript">const MyComponent: React.FC = () => {
+    // Effect 1: Document title
+    useEffect(() => {
+        document.title = `Page ${page}`;
+    }, [page]);
+    
+    // Effect 2: Data fetching
+    useEffect(() => {
+        fetchData();
+    }, [userId]);
+    
+    // Effect 3: Event listener
+    useEffect(() => {
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+    
+    // Each effect has single responsibility
+};</code></pre>
+                </div>
+
+                <div class="card">
+                    <h4>❌ Bad: Everything in One Effect</h4>
+                    <pre><code class="language-typescript">const MyComponent: React.FC = () => {
+    useEffect(() => {
+        // Too much in one effect!
+        document.title = `Page ${page}`;
+        fetchData();
+        window.addEventListener('resize', handleResize);
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [page, userId]); // Runs for both changes
+};</code></pre>
+                </div>
+
+                <h3>When NOT to Use useEffect</h3>
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Consider Alternatives</h4>
+                    <pre><code class="language-typescript">// ❌ DON'T: Use effect for derived state
+const [items, setItems] = useState([]);
+const [total, setTotal] = useState(0);
+
+useEffect(() => {
+    setTotal(items.reduce((sum, item) => sum + item.price, 0));
+}, [items]);
+
+// ✅ DO: Calculate during render
+const [items, setItems] = useState([]);
+const total = items.reduce((sum, item) => sum + item.price, 0);
+
+// ❌ DON'T: Use effect to transform props
+useEffect(() => {
+    setUpperName(name.toUpperCase());
+}, [name]);
+
+// ✅ DO: Transform during render
+const upperName = name.toUpperCase();
+
+// ❌ DON'T: Use effect for event handlers
+useEffect(() => {
+    if (shouldSubmit) {
+        submitForm();
+    }
+}, [shouldSubmit]);
+
+// ✅ DO: Call directly in event handler
+const handleClick = () => {
+    submitForm();
+};</code></pre>
+                </div>
+
+                <h3>Performance Considerations</h3>
+                <div class="card">
+                    <h4>Optimize Effect Execution</h4>
+                    <pre><code class="language-typescript">// ❌ Runs on every render
+useEffect(() => {
+    expensiveOperation();
+});
+
+// ✅ Runs only when needed
+useEffect(() => {
+    expensiveOperation();
+}, [dependency]);
+
+// ✅ Early return for unnecessary work
+useEffect(() => {
+    if (!shouldRun) return;
+    expensiveOperation();
+}, [shouldRun, dependency]);</code></pre>
+                </div>
+            </section>
+
+            <!-- Section 11: Summary -->
+            <section id="section11" class="lesson-section">
+                <h2>📚 Summary</h2>
+                
+                <div class="card">
+                    <h3>What You Learned</h3>
+                    <p>Congratulations! You've mastered the useEffect hook—one of React's most powerful and essential features:</p>
+                    
+                    <ul>
+                        <li>✅ Understanding side effects and why they need special handling</li>
+                        <li>✅ Using useEffect to run code after renders</li>
+                        <li>✅ Mastering dependency arrays for controlling when effects run</li>
+                        <li>✅ Implementing cleanup functions to prevent memory leaks</li>
+                        <li>✅ Understanding effect execution timing and lifecycle</li>
+                        <li>✅ Common patterns: timers, event listeners, document updates</li>
+                        <li>✅ Avoiding infinite loops and other common pitfalls</li>
+                        <li>✅ Writing clean, maintainable effects with TypeScript</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h3 style="color: white;">🎯 Key Takeaways</h3>
+                    <ul style="color: white;">
+                        <li><strong>Pure render functions:</strong> Side effects go in useEffect, not render</li>
+                        <li><strong>Dependency arrays matter:</strong> They control when effects run</li>
+                        <li><strong>Always clean up:</strong> Prevent memory leaks and stale updates</li>
+                        <li><strong>One effect per concern:</strong> Keep effects focused and maintainable</li>
+                        <li><strong>Trust ESLint:</strong> The exhaustive-deps rule catches real problems</li>
+                    </ul>
+                </div>
+
+                <h3>useEffect Quick Reference</h3>
+                <div class="card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pattern</th>
+                                <th>Code</th>
+                                <th>When It Runs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Every Render</strong></td>
+                                <td><code>useEffect(() => {})</code></td>
+                                <td>After every render</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Mount Only</strong></td>
+                                <td><code>useEffect(() => {}, [])</code></td>
+                                <td>Once when component mounts</td>
+                            </tr>
+                            <tr>
+                                <td><strong>On Change</strong></td>
+                                <td><code>useEffect(() => {}, [dep])</code></td>
+                                <td>When dep changes</td>
+                            </tr>
+                            <tr>
+                                <td><strong>With Cleanup</strong></td>
+                                <td><code>useEffect(() => { return () => {} }, [])</code></td>
+                                <td>Cleanup on unmount/re-run</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Common Use Cases Cheatsheet</h3>
+                <div class="card">
+                    <pre><code class="language-typescript">// Document title
+useEffect(() => {
+    document.title = title;
+}, [title]);
+
+// Timer
+useEffect(() => {
+    const id = setInterval(() => {}, 1000);
+    return () => clearInterval(id);
+}, []);
+
+// Event listener
+useEffect(() => {
+    window.addEventListener('event', handler);
+    return () => window.removeEventListener('event', handler);
+}, []);
+
+// Focus input
+useEffect(() => {
+    inputRef.current?.focus();
+}, []);
+
+// localStorage sync
+useEffect(() => {
+    localStorage.setItem('key', value);
+}, [value]);</code></pre>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>🚀 What's Next?</h3>
+                    <p>In the next lesson, we'll learn about <strong>Data Fetching Basics</strong>:</p>
+                    <ul>
+                        <li>Using fetch API with useEffect</li>
+                        <li>Handling loading and error states</li>
+                        <li>Typing API responses with TypeScript</li>
+                        <li>Async/await patterns in effects</li>
+                        <li>Canceling requests with AbortController</li>
+                        <li>Building real-world data fetching components</li>
+                    </ul>
+                    <p>You're building real React applications now! 💪</p>
+                </div>
+            </section>
+
+            <!-- Lesson Navigation -->
+            <div class="lesson-nav">
+                <a href="module_project_3_todo_app.html" class="prev-lesson">← Previous: Module 3 Project</a>
+                <a href="index.html" class="home-link">🏠 Home</a>
+                <a href="lesson_4_2_data_fetching_basics.html" class="next-lesson">Next: Data Fetching Basics →</a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 React TypeScript Course. All rights reserved.</p>
+            <p>
+                <a href="index.html">Home</a> |
+                <a href="index.html#modules">All Modules</a> |
+                <a href="https://react.dev" target="_blank">React Docs</a> |
+                <a href="https://www.typescriptlang.org/docs/" target="_blank">TypeScript Docs</a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>
