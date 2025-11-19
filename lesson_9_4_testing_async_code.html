@@ -1,0 +1,2951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Master testing asynchronous code in React. Learn to test data fetching, API calls, loading states, error handling, race conditions, and complex async patterns with React Testing Library.">
+    <meta name="author" content="Ray">
+    <title>Lesson 9.4: Testing Async Code - React TypeScript Course</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#f0f0f0',
+                primaryTextColor: '#333',
+                primaryBorderColor: '#667eea'
+            }
+        });
+    </script>
+</head>
+<body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+    
+    <!-- Progress indicator -->
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React TypeScript Course</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">
+                ☰
+            </button>
+            <div class="nav-links" id="nav-links" aria-hidden="false">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <button id="theme-toggle" aria-label="Toggle theme">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ul>
+            <li><a href="index.html">Home</a></li>
+            <li><a href="index.html#modules">Module 9: Testing React Applications</a></li>
+            <li aria-current="page">Lesson 9.4: Testing Async Code</li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main-content">
+        <div class="container">
+            <!-- Lesson Header -->
+            <header>
+                <h1>⏳ Lesson 9.4: Testing Async Code</h1>
+                <p class="lead">Master the art of testing asynchronous operations in React applications. Learn to test data fetching, API calls, loading states, error handling, race conditions, and advanced async patterns with confidence.</p>
+                
+                <!-- Learning objectives -->
+                <div class="card">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Test components that fetch data with proper async handling</li>
+                        <li>Mock API calls effectively using Mock Service Worker (MSW)</li>
+                        <li>Test loading states, success states, and error states comprehensively</li>
+                        <li>Handle race conditions and concurrent requests in tests</li>
+                        <li>Test React Query and other data fetching libraries</li>
+                        <li>Test infinite scroll, pagination, and polling patterns</li>
+                        <li>Write reliable tests for complex async workflows</li>
+                    </ul>
+                    <p><strong>Estimated Time:</strong> 75-90 minutes</p>
+                    <p><strong>Project:</strong> Test a complete data fetching component with all async states</p>
+                </div>
+            </header>
+
+            <!-- Sticky Table of Contents -->
+            <details class="card" open style="position: sticky; top: 80px; z-index: 100; background: var(--card-bg, white); box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+                <summary style="cursor: pointer; font-weight: bold; padding: 0.5rem 1rem; user-select: none;">
+                    <h2 style="display: inline; margin: 0;">📑 In This Lesson</h2>
+                </summary>
+                <nav aria-label="Table of Contents" style="padding: 0 1rem 1rem 1rem;">
+                    <ol>
+                        <li><a href="#introduction" class="toc-link">Understanding Async Testing</a></li>
+                        <li><a href="#basic-async" class="toc-link">Testing Basic Data Fetching</a></li>
+                        <li><a href="#msw-setup" class="toc-link">Mock Service Worker Deep Dive</a></li>
+                        <li><a href="#loading-states" class="toc-link">Testing Loading States</a></li>
+                        <li><a href="#error-handling" class="toc-link">Testing Error Handling</a></li>
+                        <li><a href="#race-conditions" class="toc-link">Testing Race Conditions</a></li>
+                        <li><a href="#react-query" class="toc-link">Testing React Query</a></li>
+                        <li><a href="#advanced-patterns" class="toc-link">Advanced Async Patterns</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#best-practices" class="toc-link">Best Practices</a></li>
+                        <li><a href="#summary" class="toc-link">Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <!-- Section 1: Introduction -->
+            <section id="introduction" class="lesson-section">
+                <h2>📖 Understanding Async Testing</h2>
+                
+                <p>Asynchronous code is everywhere in modern React applications—data fetching, API calls, animations, timers, and more. Testing async code is challenging because you need to wait for operations to complete before asserting on results.</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4>📖 What is Async Testing?</h4>
+                    <p style="color: white;"><strong>Async testing</strong> involves testing code that doesn't execute immediately. This includes network requests, setTimeout/setInterval, Promises, async/await, and any operation where results aren't available synchronously.</p>
+                </div>
+
+                <h3>The Challenge with Async Code</h3>
+                <p>Consider this component that fetches user data:</p>
+
+                <pre><code class="language-typescript">
+function UserProfile({ userId }: { userId: string }) {
+  const [user, setUser] = React.useState&lt;User | null&gt;(null);
+  const [loading, setLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    fetch(`/api/users/${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        setUser(data);
+        setLoading(false);
+      });
+  }, [userId]);
+  
+  if (loading) return &lt;div&gt;Loading...&lt;/div&gt;;
+  return &lt;div&gt;{user?.name}&lt;/div&gt;;
+}
+                </code></pre>
+
+                <p>If we test this synchronously, we'll only see the loading state:</p>
+
+                <pre><code class="language-typescript">
+// ❌ This test fails - doesn't wait for async operation
+test('displays user name', () => {
+  render(&lt;UserProfile userId="123" /&gt;);
+  
+  // This fails - user data hasn't loaded yet!
+  expect(screen.getByText('John Doe')).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>The Async Testing Lifecycle</h3>
+                <div class="mermaid">
+                    graph LR
+                    A[Render Component] --> B[Initial State: Loading]
+                    B --> C[Async Operation Starts]
+                    C --> D[Wait for Operation]
+                    D --> E{Success?}
+                    E -->|Yes| F[Update State: Data]
+                    E -->|No| G[Update State: Error]
+                    F --> H[Component Rerenders]
+                    G --> H
+                    H --> I[Assert on Final State]
+                    
+                    style A fill:#667eea,stroke:#333,stroke-width:2px,color:#fff
+                    style D fill:#ffc107,stroke:#333,stroke-width:2px,color:#333
+                    style I fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
+                </div>
+
+                <h3>Three Approaches to Async Testing</h3>
+                <p>React Testing Library provides three ways to handle async operations:</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Method</th>
+                            <th>Use Case</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>findBy</code> queries</td>
+                            <td>Waiting for elements to appear</td>
+                            <td><code>await screen.findByText('Loaded')</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>waitFor</code></td>
+                            <td>Waiting for assertions to pass</td>
+                            <td><code>await waitFor(() => expect(...).toBe(...))</code></td>
+                        </tr>
+                        <tr>
+                            <td><code>waitForElementToBeRemoved</code></td>
+                            <td>Waiting for elements to disappear</td>
+                            <td><code>await waitForElementToBeRemoved(() => screen.getByText('Loading'))</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Key Async Testing Principles</h4>
+                    <ol>
+                        <li><strong>Always use async/await:</strong> Mark test functions as <code>async</code></li>
+                        <li><strong>Wait for changes:</strong> Use <code>findBy</code> or <code>waitFor</code></li>
+                        <li><strong>Mock external dependencies:</strong> Control API responses in tests</li>
+                        <li><strong>Test all states:</strong> Loading, success, error, and empty states</li>
+                        <li><strong>Be patient:</strong> Set appropriate timeouts for slow operations</li>
+                    </ol>
+                </div>
+
+                <blockquote>
+                    <strong>💬 Testing Philosophy:</strong> "Async tests should mirror reality—wait for operations to complete, handle errors gracefully, and verify the final state matches user expectations."
+                </blockquote>
+            </section>
+
+            <!-- Section 2: Basic Data Fetching -->
+            <section id="basic-async" class="lesson-section">
+                <h2>🌐 Testing Basic Data Fetching</h2>
+                
+                <p>Let's start with the fundamentals of testing components that fetch data.</p>
+
+                <h3>Simple Data Fetching Component</h3>
+                <pre><code class="language-typescript">
+interface Post {
+  id: string;
+  title: string;
+  body: string;
+}
+
+export function PostList() {
+  const [posts, setPosts] = React.useState&lt;Post[]&gt;([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState&lt;string | null&gt;(null);
+  
+  React.useEffect(() => {
+    fetch('/api/posts')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch');
+        return res.json();
+      })
+      .then(data => {
+        setPosts(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, []);
+  
+  if (loading) return &lt;div&gt;Loading posts...&lt;/div&gt;;
+  if (error) return &lt;div&gt;Error: {error}&lt;/div&gt;;
+  if (posts.length === 0) return &lt;div&gt;No posts found&lt;/div&gt;;
+  
+  return (
+    &lt;ul&gt;
+      {posts.map(post => (
+        &lt;li key={post.id}&gt;
+          &lt;h3&gt;{post.title}&lt;/h3&gt;
+          &lt;p&gt;{post.body}&lt;/p&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+                </code></pre>
+
+                <h3>Testing with findBy</h3>
+                <pre><code class="language-typescript">
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
+import { rest } from 'msw';
+import { setupServer } from 'msw/node';
+import { PostList } from './PostList';
+
+// Set up MSW server
+const server = setupServer(
+  rest.get('/api/posts', (req, res, ctx) => {
+    return res(
+      ctx.json([
+        { id: '1', title: 'First Post', body: 'Content 1' },
+        { id: '2', title: 'Second Post', body: 'Content 2' }
+      ])
+    );
+  })
+);
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+describe('PostList', () => {
+  it('displays posts after loading', async () => {
+    render(&lt;PostList /&gt;);
+    
+    // Initially shows loading
+    expect(screen.getByText('Loading posts...')).toBeInTheDocument();
+    
+    // Wait for posts to appear
+    expect(await screen.findByText('First Post')).toBeInTheDocument();
+    expect(screen.getByText('Second Post')).toBeInTheDocument();
+    
+    // Loading should be gone
+    expect(screen.queryByText('Loading posts...')).not.toBeInTheDocument();
+  });
+});
+                </code></pre>
+
+                <h3>Testing with waitFor</h3>
+                <pre><code class="language-typescript">
+import { waitFor } from '@testing-library/react';
+
+test('displays posts using waitFor', async () => {
+  render(&lt;PostList /&gt;);
+  
+  // Wait for loading to finish and posts to appear
+  await waitFor(() => {
+    expect(screen.queryByText('Loading posts...')).not.toBeInTheDocument();
+    expect(screen.getByText('First Post')).toBeInTheDocument();
+  });
+});
+                </code></pre>
+
+                <h3>Testing Empty State</h3>
+                <pre><code class="language-typescript">
+test('displays empty state when no posts', async () => {
+  // Override handler to return empty array
+  server.use(
+    rest.get('/api/posts', (req, res, ctx) => {
+      return res(ctx.json([]));
+    })
+  );
+  
+  render(&lt;PostList /&gt;);
+  
+  expect(await screen.findByText('No posts found')).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing with Different Data</h3>
+                <pre><code class="language-typescript">
+test('displays correct number of posts', async () => {
+  server.use(
+    rest.get('/api/posts', (req, res, ctx) => {
+      return res(
+        ctx.json([
+          { id: '1', title: 'Post 1', body: 'Body 1' },
+          { id: '2', title: 'Post 2', body: 'Body 2' },
+          { id: '3', title: 'Post 3', body: 'Body 3' }
+        ])
+      );
+    })
+  );
+  
+  render(&lt;PostList /&gt;);
+  
+  await waitFor(() => {
+    const posts = screen.getAllByRole('listitem');
+    expect(posts).toHaveLength(3);
+  });
+});
+                </code></pre>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ findBy vs waitFor - When to Use Which?</h4>
+                    <p><strong>Use findBy when:</strong></p>
+                    <ul>
+                        <li>Waiting for a single element to appear</li>
+                        <li>The test is simple and straightforward</li>
+                        <li>You want cleaner, more readable code</li>
+                    </ul>
+                    <p><strong>Use waitFor when:</strong></p>
+                    <ul>
+                        <li>Making multiple assertions that need to pass together</li>
+                        <li>Waiting for something to disappear</li>
+                        <li>Complex conditions that can't be expressed with a single query</li>
+                        <li>Need custom timeout or retry intervals</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 3: MSW Deep Dive -->
+            <section id="msw-setup" class="lesson-section">
+                <h2>🎭 Mock Service Worker Deep Dive</h2>
+                
+                <p>Mock Service Worker (MSW) is the gold standard for mocking APIs in tests. It intercepts network requests at the network level, making tests more realistic.</p>
+
+                <h3>Why MSW Over fetch Mocking?</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Approach</th>
+                            <th>Pros</th>
+                            <th>Cons</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Mock fetch</strong></td>
+                            <td>Simple, no dependencies</td>
+                            <td>Brittle, doesn't test network layer, hard to maintain</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Mock axios/API client</strong></td>
+                            <td>Easier than mocking fetch</td>
+                            <td>Tied to implementation, misses network issues</td>
+                        </tr>
+                        <tr>
+                            <td><strong>MSW</strong></td>
+                            <td>Realistic, reusable, works with any HTTP client</td>
+                            <td>Extra dependency, slightly more setup</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Complete MSW Setup</h3>
+                <pre><code class="language-typescript">
+// src/mocks/handlers.ts
+import { rest } from 'msw';
+
+export const handlers = [
+  // GET request with dynamic params
+  rest.get('/api/users/:id', (req, res, ctx) => {
+    const { id } = req.params;
+    
+    return res(
+      ctx.status(200),
+      ctx.json({
+        id,
+        name: `User ${id}`,
+        email: `user${id}@example.com`
+      })
+    );
+  }),
+  
+  // POST request with request body
+  rest.post('/api/users', async (req, res, ctx) => {
+    const body = await req.json();
+    
+    return res(
+      ctx.status(201),
+      ctx.json({
+        id: Math.random().toString(),
+        ...body,
+        createdAt: new Date().toISOString()
+      })
+    );
+  }),
+  
+  // PUT request
+  rest.put('/api/users/:id', async (req, res, ctx) => {
+    const { id } = req.params;
+    const body = await req.json();
+    
+    return res(
+      ctx.status(200),
+      ctx.json({
+        id,
+        ...body,
+        updatedAt: new Date().toISOString()
+      })
+    );
+  }),
+  
+  // DELETE request
+  rest.delete('/api/users/:id', (req, res, ctx) => {
+    return res(
+      ctx.status(204)
+    );
+  }),
+  
+  // Query parameters
+  rest.get('/api/search', (req, res, ctx) => {
+    const query = req.url.searchParams.get('q');
+    const page = req.url.searchParams.get('page') || '1';
+    
+    return res(
+      ctx.json({
+        query,
+        page: parseInt(page),
+        results: [`Result for ${query}`]
+      })
+    );
+  })
+];
+
+// src/mocks/server.ts
+import { setupServer } from 'msw/node';
+import { handlers } from './handlers';
+
+export const server = setupServer(...handlers);
+
+// src/test/setup.ts
+import { beforeAll, afterEach, afterAll } from 'vitest';
+import { server } from '../mocks/server';
+
+// Start server before all tests
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+
+// Reset handlers after each test
+afterEach(() => server.resetHandlers());
+
+// Clean up after all tests
+afterAll(() => server.close());
+                </code></pre>
+
+                <h3>Simulating Different Response Times</h3>
+                <pre><code class="language-typescript">
+test('handles slow API responses', async () => {
+  server.use(
+    rest.get('/api/posts', async (req, res, ctx) => {
+      // Delay response by 2 seconds
+      await ctx.delay(2000);
+      
+      return res(
+        ctx.json([{ id: '1', title: 'Post' }])
+      );
+    })
+  );
+  
+  render(&lt;PostList /&gt;);
+  
+  // Should show loading for a while
+  expect(screen.getByText('Loading posts...')).toBeInTheDocument();
+  
+  // Eventually loads
+  expect(await screen.findByText('Post', {}, { timeout: 3000 })).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Simulating Network Errors</h3>
+                <pre><code class="language-typescript">
+test('handles network errors', async () => {
+  server.use(
+    rest.get('/api/posts', (req, res, ctx) => {
+      return res.networkError('Failed to connect');
+    })
+  );
+  
+  render(&lt;PostList /&gt;);
+  
+  expect(await screen.findByText(/error/i)).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing Different Status Codes</h3>
+                <pre><code class="language-typescript">
+test('handles 404 not found', async () => {
+  server.use(
+    rest.get('/api/posts', (req, res, ctx) => {
+      return res(
+        ctx.status(404),
+        ctx.json({ message: 'Not found' })
+      );
+    })
+  );
+  
+  render(&lt;PostList /&gt;);
+  
+  expect(await screen.findByText('Error: Failed to fetch')).toBeInTheDocument();
+});
+
+test('handles 500 server error', async () => {
+  server.use(
+    rest.get('/api/posts', (req, res, ctx) => {
+      return res(
+        ctx.status(500),
+        ctx.json({ message: 'Internal server error' })
+      );
+    })
+  );
+  
+  render(&lt;PostList /&gt;);
+  
+  expect(await screen.findByText(/error/i)).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Per-Test Handler Overrides</h3>
+                <pre><code class="language-typescript">
+describe('PostList with different scenarios', () => {
+  it('shows success state', async () => {
+    // Uses default handler
+    render(&lt;PostList /&gt;);
+    expect(await screen.findByText('First Post')).toBeInTheDocument();
+  });
+  
+  it('shows error state', async () => {
+    // Override for this test only
+    server.use(
+      rest.get('/api/posts', (req, res, ctx) => {
+        return res(ctx.status(500));
+      })
+    );
+    
+    render(&lt;PostList /&gt;);
+    expect(await screen.findByText(/error/i)).toBeInTheDocument();
+  });
+  
+  it('shows empty state', async () => {
+    // Override for this test only
+    server.use(
+      rest.get('/api/posts', (req, res, ctx) => {
+        return res(ctx.json([]));
+      })
+    );
+    
+    render(&lt;PostList /&gt;);
+    expect(await screen.findByText('No posts found')).toBeInTheDocument();
+  });
+});
+                </code></pre>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 MSW Best Practices</h4>
+                    <ul>
+                        <li><strong>Create realistic responses:</strong> Mirror your actual API structure</li>
+                        <li><strong>Use request handlers for each endpoint:</strong> Keep handlers organized</li>
+                        <li><strong>Reset handlers after each test:</strong> Prevents test pollution</li>
+                        <li><strong>Handle all HTTP methods:</strong> GET, POST, PUT, DELETE, PATCH</li>
+                        <li><strong>Test various response scenarios:</strong> Success, errors, timeouts</li>
+                        <li><strong>Use ctx.delay() sparingly:</strong> Don't slow down your test suite unnecessarily</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 4: Testing Loading States -->
+            <section id="loading-states" class="lesson-section">
+                <h2>⏳ Testing Loading States</h2>
+                
+                <p>Loading states are crucial for user experience. Let's ensure they work correctly in all scenarios.</p>
+
+                <h3>Testing Sequential Loading States</h3>
+                <pre><code class="language-typescript">
+function DataComponent() {
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    setLoading(true);
+    fetch('/api/data')
+      .then(res => res.json())
+      .then(data => {
+        setData(data);
+        setLoading(false);
+      });
+  }, []);
+  
+  return (
+    &lt;div&gt;
+      {loading && &lt;div data-testid="spinner"&gt;Loading...&lt;/div&gt;}
+      {!loading && data && &lt;div&gt;{data.value}&lt;/div&gt;}
+    &lt;/div&gt;
+  );
+}
+
+test('shows loading spinner then data', async () => {
+  server.use(
+    rest.get('/api/data', (req, res, ctx) => {
+      return res(
+        ctx.delay(100), // Simulate network delay
+        ctx.json({ value: 'Loaded!' })
+      );
+    })
+  );
+  
+  render(&lt;DataComponent /&gt;);
+  
+  // Should show loading initially
+  expect(screen.getByTestId('spinner')).toBeInTheDocument();
+  expect(screen.getByText('Loading...')).toBeInTheDocument();
+  
+  // Wait for data to load
+  await waitFor(() => {
+    expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+  });
+  
+  expect(screen.getByText('Loaded!')).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing Multiple Loading Indicators</h3>
+                <pre><code class="language-typescript">
+function MultiStepLoader() {
+  const [step, setStep] = React.useState&lt;'idle' | 'fetching' | 'processing' | 'done'&gt;('idle');
+  
+  const handleLoad = async () => {
+    setStep('fetching');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    setStep('processing');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    setStep('done');
+  };
+  
+  return (
+    &lt;div&gt;
+      &lt;button onClick={handleLoad}&gt;Load Data&lt;/button&gt;
+      {step === 'fetching' && &lt;div&gt;Fetching data...&lt;/div&gt;}
+      {step === 'processing' && &lt;div&gt;Processing data...&lt;/div&gt;}
+      {step === 'done' && &lt;div&gt;Complete!&lt;/div&gt;}
+    &lt;/div&gt;
+  );
+}
+
+test('shows correct loading message at each step', async () => {
+  const user = userEvent.setup();
+  render(&lt;MultiStepLoader /&gt;);
+  
+  await user.click(screen.getByRole('button', { name: 'Load Data' }));
+  
+  // Step 1: Fetching
+  expect(screen.getByText('Fetching data...')).toBeInTheDocument();
+  
+  // Step 2: Processing
+  await waitFor(() => {
+    expect(screen.getByText('Processing data...')).toBeInTheDocument();
+  });
+  
+  // Step 3: Complete
+  await waitFor(() => {
+    expect(screen.getByText('Complete!')).toBeInTheDocument();
+  });
+});
+                </code></pre>
+
+                <h3>Testing Skeleton Screens</h3>
+                <pre><code class="language-typescript">
+function UserCard({ userId }: { userId: string }) {
+  const [user, setUser] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    fetch(`/api/users/${userId}`)
+      .then(res => res.json())
+      .then(data => {
+        setUser(data);
+        setLoading(false);
+      });
+  }, [userId]);
+  
+  if (loading) {
+    return (
+      &lt;div data-testid="skeleton"&gt;
+        &lt;div className="skeleton-avatar" /&gt;
+        &lt;div className="skeleton-line" /&gt;
+        &lt;div className="skeleton-line" /&gt;
+      &lt;/div&gt;
+    );
+  }
+  
+  return (
+    &lt;div&gt;
+      &lt;img src={user.avatar} alt={user.name} /&gt;
+      &lt;h2&gt;{user.name}&lt;/h2&gt;
+      &lt;p&gt;{user.email}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+
+test('shows skeleton screen while loading', async () => {
+  server.use(
+    rest.get('/api/users/:id', (req, res, ctx) => {
+      return res(
+        ctx.delay(100),
+        ctx.json({
+          name: 'John Doe',
+          email: 'john@example.com',
+          avatar: '/avatar.jpg'
+        })
+      );
+    })
+  );
+  
+  render(&lt;UserCard userId="123" /&gt;);
+  
+  // Skeleton should be visible
+  const skeleton = screen.getByTestId('skeleton');
+  expect(skeleton).toBeInTheDocument();
+  expect(skeleton.querySelector('.skeleton-avatar')).toBeInTheDocument();
+  
+  // Wait for actual content
+  await waitFor(() => {
+    expect(screen.queryByTestId('skeleton')).not.toBeInTheDocument();
+  });
+  
+  expect(screen.getByText('John Doe')).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing Progress Indicators</h3>
+                <pre><code class="language-typescript">
+function FileUploadProgress() {
+  const [progress, setProgress] = React.useState(0);
+  const [status, setStatus] = React.useState&lt;'idle' | 'uploading' | 'complete'&gt;('idle');
+  
+  const handleUpload = () => {
+    setStatus('uploading');
+    
+    // Simulate progress
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setStatus('complete');
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 100);
+  };
+  
+  return (
+    &lt;div&gt;
+      &lt;button onClick={handleUpload} disabled={status === 'uploading'}&gt;
+        Upload
+      &lt;/button&gt;
+      {status === 'uploading' && (
+        &lt;div&gt;
+          &lt;div&gt;Uploading... {progress}%&lt;/div&gt;
+          &lt;progress value={progress} max={100} /&gt;
+        &lt;/div&gt;
+      )}
+      {status === 'complete' && &lt;div&gt;Upload complete!&lt;/div&gt;}
+    &lt;/div&gt;
+  );
+}
+
+test('shows upload progress', async () => {
+  vi.useFakeTimers();
+  const user = userEvent.setup({ delay: null }); // Disable userEvent's built-in delay
+  
+  render(&lt;FileUploadProgress /&gt;);
+  
+  await user.click(screen.getByRole('button', { name: 'Upload' }));
+  
+  // Should start uploading
+  expect(screen.getByText('Uploading... 0%')).toBeInTheDocument();
+  
+  // Advance time and check progress
+  act(() => {
+    vi.advanceTimersByTime(500);
+  });
+  
+  expect(screen.getByText('Uploading... 50%')).toBeInTheDocument();
+  
+  // Complete upload
+  act(() => {
+    vi.advanceTimersByTime(500);
+  });
+  
+  expect(screen.getByText('Upload complete!')).toBeInTheDocument();
+  
+  vi.useRealTimers();
+});
+                </code></pre>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Loading State Testing Checklist</h4>
+                    <ul>
+                        <li>✓ Test that loading indicator appears immediately</li>
+                        <li>✓ Test that loading indicator disappears after data loads</li>
+                        <li>✓ Test multiple sequential loading states</li>
+                        <li>✓ Test that buttons are disabled during loading</li>
+                        <li>✓ Test progress indicators update correctly</li>
+                        <li>✓ Test skeleton screens render proper structure</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 5: Testing Error Handling -->
+            <section id="error-handling" class="lesson-section">
+                <h2>❌ Testing Error Handling</h2>
+                
+                <p>Robust applications handle errors gracefully. Let's ensure your error handling works as expected.</p>
+
+                <h3>Testing Network Errors</h3>
+                <pre><code class="language-typescript">
+function RobustDataFetcher() {
+  const [data, setData] = React.useState(null);
+  const [error, setError] = React.useState&lt;string | null&gt;(null);
+  const [loading, setLoading] = React.useState(false);
+  
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/data');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const json = await response.json();
+      setData(json);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    &lt;div&gt;
+      &lt;button onClick={fetchData} disabled={loading}&gt;
+        Fetch Data
+      &lt;/button&gt;
+      
+      {loading && &lt;div&gt;Loading...&lt;/div&gt;}
+      {error && &lt;div role="alert"&gt;Error: {error}&lt;/div&gt;}
+      {data && &lt;div&gt;Data: {JSON.stringify(data)}&lt;/div&gt;}
+    &lt;/div&gt;
+  );
+}
+
+test('handles network error', async () => {
+  const user = userEvent.setup();
+  
+  server.use(
+    rest.get('/api/data', (req, res, ctx) => {
+      return res.networkError('Failed to connect');
+    })
+  );
+  
+  render(&lt;RobustDataFetcher /&gt;);
+  
+  await user.click(screen.getByRole('button', { name: 'Fetch Data' }));
+  
+  expect(await screen.findByRole('alert')).toHaveTextContent(/error/i);
+  expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
+});
+
+test('handles 404 error', async () => {
+  const user = userEvent.setup();
+  
+  server.use(
+    rest.get('/api/data', (req, res, ctx) => {
+      return res(
+        ctx.status(404),
+        ctx.text('Not Found')
+      );
+    })
+  );
+  
+  render(&lt;RobustDataFetcher /&gt;);
+  
+  await user.click(screen.getByRole('button', { name: 'Fetch Data' }));
+  
+  expect(await screen.findByRole('alert')).toHaveTextContent(/HTTP 404/i);
+});
+
+test('handles 500 error', async () => {
+  const user = userEvent.setup();
+  
+  server.use(
+    rest.get('/api/data', (req, res, ctx) => {
+      return res(
+        ctx.status(500),
+        ctx.json({ message: 'Internal Server Error' })
+      );
+    })
+  );
+  
+  render(&lt;RobustDataFetcher /&gt;);
+  
+  await user.click(screen.getByRole('button', { name: 'Fetch Data' }));
+  
+  expect(await screen.findByRole('alert')).toHaveTextContent(/HTTP 500/i);
+});
+                </code></pre>
+
+                <h3>Testing Retry Logic</h3>
+                <pre><code class="language-typescript">
+function DataFetcherWithRetry() {
+  const [data, setData] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const [retryCount, setRetryCount] = React.useState(0);
+  const maxRetries = 3;
+  
+  const fetchData = async () => {
+    try {
+      const response = await fetch('/api/data');
+      if (!response.ok) throw new Error('Failed');
+      
+      const json = await response.json();
+      setData(json);
+      setRetryCount(0);
+    } catch (err) {
+      if (retryCount < maxRetries) {
+        setRetryCount(prev => prev + 1);
+        setTimeout(fetchData, 1000);
+      } else {
+        setError('Failed after 3 retries');
+      }
+    }
+  };
+  
+  React.useEffect(() => {
+    fetchData();
+  }, []);
+  
+  if (error) return &lt;div&gt;Error: {error}&lt;/div&gt;;
+  if (!data) return &lt;div&gt;Loading... (Attempt {retryCount + 1})&lt;/div&gt;;
+  return &lt;div&gt;Data: {data.value}&lt;/div&gt;;
+}
+
+test('retries on failure and eventually succeeds', async () => {
+  let attempts = 0;
+  
+  server.use(
+    rest.get('/api/data', (req, res, ctx) => {
+      attempts++;
+      
+      if (attempts < 3) {
+        return res(ctx.status(500));
+      }
+      
+      return res(ctx.json({ value: 'Success!' }));
+    })
+  );
+  
+  vi.useFakeTimers();
+  render(&lt;DataFetcherWithRetry /&gt;);
+  
+  // First attempt fails
+  expect(screen.getByText('Loading... (Attempt 1)')).toBeInTheDocument();
+  
+  // Wait for retry
+  act(() => {
+    vi.advanceTimersByTime(1000);
+  });
+  
+  await waitFor(() => {
+    expect(screen.getByText('Loading... (Attempt 2)')).toBeInTheDocument();
+  });
+  
+  // Second retry
+  act(() => {
+    vi.advanceTimersByTime(1000);
+  });
+  
+  // Eventually succeeds
+  expect(await screen.findByText('Data: Success!')).toBeInTheDocument();
+  
+  vi.useRealTimers();
+});
+
+test('gives up after max retries', async () => {
+  server.use(
+    rest.get('/api/data', (req, res, ctx) => {
+      return res(ctx.status(500));
+    })
+  );
+  
+  vi.useFakeTimers();
+  render(&lt;DataFetcherWithRetry /&gt;);
+  
+  // Fast-forward through all retries
+  act(() => {
+    vi.advanceTimersByTime(4000);
+  });
+  
+  expect(await screen.findByText('Error: Failed after 3 retries')).toBeInTheDocument();
+  
+  vi.useRealTimers();
+});
+                </code></pre>
+
+                <h3>Testing Error Recovery</h3>
+                <pre><code class="language-typescript">
+function ErrorRecoveryComponent() {
+  const [data, setData] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  
+  const fetchData = async () => {
+    setError(null);
+    try {
+      const response = await fetch('/api/data');
+      if (!response.ok) throw new Error('Failed to fetch');
+      const json = await response.json();
+      setData(json);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+  
+  React.useEffect(() => {
+    fetchData();
+  }, []);
+  
+  if (error) {
+    return (
+      &lt;div&gt;
+        &lt;div&gt;Error: {error}&lt;/div&gt;
+        &lt;button onClick={fetchData}&gt;Try Again&lt;/button&gt;
+      &lt;/div&gt;
+    );
+  }
+  
+  if (!data) return &lt;div&gt;Loading...&lt;/div&gt;;
+  return &lt;div&gt;Data: {data.value}&lt;/div&gt;;
+}
+
+test('allows user to retry after error', async () => {
+  const user = userEvent.setup();
+  
+  // First request fails
+  server.use(
+    rest.get('/api/data', (req, res, ctx) => {
+      return res(ctx.status(500));
+    })
+  );
+  
+  render(&lt;ErrorRecoveryComponent /&gt;);
+  
+  // Wait for error
+  expect(await screen.findByText(/error/i)).toBeInTheDocument();
+  
+  // Fix the API
+  server.use(
+    rest.get('/api/data', (req, res, ctx) => {
+      return res(ctx.json({ value: 'Success!' }));
+    })
+  );
+  
+  // Click retry
+  await user.click(screen.getByRole('button', { name: 'Try Again' }));
+  
+  // Should succeed now
+  expect(await screen.findByText('Data: Success!')).toBeInTheDocument();
+});
+                </code></pre>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Error Testing Best Practices</h4>
+                    <ul>
+                        <li><strong>Test all error types:</strong> Network, HTTP status codes, timeout, parsing errors</li>
+                        <li><strong>Test error messages:</strong> Ensure they're user-friendly</li>
+                        <li><strong>Test error recovery:</strong> Can users retry? Does retry work?</li>
+                        <li><strong>Test error boundaries:</strong> Do errors crash the app or get caught?</li>
+                        <li><strong>Test cleanup:</strong> Are errors cleared on retry?</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 6: Testing Race Conditions -->
+            <section id="race-conditions" class="lesson-section">
+                <h2>🏁 Testing Race Conditions</h2>
+                
+                <p>Race conditions occur when the order of async operations matters. Let's test that your components handle them correctly.</p>
+
+                <h3>Testing Rapid Requests</h3>
+                <pre><code class="language-typescript">
+function SearchComponent() {
+  const [query, setQuery] = React.useState('');
+  const [results, setResults] = React.useState&lt;string[]&gt;([]);
+  
+  React.useEffect(() => {
+    if (!query) {
+      setResults([]);
+      return;
+    }
+    
+    let cancelled = false;
+    
+    fetch(`/api/search?q=${query}`)
+      .then(res => res.json())
+      .then(data => {
+        if (!cancelled) {
+          setResults(data.results);
+        }
+      });
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
+  
+  return (
+    &lt;div&gt;
+      &lt;input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search..."
+      /&gt;
+      &lt;ul&gt;
+        {results.map((result, i) => (
+          &lt;li key={i}&gt;{result}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}
+
+test('handles rapid search queries correctly', async () => {
+  const user = userEvent.setup();
+  
+  server.use(
+    rest.get('/api/search', async (req, res, ctx) => {
+      const query = req.url.searchParams.get('q');
+      
+      // Simulate different response times
+      const delay = query === 'first' ? 200 : 50;
+      await ctx.delay(delay);
+      
+      return res(
+        ctx.json({
+          results: [`Result for ${query}`]
+        })
+      );
+    })
+  );
+  
+  render(&lt;SearchComponent /&gt;);
+  
+  const input = screen.getByPlaceholderText('Search...');
+  
+  // Type "first" - slow response
+  await user.type(input, 'first');
+  
+  // Immediately change to "second" - fast response
+  await user.clear(input);
+  await user.type(input, 'second');
+  
+  // Should show results for "second", not "first"
+  await waitFor(() => {
+    expect(screen.getByText('Result for second')).toBeInTheDocument();
+  });
+  
+  expect(screen.queryByText('Result for first')).not.toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing Request Cancellation</h3>
+                <pre><code class="language-typescript">
+function DataFetcherWithAbort() {
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const abortControllerRef = React.useRef&lt;AbortController | null&gt;(null);
+  
+  const fetchData = async (id: string) => {
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    abortControllerRef.current = new AbortController();
+    setLoading(true);
+    
+    try {
+      const response = await fetch(`/api/data/${id}`, {
+        signal: abortControllerRef.current.signal
+      });
+      
+      const json = await response.json();
+      setData(json);
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error(err);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    &lt;div&gt;
+      &lt;button onClick={() => fetchData('1')}&gt;Fetch 1&lt;/button&gt;
+      &lt;button onClick={() => fetchData('2')}&gt;Fetch 2&lt;/button&gt;
+      {loading && &lt;div&gt;Loading...&lt;/div&gt;}
+      {data && &lt;div&gt;Data: {data.id}&lt;/div&gt;}
+    &lt;/div&gt;
+  );
+}
+
+test('cancels previous request when new one starts', async () => {
+  const user = userEvent.setup();
+  
+  let request1Completed = false;
+  let request2Completed = false;
+  
+  server.use(
+    rest.get('/api/data/1', async (req, res, ctx) => {
+      await ctx.delay(200);
+      request1Completed = true;
+      return res(ctx.json({ id: '1' }));
+    }),
+    rest.get('/api/data/2', async (req, res, ctx) => {
+      await ctx.delay(50);
+      request2Completed = true;
+      return res(ctx.json({ id: '2' }));
+    })
+  );
+  
+  render(&lt;DataFetcherWithAbort /&gt;);
+  
+  // Start first request
+  await user.click(screen.getByRole('button', { name: 'Fetch 1' }));
+  expect(screen.getByText('Loading...')).toBeInTheDocument();
+  
+  // Immediately start second request (should cancel first)
+  await user.click(screen.getByRole('button', { name: 'Fetch 2' }));
+  
+  // Wait for second request to complete
+  await waitFor(() => {
+    expect(screen.getByText('Data: 2')).toBeInTheDocument();
+  });
+  
+  // Second request should have completed
+  expect(request2Completed).toBe(true);
+  
+  // First request may or may not have completed (depends on abort timing)
+  // But we should only see data from request 2
+  expect(screen.queryByText('Data: 1')).not.toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing Dependent Requests</h3>
+                <pre><code class="language-typescript">
+function UserWithPosts({ userId }: { userId: string }) {
+  const [user, setUser] = React.useState(null);
+  const [posts, setPosts] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    setLoading(true);
+    
+    // Fetch user first
+    fetch(`/api/users/${userId}`)
+      .then(res => res.json())
+      .then(userData => {
+        setUser(userData);
+        
+        // Then fetch their posts
+        return fetch(`/api/users/${userId}/posts`);
+      })
+      .then(res => res.json())
+      .then(postsData => {
+        setPosts(postsData);
+        setLoading(false);
+      });
+  }, [userId]);
+  
+  if (loading) return &lt;div&gt;Loading...&lt;/div&gt;;
+  
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;{user.name}&lt;/h2&gt;
+      &lt;ul&gt;
+        {posts.map(post => (
+          &lt;li key={post.id}&gt;{post.title}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}
+
+test('fetches user then posts in sequence', async () => {
+  const userFetchOrder: string[] = [];
+  
+  server.use(
+    rest.get('/api/users/:id', async (req, res, ctx) => {
+      userFetchOrder.push('user');
+      await ctx.delay(50);
+      return res(ctx.json({ name: 'John Doe' }));
+    }),
+    rest.get('/api/users/:id/posts', async (req, res, ctx) => {
+      userFetchOrder.push('posts');
+      await ctx.delay(50);
+      return res(
+        ctx.json([
+          { id: '1', title: 'First Post' },
+          { id: '2', title: 'Second Post' }
+        ])
+      );
+    })
+  );
+  
+  render(&lt;UserWithPosts userId="123" /&gt;);
+  
+  // Wait for both requests to complete
+  await waitFor(() => {
+    expect(screen.getByText('John Doe')).toBeInTheDocument();
+  });
+  
+  expect(screen.getByText('First Post')).toBeInTheDocument();
+  expect(screen.getByText('Second Post')).toBeInTheDocument();
+  
+  // Verify requests happened in correct order
+  expect(userFetchOrder).toEqual(['user', 'posts']);
+});
+                </code></pre>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Race Condition Testing Tips</h4>
+                    <ul>
+                        <li><strong>Use cleanup functions:</strong> Test that effects cancel previous requests</li>
+                        <li><strong>Test rapid changes:</strong> Simulate users typing fast or clicking rapidly</li>
+                        <li><strong>Verify final state:</strong> Ensure the latest request wins</li>
+                        <li><strong>Test request order:</strong> For dependent requests, verify sequence</li>
+                        <li><strong>Use AbortController:</strong> Test proper request cancellation</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 7: Testing React Query -->
+            <section id="react-query" class="lesson-section">
+                <h2>🔄 Testing React Query</h2>
+                
+                <p>React Query (TanStack Query) is a popular data fetching library. Testing it requires understanding its query cache and hooks.</p>
+
+                <h3>Basic React Query Component</h3>
+                <pre><code class="language-typescript">
+import { useQuery } from '@tanstack/react-query';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+function UserProfile({ userId }: { userId: string }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => fetch(`/api/users/${userId}`).then(res => res.json())
+  });
+  
+  if (isLoading) return &lt;div&gt;Loading...&lt;/div&gt;;
+  if (error) return &lt;div&gt;Error loading user&lt;/div&gt;;
+  
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;{data.name}&lt;/h2&gt;
+      &lt;p&gt;{data.email}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+                </code></pre>
+
+                <h3>Setting Up Query Client for Tests</h3>
+                <pre><code class="language-typescript">
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen } from '@testing-library/react';
+
+// Create a test wrapper with QueryClient
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false, // Don't retry failed queries in tests
+        cacheTime: 0, // Don't cache between tests
+      },
+    },
+  });
+}
+
+function renderWithQueryClient(ui: React.ReactElement) {
+  const testQueryClient = createTestQueryClient();
+  
+  return render(
+    &lt;QueryClientProvider client={testQueryClient}&gt;
+      {ui}
+    &lt;/QueryClientProvider&gt;
+  );
+}
+                </code></pre>
+
+                <h3>Testing React Query Success State</h3>
+                <pre><code class="language-typescript">
+test('displays user data from React Query', async () => {
+  server.use(
+    rest.get('/api/users/123', (req, res, ctx) => {
+      return res(
+        ctx.json({
+          id: '123',
+          name: 'John Doe',
+          email: 'john@example.com'
+        })
+      );
+    })
+  );
+  
+  renderWithQueryClient(&lt;UserProfile userId="123" /&gt;);
+  
+  // Shows loading initially
+  expect(screen.getByText('Loading...')).toBeInTheDocument();
+  
+  // Shows data after loading
+  expect(await screen.findByText('John Doe')).toBeInTheDocument();
+  expect(screen.getByText('john@example.com')).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing React Query Error State</h3>
+                <pre><code class="language-typescript">
+test('handles React Query errors', async () => {
+  server.use(
+    rest.get('/api/users/123', (req, res, ctx) => {
+      return res(ctx.status(500));
+    })
+  );
+  
+  renderWithQueryClient(&lt;UserProfile userId="123" /&gt;);
+  
+  expect(await screen.findByText('Error loading user')).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing Mutations</h3>
+                <pre><code class="language-typescript">
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+function CreateUserForm() {
+  const queryClient = useQueryClient();
+  const [name, setName] = React.useState('');
+  
+  const mutation = useMutation({
+    mutationFn: (newUser: { name: string }) => 
+      fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser)
+      }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    }
+  });
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    mutation.mutate({ name });
+  };
+  
+  return (
+    &lt;form onSubmit={handleSubmit}&gt;
+      &lt;input
+        value={name}
+        onChange={e => setName(e.target.value)}
+        placeholder="User name"
+      /&gt;
+      &lt;button type="submit" disabled={mutation.isPending}&gt;
+        {mutation.isPending ? 'Creating...' : 'Create User'}
+      &lt;/button&gt;
+      {mutation.isError && &lt;div&gt;Error creating user&lt;/div&gt;}
+      {mutation.isSuccess && &lt;div&gt;User created!&lt;/div&gt;}
+    &lt;/form&gt;
+  );
+}
+
+test('creates user with mutation', async () => {
+  const user = userEvent.setup();
+  
+  server.use(
+    rest.post('/api/users', async (req, res, ctx) => {
+      const body = await req.json();
+      return res(
+        ctx.json({
+          id: '123',
+          ...body
+        })
+      );
+    })
+  );
+  
+  renderWithQueryClient(&lt;CreateUserForm /&gt;);
+  
+  const input = screen.getByPlaceholderText('User name');
+  const button = screen.getByRole('button');
+  
+  await user.type(input, 'Jane Doe');
+  await user.click(button);
+  
+  // Button shows loading state
+  expect(screen.getByText('Creating...')).toBeInTheDocument();
+  
+  // Success message appears
+  expect(await screen.findByText('User created!')).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing Query Invalidation</h3>
+                <pre><code class="language-typescript">
+test('invalidates queries after mutation', async () => {
+  const user = userEvent.setup();
+  let queryCount = 0;
+  
+  server.use(
+    rest.get('/api/users', (req, res, ctx) => {
+      queryCount++;
+      return res(
+        ctx.json([{ id: '1', name: `User ${queryCount}` }])
+      );
+    }),
+    rest.post('/api/users', async (req, res, ctx) => {
+      return res(ctx.json({ id: '2', name: 'New User' }));
+    })
+  );
+  
+  renderWithQueryClient(
+    &lt;&gt;
+      &lt;UserList /&gt;
+      &lt;CreateUserForm /&gt;
+    &lt;/&gt;
+  );
+  
+  // Initial query
+  expect(await screen.findByText('User 1')).toBeInTheDocument();
+  expect(queryCount).toBe(1);
+  
+  // Create new user
+  await user.type(screen.getByPlaceholderText('User name'), 'New User');
+  await user.click(screen.getByText('Create User'));
+  
+  // Query should be invalidated and refetched
+  await waitFor(() => {
+    expect(queryCount).toBe(2);
+  });
+});
+                </code></pre>
+
+                <h3>Testing with Prefilled Cache</h3>
+                <pre><code class="language-typescript">
+test('uses cached data', async () => {
+  const testQueryClient = createTestQueryClient();
+  
+  // Prefill cache
+  testQueryClient.setQueryData(['user', '123'], {
+    id: '123',
+    name: 'Cached User',
+    email: 'cached@example.com'
+  });
+  
+  render(
+    &lt;QueryClientProvider client={testQueryClient}&gt;
+      &lt;UserProfile userId="123" /&gt;
+    &lt;/QueryClientProvider&gt;
+  );
+  
+  // Should immediately show cached data without loading
+  expect(screen.getByText('Cached User')).toBeInTheDocument();
+  expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+});
+                </code></pre>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ React Query Testing Tips</h4>
+                    <ul>
+                        <li><strong>Disable retries:</strong> Set <code>retry: false</code> in test config</li>
+                        <li><strong>Clear cache:</strong> Use <code>cacheTime: 0</code> to prevent test pollution</li>
+                        <li><strong>Create fresh clients:</strong> New QueryClient for each test</li>
+                        <li><strong>Test invalidation:</strong> Verify cache is refreshed after mutations</li>
+                        <li><strong>Use MSW for API:</strong> Mock at network level, not Query functions</li>
+                        <li><strong>Test all states:</strong> idle, loading, success, error</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 8: Advanced Async Patterns -->
+            <section id="advanced-patterns" class="lesson-section">
+                <h2>🚀 Advanced Async Patterns</h2>
+                
+                <p>Let's explore testing more complex async scenarios like infinite scroll, pagination, polling, and debouncing.</p>
+
+                <h3>Testing Infinite Scroll</h3>
+                <pre><code class="language-typescript">
+function InfinitePostList() {
+  const [posts, setPosts] = React.useState&lt;Post[]&gt;([]);
+  const [page, setPage] = React.useState(1);
+  const [hasMore, setHasMore] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
+  
+  const loadMore = React.useCallback(async () => {
+    if (loading || !hasMore) return;
+    
+    setLoading(true);
+    const response = await fetch(`/api/posts?page=${page}`);
+    const data = await response.json();
+    
+    setPosts(prev => [...prev, ...data.posts]);
+    setHasMore(data.hasMore);
+    setPage(prev => prev + 1);
+    setLoading(false);
+  }, [page, loading, hasMore]);
+  
+  React.useEffect(() => {
+    loadMore();
+  }, []);
+  
+  return (
+    &lt;div&gt;
+      {posts.map(post => (
+        &lt;article key={post.id}&gt;{post.title}&lt;/article&gt;
+      ))}
+      {hasMore && (
+        &lt;button onClick={loadMore} disabled={loading}&gt;
+          {loading ? 'Loading...' : 'Load More'}
+        &lt;/button&gt;
+      )}
+      {!hasMore && &lt;p&gt;No more posts&lt;/p&gt;}
+    &lt;/div&gt;
+  );
+}
+
+test('loads more posts on button click', async () => {
+  const user = userEvent.setup();
+  let requestCount = 0;
+  
+  server.use(
+    rest.get('/api/posts', (req, res, ctx) => {
+      const page = req.url.searchParams.get('page') || '1';
+      requestCount++;
+      
+      return res(
+        ctx.json({
+          posts: [
+            { id: `${page}-1`, title: `Post ${page}-1` },
+            { id: `${page}-2`, title: `Post ${page}-2` }
+          ],
+          hasMore: parseInt(page) < 3
+        })
+      );
+    })
+  );
+  
+  render(&lt;InfinitePostList /&gt;);
+  
+  // First page loads automatically
+  expect(await screen.findByText('Post 1-1')).toBeInTheDocument();
+  expect(screen.getByText('Post 1-2')).toBeInTheDocument();
+  expect(requestCount).toBe(1);
+  
+  // Click load more
+  const loadMoreButton = screen.getByText('Load More');
+  await user.click(loadMoreButton);
+  
+  // Second page appears
+  expect(await screen.findByText('Post 2-1')).toBeInTheDocument();
+  expect(screen.getByText('Post 2-2')).toBeInTheDocument();
+  expect(requestCount).toBe(2);
+  
+  // Still has more
+  expect(screen.getByText('Load More')).toBeInTheDocument();
+  
+  // Load final page
+  await user.click(screen.getByText('Load More'));
+  
+  expect(await screen.findByText('Post 3-1')).toBeInTheDocument();
+  expect(requestCount).toBe(3);
+  
+  // No more posts
+  expect(screen.queryByText('Load More')).not.toBeInTheDocument();
+  expect(screen.getByText('No more posts')).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>Testing Pagination</h3>
+                <pre><code class="language-typescript">
+function PaginatedList() {
+  const [page, setPage] = React.useState(1);
+  const [data, setData] = React.useState&lt;any&gt;(null);
+  
+  React.useEffect(() => {
+    fetch(`/api/posts?page=${page}`)
+      .then(res => res.json())
+      .then(setData);
+  }, [page]);
+  
+  if (!data) return &lt;div&gt;Loading...&lt;/div&gt;;
+  
+  return (
+    &lt;div&gt;
+      {data.posts.map((post: Post) => (
+        &lt;div key={post.id}&gt;{post.title}&lt;/div&gt;
+      ))}
+      &lt;button
+        onClick={() => setPage(p => p - 1)}
+        disabled={page === 1}
+      &gt;
+        Previous
+      &lt;/button&gt;
+      &lt;span&gt;Page {page} of {data.totalPages}&lt;/span&gt;
+      &lt;button
+        onClick={() => setPage(p => p + 1)}
+        disabled={page === data.totalPages}
+      &gt;
+        Next
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+test('navigates through pages', async () => {
+  const user = userEvent.setup();
+  
+  server.use(
+    rest.get('/api/posts', (req, res, ctx) => {
+      const page = parseInt(req.url.searchParams.get('page') || '1');
+      
+      return res(
+        ctx.json({
+          posts: [
+            { id: `${page}-1`, title: `Page ${page} Post 1` }
+          ],
+          totalPages: 3
+        })
+      );
+    })
+  );
+  
+  render(&lt;PaginatedList /&gt;);
+  
+  // First page
+  expect(await screen.findByText('Page 1 Post 1')).toBeInTheDocument();
+  expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+  
+  // Previous button disabled on first page
+  expect(screen.getByText('Previous')).toBeDisabled();
+  
+  // Go to next page
+  await user.click(screen.getByText('Next'));
+  
+  expect(await screen.findByText('Page 2 Post 1')).toBeInTheDocument();
+  expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
+  
+  // Both buttons enabled
+  expect(screen.getByText('Previous')).not.toBeDisabled();
+  expect(screen.getByText('Next')).not.toBeDisabled();
+  
+  // Go to last page
+  await user.click(screen.getByText('Next'));
+  
+  expect(await screen.findByText('Page 3 Post 1')).toBeInTheDocument();
+  expect(screen.getByText('Next')).toBeDisabled();
+});
+                </code></pre>
+
+                <h3>Testing Debounced Search</h3>
+                <pre><code class="language-typescript">
+import { debounce } from 'lodash';
+
+function SearchComponent() {
+  const [query, setQuery] = React.useState('');
+  const [results, setResults] = React.useState&lt;string[]&gt;([]);
+  const [searching, setSearching] = React.useState(false);
+  
+  const searchApi = React.useMemo(
+    () => debounce(async (searchQuery: string) => {
+      if (!searchQuery) {
+        setResults([]);
+        return;
+      }
+      
+      setSearching(true);
+      const response = await fetch(`/api/search?q=${searchQuery}`);
+      const data = await response.json();
+      setResults(data.results);
+      setSearching(false);
+    }, 300),
+    []
+  );
+  
+  React.useEffect(() => {
+    searchApi(query);
+  }, [query, searchApi]);
+  
+  return (
+    &lt;div&gt;
+      &lt;input
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        placeholder="Search..."
+      /&gt;
+      {searching && &lt;div&gt;Searching...&lt;/div&gt;}
+      &lt;ul&gt;
+        {results.map((result, i) => (
+          &lt;li key={i}&gt;{result}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}
+
+test('debounces search requests', async () => {
+  const user = userEvent.setup();
+  let requestCount = 0;
+  
+  server.use(
+    rest.get('/api/search', (req, res, ctx) => {
+      requestCount++;
+      const query = req.url.searchParams.get('q');
+      
+      return res(
+        ctx.json({
+          results: [`Result for ${query}`]
+        })
+      );
+    })
+  );
+  
+  render(&lt;SearchComponent /&gt;);
+  
+  const input = screen.getByPlaceholderText('Search...');
+  
+  // Type quickly - should only trigger one request after debounce
+  await user.type(input, 'react');
+  
+  // Wait for debounce and search
+  expect(await screen.findByText('Result for react')).toBeInTheDocument();
+  
+  // Should have made only one request despite typing 5 characters
+  expect(requestCount).toBe(1);
+});
+
+test('cancels previous search when typing continues', async () => {
+  const user = userEvent.setup();
+  const searches: string[] = [];
+  
+  server.use(
+    rest.get('/api/search', async (req, res, ctx) => {
+      const query = req.url.searchParams.get('q');
+      searches.push(query || '');
+      
+      // Simulate slow search
+      await ctx.delay(100);
+      
+      return res(
+        ctx.json({
+          results: [`Result for ${query}`]
+        })
+      );
+    })
+  );
+  
+  render(&lt;SearchComponent /&gt;);
+  
+  const input = screen.getByPlaceholderText('Search...');
+  
+  // Type "re", wait, then type "act"
+  await user.type(input, 're');
+  await new Promise(resolve => setTimeout(resolve, 350));
+  await user.type(input, 'act');
+  
+  // Should show final results
+  expect(await screen.findByText('Result for react')).toBeInTheDocument();
+  
+  // Should have made two requests (after "re" and after "react")
+  expect(searches.length).toBe(2);
+});
+                </code></pre>
+
+                <h3>Testing Polling</h3>
+                <pre><code class="language-typescript">
+function LiveCounter() {
+  const [count, setCount] = React.useState(0);
+  
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      fetch('/api/counter')
+        .then(res => res.json())
+        .then(data => setCount(data.count));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  return &lt;div&gt;Count: {count}&lt;/div&gt;;
+}
+
+test('polls for updates', async () => {
+  vi.useFakeTimers();
+  let currentCount = 0;
+  
+  server.use(
+    rest.get('/api/counter', (req, res, ctx) => {
+      currentCount++;
+      return res(ctx.json({ count: currentCount }));
+    })
+  );
+  
+  render(&lt;LiveCounter /&gt;);
+  
+  // Initial render
+  expect(screen.getByText('Count: 0')).toBeInTheDocument();
+  
+  // First poll (1 second later)
+  vi.advanceTimersByTime(1000);
+  expect(await screen.findByText('Count: 1')).toBeInTheDocument();
+  
+  // Second poll
+  vi.advanceTimersByTime(1000);
+  expect(await screen.findByText('Count: 2')).toBeInTheDocument();
+  
+  // Third poll
+  vi.advanceTimersByTime(1000);
+  expect(await screen.findByText('Count: 3')).toBeInTheDocument();
+  
+  vi.useRealTimers();
+});
+                </code></pre>
+
+                <h3>Testing Optimistic Updates</h3>
+                <pre><code class="language-typescript">
+function TodoList() {
+  const [todos, setTodos] = React.useState&lt;Todo[]&gt;([]);
+  
+  const toggleTodo = async (id: string) => {
+    // Optimistic update
+    setTodos(prev => 
+      prev.map(todo => 
+        todo.id === id 
+          ? { ...todo, completed: !todo.completed }
+          : todo
+      )
+    );
+    
+    try {
+      await fetch(`/api/todos/${id}/toggle`, { method: 'POST' });
+    } catch (error) {
+      // Rollback on error
+      setTodos(prev => 
+        prev.map(todo => 
+          todo.id === id 
+            ? { ...todo, completed: !todo.completed }
+            : todo
+        )
+      );
+    }
+  };
+  
+  return (
+    &lt;ul&gt;
+      {todos.map(todo => (
+        &lt;li key={todo.id}&gt;
+          &lt;input
+            type="checkbox"
+            checked={todo.completed}
+            onChange={() => toggleTodo(todo.id)}
+          /&gt;
+          {todo.title}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+
+test('updates UI optimistically', async () => {
+  const user = userEvent.setup();
+  
+  server.use(
+    rest.post('/api/todos/:id/toggle', async (req, res, ctx) => {
+      // Simulate slow network
+      await ctx.delay(500);
+      return res(ctx.status(200));
+    })
+  );
+  
+  // Start with initial todos
+  render(&lt;TodoList /&gt;);
+  // ... set up initial state
+  
+  const checkbox = screen.getByRole('checkbox');
+  
+  // Should be unchecked
+  expect(checkbox).not.toBeChecked();
+  
+  // Click checkbox
+  await user.click(checkbox);
+  
+  // Should be checked immediately (optimistic)
+  expect(checkbox).toBeChecked();
+  
+  // Wait for API call to complete
+  await waitFor(() => {
+    // Still checked after API confirms
+    expect(checkbox).toBeChecked();
+  });
+});
+
+test('rolls back on error', async () => {
+  const user = userEvent.setup();
+  
+  server.use(
+    rest.post('/api/todos/:id/toggle', (req, res, ctx) => {
+      return res(ctx.status(500));
+    })
+  );
+  
+  render(&lt;TodoList /&gt;);
+  // ... set up initial state
+  
+  const checkbox = screen.getByRole('checkbox');
+  
+  // Click checkbox
+  await user.click(checkbox);
+  
+  // Immediately checked
+  expect(checkbox).toBeChecked();
+  
+  // Should roll back after error
+  await waitFor(() => {
+    expect(checkbox).not.toBeChecked();
+  });
+});
+                </code></pre>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Advanced Pattern Testing Tips</h4>
+                    <ul>
+                        <li><strong>Use fake timers:</strong> Control debouncing and polling with <code>vi.useFakeTimers()</code></li>
+                        <li><strong>Test incremental loading:</strong> Verify each page/batch loads correctly</li>
+                        <li><strong>Test optimistic updates:</strong> Check immediate UI changes and rollbacks</li>
+                        <li><strong>Count API calls:</strong> Ensure debouncing and caching work correctly</li>
+                        <li><strong>Test edge cases:</strong> Empty results, last page, errors during pagination</li>
+                        <li><strong>Test cleanup:</strong> Verify intervals and listeners are properly cleaned up</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 9: Hands-on Exercises -->
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                
+                <p>Practice your async testing skills with these exercises. Each builds on the concepts we've covered.</p>
+
+                <!-- Exercise 1 -->
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Exercise 1: Test a Profile Loader Component</h3>
+                    
+                    <p><strong>Task:</strong> Create comprehensive tests for a user profile component that fetches data from an API.</p>
+                    
+                    <p><strong>Component to test:</strong></p>
+                    <pre><code class="language-typescript">
+function UserProfileLoader({ userId }: { userId: string }) {
+  const [profile, setProfile] = React.useState&lt;Profile | null&gt;(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState&lt;string | null&gt;(null);
+  
+  React.useEffect(() => {
+    let cancelled = false;
+    
+    setLoading(true);
+    setError(null);
+    
+    fetch(`/api/users/${userId}/profile`)
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load profile');
+        return res.json();
+      })
+      .then(data => {
+        if (!cancelled) {
+          setProfile(data);
+          setLoading(false);
+        }
+      })
+      .catch(err => {
+        if (!cancelled) {
+          setError(err.message);
+          setLoading(false);
+        }
+      });
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+  
+  if (loading) return &lt;div&gt;Loading profile...&lt;/div&gt;;
+  if (error) return &lt;div&gt;Error: {error}&lt;/div&gt;;
+  if (!profile) return &lt;div&gt;No profile found&lt;/div&gt;;
+  
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;{profile.name}&lt;/h2&gt;
+      &lt;p&gt;{profile.bio}&lt;/p&gt;
+      &lt;p&gt;Followers: {profile.followers}&lt;/p&gt;
+    &lt;/div&gt;
+  );
+}
+                    </code></pre>
+                    
+                    <p><strong>Requirements:</strong></p>
+                    <ul>
+                        <li>Test successful profile loading</li>
+                        <li>Test loading state display</li>
+                        <li>Test error handling</li>
+                        <li>Test that changing userId fetches new data</li>
+                        <li>Test cleanup (cancelled requests don't update state)</li>
+                    </ul>
+                    
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Use MSW to mock the API endpoint. Use <code>rerender</code> from React Testing Library to test userId changes. For testing cleanup, unmount the component and verify state doesn't update.</p>
+                    </details>
+                    
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre><code class="language-typescript">
+describe('UserProfileLoader', () => {
+  it('displays profile after loading', async () => {
+    server.use(
+      rest.get('/api/users/123/profile', (req, res, ctx) => {
+        return res(
+          ctx.json({
+            name: 'Jane Doe',
+            bio: 'Software Developer',
+            followers: 1500
+          })
+        );
+      })
+    );
+    
+    render(&lt;UserProfileLoader userId="123" /&gt;);
+    
+    expect(screen.getByText('Loading profile...')).toBeInTheDocument();
+    
+    expect(await screen.findByText('Jane Doe')).toBeInTheDocument();
+    expect(screen.getByText('Software Developer')).toBeInTheDocument();
+    expect(screen.getByText('Followers: 1500')).toBeInTheDocument();
+  });
+  
+  it('handles errors', async () => {
+    server.use(
+      rest.get('/api/users/123/profile', (req, res, ctx) => {
+        return res(ctx.status(500));
+      })
+    );
+    
+    render(&lt;UserProfileLoader userId="123" /&gt;);
+    
+    expect(
+      await screen.findByText('Error: Failed to load profile')
+    ).toBeInTheDocument();
+  });
+  
+  it('refetches when userId changes', async () => {
+    server.use(
+      rest.get('/api/users/:id/profile', (req, res, ctx) => {
+        const { id } = req.params;
+        return res(
+          ctx.json({
+            name: `User ${id}`,
+            bio: `Bio ${id}`,
+            followers: 100
+          })
+        );
+      })
+    );
+    
+    const { rerender } = render(&lt;UserProfileLoader userId="123" /&gt;);
+    
+    expect(await screen.findByText('User 123')).toBeInTheDocument();
+    
+    rerender(&lt;UserProfileLoader userId="456" /&gt;);
+    
+    expect(await screen.findByText('User 456')).toBeInTheDocument();
+  });
+  
+  it('cancels requests on unmount', async () => {
+    const consoleError = vi.spyOn(console, 'error');
+    
+    server.use(
+      rest.get('/api/users/123/profile', async (req, res, ctx) => {
+        await ctx.delay(100);
+        return res(ctx.json({ name: 'Test' }));
+      })
+    );
+    
+    const { unmount } = render(&lt;UserProfileLoader userId="123" /&gt;);
+    
+    // Unmount before request completes
+    unmount();
+    
+    // Wait for request to complete
+    await new Promise(resolve => setTimeout(resolve, 150));
+    
+    // Should not have errors from state updates after unmount
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+});
+                        </code></pre>
+                    </details>
+                </div>
+
+                <!-- Exercise 2 -->
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Exercise 2: Test Auto-Save Functionality</h3>
+                    
+                    <p><strong>Task:</strong> Test a text editor with auto-save that debounces saves.</p>
+                    
+                    <p><strong>Component:</strong></p>
+                    <pre><code class="language-typescript">
+function AutoSaveEditor({ documentId }: { documentId: string }) {
+  const [content, setContent] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [lastSaved, setLastSaved] = React.useState&lt;Date | null&gt;(null);
+  
+  const saveDocument = React.useMemo(
+    () => debounce(async (text: string) => {
+      setSaving(true);
+      await fetch(`/api/documents/${documentId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ content: text })
+      });
+      setSaving(false);
+      setLastSaved(new Date());
+    }, 500),
+    [documentId]
+  );
+  
+  const handleChange = (e: React.ChangeEvent&lt;HTMLTextAreaElement&gt;) => {
+    const newContent = e.target.value;
+    setContent(newContent);
+    saveDocument(newContent);
+  };
+  
+  return (
+    &lt;div&gt;
+      &lt;textarea value={content} onChange={handleChange} /&gt;
+      {saving && &lt;span&gt;Saving...&lt;/span&gt;}
+      {lastSaved && &lt;span&gt;Saved at {lastSaved.toLocaleTimeString()}&lt;/span&gt;}
+    &lt;/div&gt;
+  );
+}
+                    </code></pre>
+                    
+                    <p><strong>Requirements:</strong></p>
+                    <ul>
+                        <li>Test that typing triggers a save after 500ms</li>
+                        <li>Test that multiple rapid changes only trigger one save</li>
+                        <li>Test the "Saving..." indicator appears and disappears</li>
+                        <li>Test that saved timestamp updates</li>
+                        <li>Test error handling during save</li>
+                    </ul>
+                    
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Use fake timers to control debouncing. Use <code>vi.advanceTimersByTime()</code> to move time forward. Remember to restore real timers after tests.</p>
+                    </details>
+                    
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre><code class="language-typescript">
+describe('AutoSaveEditor', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  
+  it('saves after 500ms of inactivity', async () => {
+    const user = userEvent.setup({ delay: null });
+    let saveCount = 0;
+    
+    server.use(
+      rest.put('/api/documents/doc1', (req, res, ctx) => {
+        saveCount++;
+        return res(ctx.status(200));
+      })
+    );
+    
+    render(&lt;AutoSaveEditor documentId="doc1" /&gt;);
+    
+    const textarea = screen.getByRole('textbox');
+    await user.type(textarea, 'Hello');
+    
+    // Should not save immediately
+    expect(saveCount).toBe(0);
+    
+    // Advance time
+    vi.advanceTimersByTime(500);
+    
+    // Should have saved once
+    await waitFor(() => {
+      expect(saveCount).toBe(1);
+    });
+  });
+  
+  it('debounces multiple changes', async () => {
+    const user = userEvent.setup({ delay: null });
+    let saveCount = 0;
+    
+    server.use(
+      rest.put('/api/documents/doc1', (req, res, ctx) => {
+        saveCount++;
+        return res(ctx.status(200));
+      })
+    );
+    
+    render(&lt;AutoSaveEditor documentId="doc1" /&gt;);
+    
+    const textarea = screen.getByRole('textbox');
+    
+    // Type multiple times
+    await user.type(textarea, 'H');
+    vi.advanceTimersByTime(100);
+    await user.type(textarea, 'e');
+    vi.advanceTimersByTime(100);
+    await user.type(textarea, 'l');
+    vi.advanceTimersByTime(100);
+    await user.type(textarea, 'l');
+    vi.advanceTimersByTime(100);
+    await user.type(textarea, 'o');
+    
+    // Only 100ms passed, shouldn't save yet
+    expect(saveCount).toBe(0);
+    
+    // Wait full 500ms from last change
+    vi.advanceTimersByTime(500);
+    
+    // Should have saved only once
+    await waitFor(() => {
+      expect(saveCount).toBe(1);
+    });
+  });
+  
+  it('shows saving indicator', async () => {
+    const user = userEvent.setup({ delay: null });
+    
+    server.use(
+      rest.put('/api/documents/doc1', async (req, res, ctx) => {
+        await ctx.delay(100);
+        return res(ctx.status(200));
+      })
+    );
+    
+    render(&lt;AutoSaveEditor documentId="doc1" /&gt;);
+    
+    const textarea = screen.getByRole('textbox');
+    await user.type(textarea, 'Test');
+    
+    vi.advanceTimersByTime(500);
+    
+    // Should show saving indicator
+    expect(await screen.findByText('Saving...')).toBeInTheDocument();
+    
+    // Wait for save to complete
+    vi.advanceTimersByTime(100);
+    
+    await waitFor(() => {
+      expect(screen.queryByText('Saving...')).not.toBeInTheDocument();
+    });
+  });
+});
+                        </code></pre>
+                    </details>
+                </div>
+
+                <!-- Exercise 3 -->
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Exercise 3: Test Real-time Notifications</h3>
+                    
+                    <p><strong>Task:</strong> Test a notification system that polls for new notifications and displays them.</p>
+                    
+                    <p><strong>Requirements:</strong></p>
+                    <ul>
+                        <li>Polls every 5 seconds</li>
+                        <li>Displays count of unread notifications</li>
+                        <li>Shows notification list when clicked</li>
+                        <li>Marks notifications as read</li>
+                        <li>Stops polling when component unmounts</li>
+                    </ul>
+                    
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Combine fake timers with user interactions. Test polling by advancing time. Verify cleanup by checking that no more requests happen after unmount.</p>
+                    </details>
+                    
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Try implementing this yourself first! The solution combines polling (like the LiveCounter example), user interactions (clicking to view), and state management for read/unread status.</p>
+                    </details>
+                </div>
+            </section>
+
+            <!-- Section 10: Best Practices -->
+            <section id="best-practices" class="lesson-section">
+                <h2>⭐ Best Practices for Async Testing</h2>
+                
+                <p>Follow these guidelines to write reliable, maintainable async tests.</p>
+
+                <h3>1. Always Use async/await</h3>
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Do This</h4>
+                    <pre><code class="language-typescript">
+test('loads data', async () => {
+  render(&lt;Component /&gt;);
+  expect(await screen.findByText('Loaded')).toBeInTheDocument();
+});
+                    </code></pre>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>❌ Don't Do This</h4>
+                    <pre><code class="language-typescript">
+test('loads data', () => {
+  render(&lt;Component /&gt;);
+  // This will fail - doesn't wait!
+  expect(screen.getByText('Loaded')).toBeInTheDocument();
+});
+                    </code></pre>
+                </div>
+
+                <h3>2. Use MSW Instead of Mocking fetch</h3>
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Do This</h4>
+                    <pre><code class="language-typescript">
+// Set up MSW handlers
+server.use(
+  rest.get('/api/data', (req, res, ctx) => {
+    return res(ctx.json({ data: 'test' }));
+  })
+);
+                    </code></pre>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>❌ Don't Do This</h4>
+                    <pre><code class="language-typescript">
+// Mocking fetch directly is brittle
+global.fetch = vi.fn().mockResolvedValue({
+  json: async () => ({ data: 'test' })
+});
+                    </code></pre>
+                </div>
+
+                <h3>3. Test All Async States</h3>
+                <p>Every async operation should test at least these states:</p>
+                <ul>
+                    <li><strong>Loading:</strong> Initial state while waiting</li>
+                    <li><strong>Success:</strong> Data loaded successfully</li>
+                    <li><strong>Error:</strong> Request failed</li>
+                    <li><strong>Empty:</strong> No data returned (when applicable)</li>
+                </ul>
+
+                <pre><code class="language-typescript">
+describe('DataComponent', () => {
+  it('shows loading state', () => {
+    render(&lt;DataComponent /&gt;);
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+  });
+  
+  it('shows success state', async () => {
+    render(&lt;DataComponent /&gt;);
+    expect(await screen.findByText('Data loaded')).toBeInTheDocument();
+  });
+  
+  it('shows error state', async () => {
+    server.use(
+      rest.get('/api/data', (req, res, ctx) => {
+        return res(ctx.status(500));
+      })
+    );
+    
+    render(&lt;DataComponent /&gt;);
+    expect(await screen.findByText('Error')).toBeInTheDocument();
+  });
+  
+  it('shows empty state', async () => {
+    server.use(
+      rest.get('/api/data', (req, res, ctx) => {
+        return res(ctx.json([]));
+      })
+    );
+    
+    render(&lt;DataComponent /&gt;);
+    expect(await screen.findByText('No data')).toBeInTheDocument();
+  });
+});
+                </code></pre>
+
+                <h3>4. Set Appropriate Timeouts</h3>
+                <pre><code class="language-typescript">
+// For slow operations, increase timeout
+expect(
+  await screen.findByText('Loaded', {}, { timeout: 5000 })
+).toBeInTheDocument();
+
+// Or for waitFor
+await waitFor(
+  () => {
+    expect(screen.getByText('Loaded')).toBeInTheDocument();
+  },
+  { timeout: 5000 }
+);
+                </code></pre>
+
+                <h3>5. Clean Up After Tests</h3>
+                <pre><code class="language-typescript">
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  server.resetHandlers();
+  cleanup(); // Clean up rendered components
+});
+                </code></pre>
+
+                <h3>6. Test Request Parameters</h3>
+                <pre><code class="language-typescript">
+test('sends correct request parameters', async () => {
+  let receivedBody: any;
+  
+  server.use(
+    rest.post('/api/users', async (req, res, ctx) => {
+      receivedBody = await req.json();
+      return res(ctx.json({ id: '123' }));
+    })
+  );
+  
+  // ... trigger request
+  
+  await waitFor(() => {
+    expect(receivedBody).toEqual({
+      name: 'John',
+      email: 'john@example.com'
+    });
+  });
+});
+                </code></pre>
+
+                <h3>7. Handle Race Conditions</h3>
+                <pre><code class="language-typescript">
+test('cancels previous requests', async () => {
+  const user = userEvent.setup();
+  let requestCount = 0;
+  
+  server.use(
+    rest.get('/api/search', async (req, res, ctx) => {
+      requestCount++;
+      const query = req.url.searchParams.get('q');
+      await ctx.delay(100);
+      return res(ctx.json({ query }));
+    })
+  );
+  
+  render(&lt;SearchComponent /&gt;);
+  
+  const input = screen.getByRole('textbox');
+  
+  // Type different searches rapidly
+  await user.type(input, 'a');
+  await user.clear(input);
+  await user.type(input, 'ab');
+  await user.clear(input);
+  await user.type(input, 'abc');
+  
+  // Should show only the last result
+  expect(await screen.findByText(/abc/)).toBeInTheDocument();
+});
+                </code></pre>
+
+                <h3>8. Use React Query Testing Utils</h3>
+                <pre><code class="language-typescript">
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+        cacheTime: 0,
+      },
+    },
+  });
+  
+  return ({ children }: { children: React.ReactNode }) => (
+    &lt;QueryClientProvider client={queryClient}&gt;
+      {children}
+    &lt;/QueryClientProvider&gt;
+  );
+}
+
+test('with React Query', async () => {
+  const { result } = renderHook(() => useUserQuery('123'), {
+    wrapper: createWrapper()
+  });
+  
+  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  expect(result.current.data.name).toBe('John');
+});
+                </code></pre>
+
+                <h3>9. Avoid Act Warnings</h3>
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Understanding act() Warnings</h4>
+                    <p>If you see "Warning: An update to Component inside a test was not wrapped in act(...)", it means state updates happened after your test finished.</p>
+                    
+                    <p><strong>Common causes:</strong></p>
+                    <ul>
+                        <li>Not waiting for async operations to complete</li>
+                        <li>Component updating after unmount</li>
+                        <li>Missing cleanup in useEffect</li>
+                    </ul>
+                    
+                    <p><strong>Solution:</strong> Always wait for all state updates</p>
+                    <pre><code class="language-typescript">
+// Wait for all updates
+await waitFor(() => {
+  expect(screen.queryByText('Loading')).not.toBeInTheDocument();
+});
+
+// Or use findBy which waits automatically
+await screen.findByText('Loaded');
+                    </code></pre>
+                </div>
+
+                <h3>10. Test Error Boundaries</h3>
+                <pre><code class="language-typescript">
+test('error boundary catches async errors', async () => {
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+  
+  server.use(
+    rest.get('/api/data', (req, res, ctx) => {
+      return res(ctx.status(500));
+    })
+  );
+  
+  render(
+    &lt;ErrorBoundary fallback={&lt;div&gt;Something went wrong&lt;/div&gt;}&gt;
+      &lt;DataComponent /&gt;
+    &lt;/ErrorBoundary&gt;
+  );
+  
+  expect(await screen.findByText('Something went wrong')).toBeInTheDocument();
+  
+  consoleError.mockRestore();
+});
+                </code></pre>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4>📋 Async Testing Checklist</h4>
+                    <ul style="color: white;">
+                        <li>✅ Mark test functions as <code style="color: white;">async</code></li>
+                        <li>✅ Use <code style="color: white;">await</code> with findBy or waitFor</li>
+                        <li>✅ Mock APIs with MSW, not fetch directly</li>
+                        <li>✅ Test loading, success, error, and empty states</li>
+                        <li>✅ Set appropriate timeouts for slow operations</li>
+                        <li>✅ Clean up timers, handlers, and components</li>
+                        <li>✅ Test race conditions and cancellation</li>
+                        <li>✅ Verify request parameters and headers</li>
+                        <li>✅ Handle act() warnings properly</li>
+                        <li>✅ Test error boundaries with async errors</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 11: Summary -->
+            <section id="summary" class="lesson-section">
+                <h2>📚 Summary</h2>
+                
+                <p>Congratulations! You've mastered testing asynchronous code in React applications. Let's recap the key concepts.</p>
+
+                <h3>Key Takeaways</h3>
+                
+                <div class="card">
+                    <h4>🎯 Core Concepts</h4>
+                    <ol>
+                        <li><strong>Async Testing Fundamentals</strong>
+                            <ul>
+                                <li>Always use <code>async/await</code> in tests</li>
+                                <li>Wait for state updates with <code>findBy</code> or <code>waitFor</code></li>
+                                <li>Test all possible states: loading, success, error, empty</li>
+                            </ul>
+                        </li>
+                        
+                        <li><strong>Mock Service Worker (MSW)</strong>
+                            <ul>
+                                <li>Intercepts network requests at the network level</li>
+                                <li>More realistic than mocking fetch directly</li>
+                                <li>Reusable handlers across tests</li>
+                                <li>Works with any HTTP client</li>
+                            </ul>
+                        </li>
+                        
+                        <li><strong>Testing Patterns</strong>
+                            <ul>
+                                <li>Use <code>findBy</code> for waiting for elements to appear</li>
+                                <li>Use <code>waitFor</code> for complex assertions</li>
+                                <li>Use <code>waitForElementToBeRemoved</code> for disappearing elements</li>
+                                <li>Use fake timers for debouncing and polling</li>
+                            </ul>
+                        </li>
+                        
+                        <li><strong>React Query Testing</strong>
+                            <ul>
+                                <li>Create fresh QueryClient for each test</li>
+                                <li>Disable retries and caching in tests</li>
+                                <li>Test mutations and invalidation</li>
+                                <li>Use MSW for API mocking</li>
+                            </ul>
+                        </li>
+                        
+                        <li><strong>Advanced Patterns</strong>
+                            <ul>
+                                <li>Test infinite scroll and pagination</li>
+                                <li>Test debounced searches</li>
+                                <li>Test polling and real-time updates</li>
+                                <li>Test optimistic updates and rollbacks</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+
+                <h3>Testing Async Code Workflow</h3>
+                <div class="mermaid">
+                    graph TB
+                    A[Write Component with Async Logic] --> B[Set Up MSW Handlers]
+                    B --> C[Write Test Cases]
+                    C --> D{Test Type?}
+                    D -->|Success| E[Mock Successful Response]
+                    D -->|Error| F[Mock Error Response]
+                    D -->|Loading| G[Test Initial State]
+                    D -->|Empty| H[Mock Empty Response]
+                    E --> I[Render Component]
+                    F --> I
+                    G --> I
+                    H --> I
+                    I --> J[Wait for Async Operations]
+                    J --> K[Assert on Final State]
+                    K --> L[Clean Up]
+                    
+                    style A fill:#667eea,stroke:#333,stroke-width:2px,color:#fff
+                    style J fill:#ffc107,stroke:#333,stroke-width:2px,color:#333
+                    style K fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
+                </div>
+
+                <h3>Common Pitfalls to Avoid</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pitfall</th>
+                            <th>Problem</th>
+                            <th>Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Not using async/await</td>
+                            <td>Tests finish before async operations complete</td>
+                            <td>Mark test as <code>async</code> and use <code>await</code></td>
+                        </tr>
+                        <tr>
+                            <td>Mocking fetch directly</td>
+                            <td>Brittle tests tied to implementation</td>
+                            <td>Use MSW to mock at network level</td>
+                        </tr>
+                        <tr>
+                            <td>Not testing all states</td>
+                            <td>Missing edge cases and errors</td>
+                            <td>Test loading, success, error, and empty states</td>
+                        </tr>
+                        <tr>
+                            <td>Forgetting to clean up</td>
+                            <td>Test pollution and false positives/negatives</td>
+                            <td>Reset handlers and timers in <code>afterEach</code></td>
+                        </tr>
+                        <tr>
+                            <td>Ignoring race conditions</td>
+                            <td>Flaky tests that sometimes pass/fail</td>
+                            <td>Test cancellation and proper cleanup</td>
+                        </tr>
+                        <tr>
+                            <td>Using real timers for debouncing</td>
+                            <td>Slow test suite</td>
+                            <td>Use fake timers with <code>vi.useFakeTimers()</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Tools and Libraries Reference</h3>
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>🛠️ Essential Testing Tools</h4>
+                    <ul>
+                        <li><strong>Vitest:</strong> Test runner with modern features</li>
+                        <li><strong>React Testing Library:</strong> User-centric testing utilities</li>
+                        <li><strong>MSW (Mock Service Worker):</strong> Network request mocking</li>
+                        <li><strong>@testing-library/user-event:</strong> Realistic user interactions</li>
+                        <li><strong>@tanstack/react-query:</strong> Data fetching library</li>
+                    </ul>
+                </div>
+
+                <h3>Next Steps</h3>
+                <p>Now that you understand async testing, you're ready to:</p>
+                <ul>
+                    <li>Write comprehensive tests for data-fetching components</li>
+                    <li>Test complex async workflows in your applications</li>
+                    <li>Handle edge cases like race conditions and errors</li>
+                    <li>Test React Query and other data fetching libraries</li>
+                    <li>Build confidence in your application's async behavior</li>
+                </ul>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>🎉 Congratulations!</h4>
+                    <p>You've completed Lesson 9.4: Testing Async Code! You now have the skills to:</p>
+                    <ul>
+                        <li>✅ Test components that fetch data from APIs</li>
+                        <li>✅ Use Mock Service Worker to mock network requests</li>
+                        <li>✅ Handle loading states, errors, and race conditions</li>
+                        <li>✅ Test React Query and other data fetching libraries</li>
+                        <li>✅ Test advanced patterns like pagination and polling</li>
+                        <li>✅ Write reliable, maintainable async tests</li>
+                    </ul>
+                </div>
+
+                <blockquote>
+                    <strong>💡 Remember:</strong> "Good async tests are patient—they wait for operations to complete, handle all states gracefully, and mirror how users actually interact with your app."
+                </blockquote>
+            </section>
+
+            <!-- Lesson Navigation -->
+            <nav aria-label="Lesson Navigation">
+                <div class="lesson-nav">
+                    <a href="lesson_9_3_testing_user_interactions.html" class="nav-button prev-lesson">
+                        ← Previous: Testing User Interactions
+                    </a>
+                    <a href="index.html" class="nav-button home">
+                        ⌂ Home
+                    </a>
+                    <a href="lesson_9_5_integration_testing.html" class="nav-button next-lesson">
+                        Next: Integration Testing →
+                    </a>
+                </div>
+            </nav>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 React TypeScript Course. All rights reserved.</p>
+            <p>
+                <a href="index.html">Home</a> |
+                <a href="index.html#modules">All Modules</a> |
+                <a href="#">Terms of Use</a> |
+                <a href="#">Privacy Policy</a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>
+
