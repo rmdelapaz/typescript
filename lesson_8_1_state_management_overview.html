@@ -2014,3 +2014,865 @@ const mutation = useMutation({
                     </ul>
                 </div>
             </section>
+            <!-- Section 8: Decision Framework -->
+            <section id="section8" class="lesson-section">
+                <h2>🎯 Decision Framework</h2>
+                
+                <p>Choosing the right state management approach can feel overwhelming. Let's break it down into a systematic decision-making process.</p>
+
+                <h3>The State Management Decision Tree</h3>
+
+                <div class="mermaid">
+                    graph TD
+                    A[Start: Need to manage state] --> B{Is it server data?}
+                    B -->|Yes| C[React Query or SWR]
+                    B -->|No| D{How many components need it?}
+                    
+                    D -->|Just one| E[Local useState]
+                    D -->|2-3 nearby| F[Lift state up]
+                    D -->|Many, far apart| G{How complex?}
+                    
+                    G -->|Simple| H{How many global values?}
+                    G -->|Very complex| I[Redux Toolkit or XState]
+                    
+                    H -->|1-3 values| J[Context API]
+                    H -->|Many values| K[Zustand or Jotai]
+                    
+                    style A fill:#667eea,color:#fff
+                    style C fill:#4CAF50,color:#fff
+                    style E fill:#4CAF50,color:#fff
+                    style J fill:#FFA726,color:#fff
+                    style K fill:#2196F3,color:#fff
+                    style I fill:#9C27B0,color:#fff
+                </div>
+
+                <h3>Question-Based Decision Guide</h3>
+
+                <h4>Question 1: What type of data is it?</h4>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data Type</th>
+                            <th>Best Solution</th>
+                            <th>Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>From API/Server</strong></td>
+                            <td>React Query, SWR, Apollo</td>
+                            <td>User profile, product list, posts</td>
+                        </tr>
+                        <tr>
+                            <td><strong>UI/Client State</strong></td>
+                            <td>useState, Context, Zustand</td>
+                            <td>Modal open, sidebar collapsed, theme</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Form Data</strong></td>
+                            <td>React Hook Form, Formik</td>
+                            <td>Registration form, checkout form</td>
+                        </tr>
+                        <tr>
+                            <td><strong>URL-Based</strong></td>
+                            <td>React Router, Next.js router</td>
+                            <td>Current page, search filters, sort order</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h4>Question 2: How many components need this data?</h4>
+
+                <pre><code class="language-typescript">// 1 component → useState
+function Counter() {
+  const [count, setCount] = useState(0);
+  return &lt;div&gt;{count}&lt;/div&gt;;
+}
+
+// 2-3 nearby components → Lift state up
+function Parent() {
+  const [count, setCount] = useState(0);
+  return (
+    &lt;&gt;
+      &lt;Display count={count} /&gt;
+      &lt;Controls setCount={setCount} /&gt;
+    &lt;/&gt;
+  );
+}
+
+// Many distant components → Global state
+const useStore = create((set) => ({
+  count: 0,
+  increment: () => set((state) => ({ count: state.count + 1 }))
+}));</code></pre>
+
+                <h4>Question 3: How often does it change?</h4>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Rarely Changes</h4>
+                    <p><strong>Examples:</strong> Theme, locale, user auth status</p>
+                    <p><strong>Solution:</strong> Context API is perfect</p>
+                    <pre><code class="language-typescript">const ThemeContext = createContext&lt;Theme&gt;('light');
+
+function App() {
+  const [theme, setTheme] = useState&lt;Theme&gt;('light');
+  // Changes rarely, Context is fine
+  return (
+    &lt;ThemeContext.Provider value={theme}&gt;
+      &lt;YourApp /&gt;
+    &lt;/ThemeContext.Provider&gt;
+  );
+}</code></pre>
+                </div>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Changes Frequently</h4>
+                    <p><strong>Examples:</strong> Mouse position, animation values, real-time data</p>
+                    <p><strong>Solution:</strong> Zustand, Jotai (fine-grained updates), or useRef</p>
+                    <pre><code class="language-typescript">// Fine-grained updates with Zustand
+const useStore = create((set) => ({
+  x: 0,
+  y: 0,
+  setPosition: (x: number, y: number) => set({ x, y })
+}));
+
+function MouseTracker() {
+  // Only subscribes to what it needs
+  const x = useStore(state => state.x);
+  return &lt;div&gt;X: {x}&lt;/div&gt;;
+}</code></pre>
+                </div>
+
+                <h4>Question 4: How complex is the state logic?</h4>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Complexity</th>
+                            <th>Indicators</th>
+                            <th>Best Solution</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Simple</strong></td>
+                            <td>1-3 values, independent updates</td>
+                            <td>useState</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Moderate</strong></td>
+                            <td>5-10 values, some relationships</td>
+                            <td>useReducer, Zustand</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Complex</strong></td>
+                            <td>Many values, interdependencies, workflows</td>
+                            <td>Redux Toolkit, XState</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <pre><code class="language-typescript">// Simple → useState
+const [isOpen, setIsOpen] = useState(false);
+
+// Moderate → useReducer
+const [state, dispatch] = useReducer(reducer, initialState);
+
+// Complex → Redux Toolkit
+const store = configureStore({
+  reducer: {
+    auth: authReducer,
+    products: productsReducer,
+    cart: cartReducer,
+    orders: ordersReducer
+  }
+});</code></pre>
+
+                <h4>Question 5: What's your team's experience?</h4>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 Team Considerations</h4>
+                    <ul>
+                        <li><strong>Junior team:</strong> Stick with built-in React features or Zustand (simple API)</li>
+                        <li><strong>Mixed experience:</strong> Zustand or Jotai (gradual learning curve)</li>
+                        <li><strong>Experienced team:</strong> Any solution, choose based on requirements</li>
+                        <li><strong>Redux veterans:</strong> Redux Toolkit is productive and familiar</li>
+                    </ul>
+                </div>
+
+                <h3>Real-World Scenarios</h3>
+
+                <h4>Scenario 1: Building a Blog</h4>
+                <p><strong>Requirements:</strong> Display posts, comments, user authentication</p>
+                <p><strong>Recommended Stack:</strong></p>
+                <ul>
+                    <li><strong>Server state (posts, comments):</strong> React Query</li>
+                    <li><strong>Auth state:</strong> Context API (rarely changes)</li>
+                    <li><strong>UI state (theme, sidebar):</strong> Context or useState</li>
+                </ul>
+
+                <pre><code class="language-typescript">// Blog state architecture
+// 1. Auth context (global, changes rarely)
+const AuthContext = createContext&lt;AuthContextType | null&gt;(null);
+
+// 2. React Query for posts
+function BlogList() {
+  const { data: posts } = useQuery({
+    queryKey: ['posts'],
+    queryFn: fetchPosts
+  });
+  
+  return &lt;div&gt;{posts?.map(post => &lt;PostCard key={post.id} post={post} /&gt;)}&lt;/div&gt;;
+}
+
+// 3. Local state for UI
+function PostCard({ post }: { post: Post }) {
+  const [expanded, setExpanded] = useState(false);
+  return &lt;div onClick={() => setExpanded(!expanded)}&gt;...&lt;/div&gt;;
+}</code></pre>
+
+                <h4>Scenario 2: E-commerce Application</h4>
+                <p><strong>Requirements:</strong> Products, cart, orders, user profile, filters</p>
+                <p><strong>Recommended Stack:</strong></p>
+                <ul>
+                    <li><strong>Server state (products, orders):</strong> React Query</li>
+                    <li><strong>Cart state:</strong> Zustand (shared, frequently updated)</li>
+                    <li><strong>Filter state:</strong> URL params (shareable, bookmarkable)</li>
+                    <li><strong>Auth state:</strong> Context API</li>
+                </ul>
+
+                <pre><code class="language-typescript">// E-commerce state architecture
+// 1. Cart store (Zustand)
+const useCartStore = create&lt;CartStore&gt;((set) => ({
+  items: [],
+  addItem: (product) => set((state) => ({
+    items: [...state.items, { ...product, quantity: 1 }]
+  })),
+  removeItem: (id) => set((state) => ({
+    items: state.items.filter(item => item.id !== id)
+  }))
+}));
+
+// 2. Products from server (React Query)
+function ProductList() {
+  const [searchParams] = useSearchParams();
+  const category = searchParams.get('category') || 'all';
+  
+  const { data: products } = useQuery({
+    queryKey: ['products', category],
+    queryFn: () => fetchProducts(category)
+  });
+  
+  const { addItem } = useCartStore();
+  
+  return products?.map(p => (
+    &lt;ProductCard 
+      key={p.id} 
+      product={p} 
+      onAddToCart={() => addItem(p)} 
+    /&gt;
+  ));
+}</code></pre>
+
+                <h4>Scenario 3: Admin Dashboard</h4>
+                <p><strong>Requirements:</strong> Complex forms, tables, charts, real-time updates, multiple user roles</p>
+                <p><strong>Recommended Stack:</strong></p>
+                <ul>
+                    <li><strong>Server state:</strong> React Query with real-time subscriptions</li>
+                    <li><strong>Global UI state:</strong> Redux Toolkit (complex, predictable updates needed)</li>
+                    <li><strong>Form state:</strong> React Hook Form</li>
+                    <li><strong>Auth & permissions:</strong> Context API</li>
+                </ul>
+
+                <h4>Scenario 4: Real-Time Chat Application</h4>
+                <p><strong>Requirements:</strong> Messages, presence, notifications, typing indicators</p>
+                <p><strong>Recommended Stack:</strong></p>
+                <ul>
+                    <li><strong>Messages:</strong> React Query with WebSocket integration</li>
+                    <li><strong>Presence/typing:</strong> Zustand (frequent updates, global)</li>
+                    <li><strong>UI state:</strong> Local useState</li>
+                </ul>
+
+                <h3>Migration Strategies</h3>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ When to Migrate</h4>
+                    <p>Signs you might need to refactor your state management:</p>
+                    <ul>
+                        <li>Prop drilling through 5+ levels consistently</li>
+                        <li>Performance issues from Context re-renders</li>
+                        <li>Difficulty debugging state changes</li>
+                        <li>Team spending too much time on state-related bugs</li>
+                        <li>Code duplication in state update logic</li>
+                    </ul>
+                </div>
+
+                <h4>Migration Path: Context → Zustand</h4>
+
+                <pre><code class="language-typescript">// Before: Context (causing re-render issues)
+const AppContext = createContext&lt;AppState | null&gt;(null);
+
+function AppProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState&lt;User | null&gt;(null);
+  const [theme, setTheme] = useState('light');
+  const [cart, setCart] = useState&lt;CartItem[]&gt;([]);
+  
+  // Every component re-renders when ANY value changes!
+  const value = { user, setUser, theme, setTheme, cart, setCart };
+  
+  return &lt;AppContext.Provider value={value}&gt;{children}&lt;/AppContext.Provider&gt;;
+}
+
+// After: Zustand (fine-grained subscriptions)
+const useStore = create&lt;AppStore&gt;((set) => ({
+  user: null,
+  theme: 'light',
+  cart: [],
+  setUser: (user) => set({ user }),
+  setTheme: (theme) => set({ theme }),
+  addToCart: (item) => set((state) => ({ cart: [...state.cart, item] }))
+}));
+
+// Components only re-render when THEIR data changes
+function ThemeToggle() {
+  const theme = useStore(state => state.theme); // Only subscribes to theme
+  const setTheme = useStore(state => state.setTheme);
+  return &lt;button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}&gt;Toggle&lt;/button&gt;;
+}</code></pre>
+
+                <h4>Gradual Migration Strategy</h4>
+
+                <ol>
+                    <li><strong>Identify pain points:</strong> Which Context is causing the most re-renders?</li>
+                    <li><strong>Start small:</strong> Migrate one feature/store at a time</li>
+                    <li><strong>Run both systems:</strong> Zustand and Context can coexist during migration</li>
+                    <li><strong>Test thoroughly:</strong> Ensure behavior is identical</li>
+                    <li><strong>Monitor performance:</strong> Verify improvements with React DevTools Profiler</li>
+                    <li><strong>Complete migration:</strong> Remove old Context code once everything is migrated</li>
+                </ol>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">🎯 Decision Framework Summary</h4>
+                    <ol style="color: white;">
+                        <li><strong>Always start with the simplest solution</strong> (useState)</li>
+                        <li><strong>Separate concerns</strong> (server state vs client state)</li>
+                        <li><strong>Choose based on actual needs,</strong> not trends</li>
+                        <li><strong>Consider team experience</strong> and learning curve</li>
+                        <li><strong>Plan for growth,</strong> but don't over-engineer</li>
+                        <li><strong>Refactor when you feel pain,</strong> not before</li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- Section 9: Best Practices -->
+            <section id="section9" class="lesson-section">
+                <h2>✅ Best Practices</h2>
+                
+                <p>Follow these proven practices to build maintainable, performant state management systems.</p>
+
+                <h3>1. Separate Concerns</h3>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Do This</h4>
+                    <pre><code class="language-typescript">// Server state - React Query
+const { data: user } = useQuery(['user', userId], fetchUser);
+
+// Client state - Zustand
+const theme = useStore(state => state.theme);
+
+// Form state - React Hook Form
+const { register, handleSubmit } = useForm();
+
+// URL state - React Router
+const [searchParams] = useSearchParams();</code></pre>
+                </div>
+
+                <div class="card" style="background-color: #ffebee; border-left: 4px solid #f44336;">
+                    <h4>❌ Don't Do This</h4>
+                    <pre><code class="language-typescript">// Mixing server state in Redux (now you manage cache yourself!)
+dispatch(fetchUser(userId)); // Manual async action
+const user = useSelector(state => state.user); // Manual cache management
+
+// Putting everything in Context (performance issues)
+const { user, products, cart, theme, locale } = useContext(EverythingContext);</code></pre>
+                </div>
+
+                <h3>2. Keep State Close to Where It's Used</h3>
+
+                <pre><code class="language-typescript">// ✅ Good: Local state for accordion
+function Accordion({ items }: { items: Item[] }) {
+  const [openIndex, setOpenIndex] = useState(0);
+  // State only matters to this component
+  return &lt;div&gt;{/* ... */}&lt;/div&gt;;
+}
+
+// ❌ Bad: Unnecessary global state
+const useStore = create((set) => ({
+  accordionOpenIndex: 0, // Why is this global?
+  setAccordionOpenIndex: (index: number) => set({ accordionOpenIndex: index })
+}));</code></pre>
+
+                <h3>3. Use TypeScript Properly</h3>
+
+                <pre><code class="language-typescript">// ✅ Good: Fully typed store
+interface UserStore {
+  user: User | null;
+  setUser: (user: User | null) => void;
+  logout: () => void;
+}
+
+const useUserStore = create&lt;UserStore&gt;((set) => ({
+  user: null,
+  setUser: (user) => set({ user }),
+  logout: () => set({ user: null })
+}));
+
+// ❌ Bad: Any types
+const useStore = create((set: any) => ({
+  user: null as any,
+  setUser: (user: any) => set({ user })
+}));</code></pre>
+
+                <h3>4. Avoid Derived State</h3>
+
+                <pre><code class="language-typescript">// ❌ Bad: Storing derived state
+const useStore = create((set) => ({
+  items: [],
+  total: 0, // Derived from items!
+  addItem: (item) => set((state) => ({
+    items: [...state.items, item],
+    total: state.total + item.price // Easy to get out of sync!
+  }))
+}));
+
+// ✅ Good: Calculate on the fly
+const useStore = create((set) => ({
+  items: [],
+  addItem: (item) => set((state) => ({
+    items: [...state.items, item]
+  }))
+}));
+
+// Compute when needed
+function Cart() {
+  const items = useStore(state => state.items);
+  const total = items.reduce((sum, item) => sum + item.price, 0);
+  return &lt;div&gt;Total: ${total}&lt;/div&gt;;
+}
+
+// Or use a selector with memoization
+const useTotal = () => useStore(
+  state => state.items.reduce((sum, item) => sum + item.price, 0)
+);</code></pre>
+
+                <h3>5. Normalize Related Data</h3>
+
+                <pre><code class="language-typescript">// ✅ Good: Normalized structure
+interface NormalizedState {
+  users: {
+    byId: Record&lt;string, User&gt;;
+    allIds: string[];
+  };
+  posts: {
+    byId: Record&lt;string, Post&gt;;
+    allIds: string[];
+  };
+}
+
+// Easy to update a single user
+const updateUser = (userId: string, updates: Partial&lt;User&gt;) => {
+  set((state) => ({
+    users: {
+      ...state.users,
+      byId: {
+        ...state.users.byId,
+        [userId]: { ...state.users.byId[userId], ...updates }
+      }
+    }
+  }));
+};</code></pre>
+
+                <h3>6. Use Selectors for Performance</h3>
+
+                <pre><code class="language-typescript">// ❌ Bad: Component re-renders when ANY store property changes
+function UserName() {
+  const store = useStore(); // Subscribes to everything!
+  return &lt;div&gt;{store.user?.name}&lt;/div&gt;;
+}
+
+// ✅ Good: Only re-renders when user.name changes
+function UserName() {
+  const userName = useStore(state => state.user?.name);
+  return &lt;div&gt;{userName}&lt;/div&gt;;
+}
+
+// ✅ Even better: Custom selector hook
+const useUserName = () => useStore(state => state.user?.name);
+
+function UserName() {
+  const userName = useUserName();
+  return &lt;div&gt;{userName}&lt;/div&gt;;
+}</code></pre>
+
+                <h3>7. Handle Async Operations Properly</h3>
+
+                <pre><code class="language-typescript">// ✅ Good: Proper async handling with React Query
+const { data, isLoading, error } = useQuery({
+  queryKey: ['user', userId],
+  queryFn: () => fetchUser(userId)
+});
+
+if (isLoading) return &lt;Spinner /&gt;;
+if (error) return &lt;Error error={error} /&gt;;
+return &lt;UserProfile user={data} /&gt;;
+
+// ✅ Good: Async actions in Zustand
+const useStore = create&lt;Store&gt;((set) => ({
+  user: null,
+  loading: false,
+  error: null,
+  fetchUser: async (id: string) => {
+    set({ loading: true, error: null });
+    try {
+      const user = await fetchUser(id);
+      set({ user, loading: false });
+    } catch (error) {
+      set({ error: error.message, loading: false });
+    }
+  }
+}));</code></pre>
+
+                <h3>8. Don't Over-Optimize Prematurely</h3>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Remember</h4>
+                    <p>React is fast. Most apps don't need aggressive optimization. Profile first, optimize second.</p>
+                    <ul>
+                        <li>Don't wrap everything in useMemo/useCallback without reason</li>
+                        <li>Don't split Context into 20 tiny contexts prematurely</li>
+                        <li>Don't reach for Redux if Context works fine</li>
+                        <li>Measure with React DevTools Profiler before optimizing</li>
+                    </ul>
+                </div>
+
+                <h3>9. Write Testable State Logic</h3>
+
+                <pre><code class="language-typescript">// ✅ Good: Testable Zustand store
+import { create } from 'zustand';
+
+export const createCounterStore = (initialCount = 0) => {
+  return create&lt;CounterStore&gt;((set) => ({
+    count: initialCount,
+    increment: () => set((state) => ({ count: state.count + 1 })),
+    decrement: () => set((state) => ({ count: state.count - 1 }))
+  }));
+};
+
+// Easy to test!
+describe('Counter Store', () => {
+  it('increments count', () => {
+    const useStore = createCounterStore(0);
+    const { increment } = useStore.getState();
+    
+    increment();
+    expect(useStore.getState().count).toBe(1);
+  });
+});</code></pre>
+
+                <h3>10. Document Your State Architecture</h3>
+
+                <pre><code class="language-typescript">/**
+ * Application State Architecture
+ * 
+ * Server State (React Query):
+ * - User data (/api/user)
+ * - Products (/api/products)
+ * - Orders (/api/orders)
+ * 
+ * Client State (Zustand):
+ * - Cart (useCartStore): Shopping cart items
+ * - UI (useUIStore): Theme, sidebar state, modals
+ * 
+ * Form State (React Hook Form):
+ * - Checkout form
+ * - Profile edit form
+ * 
+ * URL State (React Router):
+ * - Search filters
+ * - Pagination
+ * - Selected category
+ */</code></pre>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 style="color: white;">🎯 Best Practices Checklist</h4>
+                    <ul style="color: white;">
+                        <li>✅ Separate server and client state</li>
+                        <li>✅ Keep state as local as possible</li>
+                        <li>✅ Use TypeScript for type safety</li>
+                        <li>✅ Avoid storing derived state</li>
+                        <li>✅ Normalize when needed</li>
+                        <li>✅ Use selectors for performance</li>
+                        <li>✅ Handle async properly</li>
+                        <li>✅ Profile before optimizing</li>
+                        <li>✅ Write testable state logic</li>
+                        <li>✅ Document your architecture</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Section 10: Summary -->
+            <section id="section10" class="lesson-section">
+                <h2>📚 Summary</h2>
+                
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h3 style="color: white;">🎉 What You've Learned</h3>
+                    <p style="color: white;">Congratulations! You now have a comprehensive understanding of state management in React applications. Let's review the key concepts:</p>
+                </div>
+
+                <h3>Key Takeaways</h3>
+
+                <ol>
+                    <li><strong>State Management is About Trade-offs:</strong> There's no perfect solution for all cases. Choose based on your specific needs.</li>
+                    
+                    <li><strong>Four Types of State:</strong>
+                        <ul>
+                            <li><strong>Local:</strong> Component-specific (useState)</li>
+                            <li><strong>Shared:</strong> Multiple components need it (Context, Zustand, Redux)</li>
+                            <li><strong>Server:</strong> From APIs (React Query, SWR)</li>
+                            <li><strong>URL:</strong> In the URL (React Router)</li>
+                        </ul>
+                    </li>
+                    
+                    <li><strong>Start Simple, Scale When Needed:</strong> Begin with useState and Context, only add complexity when you feel real pain points.</li>
+                    
+                    <li><strong>Separate Server and Client State:</strong> This is the single biggest improvement you can make to state management.</li>
+                    
+                    <li><strong>Modern Recommendation:</strong>
+                        <ul>
+                            <li><strong>Server state:</strong> React Query or SWR</li>
+                            <li><strong>Client state:</strong> Zustand for simplicity, Redux Toolkit for complex apps</li>
+                            <li><strong>Forms:</strong> React Hook Form</li>
+                            <li><strong>URL state:</strong> React Router</li>
+                        </ul>
+                    </li>
+                </ol>
+
+                <h3>Comparison at a Glance</h3>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Solution</th>
+                            <th>Best For</th>
+                            <th>Size</th>
+                            <th>Learning Curve</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>useState/Context</strong></td>
+                            <td>Small to medium apps</td>
+                            <td>0KB (built-in)</td>
+                            <td>⭐ Very Easy</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Zustand</strong></td>
+                            <td>Most applications</td>
+                            <td>1KB</td>
+                            <td>⭐ Very Easy</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Jotai</strong></td>
+                            <td>Atomic state needs</td>
+                            <td>3KB</td>
+                            <td>⭐⭐ Easy</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Redux Toolkit</strong></td>
+                            <td>Large enterprise apps</td>
+                            <td>20KB</td>
+                            <td>⭐⭐⭐ Moderate</td>
+                        </tr>
+                        <tr>
+                            <td><strong>React Query</strong></td>
+                            <td>Server state (always!)</td>
+                            <td>13KB</td>
+                            <td>⭐⭐ Easy</td>
+                        </tr>
+                        <tr>
+                            <td><strong>XState</strong></td>
+                            <td>Complex workflows</td>
+                            <td>25KB</td>
+                            <td>⭐⭐⭐⭐ Challenging</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Next Steps in Module 8</h3>
+
+                <p>Now that you understand the landscape, here's what's coming:</p>
+
+                <ul>
+                    <li><strong>Lesson 8.2:</strong> Hands-on with Zustand - Build real applications with this popular library</li>
+                    <li><strong>Lesson 8.3:</strong> Redux Toolkit - Master enterprise-grade state management</li>
+                    <li><strong>Lesson 8.4:</strong> React Query - Transform how you handle server state</li>
+                    <li><strong>Lesson 8.5:</strong> Architecture Best Practices - Organize your code like a pro</li>
+                </ul>
+
+                <h3>Practical Exercise</h3>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>🏋️ Practice: Audit Your Current Project</h4>
+                    <p>Take a project you're working on (or one from earlier modules) and answer these questions:</p>
+                    <ol>
+                        <li>What state do I have? Categorize each piece (local, shared, server, URL)</li>
+                        <li>Am I experiencing any pain points? (Prop drilling, performance, complexity)</li>
+                        <li>Is my server state separate from client state?</li>
+                        <li>What would I change about my current state management?</li>
+                        <li>Based on this lesson, what's the best solution for my needs?</li>
+                    </ol>
+                </div>
+
+                <h3>Additional Resources</h3>
+
+                <ul>
+                    <li><a href="https://zustand-demo.pmnd.rs/" target="_blank" rel="noopener noreferrer">Zustand Documentation</a></li>
+                    <li><a href="https://tanstack.com/query/latest" target="_blank" rel="noopener noreferrer">TanStack Query (React Query) Docs</a></li>
+                    <li><a href="https://redux-toolkit.js.org/" target="_blank" rel="noopener noreferrer">Redux Toolkit Documentation</a></li>
+                    <li><a href="https://jotai.org/" target="_blank" rel="noopener noreferrer">Jotai Documentation</a></li>
+                    <li><a href="https://xstate.js.org/" target="_blank" rel="noopener noreferrer">XState Documentation</a></li>
+                    <li><a href="https://kentcdodds.com/blog/application-state-management-with-react" target="_blank" rel="noopener noreferrer">Kent C. Dodds: Application State Management</a></li>
+                </ul>
+
+                <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-align: center; padding: 3rem 2rem;">
+                    <h2 style="color: white; font-size: 2.5rem; margin-bottom: 1rem;">🎉 Great Job!</h2>
+                    <p style="color: white; font-size: 1.2rem; margin-bottom: 1rem;">You now understand the state management landscape!</p>
+                    <p style="color: white; font-size: 1rem;">You're equipped to make informed decisions about which tools to use for your applications. In the next lesson, we'll get hands-on with Zustand and build real state management solutions.</p>
+                    <p style="color: white; font-size: 1.1rem; margin-top: 2rem; font-weight: 600;">Ready to start building? Let's go! 🚀</p>
+                </div>
+            </section>
+
+            <!-- Quiz Section -->
+            <section id="quiz" class="lesson-section">
+                <div class="card quiz-container">
+                    <h2>🎯 Quick Quiz</h2>
+                    <p>Test your understanding of state management concepts!</p>
+                    
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> What type of state is data fetched from an API?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="This is for component-specific UI state">
+                                A) Local state
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Correct! Server state (data from APIs) is best managed by specialized libraries like React Query or SWR that handle caching, refetching, and synchronization.">
+                                B) Server state
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This is for multiple components sharing data">
+                                C) Shared state
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This is for data in the URL">
+                                D) URL state
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> When should you choose Redux Toolkit over Zustand?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Think about scale and complexity">
+                                A) Always - Redux is always better
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Bundle size alone shouldn't drive this decision">
+                                B) When you need the smallest bundle size
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Excellent! Redux Toolkit shines in large enterprise applications with complex state logic, multiple teams, and when you need strict patterns and excellent DevTools.">
+                                C) For large, complex apps needing strict patterns and DevTools
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Learning curve shouldn't be the primary factor">
+                                D) When your team is new to React
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> What is the main problem with using Context API for frequently changing values?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Perfect! Context causes ALL consumers to re-render when ANY value changes, even if a component only uses one value. This is why libraries like Zustand with fine-grained subscriptions are better for frequently changing state.">
+                                A) All consumers re-render when any value changes
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Context has good TypeScript support">
+                                B) It doesn't support TypeScript
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Context can be used anywhere in React">
+                                C) It can't be used with functional components
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Context works with async operations">
+                                D) It doesn't work with async operations
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> What is the principle of "colocation" in state management?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="This is about WHERE state lives">
+                                A) Putting all state in Redux
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Spot on! Colocation means keeping state as close as possible to where it's used. This improves maintainability, performance, and makes code easier to understand.">
+                                B) Keeping state as close as possible to where it's used
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Colocation is about proximity, not format">
+                                C) Storing state in localStorage
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This relates to data normalization">
+                                D) Normalizing your data structure
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Why is React Query considered a game-changer for state management?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="React Query is specifically for server state">
+                                A) It handles all types of state in one library
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Exactly right! React Query revolutionized state management by recognizing that server state is fundamentally different and providing automatic caching, refetching, synchronization, and error handling.">
+                                B) It separates server state and handles caching automatically
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="React Query is actually lightweight">
+                                C) It has the smallest bundle size
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="React Query doesn't replace Redux">
+                                D) It replaces Redux completely
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Lesson Navigation -->
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="module_project_7_registration_system.html" class="prev-lesson">← Previous: Module 7 Project</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_8_2_zustand_basics.html" class="next-lesson">Next: Zustand Basics →</a>
+            </nav>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: var(--primary-gradient); color: white; padding: 2rem; text-align: center; margin-top: 4rem;">
+        <p>&copy; 2024 PracticalAce. All rights reserved.</p>
+        <p style="margin-top: 0.5rem; opacity: 0.9;">Empowering developers to build exceptional applications.</p>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

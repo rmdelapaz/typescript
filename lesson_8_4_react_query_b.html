@@ -1,0 +1,1514 @@
+            <!-- Section 5: Mutations -->
+            <section id="section5">
+                <h2>🔧 Mutations: Updating Data</h2>
+                
+                <p>While queries are for reading data, <strong>mutations</strong> are for creating, updating, or deleting data. React Query's <code>useMutation</code> hook provides a powerful abstraction for modifying server state with automatic cache updates and optimistic UI patterns.</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4>📖 Definition</h4>
+                    <p style="color: white;"><strong>Mutation:</strong> A side effect that changes data on the server (POST, PUT, PATCH, DELETE requests). Mutations trigger cache invalidation and refetching to keep data synchronized.</p>
+                </div>
+
+                <h3>Basic Mutation Example</h3>
+
+                <pre><code class="language-typescript">import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+interface CreateUserData {
+  name: string;
+  email: string;
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+}
+
+// API function
+const createUser = async (userData: CreateUserData): Promise&lt;User&gt; => {
+  const response = await fetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to create user');
+  }
+  
+  return response.json();
+};
+
+// Component
+function CreateUserForm() {
+  const queryClient = useQueryClient();
+  
+  const mutation = useMutation({
+    mutationFn: createUser,
+    onSuccess: (data) => {
+      // Invalidate and refetch users list
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      console.log('User created:', data);
+    },
+    onError: (error) => {
+      console.error('Error creating user:', error);
+    }
+  });
+
+  const handleSubmit = (e: React.FormEvent&lt;HTMLFormElement&gt;) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    mutation.mutate({
+      name: formData.get('name') as string,
+      email: formData.get('email') as string
+    });
+  };
+
+  return (
+    &lt;form onSubmit={handleSubmit}&gt;
+      &lt;input name="name" placeholder="Name" required /&gt;
+      &lt;input name="email" type="email" placeholder="Email" required /&gt;
+      
+      &lt;button 
+        type="submit" 
+        disabled={mutation.isPending}
+      &gt;
+        {mutation.isPending ? 'Creating...' : 'Create User'}
+      &lt;/button&gt;
+      
+      {mutation.isError && (
+        &lt;div className="error"&gt;
+          Error: {mutation.error.message}
+        &lt;/div&gt;
+      )}
+      
+      {mutation.isSuccess && (
+        &lt;div className="success"&gt;
+          User created successfully!
+        &lt;/div&gt;
+      )}
+    &lt;/form&gt;
+  );
+}</code></pre>
+
+                <div class="mermaid">
+graph LR
+    A[User submits form] --> B[mutation.mutate called]
+    B --> C[isPending = true]
+    C --> D[API request]
+    D --> E{Success?}
+    E -->|Yes| F[onSuccess callback]
+    E -->|No| G[onError callback]
+    F --> H[Invalidate queries]
+    H --> I[Refetch data]
+    G --> J[Show error]
+    I --> K[isSuccess = true]
+    J --> L[isError = true]
+    
+    style F fill:#c8e6c9
+    style G fill:#ffcdd2
+    style C fill:#fff3cd
+</div>
+
+                <h3>Mutation States</h3>
+
+                <pre><code class="language-typescript">const mutation = useMutation({ mutationFn: createUser });
+
+// Access mutation states
+mutation.isPending;   // true while request is in flight
+mutation.isError;     // true if mutation failed
+mutation.isSuccess;   // true if mutation succeeded
+mutation.isIdle;      // true if mutation hasn't been called yet
+
+mutation.error;       // Error object if failed
+mutation.data;        // Response data if successful
+mutation.status;      // 'idle' | 'pending' | 'error' | 'success'
+
+// Call the mutation
+mutation.mutate(userData);
+
+// Or use async version with Promise
+mutation.mutateAsync(userData)
+  .then(data => console.log('Success:', data))
+  .catch(error => console.error('Error:', error));</code></pre>
+
+                <h3>Update and Delete Mutations</h3>
+
+                <pre><code class="language-typescript">// Update mutation
+const updateUser = async ({ id, data }: { 
+  id: string; 
+  data: Partial&lt;User&gt; 
+}): Promise&lt;User&gt; => {
+  const response = await fetch(`/api/users/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return response.json();
+};
+
+const updateMutation = useMutation({
+  mutationFn: updateUser,
+  onSuccess: (data, variables) => {
+    // Invalidate specific user and list
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+    queryClient.invalidateQueries({ queryKey: ['users', variables.id] });
+  }
+});
+
+// Delete mutation
+const deleteUser = async (userId: string): Promise&lt;void&gt; => {
+  await fetch(`/api/users/${userId}`, {
+    method: 'DELETE'
+  });
+};
+
+const deleteMutation = useMutation({
+  mutationFn: deleteUser,
+  onSuccess: (_, deletedId) => {
+    // Remove from cache
+    queryClient.setQueryData&lt;User[]&gt;(['users'], (old) => 
+      old?.filter(user => user.id !== deletedId)
+    );
+  }
+});
+
+// Usage
+&lt;button onClick={() => updateMutation.mutate({ 
+  id: user.id, 
+  data: { name: 'New Name' } 
+})}&gt;
+  Update
+&lt;/button&gt;
+
+&lt;button onClick={() => deleteMutation.mutate(user.id)}&gt;
+  Delete
+&lt;/button&gt;</code></pre>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Mutation Best Practices</h4>
+                    <ul>
+                        <li><strong>Always invalidate affected queries</strong> in <code>onSuccess</code></li>
+                        <li><strong>Use mutateAsync</strong> when you need Promise-based flow</li>
+                        <li><strong>Handle errors gracefully</strong> with onError callbacks</li>
+                        <li><strong>Show loading states</strong> using isPending</li>
+                        <li><strong>Disable submit buttons</strong> during mutations</li>
+                        <li><strong>Reset mutation state</strong> when appropriate with <code>mutation.reset()</code></li>
+                    </ul>
+                </div>
+
+                <h3>Mutation with Variables</h3>
+
+                <pre><code class="language-typescript">// Access mutation variables in callbacks
+const mutation = useMutation({
+  mutationFn: createUser,
+  onMutate: async (variables) => {
+    // Called before mutation function
+    console.log('About to create:', variables);
+    
+    // Can return context for rollback
+    return { timestamp: Date.now() };
+  },
+  onSuccess: (data, variables, context) => {
+    console.log('Created:', data);
+    console.log('With input:', variables);
+    console.log('Context:', context);
+  },
+  onError: (error, variables, context) => {
+    console.error('Failed to create:', variables);
+    console.log('Rollback context:', context);
+  },
+  onSettled: (data, error, variables, context) => {
+    // Called whether success or error
+    console.log('Mutation finished');
+  }
+});
+
+// All callbacks receive:
+// - data: response from mutationFn (success only)
+// - error: error object (error only)
+// - variables: input passed to mutate()
+// - context: value returned from onMutate</code></pre>
+
+            </section>
+
+            <!-- Section 6: Cache Invalidation and Refetching -->
+            <section id="section6">
+                <h2>🔄 Cache Invalidation and Refetching</h2>
+                
+                <p>One of React Query's superpowers is intelligent cache management. Understanding when and how to invalidate queries ensures your UI always displays the most current data without unnecessary network requests.</p>
+
+                <h3>Query Invalidation Strategies</h3>
+
+                <pre><code class="language-typescript">import { useQueryClient } from '@tanstack/react-query';
+
+function MyComponent() {
+  const queryClient = useQueryClient();
+
+  // 1. Invalidate exact query
+  queryClient.invalidateQueries({ 
+    queryKey: ['users', '123'] 
+  });
+
+  // 2. Invalidate all queries starting with key
+  queryClient.invalidateQueries({ 
+    queryKey: ['users'] 
+  });
+  // Invalidates: ['users'], ['users', '123'], ['users', 'list'], etc.
+
+  // 3. Invalidate with predicate function
+  queryClient.invalidateQueries({
+    predicate: (query) => {
+      return query.queryKey[0] === 'users' && 
+             query.state.data !== undefined;
+    }
+  });
+
+  // 4. Invalidate multiple query keys
+  queryClient.invalidateQueries({ queryKey: ['users'] });
+  queryClient.invalidateQueries({ queryKey: ['posts'] });
+
+  // 5. Invalidate and refetch immediately
+  await queryClient.invalidateQueries({ 
+    queryKey: ['users'],
+    refetchType: 'active' // 'active' | 'inactive' | 'all' | 'none'
+  });
+}</code></pre>
+
+                <div class="mermaid">
+graph TB
+    A[Mutation Success] --> B[Invalidate Queries]
+    B --> C{Query has active observers?}
+    C -->|Yes| D[Mark stale + Refetch immediately]
+    C -->|No| E[Mark stale only]
+    
+    D --> F[Fresh data in cache]
+    E --> G[Will refetch on next mount]
+    
+    H[Component mounts] --> I{Query in cache?}
+    I -->|Fresh| J[Use cached data]
+    I -->|Stale| K[Show cached + Refetch]
+    I -->|Not in cache| L[Fetch new data]
+    
+    style D fill:#c8e6c9
+    style K fill:#fff3cd
+    style L fill:#e3f2fd
+</div>
+
+                <h3>Manual Refetching</h3>
+
+                <pre><code class="language-typescript">function UserProfile({ userId }: { userId: string }) {
+  const { data, refetch, isRefetching } = useQuery({
+    queryKey: ['users', userId],
+    queryFn: () => getUser(userId)
+  });
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;{data?.name}&lt;/h2&gt;
+      
+      &lt;button 
+        onClick={() => refetch()}
+        disabled={isRefetching}
+      &gt;
+        {isRefetching ? 'Refreshing...' : 'Refresh'}
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}
+
+// Refetch from outside component
+const queryClient = useQueryClient();
+
+// Refetch specific query
+queryClient.refetchQueries({ queryKey: ['users', '123'] });
+
+// Refetch all queries with key prefix
+queryClient.refetchQueries({ queryKey: ['users'] });
+
+// Refetch all active queries
+queryClient.refetchQueries({ type: 'active' });</code></pre>
+
+                <h3>Setting Query Data Directly</h3>
+
+                <pre><code class="language-typescript">const queryClient = useQueryClient();
+
+// 1. Set data directly (overwrite)
+queryClient.setQueryData&lt;User&gt;(['users', '123'], {
+  id: '123',
+  name: 'John Doe',
+  email: 'john@example.com'
+});
+
+// 2. Update data with function (merge)
+queryClient.setQueryData&lt;User&gt;(['users', '123'], (oldData) => {
+  if (!oldData) return oldData;
+  return { ...oldData, name: 'Updated Name' };
+});
+
+// 3. Update list after creating item
+const createMutation = useMutation({
+  mutationFn: createUser,
+  onSuccess: (newUser) => {
+    // Add new user to cached list
+    queryClient.setQueryData&lt;User[]&gt;(['users'], (old) => {
+      return old ? [...old, newUser] : [newUser];
+    });
+  }
+});
+
+// 4. Update list after deleting item
+const deleteMutation = useMutation({
+  mutationFn: deleteUser,
+  onSuccess: (_, deletedId) => {
+    // Remove user from cached list
+    queryClient.setQueryData&lt;User[]&gt;(['users'], (old) => {
+      return old?.filter(user => user.id !== deletedId);
+    });
+  }
+});</code></pre>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 When to Use Each Strategy</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Strategy</th>
+                                <th>When to Use</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>invalidateQueries</strong></td>
+                                <td>Default choice - marks stale and refetches active queries</td>
+                            </tr>
+                            <tr>
+                                <td><strong>setQueryData</strong></td>
+                                <td>When you have the new data and want instant updates</td>
+                            </tr>
+                            <tr>
+                                <td><strong>refetchQueries</strong></td>
+                                <td>Force immediate refetch regardless of stale status</td>
+                            </tr>
+                            <tr>
+                                <td><strong>removeQueries</strong></td>
+                                <td>Clear cache entirely (logout, data no longer valid)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Removing Queries from Cache</h3>
+
+                <pre><code class="language-typescript">// Remove specific query
+queryClient.removeQueries({ queryKey: ['users', '123'] });
+
+// Remove all queries with prefix
+queryClient.removeQueries({ queryKey: ['users'] });
+
+// Clear entire cache
+queryClient.clear();
+
+// Example: Clear user data on logout
+const logout = () => {
+  // Clear all user-related queries
+  queryClient.removeQueries({ queryKey: ['users'] });
+  queryClient.removeQueries({ queryKey: ['profile'] });
+  
+  // Or clear everything
+  queryClient.clear();
+  
+  // Then navigate to login
+  navigate('/login');
+};</code></pre>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ Common Pitfall: Over-Invalidation</h4>
+                    <p>Invalidating too broadly can cause unnecessary refetches:</p>
+                    <pre><code class="language-typescript">// ❌ BAD - Invalidates ALL queries
+queryClient.invalidateQueries();
+
+// ❌ BAD - Invalidates all user queries after updating one
+queryClient.invalidateQueries({ queryKey: ['users'] });
+
+// ✅ GOOD - Only invalidate what changed
+queryClient.invalidateQueries({ queryKey: ['users', userId] });</code></pre>
+                </div>
+
+            </section>
+
+            <!-- Section 7: Optimistic Updates -->
+            <section id="section7">
+                <h2>⚡ Optimistic Updates</h2>
+                
+                <p><strong>Optimistic updates</strong> make your app feel instant by updating the UI immediately, before waiting for the server response. If the server request fails, React Query automatically rolls back to the previous state.</p>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4>📖 Definition</h4>
+                    <p style="color: white;"><strong>Optimistic Update:</strong> Updating the UI immediately based on the expected result of an operation, before receiving server confirmation. Provides instant feedback and makes apps feel faster.</p>
+                </div>
+
+                <div class="mermaid">
+sequenceDiagram
+    participant User
+    participant UI
+    participant Cache
+    participant Server
+    
+    User->>UI: Click "Like" button
+    UI->>Cache: Update likes count (+1)
+    UI->>User: Show liked state immediately
+    UI->>Server: POST /api/like
+    
+    alt Success
+        Server-->>UI: 200 OK
+        Note over UI,Cache: Keep optimistic update
+    else Error
+        Server-->>UI: 500 Error
+        UI->>Cache: Rollback to previous state
+        UI->>User: Show error + unliked state
+    end
+</div>
+
+                <h3>Basic Optimistic Update</h3>
+
+                <pre><code class="language-typescript">interface Todo {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+const toggleTodo = async (id: string): Promise&lt;Todo&gt; => {
+  const response = await fetch(`/api/todos/${id}/toggle`, {
+    method: 'PATCH'
+  });
+  return response.json();
+};
+
+function TodoList() {
+  const queryClient = useQueryClient();
+
+  const toggleMutation = useMutation({
+    mutationFn: toggleTodo,
+    
+    // Before mutation starts
+    onMutate: async (todoId) => {
+      // Cancel outgoing refetches (so they don't overwrite optimistic update)
+      await queryClient.cancelQueries({ queryKey: ['todos'] });
+
+      // Snapshot the previous value
+      const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
+
+      // Optimistically update the cache
+      queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) => {
+        return old?.map(todo =>
+          todo.id === todoId
+            ? { ...todo, completed: !todo.completed }
+            : todo
+        );
+      });
+
+      // Return context with snapshot
+      return { previousTodos };
+    },
+    
+    // On error, rollback
+    onError: (error, variables, context) => {
+      queryClient.setQueryData(['todos'], context?.previousTodos);
+      alert('Failed to update todo. Please try again.');
+    },
+    
+    // Always refetch after error or success
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+    }
+  });
+
+  return (
+    &lt;ul&gt;
+      {todos?.map(todo => (
+        &lt;li key={todo.id}&gt;
+          &lt;input
+            type="checkbox"
+            checked={todo.completed}
+            onChange={() => toggleMutation.mutate(todo.id)}
+          /&gt;
+          {todo.title}
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}</code></pre>
+
+                <h3>Optimistic Create</h3>
+
+                <pre><code class="language-typescript">const createTodo = async (newTodo: { title: string }): Promise&lt;Todo&gt; => {
+  const response = await fetch('/api/todos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newTodo)
+  });
+  return response.json();
+};
+
+const createMutation = useMutation({
+  mutationFn: createTodo,
+  
+  onMutate: async (newTodo) => {
+    await queryClient.cancelQueries({ queryKey: ['todos'] });
+    
+    const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
+    
+    // Create optimistic todo with temporary ID
+    const optimisticTodo: Todo = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      title: newTodo.title,
+      completed: false
+    };
+    
+    // Add optimistic todo to cache
+    queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) => {
+      return old ? [...old, optimisticTodo] : [optimisticTodo];
+    });
+    
+    return { previousTodos, optimisticTodo };
+  },
+  
+  onSuccess: (newTodo, variables, context) => {
+    // Replace temp todo with real one from server
+    queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) => {
+      return old?.map(todo => 
+        todo.id === context.optimisticTodo.id ? newTodo : todo
+      );
+    });
+  },
+  
+  onError: (error, variables, context) => {
+    queryClient.setQueryData(['todos'], context?.previousTodos);
+  },
+  
+  onSettled: () => {
+    queryClient.invalidateQueries({ queryKey: ['todos'] });
+  }
+});</code></pre>
+
+                <h3>Optimistic Delete</h3>
+
+                <pre><code class="language-typescript">const deleteTodo = async (id: string): Promise&lt;void&gt; => {
+  await fetch(`/api/todos/${id}`, { method: 'DELETE' });
+};
+
+const deleteMutation = useMutation({
+  mutationFn: deleteTodo,
+  
+  onMutate: async (todoId) => {
+    await queryClient.cancelQueries({ queryKey: ['todos'] });
+    
+    const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
+    
+    // Remove todo optimistically
+    queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) => {
+      return old?.filter(todo => todo.id !== todoId);
+    });
+    
+    return { previousTodos };
+  },
+  
+  onError: (error, variables, context) => {
+    // Restore deleted todo on error
+    queryClient.setQueryData(['todos'], context?.previousTodos);
+    alert('Failed to delete todo');
+  },
+  
+  onSettled: () => {
+    queryClient.invalidateQueries({ queryKey: ['todos'] });
+  }
+});</code></pre>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h4>✅ Optimistic Update Checklist</h4>
+                    <ol>
+                        <li><strong>Cancel queries:</strong> Prevent refetches from overwriting optimistic state</li>
+                        <li><strong>Snapshot previous state:</strong> Save current data for rollback</li>
+                        <li><strong>Update cache optimistically:</strong> Show expected result immediately</li>
+                        <li><strong>Return context:</strong> Pass snapshot to error/success handlers</li>
+                        <li><strong>Handle errors:</strong> Rollback to previous state on failure</li>
+                        <li><strong>Invalidate on settled:</strong> Sync with server after success or error</li>
+                    </ol>
+                </div>
+
+                <h3>Complex Optimistic Update: Like Button</h3>
+
+                <pre><code class="language-typescript">interface Post {
+  id: string;
+  title: string;
+  likes: number;
+  likedBy: string[]; // Array of user IDs
+}
+
+const toggleLike = async ({ 
+  postId, 
+  userId 
+}: { 
+  postId: string; 
+  userId: string 
+}): Promise&lt;Post&gt; => {
+  const response = await fetch(`/api/posts/${postId}/like`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId })
+  });
+  return response.json();
+};
+
+function LikeButton({ post, userId }: { post: Post; userId: string }) {
+  const queryClient = useQueryClient();
+  const isLiked = post.likedBy.includes(userId);
+
+  const likeMutation = useMutation({
+    mutationFn: toggleLike,
+    
+    onMutate: async ({ postId, userId }) => {
+      await queryClient.cancelQueries({ queryKey: ['posts', postId] });
+      
+      const previousPost = queryClient.getQueryData&lt;Post&gt;(['posts', postId]);
+      
+      queryClient.setQueryData&lt;Post&gt;(['posts', postId], (old) => {
+        if (!old) return old;
+        
+        const isCurrentlyLiked = old.likedBy.includes(userId);
+        
+        return {
+          ...old,
+          likes: isCurrentlyLiked ? old.likes - 1 : old.likes + 1,
+          likedBy: isCurrentlyLiked
+            ? old.likedBy.filter(id => id !== userId)
+            : [...old.likedBy, userId]
+        };
+      });
+      
+      return { previousPost };
+    },
+    
+    onError: (error, variables, context) => {
+      if (context?.previousPost) {
+        queryClient.setQueryData(['posts', variables.postId], context.previousPost);
+      }
+    },
+    
+    onSettled: (data, error, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['posts', variables.postId] });
+    }
+  });
+
+  return (
+    &lt;button
+      onClick={() => likeMutation.mutate({ postId: post.id, userId })}
+      disabled={likeMutation.isPending}
+      style={{
+        color: isLiked ? 'red' : 'gray',
+        opacity: likeMutation.isPending ? 0.6 : 1
+      }}
+    &gt;
+      ❤️ {post.likes}
+    &lt;/button&gt;
+  );
+}</code></pre>
+
+                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                    <h4>⚠️ When NOT to Use Optimistic Updates</h4>
+                    <ul>
+                        <li><strong>Critical operations:</strong> Financial transactions, medical records</li>
+                        <li><strong>Complex validation:</strong> When server might reject for many reasons</li>
+                        <li><strong>Large payloads:</strong> When update logic is complex or data intensive</li>
+                        <li><strong>Permission-based:</strong> When user might not have permission</li>
+                    </ul>
+                    <p>In these cases, show loading state and wait for server confirmation.</p>
+                </div>
+
+            </section>
+
+            <!-- Section 8: Best Practices -->
+            <section id="section8">
+                <h2>🎯 Best Practices and Patterns</h2>
+                
+                <p>After mastering the basics of React Query, following these best practices will help you build maintainable, performant applications that leverage React Query's full power.</p>
+
+                <h3>1. Organize API Functions</h3>
+
+                <pre><code class="language-typescript">// api/users.ts
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export const usersApi = {
+  getAll: async (): Promise&lt;User[]&gt; => {
+    const response = await fetch('/api/users');
+    if (!response.ok) throw new Error('Failed to fetch users');
+    return response.json();
+  },
+  
+  getById: async (id: string): Promise&lt;User&gt; => {
+    const response = await fetch(`/api/users/${id}`);
+    if (!response.ok) throw new Error('Failed to fetch user');
+    return response.json();
+  },
+  
+  create: async (data: Omit&lt;User, 'id'&gt;): Promise&lt;User&gt; => {
+    const response = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to create user');
+    return response.json();
+  },
+  
+  update: async ({ id, data }: { id: string; data: Partial&lt;User&gt; }): Promise&lt;User&gt; => {
+    const response = await fetch(`/api/users/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Failed to update user');
+    return response.json();
+  },
+  
+  delete: async (id: string): Promise&lt;void&gt; => {
+    const response = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Failed to delete user');
+  }
+};</code></pre>
+
+                <h3>2. Create Custom Hooks for Queries</h3>
+
+                <pre><code class="language-typescript">// hooks/useUsers.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { usersApi, User } from '../api/users';
+
+// Query keys factory
+export const userKeys = {
+  all: ['users'] as const,
+  lists: () => [...userKeys.all, 'list'] as const,
+  list: (filters: string) => [...userKeys.lists(), { filters }] as const,
+  details: () => [...userKeys.all, 'detail'] as const,
+  detail: (id: string) => [...userKeys.details(), id] as const,
+};
+
+// Get all users
+export function useUsers() {
+  return useQuery({
+    queryKey: userKeys.lists(),
+    queryFn: usersApi.getAll,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+// Get single user
+export function useUser(id: string) {
+  return useQuery({
+    queryKey: userKeys.detail(id),
+    queryFn: () => usersApi.getById(id),
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+// Create user
+export function useCreateUser() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: usersApi.create,
+    onSuccess: (newUser) => {
+      // Optimistically add to list
+      queryClient.setQueryData&lt;User[]&gt;(userKeys.lists(), (old) => {
+        return old ? [...old, newUser] : [newUser];
+      });
+      // Invalidate to refetch from server
+      queryClient.invalidateQueries({ queryKey: userKeys.lists() });
+    },
+  });
+}
+
+// Update user
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: usersApi.update,
+    onSuccess: (updatedUser) => {
+      // Update specific user cache
+      queryClient.setQueryData(
+        userKeys.detail(updatedUser.id),
+        updatedUser
+      );
+      // Invalidate list
+      queryClient.invalidateQueries({ queryKey: userKeys.lists() });
+    },
+  });
+}
+
+// Delete user
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: usersApi.delete,
+    onSuccess: (_, deletedId) => {
+      // Remove from list cache
+      queryClient.setQueryData&lt;User[]&gt;(userKeys.lists(), (old) => {
+        return old?.filter(user => user.id !== deletedId);
+      });
+      // Remove detail cache
+      queryClient.removeQueries({ queryKey: userKeys.detail(deletedId) });
+    },
+  });
+}</code></pre>
+
+                <h3>3. Configure Global Defaults</h3>
+
+                <pre><code class="language-typescript">// App.tsx or main provider file
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Global defaults for ALL queries
+      staleTime: 1000 * 60 * 5,        // 5 minutes
+      gcTime: 1000 * 60 * 10,          // 10 minutes (was cacheTime)
+      refetchOnWindowFocus: false,     // Don't refetch on tab focus
+      refetchOnReconnect: true,        // Refetch on network reconnect
+      retry: 1,                        // Retry failed requests once
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    },
+    mutations: {
+      // Global defaults for ALL mutations
+      retry: 0,                        // Don't retry mutations
+      onError: (error) => {
+        console.error('Mutation error:', error);
+        // Show global error toast
+      },
+    },
+  },
+});
+
+function App() {
+  return (
+    &lt;QueryClientProvider client={queryClient}&gt;
+      &lt;YourApp /&gt;
+      &lt;ReactQueryDevtools initialIsOpen={false} /&gt;
+    &lt;/QueryClientProvider&gt;
+  );
+}</code></pre>
+
+                <h3>4. Error Handling Patterns</h3>
+
+                <pre><code class="language-typescript">// Create custom error class
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public data?: any
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+// Enhanced fetch with error handling
+async function fetchApi&lt;T&gt;(url: string, options?: RequestInit): Promise&lt;T&gt; {
+  const response = await fetch(url, options);
+  
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new ApiError(
+      errorData.message || 'Request failed',
+      response.status,
+      errorData
+    );
+  }
+  
+  return response.json();
+}
+
+// Use in component with proper error typing
+function UserProfile({ userId }: { userId: string }) {
+  const { data, error, isError } = useQuery({
+    queryKey: ['users', userId],
+    queryFn: () => fetchApi&lt;User&gt;(`/api/users/${userId}`)
+  });
+
+  if (isError) {
+    if (error instanceof ApiError) {
+      if (error.status === 404) {
+        return &lt;div&gt;User not found&lt;/div&gt;;
+      }
+      if (error.status === 403) {
+        return &lt;div&gt;Access denied&lt;/div&gt;;
+      }
+    }
+    return &lt;div&gt;Error: {error.message}&lt;/div&gt;;
+  }
+
+  return &lt;div&gt;{data?.name}&lt;/div&gt;;
+}</code></pre>
+
+                <h3>5. Prefetching Data</h3>
+
+                <pre><code class="language-typescript">import { useQueryClient } from '@tanstack/react-query';
+
+function UserList() {
+  const queryClient = useQueryClient();
+  const { data: users } = useUsers();
+
+  // Prefetch user details on hover
+  const prefetchUser = (userId: string) => {
+    queryClient.prefetchQuery({
+      queryKey: userKeys.detail(userId),
+      queryFn: () => usersApi.getById(userId),
+      staleTime: 1000 * 60 * 5,
+    });
+  };
+
+  return (
+    &lt;ul&gt;
+      {users?.map(user => (
+        &lt;li
+          key={user.id}
+          onMouseEnter={() => prefetchUser(user.id)}
+        &gt;
+          &lt;Link to={`/users/${user.id}`}&gt;{user.name}&lt;/Link&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+
+// Prefetch on route loader
+function UserDetailPage() {
+  const { userId } = useParams();
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    // Prefetch related data
+    queryClient.prefetchQuery({
+      queryKey: ['posts', userId],
+      queryFn: () => getPostsByUser(userId!)
+    });
+  }, [userId, queryClient]);
+  
+  const { data } = useUser(userId!);
+  
+  return &lt;div&gt;{data?.name}&lt;/div&gt;;
+}</code></pre>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h4>💡 React Query Best Practices Summary</h4>
+                    <ol>
+                        <li><strong>Use query keys factory</strong> for consistent, typed keys</li>
+                        <li><strong>Create custom hooks</strong> to encapsulate query logic</li>
+                        <li><strong>Organize API functions</strong> in separate files</li>
+                        <li><strong>Set sensible global defaults</strong> in QueryClient</li>
+                        <li><strong>Handle errors properly</strong> with typed error classes</li>
+                        <li><strong>Use optimistic updates</strong> for better UX</li>
+                        <li><strong>Prefetch on hover/navigation</strong> for snappy experience</li>
+                        <li><strong>Invalidate precisely</strong> to avoid unnecessary refetches</li>
+                        <li><strong>Use DevTools</strong> for debugging cache state</li>
+                        <li><strong>Test with React Query</strong> using testing-library</li>
+                    </ol>
+                </div>
+
+                <h3>6. Dependent Queries</h3>
+
+                <pre><code class="language-typescript">// Query B depends on data from Query A
+function UserPosts({ userId }: { userId: string }) {
+  // First query
+  const { data: user } = useQuery({
+    queryKey: ['users', userId],
+    queryFn: () => getUser(userId)
+  });
+
+  // Second query depends on first
+  const { data: posts } = useQuery({
+    queryKey: ['posts', user?.id],
+    queryFn: () => getPosts(user!.id),
+    enabled: !!user, // Only run when user exists
+  });
+
+  return &lt;div&gt;{posts?.length} posts&lt;/div&gt;;
+}
+
+// Parallel dependent queries
+function Dashboard() {
+  const { data: user } = useUser();
+  
+  // These only run when user exists
+  const queries = useQueries({
+    queries: [
+      {
+        queryKey: ['posts', user?.id],
+        queryFn: () => getPosts(user!.id),
+        enabled: !!user,
+      },
+      {
+        queryKey: ['comments', user?.id],
+        queryFn: () => getComments(user!.id),
+        enabled: !!user,
+      },
+      {
+        queryKey: ['likes', user?.id],
+        queryFn: () => getLikes(user!.id),
+        enabled: !!user,
+      },
+    ],
+  });
+
+  const [postsQuery, commentsQuery, likesQuery] = queries;
+
+  if (queries.some(q => q.isLoading)) {
+    return &lt;div&gt;Loading...&lt;/div&gt;;
+  }
+
+  return (
+    &lt;div&gt;
+      &lt;div&gt;Posts: {postsQuery.data?.length}&lt;/div&gt;
+      &lt;div&gt;Comments: {commentsQuery.data?.length}&lt;/div&gt;
+      &lt;div&gt;Likes: {likesQuery.data?.length}&lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+            </section>
+
+            <!-- Hands-On Exercises -->
+            <section id="exercises">
+                <h2>🏋️ Hands-On Exercises</h2>
+                
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Exercise 1: Blog Post Manager</h3>
+                    <p><strong>Goal:</strong> Build a blog post manager with React Query that supports viewing, creating, updating, and deleting posts.</p>
+                    
+                    <p><strong>Requirements:</strong></p>
+                    <ol>
+                        <li>Fetch and display a list of blog posts</li>
+                        <li>Show loading and error states</li>
+                        <li>Create new posts with a form</li>
+                        <li>Edit existing posts inline</li>
+                        <li>Delete posts with confirmation</li>
+                        <li>Use proper TypeScript types</li>
+                        <li>Implement cache invalidation</li>
+                        <li>Add optimistic updates for like button</li>
+                    </ol>
+
+                    <details>
+                        <summary>💡 Hint #1: Project Structure</summary>
+                        <pre><code class="language-typescript">// types/post.ts
+export interface Post {
+  id: string;
+  title: string;
+  content: string;
+  author: string;
+  likes: number;
+  createdAt: string;
+}
+
+// api/posts.ts
+export const postsApi = {
+  getAll: async (): Promise&lt;Post[]&gt; => { /* ... */ },
+  getById: async (id: string): Promise&lt;Post&gt; => { /* ... */ },
+  create: async (data: Omit&lt;Post, 'id' | 'createdAt'&gt;): Promise&lt;Post&gt; => { /* ... */ },
+  update: async (id: string, data: Partial&lt;Post&gt;): Promise&lt;Post&gt; => { /* ... */ },
+  delete: async (id: string): Promise&lt;void&gt; => { /* ... */ },
+  like: async (id: string): Promise&lt;Post&gt; => { /* ... */ }
+};</code></pre>
+                    </details>
+
+                    <details>
+                        <summary>💡 Hint #2: Custom Hooks</summary>
+                        <pre><code class="language-typescript">// hooks/usePosts.ts
+export const postKeys = {
+  all: ['posts'] as const,
+  lists: () => [...postKeys.all, 'list'] as const,
+  details: () => [...postKeys.all, 'detail'] as const,
+  detail: (id: string) => [...postKeys.details(), id] as const,
+};
+
+export function usePosts() {
+  return useQuery({
+    queryKey: postKeys.lists(),
+    queryFn: postsApi.getAll
+  });
+}
+
+export function useCreatePost() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: postsApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: postKeys.lists() });
+    }
+  });
+}</code></pre>
+                    </details>
+
+                    <details>
+                        <summary>✅ Full Solution</summary>
+                        <pre><code class="language-typescript">// Full solution in next hint...</code></pre>
+                        <p>Try implementing this yourself first! The solution combines all concepts from this lesson.</p>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Exercise 2: Shopping Cart with Optimistic Updates</h3>
+                    <p><strong>Goal:</strong> Build a shopping cart that updates instantly when adding/removing items.</p>
+                    
+                    <p><strong>Requirements:</strong></p>
+                    <ol>
+                        <li>Display product list from API</li>
+                        <li>Show current cart items</li>
+                        <li>Add items to cart with optimistic update</li>
+                        <li>Remove items from cart with optimistic update</li>
+                        <li>Update quantities with optimistic update</li>
+                        <li>Rollback on error</li>
+                        <li>Show total price (derived from cart)</li>
+                        <li>Persist cart to server</li>
+                    </ol>
+
+                    <details>
+                        <summary>💡 Hint: Optimistic Cart Update</summary>
+                        <pre><code class="language-typescript">const addToCartMutation = useMutation({
+  mutationFn: (productId: string) => addToCart(productId),
+  
+  onMutate: async (productId) => {
+    await queryClient.cancelQueries({ queryKey: ['cart'] });
+    
+    const previousCart = queryClient.getQueryData&lt;CartItem[]&gt;(['cart']);
+    
+    queryClient.setQueryData&lt;CartItem[]&gt;(['cart'], (old) => {
+      const existing = old?.find(item => item.productId === productId);
+      if (existing) {
+        return old?.map(item =>
+          item.productId === productId
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...(old || []), { productId, quantity: 1 }];
+    });
+    
+    return { previousCart };
+  },
+  
+  onError: (err, variables, context) => {
+    queryClient.setQueryData(['cart'], context?.previousCart);
+  },
+  
+  onSettled: () => {
+    queryClient.invalidateQueries({ queryKey: ['cart'] });
+  }
+});</code></pre>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Exercise 3: Infinite Scroll with React Query</h3>
+                    <p><strong>Goal:</strong> Implement infinite scrolling for a feed using <code>useInfiniteQuery</code>.</p>
+                    
+                    <p><strong>Requirements:</strong></p>
+                    <ol>
+                        <li>Fetch paginated posts</li>
+                        <li>Load more on scroll or button click</li>
+                        <li>Show loading state for next page</li>
+                        <li>Handle end of data</li>
+                        <li>Implement proper TypeScript types</li>
+                    </ol>
+
+                    <details>
+                        <summary>💡 Hint: useInfiniteQuery Structure</summary>
+                        <pre><code class="language-typescript">import { useInfiniteQuery } from '@tanstack/react-query';
+
+interface Post {
+  id: string;
+  title: string;
+  content: string;
+}
+
+interface PostsResponse {
+  posts: Post[];
+  nextCursor: string | null;
+}
+
+const fetchPosts = async ({ pageParam }: { pageParam: string | undefined }): Promise&lt;PostsResponse&gt; => {
+  const url = pageParam 
+    ? `/api/posts?cursor=${pageParam}`
+    : '/api/posts';
+  const response = await fetch(url);
+  return response.json();
+};
+
+function InfinitePostList() {
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteQuery({
+    queryKey: ['posts', 'infinite'],
+    queryFn: fetchPosts,
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+  });
+
+  return (
+    &lt;div&gt;
+      {data?.pages.map((page, i) => (
+        &lt;div key={i}&gt;
+          {page.posts.map(post => (
+            &lt;div key={post.id}&gt;{post.title}&lt;/div&gt;
+          ))}
+        &lt;/div&gt;
+      ))}
+      
+      {hasNextPage && (
+        &lt;button onClick={() => fetchNextPage()}&gt;
+          {isFetchingNextPage ? 'Loading...' : 'Load More'}
+        &lt;/button&gt;
+      )}
+    &lt;/div&gt;
+  );
+}</code></pre>
+                    </details>
+                </div>
+            </section>
+
+            <!-- Quiz Section -->
+            <section id="quiz">
+                <h2>🧠 Knowledge Check Quiz</h2>
+                
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Question 1: Query vs Mutation</h3>
+                    <p>What is the main difference between <code>useQuery</code> and <code>useMutation</code>?</p>
+                    
+                    <details>
+                        <summary>Show Answer</summary>
+                        <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50; margin-top: 1rem;">
+                            <p><strong>Answer:</strong> <code>useQuery</code> is for reading/fetching data (GET requests), while <code>useMutation</code> is for creating, updating, or deleting data (POST, PUT, PATCH, DELETE requests). Queries run automatically and cache results, while mutations only run when explicitly called with <code>mutate()</code>.</p>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Question 2: Cache Invalidation</h3>
+                    <p>When should you use <code>invalidateQueries</code> vs <code>setQueryData</code>?</p>
+                    
+                    <details>
+                        <summary>Show Answer</summary>
+                        <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50; margin-top: 1rem;">
+                            <p><strong>Answer:</strong></p>
+                            <ul>
+                                <li><strong>invalidateQueries:</strong> Use when you want to mark data as stale and trigger a refetch. Best for most cases where you want fresh data from the server.</li>
+                                <li><strong>setQueryData:</strong> Use when you already have the new data and want to update the cache immediately without a server request. Perfect for optimistic updates and when mutations return the updated data.</li>
+                            </ul>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Question 3: Optimistic Updates</h3>
+                    <p>What are the key steps in implementing an optimistic update?</p>
+                    
+                    <details>
+                        <summary>Show Answer</summary>
+                        <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50; margin-top: 1rem;">
+                            <p><strong>Answer:</strong> The key steps are:</p>
+                            <ol>
+                                <li><strong>Cancel queries</strong> to prevent refetches from overwriting optimistic state</li>
+                                <li><strong>Snapshot previous state</strong> using getQueryData</li>
+                                <li><strong>Update cache optimistically</strong> with setQueryData</li>
+                                <li><strong>Return context</strong> with the snapshot from onMutate</li>
+                                <li><strong>Rollback on error</strong> by restoring previous state in onError</li>
+                                <li><strong>Invalidate queries</strong> in onSettled to sync with server</li>
+                            </ol>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Question 4: Query Keys</h3>
+                    <p>Why are query keys important, and what makes a good query key structure?</p>
+                    
+                    <details>
+                        <summary>Show Answer</summary>
+                        <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50; margin-top: 1rem;">
+                            <p><strong>Answer:</strong> Query keys are crucial because they:</p>
+                            <ul>
+                                <li>Uniquely identify cached data</li>
+                                <li>Enable precise cache invalidation</li>
+                                <li>Support dependency tracking</li>
+                            </ul>
+                            <p>A good query key structure:</p>
+                            <ul>
+                                <li>Uses arrays: <code>['users', '123']</code></li>
+                                <li>Orders from general to specific: <code>['posts', 'published', { page: 1 }]</code></li>
+                                <li>Uses a key factory for consistency</li>
+                                <li>Includes all variables that affect the query</li>
+                            </ul>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Question 5: staleTime vs gcTime</h3>
+                    <p>Explain the difference between <code>staleTime</code> and <code>gcTime</code> (formerly cacheTime).</p>
+                    
+                    <details>
+                        <summary>Show Answer</summary>
+                        <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50; margin-top: 1rem;">
+                            <p><strong>Answer:</strong></p>
+                            <ul>
+                                <li><strong>staleTime:</strong> How long data is considered "fresh" (won't refetch). Default is 0 (immediately stale). Use this to control when refetches happen.</li>
+                                <li><strong>gcTime:</strong> How long unused data stays in cache before garbage collection. Default is 5 minutes. Use this to control memory usage.</li>
+                            </ul>
+                            <p><strong>Example:</strong> With staleTime=5min and gcTime=10min, data stays fresh for 5 minutes, becomes stale but cached for another 5 minutes, then gets removed from cache.</p>
+                        </div>
+                    </details>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>Question 6: When to Use React Query</h3>
+                    <p>Should you use React Query for all state management? When is it appropriate vs when should you use useState or another solution?</p>
+                    
+                    <details>
+                        <summary>Show Answer</summary>
+                        <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50; margin-top: 1rem;">
+                            <p><strong>Answer:</strong></p>
+                            <p><strong>Use React Query for:</strong></p>
+                            <ul>
+                                <li>Server state (data from APIs)</li>
+                                <li>Data that's cached and shared across components</li>
+                                <li>Data that can become stale</li>
+                                <li>Async data fetching</li>
+                            </ul>
+                            <p><strong>Use useState/useReducer for:</strong></p>
+                            <ul>
+                                <li>UI state (modal open/closed, form input values)</li>
+                                <li>Client-only state that never touches the server</li>
+                                <li>Temporary state that doesn't need caching</li>
+                                <li>Component-local state</li>
+                            </ul>
+                            <p><strong>Use Zustand/Redux for:</strong></p>
+                            <ul>
+                                <li>Global client state</li>
+                                <li>Complex state logic that's not server-related</li>
+                                <li>State that needs to persist across route changes</li>
+                            </ul>
+                        </div>
+                    </details>
+                </div>
+            </section>
+
+            <!-- Summary Section -->
+            <section id="summary">
+                <h2>📝 Lesson Summary</h2>
+                
+                <div class="card">
+                    <h3>What You've Learned</h3>
+                    <p>Congratulations! You've completed the React Query lesson. You now understand:</p>
+                    
+                    <ul>
+                        <li>✅ The difference between server state and client state</li>
+                        <li>✅ How to set up React Query with TypeScript</li>
+                        <li>✅ Using <code>useQuery</code> for data fetching with automatic caching</li>
+                        <li>✅ Query keys and cache management strategies</li>
+                        <li>✅ Using <code>useMutation</code> for create, update, delete operations</li>
+                        <li>✅ Cache invalidation patterns and when to use each</li>
+                        <li>✅ Implementing optimistic updates for instant UI feedback</li>
+                        <li>✅ React Query best practices and patterns</li>
+                        <li>✅ Organizing API functions and custom hooks</li>
+                        <li>✅ Error handling with typed errors</li>
+                        <li>✅ Prefetching and dependent queries</li>
+                        <li>✅ Global configuration and DevTools usage</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h3 style="color: white;">🎯 Key Takeaways</h3>
+                    <ol style="color: white;">
+                        <li><strong>React Query is for server state:</strong> Use it for data from APIs, not UI state</li>
+                        <li><strong>Queries auto-cache and refetch:</strong> No manual cache management needed</li>
+                        <li><strong>Mutations update server state:</strong> Always invalidate affected queries</li>
+                        <li><strong>Optimistic updates make apps feel instant:</strong> Update UI before server responds</li>
+                        <li><strong>Query keys are crucial:</strong> Use a factory pattern for consistency</li>
+                        <li><strong>Custom hooks encapsulate logic:</strong> One hook per resource type</li>
+                        <li><strong>Configure sensible defaults:</strong> Set staleTime based on data volatility</li>
+                        <li><strong>Use DevTools for debugging:</strong> Visualize cache state and queries</li>
+                    </ol>
+                </div>
+
+                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                    <h3>🚀 Next Steps</h3>
+                    <p>Now that you've mastered React Query, you can:</p>
+                    <ul>
+                        <li>Refactor existing data fetching code to use React Query</li>
+                        <li>Build applications with complex server state requirements</li>
+                        <li>Implement real-time features with polling or WebSocket integration</li>
+                        <li>Optimize performance with prefetching and parallel queries</li>
+                        <li>Proceed to <strong>Lesson 8.5: Architecture Best Practices</strong></li>
+                        <li>Complete the Module 8 Project: Social Media Feed</li>
+                    </ul>
+                </div>
+
+                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                    <h3>📚 Additional Resources</h3>
+                    <ul>
+                        <li><a href="https://tanstack.com/query/latest" target="_blank">TanStack Query Official Documentation</a></li>
+                        <li><a href="https://tanstack.com/query/latest/docs/react/guides/migrating-to-v5" target="_blank">Migration Guide to v5</a></li>
+                        <li><a href="https://tanstack.com/query/latest/docs/react/community/tkdodos-blog" target="_blank">TkDodo's React Query Blog</a> - Excellent deep dives</li>
+                        <li><a href="https://tanstack.com/query/latest/docs/react/devtools" target="_blank">React Query DevTools Guide</a></li>
+                        <li><a href="https://tanstack.com/query/latest/docs/react/typescript" target="_blank">TypeScript Guide for React Query</a></li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Lesson Navigation -->
+            <nav class="lesson-nav" aria-label="Lesson navigation">
+                <a href="lesson_8_3_redux_toolkit.html" class="nav-button prev-lesson">
+                    <span class="arrow">←</span>
+                    <span class="label">Previous</span>
+                    <span class="title">Lesson 8.3: Redux Toolkit</span>
+                </a>
+                <a href="index.html" class="nav-button home">
+                    <span class="label">Course Home</span>
+                </a>
+                <a href="lesson_8_5_architecture_best_practices.html" class="nav-button next-lesson">
+                    <span class="label">Next</span>
+                    <span class="title">Lesson 8.5: Architecture Best Practices</span>
+                    <span class="arrow">→</span>
+                </a>
+            </nav>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 React TypeScript Course. All rights reserved.</p>
+            <p>
+                <a href="index.html">Home</a> |
+                <a href="index.html#modules">All Modules</a> |
+                <a href="mailto:support@example.com">Contact</a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>
