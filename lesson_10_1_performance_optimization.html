@@ -880,6 +880,207 @@ function PaginatedList({ items }: { items: Item[] }) {
 
             <p><code>React.memo</code> is a higher-order component that prevents unnecessary re-renders by memoizing the component output:</p>
 
+            <!-- Interactive Re-render Cascade Visualization -->
+            <div class="card" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 12px; padding: 0; overflow: hidden; margin: 2rem 0;">
+                <div style="background: rgba(102, 126, 234, 0.2); padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    <h4 style="color: #a78bfa; margin: 0; font-size: 1.1rem;">⚡ Interactive: Re-render Cascade Visualizer</h4>
+                    <p style="color: #94a3b8; margin: 0.5rem 0 0 0; font-size: 0.9rem;">Watch components flash when they re-render. See how React.memo prevents unnecessary renders.</p>
+                </div>
+                <div style="padding: 1.5rem;">
+                    <div id="rerender-viz" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        
+                        <!-- Control Panel -->
+                        <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: center;">
+                            <button onclick="triggerParentRender()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: transform 0.15s, box-shadow 0.15s;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(102,126,234,0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                                🔄 Update Parent State
+                            </button>
+                            <label style="color: #e2e8f0; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="useMemoToggle" onchange="toggleMemoization()" style="width: 18px; height: 18px; cursor: pointer;">
+                                <span>Enable React.memo</span>
+                            </label>
+                            <button onclick="resetRenderCounts()" style="background: rgba(255,255,255,0.1); color: #94a3b8; border: 1px solid rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">
+                                Reset Counts
+                            </button>
+                        </div>
+                        
+                        <!-- Component Tree Visualization -->
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                            
+                            <!-- Parent Component -->
+                            <div id="parent-box" style="background: rgba(239, 68, 68, 0.2); border: 2px solid #ef4444; border-radius: 12px; padding: 1rem 1.5rem; text-align: center; transition: all 0.3s ease; min-width: 200px;">
+                                <div style="color: #fca5a5; font-weight: 600; font-size: 0.95rem;">App (Parent)</div>
+                                <div style="color: #94a3b8; font-size: 0.8rem; margin-top: 0.25rem;">count: <span id="parent-count">0</span></div>
+                                <div style="color: #64748b; font-size: 0.75rem; margin-top: 0.5rem;">Renders: <span id="parent-renders" style="color: #f87171;">0</span></div>
+                            </div>
+                            
+                            <!-- Connector Lines -->
+                            <div style="display: flex; justify-content: center; gap: 80px;">
+                                <div style="width: 2px; height: 30px; background: linear-gradient(to bottom, #ef4444, #3b82f6);"></div>
+                                <div style="width: 2px; height: 30px; background: linear-gradient(to bottom, #ef4444, #22c55e);"></div>
+                                <div style="width: 2px; height: 30px; background: linear-gradient(to bottom, #ef4444, #f59e0b);"></div>
+                            </div>
+                            
+                            <!-- Child Components -->
+                            <div style="display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center;">
+                                
+                                <!-- Child A (receives count as prop) -->
+                                <div id="child-a-box" style="background: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; border-radius: 10px; padding: 0.75rem 1rem; text-align: center; transition: all 0.3s ease; min-width: 120px;">
+                                    <div style="color: #93c5fd; font-weight: 600; font-size: 0.85rem;">Counter</div>
+                                    <div style="color: #94a3b8; font-size: 0.75rem;">props: count</div>
+                                    <div style="color: #64748b; font-size: 0.7rem; margin-top: 0.5rem;">Renders: <span id="child-a-renders" style="color: #60a5fa;">0</span></div>
+                                    <div id="child-a-memo" style="color: #10b981; font-size: 0.65rem; margin-top: 0.25rem; display: none;">✓ memo (renders)</div>
+                                </div>
+                                
+                                <!-- Child B (static props) -->
+                                <div id="child-b-box" style="background: rgba(34, 197, 94, 0.2); border: 2px solid #22c55e; border-radius: 10px; padding: 0.75rem 1rem; text-align: center; transition: all 0.3s ease; min-width: 120px;">
+                                    <div style="color: #86efac; font-weight: 600; font-size: 0.85rem;">Header</div>
+                                    <div style="color: #94a3b8; font-size: 0.75rem;">props: title</div>
+                                    <div style="color: #64748b; font-size: 0.7rem; margin-top: 0.5rem;">Renders: <span id="child-b-renders" style="color: #4ade80;">0</span></div>
+                                    <div id="child-b-memo" style="color: #10b981; font-size: 0.65rem; margin-top: 0.25rem; display: none;">✓ memo (skipped!)</div>
+                                </div>
+                                
+                                <!-- Child C (static props) -->
+                                <div id="child-c-box" style="background: rgba(245, 158, 11, 0.2); border: 2px solid #f59e0b; border-radius: 10px; padding: 0.75rem 1rem; text-align: center; transition: all 0.3s ease; min-width: 120px;">
+                                    <div style="color: #fcd34d; font-weight: 600; font-size: 0.85rem;">Footer</div>
+                                    <div style="color: #94a3b8; font-size: 0.75rem;">props: year</div>
+                                    <div style="color: #64748b; font-size: 0.7rem; margin-top: 0.5rem;">Renders: <span id="child-c-renders" style="color: #fbbf24;">0</span></div>
+                                    <div id="child-c-memo" style="color: #10b981; font-size: 0.65rem; margin-top: 0.25rem; display: none;">✓ memo (skipped!)</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Stats Panel -->
+                        <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 1rem; display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: center;">
+                            <div style="text-align: center;">
+                                <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Total Renders</div>
+                                <div id="total-renders" style="color: #f87171; font-size: 1.5rem; font-weight: 700;">0</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Renders Saved</div>
+                                <div id="renders-saved" style="color: #4ade80; font-size: 1.5rem; font-weight: 700;">0</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Efficiency</div>
+                                <div id="efficiency" style="color: #a78bfa; font-size: 1.5rem; font-weight: 700;">0%</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Explanation -->
+                        <div id="explanation-panel" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 1rem;">
+                            <div style="color: #93c5fd; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">💡 Without React.memo:</div>
+                            <div style="color: #94a3b8; font-size: 0.85rem; line-height: 1.5;">Every time the parent updates its state, <strong style="color: #f87171;">all children re-render</strong>—even Header and Footer whose props never change. This is wasted work!</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script>
+            (function() {
+                let parentCount = 0;
+                let parentRenders = 0;
+                let childARenders = 0;
+                let childBRenders = 0;
+                let childCRenders = 0;
+                let totalRenders = 0;
+                let rendersSaved = 0;
+                let useMemo = false;
+                
+                function flashElement(id, color) {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    el.style.boxShadow = `0 0 20px ${color}, 0 0 40px ${color}`;
+                    el.style.transform = 'scale(1.05)';
+                    setTimeout(() => {
+                        el.style.boxShadow = 'none';
+                        el.style.transform = 'scale(1)';
+                    }, 300);
+                }
+                
+                function updateStats() {
+                    document.getElementById('parent-count').textContent = parentCount;
+                    document.getElementById('parent-renders').textContent = parentRenders;
+                    document.getElementById('child-a-renders').textContent = childARenders;
+                    document.getElementById('child-b-renders').textContent = childBRenders;
+                    document.getElementById('child-c-renders').textContent = childCRenders;
+                    document.getElementById('total-renders').textContent = totalRenders;
+                    document.getElementById('renders-saved').textContent = rendersSaved;
+                    
+                    const maxPossible = parentRenders * 4; // parent + 3 children
+                    const efficiency = maxPossible > 0 ? Math.round((rendersSaved / maxPossible) * 100) : 0;
+                    document.getElementById('efficiency').textContent = efficiency + '%';
+                }
+                
+                window.triggerParentRender = function() {
+                    parentCount++;
+                    parentRenders++;
+                    totalRenders++;
+                    flashElement('parent-box', '#ef4444');
+                    
+                    // Child A always renders (props changed - count)
+                    setTimeout(() => {
+                        childARenders++;
+                        totalRenders++;
+                        flashElement('child-a-box', '#3b82f6');
+                    }, 100);
+                    
+                    // Child B and C depend on memo setting
+                    setTimeout(() => {
+                        if (useMemo) {
+                            // With memo - skip render, props unchanged
+                            rendersSaved += 2;
+                        } else {
+                            // Without memo - render anyway
+                            childBRenders++;
+                            childCRenders++;
+                            totalRenders += 2;
+                            flashElement('child-b-box', '#22c55e');
+                            flashElement('child-c-box', '#f59e0b');
+                        }
+                        updateStats();
+                    }, 200);
+                    
+                    updateStats();
+                };
+                
+                window.toggleMemoization = function() {
+                    useMemo = document.getElementById('useMemoToggle').checked;
+                    
+                    const memoLabels = ['child-a-memo', 'child-b-memo', 'child-c-memo'];
+                    memoLabels.forEach(id => {
+                        document.getElementById(id).style.display = useMemo ? 'block' : 'none';
+                    });
+                    
+                    const explanationPanel = document.getElementById('explanation-panel');
+                    if (useMemo) {
+                        explanationPanel.style.background = 'rgba(34, 197, 94, 0.1)';
+                        explanationPanel.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                        explanationPanel.innerHTML = `
+                            <div style="color: #86efac; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">✅ With React.memo:</div>
+                            <div style="color: #94a3b8; font-size: 0.85rem; line-height: 1.5;">Counter still re-renders because its <code style="background: rgba(255,255,255,0.1); padding: 0.1rem 0.3rem; border-radius: 3px;">count</code> prop changes. But Header and Footer are <strong style="color: #4ade80;">skipped</strong>—their props are the same, so React.memo prevents wasted renders!</div>
+                        `;
+                    } else {
+                        explanationPanel.style.background = 'rgba(59, 130, 246, 0.1)';
+                        explanationPanel.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                        explanationPanel.innerHTML = `
+                            <div style="color: #93c5fd; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">💡 Without React.memo:</div>
+                            <div style="color: #94a3b8; font-size: 0.85rem; line-height: 1.5;">Every time the parent updates its state, <strong style="color: #f87171;">all children re-render</strong>—even Header and Footer whose props never change. This is wasted work!</div>
+                        `;
+                    }
+                };
+                
+                window.resetRenderCounts = function() {
+                    parentCount = 0;
+                    parentRenders = 0;
+                    childARenders = 0;
+                    childBRenders = 0;
+                    childCRenders = 0;
+                    totalRenders = 0;
+                    rendersSaved = 0;
+                    updateStats();
+                };
+            })();
+            </script>
+
             <pre><code class="language-typescript">// Without React.memo
 function ExpensiveComponent({ data }: { data: ComplexData }) {
   console.log('ExpensiveComponent rendering');

@@ -298,6 +298,207 @@ sequenceDiagram
     Note over Component: With AbortController: Request A was cancelled ✅
                 </div>
 
+                <!-- Interactive Race Condition Visualization -->
+                <div class="card" style="background: #f8f9fa; border: 2px solid #667eea; margin: 2rem 0;">
+                    <h4>🎮 Interactive: Race Condition Simulator</h4>
+                    <p>Click the buttons to see how race conditions happen and how AbortController fixes them!</p>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                        <svg id="raceConditionSvg" viewBox="0 0 650 320" style="max-width: 100%; height: auto; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" role="img" aria-label="Race condition visualization showing request timing">
+                            <!-- Title -->
+                            <text id="raceStatusText" x="325" y="25" text-anchor="middle" fill="#333" font-size="14" font-weight="bold">Click a button to start the simulation</text>
+                            
+                            <!-- Timeline base -->
+                            <line x1="50" y1="280" x2="600" y2="280" stroke="#ccc" stroke-width="2"/>
+                            <text x="50" y="300" fill="#666" font-size="11">0ms</text>
+                            <text x="200" y="300" fill="#666" font-size="11">500ms</text>
+                            <text x="400" y="300" fill="#666" font-size="11">1500ms</text>
+                            <text x="550" y="300" fill="#666" font-size="11">2500ms</text>
+                            
+                            <!-- User typing indicator -->
+                            <rect x="40" y="50" width="100" height="35" rx="6" fill="#667eea"/>
+                            <text x="90" y="72" text-anchor="middle" fill="white" font-size="12" font-weight="bold">User Types</text>
+                            
+                            <!-- Request A lane -->
+                            <text x="40" y="120" fill="#ff6b6b" font-size="12" font-weight="bold">Request A: "react"</text>
+                            <line x1="50" y1="130" x2="600" y2="130" stroke="#ffcdd2" stroke-width="1" stroke-dasharray="4"/>
+                            <g id="requestAGroup">
+                                <rect id="requestABar" x="150" y="115" width="0" height="30" rx="4" fill="#ff6b6b" opacity="0"/>
+                                <circle id="requestADot" cx="150" cy="130" r="8" fill="#ff6b6b" opacity="0"/>
+                            </g>
+                            
+                            <!-- Request B lane -->
+                            <text x="40" y="180" fill="#4ecdc4" font-size="12" font-weight="bold">Request B: "react ts"</text>
+                            <line x1="50" y1="190" x2="600" y2="190" stroke="#b2dfdb" stroke-width="1" stroke-dasharray="4"/>
+                            <g id="requestBGroup">
+                                <rect id="requestBBar" x="200" y="175" width="0" height="30" rx="4" fill="#4ecdc4" opacity="0"/>
+                                <circle id="requestBDot" cx="200" cy="190" r="8" fill="#4ecdc4" opacity="0"/>
+                            </g>
+                            
+                            <!-- Result display -->
+                            <rect x="40" y="230" width="120" height="35" rx="6" fill="#f5f5f5" stroke="#ddd"/>
+                            <text x="100" y="252" text-anchor="middle" fill="#333" font-size="11" font-weight="bold">UI Display:</text>
+                            <rect id="resultBox" x="170" y="230" width="200" height="35" rx="6" fill="#fff" stroke="#ddd"/>
+                            <text id="resultValue" x="270" y="252" text-anchor="middle" fill="#666" font-size="12">(waiting...)</text>
+                            
+                            <!-- Cancelled indicator -->
+                            <g id="cancelledIndicator" opacity="0">
+                                <line x1="350" y1="115" x2="380" y2="145" stroke="#ff6b6b" stroke-width="3"/>
+                                <line x1="380" y1="115" x2="350" y2="145" stroke="#ff6b6b" stroke-width="3"/>
+                                <text x="365" y="105" text-anchor="middle" fill="#ff6b6b" font-size="10">CANCELLED</text>
+                            </g>
+                        </svg>
+                        
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+                            <button onclick="simulateRaceCondition()" style="padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #ff6b6b, #ff8e8e); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; font-weight: 500; box-shadow: 0 2px 8px rgba(255,107,107,0.3);">
+                                ❌ Without Fix (Bug!)
+                            </button>
+                            <button onclick="simulateWithAbortController()" style="padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #4ecdc4, #44a08d); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; font-weight: 500; box-shadow: 0 2px 8px rgba(78,205,196,0.3);">
+                                ✅ With AbortController
+                            </button>
+                            <button onclick="resetRaceVisualization()" style="padding: 0.75rem 1.5rem; background: #666; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;">
+                                🔄 Reset
+                            </button>
+                        </div>
+                        
+                        <div id="raceExplanation" style="max-width: 550px; padding: 1rem; background: #f0f0f0; border-radius: 8px; text-align: center; display: none;">
+                            <p id="raceExplanationText" style="margin: 0; font-size: 0.9rem; line-height: 1.5;"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    // Race condition visualization
+                    let raceAnimations = [];
+                    
+                    function resetRaceVisualization() {
+                        raceAnimations.forEach(id => clearTimeout(id));
+                        raceAnimations = [];
+                        
+                        document.getElementById('raceStatusText').textContent = 'Click a button to start the simulation';
+                        document.getElementById('raceStatusText').setAttribute('fill', '#333');
+                        document.getElementById('requestABar').setAttribute('width', '0');
+                        document.getElementById('requestABar').setAttribute('opacity', '0');
+                        document.getElementById('requestADot').setAttribute('opacity', '0');
+                        document.getElementById('requestBBar').setAttribute('width', '0');
+                        document.getElementById('requestBBar').setAttribute('opacity', '0');
+                        document.getElementById('requestBDot').setAttribute('opacity', '0');
+                        document.getElementById('resultValue').textContent = '(waiting...)';
+                        document.getElementById('resultBox').setAttribute('fill', '#fff');
+                        document.getElementById('cancelledIndicator').setAttribute('opacity', '0');
+                        document.getElementById('raceExplanation').style.display = 'none';
+                    }
+                    
+                    function animateBar(barId, dotId, startX, width, duration, callback) {
+                        const bar = document.getElementById(barId);
+                        const dot = document.getElementById(dotId);
+                        bar.setAttribute('opacity', '0.7');
+                        dot.setAttribute('opacity', '1');
+                        
+                        let currentWidth = 0;
+                        const increment = width / (duration / 50);
+                        
+                        function step() {
+                            currentWidth += increment;
+                            if (currentWidth >= width) {
+                                bar.setAttribute('width', width);
+                                dot.setAttribute('cx', startX + width);
+                                if (callback) callback();
+                            } else {
+                                bar.setAttribute('width', currentWidth);
+                                dot.setAttribute('cx', startX + currentWidth);
+                                raceAnimations.push(setTimeout(step, 50));
+                            }
+                        }
+                        step();
+                    }
+                    
+                    function simulateRaceCondition() {
+                        resetRaceVisualization();
+                        const status = document.getElementById('raceStatusText');
+                        const result = document.getElementById('resultValue');
+                        const resultBox = document.getElementById('resultBox');
+                        const explanation = document.getElementById('raceExplanation');
+                        const expText = document.getElementById('raceExplanationText');
+                        
+                        // Step 1: User types "react"
+                        status.textContent = '1️⃣ User types "react" → Request A fires (slow: 2000ms)';
+                        
+                        // Start Request A (slow - takes 2000ms, shown as longer bar)
+                        animateBar('requestABar', 'requestADot', 150, 300, 2000, () => {
+                            // Request A completes SECOND but overwrites!
+                            result.textContent = '"react" ❌ STALE!';
+                            resultBox.setAttribute('fill', '#ffebee');
+                            status.textContent = '4️⃣ Request A completes LAST → Overwrites with stale data! ❌';
+                            status.setAttribute('fill', '#ff6b6b');
+                            
+                            explanation.style.display = 'block';
+                            explanation.style.background = '#ffebee';
+                            expText.textContent = '🐛 BUG! The slow request finished last and overwrote the correct results. The user sees outdated "react" results instead of "react typescript" results!';
+                        });
+                        
+                        // Step 2: After 500ms, user types more
+                        raceAnimations.push(setTimeout(() => {
+                            status.textContent = '2️⃣ User types more → Request B fires (fast: 800ms)';
+                            
+                            // Start Request B (fast - takes 800ms)
+                            animateBar('requestBBar', 'requestBDot', 200, 150, 800, () => {
+                                // Request B completes FIRST
+                                result.textContent = '"react typescript" ✅';
+                                resultBox.setAttribute('fill', '#e8f5e9');
+                                status.textContent = '3️⃣ Request B completes FIRST → Shows correct results';
+                                status.setAttribute('fill', '#4ecdc4');
+                            });
+                        }, 500));
+                    }
+                    
+                    function simulateWithAbortController() {
+                        resetRaceVisualization();
+                        const status = document.getElementById('raceStatusText');
+                        const result = document.getElementById('resultValue');
+                        const resultBox = document.getElementById('resultBox');
+                        const cancelled = document.getElementById('cancelledIndicator');
+                        const explanation = document.getElementById('raceExplanation');
+                        const expText = document.getElementById('raceExplanationText');
+                        
+                        // Step 1: User types "react"
+                        status.textContent = '1️⃣ User types "react" → Request A fires';
+                        document.getElementById('requestABar').setAttribute('opacity', '0.7');
+                        document.getElementById('requestADot').setAttribute('opacity', '1');
+                        
+                        // Start animating Request A
+                        let aWidth = 0;
+                        const aInterval = setInterval(() => {
+                            aWidth += 10;
+                            document.getElementById('requestABar').setAttribute('width', aWidth);
+                            document.getElementById('requestADot').setAttribute('cx', 150 + aWidth);
+                        }, 50);
+                        
+                        // Step 2: After 500ms, user types more - ABORT Request A!
+                        raceAnimations.push(setTimeout(() => {
+                            clearInterval(aInterval);
+                            status.textContent = '2️⃣ User types more → Request A CANCELLED! Request B fires';
+                            
+                            // Show cancelled indicator
+                            document.getElementById('requestABar').setAttribute('opacity', '0.3');
+                            cancelled.setAttribute('opacity', '1');
+                            cancelled.querySelector('text').textContent = 'ABORTED';
+                            
+                            // Start Request B
+                            animateBar('requestBBar', 'requestBDot', 200, 200, 1000, () => {
+                                result.textContent = '"react typescript" ✅';
+                                resultBox.setAttribute('fill', '#e8f5e9');
+                                status.textContent = '3️⃣ Only Request B completes → Correct result! ✅';
+                                status.setAttribute('fill', '#4CAF50');
+                                
+                                explanation.style.display = 'block';
+                                explanation.style.background = '#e8f5e9';
+                                expText.textContent = '✅ SUCCESS! AbortController cancelled the outdated Request A before it could cause problems. Only the most recent request (B) updates the UI!';
+                            });
+                        }, 500));
+                    }
+                </script>
+
+
                 <h3>Race Conditions in Custom Hooks</h3>
                 <p>Let's build a reusable hook that handles race conditions automatically:</p>
 
@@ -534,6 +735,191 @@ sequenceDiagram
     Note over User: User stops typing
     Timer->>API: 500ms passed! Fire request "react" ✅
                 </div>
+
+                <!-- Interactive Debounce vs Throttle Visualization -->
+                <div class="card" style="background: #f8f9fa; border: 2px solid #667eea; margin: 2rem 0;">
+                    <h4>🎮 Interactive: Debounce vs Throttle Comparison</h4>
+                    <p>Type in the input below and watch how debouncing and throttling handle rapid input differently!</p>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                        <input type="text" id="debounceThrottleInput" placeholder="Type quickly here..." style="width: 100%; max-width: 400px; padding: 0.75rem; font-size: 1rem; border: 2px solid #667eea; border-radius: 6px; outline: none;" oninput="handleInputChange(this.value)"/>
+                        
+                        <canvas id="debounceThrottleCanvas" width="600" height="280" style="max-width: 100%; border-radius: 8px; background: white; border: 1px solid #e0e0e0;"></canvas>
+                        
+                        <div style="display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; font-size: 0.9rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="width: 20px; height: 20px; background: #ff6b6b; border-radius: 50%; display: inline-block;"></span>
+                                <span>Raw Input Events</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="width: 20px; height: 20px; background: #667eea; border-radius: 50%; display: inline-block;"></span>
+                                <span>Debounced (500ms)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="width: 20px; height: 20px; background: #4ecdc4; border-radius: 50%; display: inline-block;"></span>
+                                <span>Throttled (500ms)</span>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; margin-top: 0.5rem;">
+                            <div style="text-align: center; padding: 0.5rem 1rem; background: #ffebee; border-radius: 6px;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #ff6b6b;" id="rawCount">0</div>
+                                <div style="font-size: 0.8rem; color: #666;">Raw Events</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.5rem 1rem; background: #e8eaf6; border-radius: 6px;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;" id="debounceCount">0</div>
+                                <div style="font-size: 0.8rem; color: #666;">Debounced</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.5rem 1rem; background: #e0f2f1; border-radius: 6px;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: #4ecdc4;" id="throttleCount">0</div>
+                                <div style="font-size: 0.8rem; color: #666;">Throttled</div>
+                            </div>
+                        </div>
+                        
+                        <button onclick="resetDebounceThrottleDemo()" style="padding: 0.5rem 1rem; background: #666; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                            🔄 Reset Visualization
+                        </button>
+                    </div>
+                </div>
+                
+                <script>
+                    // Debounce/Throttle visualization
+                    const dtCanvas = document.getElementById('debounceThrottleCanvas');
+                    const dtCtx = dtCanvas.getContext('2d');
+                    let rawEvents = [];
+                    let debounceEvents = [];
+                    let throttleEvents = [];
+                    let debounceTimer = null;
+                    let lastThrottleTime = 0;
+                    let startTime = null;
+                    const DEBOUNCE_DELAY = 500;
+                    const THROTTLE_LIMIT = 500;
+                    
+                    function drawDebounceThrottleCanvas() {
+                        dtCtx.clearRect(0, 0, 600, 280);
+                        
+                        // Draw background grid
+                        dtCtx.strokeStyle = '#f0f0f0';
+                        dtCtx.lineWidth = 1;
+                        for (let x = 50; x < 600; x += 50) {
+                            dtCtx.beginPath();
+                            dtCtx.moveTo(x, 20);
+                            dtCtx.lineTo(x, 240);
+                            dtCtx.stroke();
+                        }
+                        
+                        // Draw lanes
+                        dtCtx.font = '12px system-ui';
+                        dtCtx.fillStyle = '#666';
+                        dtCtx.fillText('Raw Input', 5, 65);
+                        dtCtx.fillText('Debounced', 5, 135);
+                        dtCtx.fillText('Throttled', 5, 205);
+                        
+                        // Draw lane lines
+                        dtCtx.strokeStyle = '#e0e0e0';
+                        dtCtx.lineWidth = 2;
+                        [60, 130, 200].forEach(y => {
+                            dtCtx.beginPath();
+                            dtCtx.moveTo(70, y);
+                            dtCtx.lineTo(580, y);
+                            dtCtx.stroke();
+                        });
+                        
+                        // Draw timeline
+                        dtCtx.fillStyle = '#999';
+                        dtCtx.font = '10px system-ui';
+                        dtCtx.fillText('Time →', 540, 255);
+                        
+                        if (!startTime) return;
+                        
+                        const elapsed = Date.now() - startTime;
+                        const scale = 550 / Math.max(elapsed, 5000);
+                        
+                        // Draw raw events
+                        rawEvents.forEach(t => {
+                            const x = 70 + (t - startTime) * scale;
+                            dtCtx.fillStyle = '#ff6b6b';
+                            dtCtx.beginPath();
+                            dtCtx.arc(x, 60, 6, 0, Math.PI * 2);
+                            dtCtx.fill();
+                        });
+                        
+                        // Draw debounce events
+                        debounceEvents.forEach(t => {
+                            const x = 70 + (t - startTime) * scale;
+                            dtCtx.fillStyle = '#667eea';
+                            dtCtx.beginPath();
+                            dtCtx.arc(x, 130, 8, 0, Math.PI * 2);
+                            dtCtx.fill();
+                            // Draw connecting line from last raw event
+                            if (rawEvents.length > 0) {
+                                const lastRaw = rawEvents[rawEvents.length - 1];
+                                const lastX = 70 + (lastRaw - startTime) * scale;
+                                dtCtx.strokeStyle = '#667eea';
+                                dtCtx.lineWidth = 1;
+                                dtCtx.setLineDash([4, 4]);
+                                dtCtx.beginPath();
+                                dtCtx.moveTo(lastX, 60);
+                                dtCtx.lineTo(x, 130);
+                                dtCtx.stroke();
+                                dtCtx.setLineDash([]);
+                            }
+                        });
+                        
+                        // Draw throttle events
+                        throttleEvents.forEach(t => {
+                            const x = 70 + (t - startTime) * scale;
+                            dtCtx.fillStyle = '#4ecdc4';
+                            dtCtx.beginPath();
+                            dtCtx.arc(x, 200, 8, 0, Math.PI * 2);
+                            dtCtx.fill();
+                        });
+                        
+                        // Update counts
+                        document.getElementById('rawCount').textContent = rawEvents.length;
+                        document.getElementById('debounceCount').textContent = debounceEvents.length;
+                        document.getElementById('throttleCount').textContent = throttleEvents.length;
+                    }
+                    
+                    function handleInputChange(value) {
+                        const now = Date.now();
+                        if (!startTime) startTime = now;
+                        
+                        // Record raw event
+                        rawEvents.push(now);
+                        
+                        // Debounce logic
+                        if (debounceTimer) clearTimeout(debounceTimer);
+                        debounceTimer = setTimeout(() => {
+                            debounceEvents.push(Date.now());
+                            drawDebounceThrottleCanvas();
+                        }, DEBOUNCE_DELAY);
+                        
+                        // Throttle logic
+                        if (now - lastThrottleTime >= THROTTLE_LIMIT) {
+                            throttleEvents.push(now);
+                            lastThrottleTime = now;
+                        }
+                        
+                        drawDebounceThrottleCanvas();
+                    }
+                    
+                    function resetDebounceThrottleDemo() {
+                        rawEvents = [];
+                        debounceEvents = [];
+                        throttleEvents = [];
+                        startTime = null;
+                        lastThrottleTime = 0;
+                        if (debounceTimer) clearTimeout(debounceTimer);
+                        document.getElementById('debounceThrottleInput').value = '';
+                        document.getElementById('rawCount').textContent = '0';
+                        document.getElementById('debounceCount').textContent = '0';
+                        document.getElementById('throttleCount').textContent = '0';
+                        drawDebounceThrottleCanvas();
+                    }
+                    
+                    // Initial draw
+                    drawDebounceThrottleCanvas();
+                </script>
 
                 <h3>Throttling for Scroll Events</h3>
                 <p>Throttling is different—it guarantees a function runs at most once per time period:</p>
@@ -1464,6 +1850,138 @@ sequenceDiagram
     Component->>User: Shows "No more items"
                 </div>
 
+                <!-- Interactive Infinite Scroll Visualization -->
+                <div class="card" style="background: #f8f9fa; border: 2px solid #667eea; margin: 2rem 0;">
+                    <h4>🎮 Interactive: Infinite Scroll Demo</h4>
+                    <p>Scroll down in the container below to see how Intersection Observer triggers data loading!</p>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                        <div id="infiniteScrollDemo" style="width: 100%; max-width: 400px; height: 300px; overflow-y: auto; border: 2px solid #667eea; border-radius: 8px; background: white; position: relative;">
+                            <div id="scrollContent" style="padding: 1rem;">
+                                <!-- Items will be added here -->
+                            </div>
+                            <div id="sentinelElement" style="height: 50px; display: flex; align-items: center; justify-content: center; background: linear-gradient(to top, #e8eaf6, transparent);">
+                                <span id="sentinelText" style="font-size: 0.9rem; color: #667eea;">👇 Scroll to load more...</span>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; text-align: center;">
+                            <div style="padding: 0.75rem 1.5rem; background: #e8f5e9; border-radius: 8px;">
+                                <div style="font-size: 1.25rem; font-weight: bold; color: #4CAF50;" id="loadedPages">1</div>
+                                <div style="font-size: 0.8rem; color: #666;">Pages Loaded</div>
+                            </div>
+                            <div style="padding: 0.75rem 1.5rem; background: #e3f2fd; border-radius: 8px;">
+                                <div style="font-size: 1.25rem; font-weight: bold; color: #2196F3;" id="totalItems">5</div>
+                                <div style="font-size: 0.8rem; color: #666;">Total Items</div>
+                            </div>
+                            <div style="padding: 0.75rem 1.5rem; background: #fff3e0; border-radius: 8px;">
+                                <div style="font-size: 1.25rem; font-weight: bold; color: #ff9800;" id="observerStatus">Watching</div>
+                                <div style="font-size: 0.8rem; color: #666;">Observer</div>
+                            </div>
+                        </div>
+                        
+                        <button onclick="resetInfiniteScrollDemo()" style="padding: 0.5rem 1rem; background: #666; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                            🔄 Reset Demo
+                        </button>
+                    </div>
+                </div>
+                
+                <script>
+                    let infiniteScrollPage = 1;
+                    let infiniteScrollLoading = false;
+                    const MAX_PAGES = 5;
+                    
+                    function createScrollItem(index) {
+                        const item = document.createElement('div');
+                        item.style.cssText = 'padding: 1rem; margin-bottom: 0.75rem; background: linear-gradient(135deg, #667eea22, #764ba222); border-radius: 8px; border-left: 4px solid #667eea;';
+                        item.innerHTML = `
+                            <div style="font-weight: bold; color: #333;">Item #${index}</div>
+                            <div style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">This is sample content for item ${index}. In a real app, this would be fetched from an API.</div>
+                        `;
+                        return item;
+                    }
+                    
+                    function loadMoreItems() {
+                        if (infiniteScrollLoading || infiniteScrollPage > MAX_PAGES) return;
+                        
+                        infiniteScrollLoading = true;
+                        document.getElementById('sentinelText').textContent = '⏳ Loading...';
+                        document.getElementById('observerStatus').textContent = 'Loading';
+                        document.getElementById('observerStatus').style.color = '#ff9800';
+                        
+                        // Simulate API delay
+                        setTimeout(() => {
+                            const content = document.getElementById('scrollContent');
+                            const startIndex = (infiniteScrollPage - 1) * 5 + 1;
+                            
+                            for (let i = 0; i < 5; i++) {
+                                content.appendChild(createScrollItem(startIndex + i));
+                            }
+                            
+                            infiniteScrollPage++;
+                            infiniteScrollLoading = false;
+                            
+                            document.getElementById('loadedPages').textContent = infiniteScrollPage - 1;
+                            document.getElementById('totalItems').textContent = (infiniteScrollPage - 1) * 5;
+                            
+                            if (infiniteScrollPage > MAX_PAGES) {
+                                document.getElementById('sentinelText').textContent = '🎉 All items loaded!';
+                                document.getElementById('sentinelElement').style.background = '#e8f5e9';
+                                document.getElementById('observerStatus').textContent = 'Complete';
+                                document.getElementById('observerStatus').style.color = '#4CAF50';
+                            } else {
+                                document.getElementById('sentinelText').textContent = '👇 Scroll to load more...';
+                                document.getElementById('observerStatus').textContent = 'Watching';
+                                document.getElementById('observerStatus').style.color = '#2196F3';
+                            }
+                        }, 800);
+                    }
+                    
+                    function resetInfiniteScrollDemo() {
+                        infiniteScrollPage = 1;
+                        infiniteScrollLoading = false;
+                        document.getElementById('scrollContent').innerHTML = '';
+                        document.getElementById('sentinelText').textContent = '👇 Scroll to load more...';
+                        document.getElementById('sentinelElement').style.background = 'linear-gradient(to top, #e8eaf6, transparent)';
+                        document.getElementById('loadedPages').textContent = '1';
+                        document.getElementById('totalItems').textContent = '5';
+                        document.getElementById('observerStatus').textContent = 'Watching';
+                        document.getElementById('observerStatus').style.color = '#2196F3';
+                        
+                        // Load initial items
+                        const content = document.getElementById('scrollContent');
+                        for (let i = 1; i <= 5; i++) {
+                            content.appendChild(createScrollItem(i));
+                        }
+                        infiniteScrollPage = 2;
+                        
+                        // Scroll back to top
+                        document.getElementById('infiniteScrollDemo').scrollTop = 0;
+                    }
+                    
+                    // Set up Intersection Observer for the demo
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const sentinel = document.getElementById('sentinelElement');
+                        const container = document.getElementById('infiniteScrollDemo');
+                        
+                        if (sentinel && container) {
+                            const observer = new IntersectionObserver((entries) => {
+                                if (entries[0].isIntersecting) {
+                                    loadMoreItems();
+                                }
+                            }, {
+                                root: container,
+                                threshold: 0.5
+                            });
+                            
+                            observer.observe(sentinel);
+                            
+                            // Initial load
+                            resetInfiniteScrollDemo();
+                        }
+                    });
+                </script>
+
+
                 <h3>Detecting When to Load More</h3>
                 <p>We need to detect when the user is near the bottom of the page:</p>
 
@@ -2063,6 +2581,163 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
         `/api/users/${userId}`,
         2 * 60 * 1000 // 2 minute cache
     );
+
+                <!-- Interactive Cache Visualization -->
+                <div class="card" style="background: #f8f9fa; border: 2px solid #667eea; margin: 2rem 0;">
+                    <h4>🎮 Interactive: Cache Hit/Miss Simulator</h4>
+                    <p>Click "Fetch" buttons to see how caching works. First request is a cache miss (slow), subsequent requests are cache hits (instant)!</p>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                        <svg id="cacheSvg" viewBox="0 0 600 250" style="max-width: 100%; height: auto; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" role="img" aria-label="Cache visualization">
+                            <!-- Client -->
+                            <rect x="30" y="80" width="100" height="60" rx="8" fill="#667eea"/>
+                            <text x="80" y="115" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Client</text>
+                            
+                            <!-- Cache -->
+                            <rect x="200" y="60" width="120" height="100" rx="8" fill="#4CAF50"/>
+                            <text x="260" y="95" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Cache</text>
+                            <text id="cacheContents" x="260" y="125" text-anchor="middle" fill="white" font-size="10">(empty)</text>
+                            <text id="cacheTtl" x="260" y="145" text-anchor="middle" fill="white" font-size="9" opacity="0.8">TTL: --</text>
+                            
+                            <!-- Server -->
+                            <rect x="400" y="80" width="100" height="60" rx="8" fill="#764ba2"/>
+                            <text x="450" y="115" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Server</text>
+                            
+                            <!-- Arrows -->
+                            <g id="requestArrow" opacity="0">
+                                <line x1="130" y1="100" x2="190" y2="100" stroke="#667eea" stroke-width="3" marker-end="url(#arrowhead)"/>
+                                <text x="160" y="90" text-anchor="middle" fill="#667eea" font-size="10">request</text>
+                            </g>
+                            <g id="cacheHitArrow" opacity="0">
+                                <line x1="190" y1="120" x2="130" y2="120" stroke="#4CAF50" stroke-width="3" marker-end="url(#arrowheadGreen)"/>
+                                <text x="160" y="140" text-anchor="middle" fill="#4CAF50" font-size="10">HIT! ⚡</text>
+                            </g>
+                            <g id="cacheMissArrow" opacity="0">
+                                <line x1="320" y1="110" x2="390" y2="110" stroke="#ff9800" stroke-width="3" marker-end="url(#arrowheadOrange)"/>
+                                <text x="355" y="100" text-anchor="middle" fill="#ff9800" font-size="10">MISS →</text>
+                            </g>
+                            <g id="serverResponseArrow" opacity="0">
+                                <line x1="390" y1="130" x2="320" y2="130" stroke="#764ba2" stroke-width="3" marker-end="url(#arrowheadPurple)"/>
+                                <text x="355" y="150" text-anchor="middle" fill="#764ba2" font-size="10">response</text>
+                            </g>
+                            
+                            <!-- Arrow markers -->
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#667eea"/>
+                                </marker>
+                                <marker id="arrowheadGreen" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                                    <polygon points="10 0, 0 3.5, 10 7" fill="#4CAF50"/>
+                                </marker>
+                                <marker id="arrowheadOrange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#ff9800"/>
+                                </marker>
+                                <marker id="arrowheadPurple" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                                    <polygon points="10 0, 0 3.5, 10 7" fill="#764ba2"/>
+                                </marker>
+                            </defs>
+                            
+                            <!-- Status -->
+                            <text id="cacheStatus" x="300" y="30" text-anchor="middle" fill="#333" font-size="14">Click a fetch button to start</text>
+                            
+                            <!-- Time indicator -->
+                            <text id="cacheTime" x="300" y="220" text-anchor="middle" fill="#666" font-size="12">Response time: --</text>
+                        </svg>
+                        
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
+                            <button onclick="fetchUserA()" style="padding: 0.75rem 1.5rem; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;">
+                                📡 Fetch User A
+                            </button>
+                            <button onclick="fetchUserB()" style="padding: 0.75rem 1.5rem; background: #764ba2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;">
+                                📡 Fetch User B
+                            </button>
+                            <button onclick="invalidateCache()" style="padding: 0.75rem 1.5rem; background: #ff6b6b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;">
+                                🗑️ Clear Cache
+                            </button>
+                        </div>
+                        
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; font-size: 0.85rem;">
+                            <div style="padding: 0.5rem 1rem; background: #e8f5e9; border-radius: 6px;">
+                                Cache Hits: <strong id="hitCount">0</strong>
+                            </div>
+                            <div style="padding: 0.5rem 1rem; background: #fff3e0; border-radius: 6px;">
+                                Cache Misses: <strong id="missCount">0</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                    const cacheDemo = new Map();
+                    let cacheHits = 0;
+                    let cacheMisses = 0;
+                    
+                    function resetCacheArrows() {
+                        document.getElementById('requestArrow').setAttribute('opacity', '0');
+                        document.getElementById('cacheHitArrow').setAttribute('opacity', '0');
+                        document.getElementById('cacheMissArrow').setAttribute('opacity', '0');
+                        document.getElementById('serverResponseArrow').setAttribute('opacity', '0');
+                    }
+                    
+                    function updateCacheDisplay() {
+                        const contents = Array.from(cacheDemo.keys()).join(', ') || '(empty)';
+                        document.getElementById('cacheContents').textContent = contents;
+                        document.getElementById('hitCount').textContent = cacheHits;
+                        document.getElementById('missCount').textContent = cacheMisses;
+                    }
+                    
+                    function fetchUserA() { fetchUser('User A'); }
+                    function fetchUserB() { fetchUser('User B'); }
+                    
+                    function fetchUser(user) {
+                        resetCacheArrows();
+                        const status = document.getElementById('cacheStatus');
+                        const timeDisplay = document.getElementById('cacheTime');
+                        
+                        // Show request arrow
+                        document.getElementById('requestArrow').setAttribute('opacity', '1');
+                        status.textContent = `Checking cache for ${user}...`;
+                        
+                        setTimeout(() => {
+                            if (cacheDemo.has(user)) {
+                                // Cache HIT
+                                cacheHits++;
+                                document.getElementById('cacheHitArrow').setAttribute('opacity', '1');
+                                status.textContent = `✅ Cache HIT! ${user} data returned instantly`;
+                                status.setAttribute('fill', '#4CAF50');
+                                timeDisplay.textContent = 'Response time: ~5ms (from cache)';
+                                updateCacheDisplay();
+                            } else {
+                                // Cache MISS
+                                cacheMisses++;
+                                document.getElementById('cacheMissArrow').setAttribute('opacity', '1');
+                                status.textContent = `❌ Cache MISS! Fetching ${user} from server...`;
+                                status.setAttribute('fill', '#ff9800');
+                                
+                                // Simulate server response
+                                setTimeout(() => {
+                                    document.getElementById('serverResponseArrow').setAttribute('opacity', '1');
+                                    cacheDemo.set(user, { name: user, timestamp: Date.now() });
+                                    status.textContent = `✅ ${user} fetched and cached!`;
+                                    status.setAttribute('fill', '#4CAF50');
+                                    timeDisplay.textContent = 'Response time: ~500ms (from server)';
+                                    document.getElementById('cacheTtl').textContent = 'TTL: 5 min';
+                                    updateCacheDisplay();
+                                }, 500);
+                            }
+                        }, 200);
+                    }
+                    
+                    function invalidateCache() {
+                        cacheDemo.clear();
+                        resetCacheArrows();
+                        document.getElementById('cacheStatus').textContent = '🗑️ Cache cleared!';
+                        document.getElementById('cacheStatus').setAttribute('fill', '#ff6b6b');
+                        document.getElementById('cacheTime').textContent = 'Response time: --';
+                        document.getElementById('cacheTtl').textContent = 'TTL: --';
+                        updateCacheDisplay();
+                    }
+                </script>
+
 
     return (
         &lt;div&gt;

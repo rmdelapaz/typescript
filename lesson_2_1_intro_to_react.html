@@ -245,6 +245,211 @@ function MyButton() {
                     style F fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
                 </div>
 
+                <!-- Interactive Virtual DOM Visualization -->
+                <div class="card" style="margin-top: 2rem;">
+                    <h4>🎨 Interactive: Virtual DOM in Action</h4>
+                    <p>Watch how React's Virtual DOM efficiently updates only what changed. Click "Update Data" to see the diffing process:</p>
+                    
+                    <canvas id="vdom-canvas" width="600" height="280" style="width: 100%; max-width: 600px; display: block; margin: 1rem auto; border-radius: 8px;" role="img" aria-label="Virtual DOM visualization"></canvas>
+                    
+                    <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem;">
+                        <button onclick="vdomUpdate()" style="padding: 0.5rem 1.2rem; border: none; background: #667eea; color: white; border-radius: 6px; cursor: pointer; font-weight: bold;">🔄 Update Data</button>
+                        <button onclick="vdomReset()" style="padding: 0.5rem 1.2rem; border: none; background: #666; color: white; border-radius: 6px; cursor: pointer;">Reset</button>
+                    </div>
+                    <p id="vdom-message" style="text-align: center; margin-top: 0.75rem; font-size: 0.95rem; color: #667eea;">Click "Update Data" to see Virtual DOM diffing</p>
+                </div>
+                
+                <script>
+                (function() {
+                    const vdomCanvas = document.getElementById('vdom-canvas');
+                    const vdomCtx = vdomCanvas.getContext('2d');
+                    
+                    let count = 0;
+                    let animationPhase = 0;
+                    
+                    function drawVDOM() {
+                        vdomCtx.clearRect(0, 0, 600, 280);
+                        
+                        // Background
+                        vdomCtx.fillStyle = '#f8f9fa';
+                        vdomCtx.fillRect(0, 0, 600, 280);
+                        
+                        // Labels
+                        vdomCtx.fillStyle = '#333';
+                        vdomCtx.font = 'bold 12px Arial';
+                        vdomCtx.textAlign = 'center';
+                        vdomCtx.fillText('Previous Virtual DOM', 110, 25);
+                        vdomCtx.fillText('New Virtual DOM', 300, 25);
+                        vdomCtx.fillText('Real DOM', 490, 25);
+                        
+                        // Previous VDOM tree
+                        drawDOMTree(30, 40, count - 1, false, false);
+                        
+                        // New VDOM tree  
+                        const isComparing = animationPhase >= 1;
+                        drawDOMTree(220, 40, count, isComparing, false);
+                        
+                        // Real DOM tree
+                        const realCount = animationPhase >= 3 ? count : count - 1;
+                        const showUpdate = animationPhase >= 2 && animationPhase < 4;
+                        drawDOMTree(410, 40, realCount, false, showUpdate);
+                        
+                        // Arrows
+                        if (animationPhase >= 1) {
+                            vdomCtx.strokeStyle = animationPhase === 1 ? '#FF9800' : '#999';
+                            vdomCtx.lineWidth = animationPhase === 1 ? 3 : 1;
+                            drawArrow(165, 120, 205, 120);
+                            
+                            if (animationPhase === 1) {
+                                vdomCtx.fillStyle = '#FF9800';
+                                vdomCtx.font = '10px Arial';
+                                vdomCtx.fillText('DIFF', 185, 110);
+                            }
+                        }
+                        
+                        if (animationPhase >= 2) {
+                            vdomCtx.strokeStyle = animationPhase === 2 ? '#4CAF50' : '#999';
+                            vdomCtx.lineWidth = animationPhase === 2 ? 3 : 1;
+                            drawArrow(355, 120, 395, 120);
+                            
+                            if (animationPhase === 2) {
+                                vdomCtx.fillStyle = '#4CAF50';
+                                vdomCtx.font = '10px Arial';
+                                vdomCtx.fillText('PATCH', 375, 110);
+                            }
+                        }
+                    }
+                    
+                    function drawDOMTree(x, y, countVal, highlight, showFlash) {
+                        // Container box
+                        vdomCtx.fillStyle = '#fff';
+                        vdomCtx.strokeStyle = '#667eea';
+                        vdomCtx.lineWidth = 2;
+                        vdomCtx.beginPath();
+                        vdomCtx.roundRect(x, y, 160, 200, 8);
+                        vdomCtx.fill();
+                        vdomCtx.stroke();
+                        
+                        // Root div
+                        vdomCtx.fillStyle = '#667eea';
+                        vdomCtx.fillRect(x + 30, y + 20, 100, 25);
+                        vdomCtx.fillStyle = 'white';
+                        vdomCtx.font = '11px monospace';
+                        vdomCtx.textAlign = 'center';
+                        vdomCtx.fillText('<div>', x + 80, y + 37);
+                        
+                        // h1 element
+                        vdomCtx.fillStyle = '#4CAF50';
+                        vdomCtx.fillRect(x + 20, y + 60, 50, 22);
+                        vdomCtx.fillStyle = 'white';
+                        vdomCtx.font = '10px monospace';
+                        vdomCtx.fillText('<h1>', x + 45, y + 75);
+                        
+                        // Button element (this one changes)
+                        const btnColor = (highlight || showFlash) ? '#FF9800' : '#2196F3';
+                        vdomCtx.fillStyle = showFlash ? '#FFE082' : btnColor;
+                        vdomCtx.fillRect(x + 20, y + 95, 120, 22);
+                        vdomCtx.fillStyle = showFlash ? '#333' : 'white';
+                        vdomCtx.font = '10px monospace';
+                        vdomCtx.fillText('<button>', x + 80, y + 110);
+                        
+                        // Button text (count value)
+                        const displayCount = countVal < 0 ? 0 : countVal;
+                        vdomCtx.fillStyle = (highlight || showFlash) ? '#f44336' : '#666';
+                        vdomCtx.font = (highlight || showFlash) ? 'bold 12px monospace' : '11px monospace';
+                        vdomCtx.fillText('Count: ' + displayCount, x + 80, y + 135);
+                        
+                        // p element
+                        vdomCtx.fillStyle = '#9C27B0';
+                        vdomCtx.fillRect(x + 90, y + 60, 50, 22);
+                        vdomCtx.fillStyle = 'white';
+                        vdomCtx.font = '10px monospace';
+                        vdomCtx.fillText('<p>', x + 115, y + 75);
+                        
+                        // Tree lines
+                        vdomCtx.strokeStyle = '#999';
+                        vdomCtx.lineWidth = 1;
+                        vdomCtx.beginPath();
+                        vdomCtx.moveTo(x + 80, y + 45);
+                        vdomCtx.lineTo(x + 80, y + 55);
+                        vdomCtx.lineTo(x + 45, y + 55);
+                        vdomCtx.lineTo(x + 45, y + 60);
+                        vdomCtx.moveTo(x + 80, y + 55);
+                        vdomCtx.lineTo(x + 115, y + 55);
+                        vdomCtx.lineTo(x + 115, y + 60);
+                        vdomCtx.moveTo(x + 45, y + 82);
+                        vdomCtx.lineTo(x + 45, y + 90);
+                        vdomCtx.lineTo(x + 80, y + 90);
+                        vdomCtx.lineTo(x + 80, y + 95);
+                        vdomCtx.stroke();
+                    }
+                    
+                    function drawArrow(x1, y1, x2, y2) {
+                        vdomCtx.beginPath();
+                        vdomCtx.moveTo(x1, y1);
+                        vdomCtx.lineTo(x2, y2);
+                        vdomCtx.stroke();
+                        
+                        // Arrowhead
+                        const angle = Math.atan2(y2 - y1, x2 - x1);
+                        vdomCtx.beginPath();
+                        vdomCtx.moveTo(x2, y2);
+                        vdomCtx.lineTo(x2 - 8 * Math.cos(angle - Math.PI / 6), y2 - 8 * Math.sin(angle - Math.PI / 6));
+                        vdomCtx.lineTo(x2 - 8 * Math.cos(angle + Math.PI / 6), y2 - 8 * Math.sin(angle + Math.PI / 6));
+                        vdomCtx.closePath();
+                        vdomCtx.fill();
+                    }
+                    
+                    // Polyfill for roundRect
+                    if (!vdomCtx.roundRect) {
+                        vdomCtx.roundRect = function(x, y, w, h, r) {
+                            this.beginPath();
+                            this.moveTo(x + r, y);
+                            this.lineTo(x + w - r, y);
+                            this.quadraticCurveTo(x + w, y, x + w, y + r);
+                            this.lineTo(x + w, y + h - r);
+                            this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                            this.lineTo(x + r, y + h);
+                            this.quadraticCurveTo(x, y + h, x, y + h - r);
+                            this.lineTo(x, y + r);
+                            this.quadraticCurveTo(x, y, x + r, y);
+                            this.closePath();
+                        };
+                    }
+                    
+                    window.vdomUpdate = function() {
+                        count++;
+                        animationPhase = 0;
+                        
+                        const messages = [
+                            '1️⃣ State changed! Creating new Virtual DOM...',
+                            '2️⃣ Diffing: Comparing old vs new Virtual DOM...',
+                            '3️⃣ Found change! Only the count needs updating...',
+                            '4️⃣ Done! Only <button> content updated in Real DOM ✅'
+                        ];
+                        
+                        function animate() {
+                            if (animationPhase < 4) {
+                                document.getElementById('vdom-message').textContent = messages[animationPhase];
+                                drawVDOM();
+                                animationPhase++;
+                                setTimeout(animate, 800);
+                            }
+                        }
+                        animate();
+                    };
+                    
+                    window.vdomReset = function() {
+                        count = 0;
+                        animationPhase = 0;
+                        drawVDOM();
+                        document.getElementById('vdom-message').textContent = 'Click "Update Data" to see Virtual DOM diffing';
+                    };
+                    
+                    drawVDOM();
+                })();
+                </script>
+
                 <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
                     <h4>💡 Real-World Analogy</h4>
                     <p>Imagine you're editing a document. You could rewrite the entire document every time you make a change (slow), or you could just update the specific words that changed (fast). React's virtual DOM is like having a smart editor that knows exactly what changed and only rewrites those parts.</p>
@@ -446,6 +651,110 @@ function Counter() {
                     style E fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
                 </div>
 
+                <!-- Interactive Props vs State Comparison -->
+                <div class="card" style="margin-top: 2rem;">
+                    <h4>🎨 Interactive: Props vs State Comparison</h4>
+                    <p>See the difference between Props (read-only, from parent) and State (internal, changeable):</p>
+                    
+                    <svg id="props-state-svg" viewBox="0 0 550 320" style="width: 100%; max-width: 550px; display: block; margin: 1rem auto;" role="img" aria-label="Props vs State comparison">
+                        <!-- Background -->
+                        <rect x="0" y="0" width="550" height="320" fill="#f8f9fa" rx="8"/>
+                        
+                        <!-- Parent Component -->
+                        <rect x="175" y="15" width="200" height="50" fill="#667eea" rx="8"/>
+                        <text x="275" y="45" text-anchor="middle" fill="white" font-weight="bold" font-size="14">Parent Component</text>
+                        
+                        <!-- Arrow down -->
+                        <path d="M 275 65 L 275 90" stroke="#667eea" stroke-width="3" fill="none" marker-end="url(#arrowhead2)"/>
+                        <text x="285" y="82" fill="#667eea" font-size="10" font-weight="bold">props</text>
+                        
+                        <!-- Arrow marker -->
+                        <defs>
+                            <marker id="arrowhead2" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#667eea"/>
+                            </marker>
+                        </defs>
+                        
+                        <!-- Child Component Box -->
+                        <rect x="75" y="95" width="400" height="180" fill="white" rx="8" stroke="#667eea" stroke-width="2"/>
+                        <text x="275" y="115" text-anchor="middle" fill="#667eea" font-weight="bold" font-size="13">Child Component</text>
+                        
+                        <!-- Props Box -->
+                        <rect x="95" y="130" width="170" height="130" fill="#e3f2fd" rx="6" stroke="#2196F3" stroke-width="2"/>
+                        <text x="180" y="150" text-anchor="middle" fill="#2196F3" font-weight="bold" font-size="12">PROPS</text>
+                        <text x="180" y="170" text-anchor="middle" fill="#666" font-size="10">From parent ↓</text>
+                        <text x="180" y="185" text-anchor="middle" fill="#666" font-size="10">Read-only 🔒</text>
+                        <text x="180" y="200" text-anchor="middle" fill="#666" font-size="10">Can't modify</text>
+                        
+                        <!-- Props value display -->
+                        <rect x="105" y="210" width="150" height="40" fill="white" rx="4" stroke="#2196F3"/>
+                        <text id="props-name" x="180" y="235" text-anchor="middle" fill="#333" font-family="monospace" font-size="11">name: "Alice"</text>
+                        
+                        <!-- State Box -->
+                        <rect x="285" y="130" width="170" height="130" fill="#e8f5e9" rx="6" stroke="#4CAF50" stroke-width="2"/>
+                        <text x="370" y="150" text-anchor="middle" fill="#4CAF50" font-weight="bold" font-size="12">STATE</text>
+                        <text x="370" y="170" text-anchor="middle" fill="#666" font-size="10">Internal data 🏠</text>
+                        <text x="370" y="185" text-anchor="middle" fill="#666" font-size="10">Can change ✏️</text>
+                        <text x="370" y="200" text-anchor="middle" fill="#666" font-size="10">Triggers re-render</text>
+                        
+                        <!-- State value display -->
+                        <rect x="295" y="210" width="150" height="40" fill="white" rx="4" stroke="#4CAF50"/>
+                        <text id="state-count" x="370" y="235" text-anchor="middle" fill="#333" font-family="monospace" font-size="11">count: 0</text>
+                        
+                        <!-- Info area -->
+                        <rect x="75" y="285" width="400" height="25" fill="#f0f0f0" rx="4"/>
+                        <text id="props-state-info" x="275" y="302" text-anchor="middle" fill="#666" font-size="11">Click buttons to see Props vs State behavior</text>
+                    </svg>
+                    
+                    <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem;">
+                        <button onclick="changeProps()" style="padding: 0.4rem 0.8rem; border: none; background: #2196F3; color: white; border-radius: 4px; cursor: pointer; font-size: 12px;">Change Props (Parent)</button>
+                        <button onclick="changeState()" style="padding: 0.4rem 0.8rem; border: none; background: #4CAF50; color: white; border-radius: 4px; cursor: pointer; font-size: 12px;">Change State (Internal)</button>
+                        <button onclick="tryModifyProps()" style="padding: 0.4rem 0.8rem; border: none; background: #f44336; color: white; border-radius: 4px; cursor: pointer; font-size: 12px;">⚠️ Try Modify Props</button>
+                    </div>
+                </div>
+                
+                <script>
+                (function() {
+                    const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
+                    let nameIndex = 0;
+                    let stateCount = 0;
+                    
+                    window.changeProps = function() {
+                        nameIndex = (nameIndex + 1) % names.length;
+                        document.getElementById('props-name').textContent = 'name: "' + names[nameIndex] + '"';
+                        document.getElementById('props-state-info').textContent = '✅ Props changed by PARENT - child re-renders with new props';
+                        document.getElementById('props-state-info').style.fill = '#2196F3';
+                        
+                        // Flash effect on props box
+                        const propsBox = document.querySelector('#props-state-svg rect:nth-of-type(4)');
+                        propsBox.setAttribute('fill', '#bbdefb');
+                        setTimeout(() => propsBox.setAttribute('fill', '#e3f2fd'), 300);
+                    };
+                    
+                    window.changeState = function() {
+                        stateCount++;
+                        document.getElementById('state-count').textContent = 'count: ' + stateCount;
+                        document.getElementById('props-state-info').textContent = '✅ State changed internally - component re-renders';
+                        document.getElementById('props-state-info').style.fill = '#4CAF50';
+                        
+                        // Flash effect on state box
+                        const stateBox = document.querySelector('#props-state-svg rect:nth-of-type(5)');
+                        stateBox.setAttribute('fill', '#c8e6c9');
+                        setTimeout(() => stateBox.setAttribute('fill', '#e8f5e9'), 300);
+                    };
+                    
+                    window.tryModifyProps = function() {
+                        document.getElementById('props-state-info').textContent = '❌ ERROR! Props are read-only. Can\'t modify from inside component!';
+                        document.getElementById('props-state-info').style.fill = '#f44336';
+                        
+                        // Shake effect on props box
+                        const propsBox = document.querySelector('#props-state-svg rect:nth-of-type(4)');
+                        propsBox.setAttribute('fill', '#ffcdd2');
+                        setTimeout(() => propsBox.setAttribute('fill', '#e3f2fd'), 500);
+                    };
+                })();
+                </script>
+
                 <h3>The Component Tree</h3>
                 <p>React applications are structured as a tree of components. At the top is your root component (usually called <code>App</code>), and it contains child components, which may contain their own children, and so on.</p>
 
@@ -462,6 +771,121 @@ function Counter() {
                     H --> J[Comments]
                     style A fill:#667eea,stroke:#333,stroke-width:2px,color:#fff
                 </div>
+
+                <!-- Interactive Component Tree Explorer -->
+                <div class="card" style="margin-top: 2rem;">
+                    <h4>🎨 Interactive: Component Tree Explorer</h4>
+                    <p>Click on components to see how they relate to each other. Notice how data flows from parent to child!</p>
+                    
+                    <svg id="component-tree-svg" viewBox="0 0 550 340" style="width: 100%; max-width: 550px; display: block; margin: 1rem auto;" role="img" aria-label="React component tree visualization">
+                        <!-- Background -->
+                        <rect x="0" y="0" width="550" height="340" fill="#f8f9fa" rx="8"/>
+                        
+                        <!-- Title -->
+                        <text x="275" y="25" text-anchor="middle" fill="#667eea" font-weight="bold" font-size="14">Component Tree</text>
+                        
+                        <!-- App (Root) -->
+                        <g id="node-app" style="cursor: pointer;" onclick="selectTreeNode('app')">
+                            <rect x="225" y="40" width="100" height="40" fill="#667eea" rx="6" stroke="#333" stroke-width="2"/>
+                            <text x="275" y="65" text-anchor="middle" fill="white" font-weight="bold" font-size="14">App</text>
+                        </g>
+                        
+                        <!-- Connection lines -->
+                        <line x1="245" y1="80" x2="110" y2="120" stroke="#999" stroke-width="2" id="line-header"/>
+                        <line x1="275" y1="80" x2="275" y2="120" stroke="#999" stroke-width="2" id="line-main"/>
+                        <line x1="305" y1="80" x2="440" y2="120" stroke="#999" stroke-width="2" id="line-footer"/>
+                        
+                        <!-- Header -->
+                        <g id="node-header" style="cursor: pointer;" onclick="selectTreeNode('header')">
+                            <rect x="60" y="120" width="100" height="35" fill="#4CAF50" rx="6"/>
+                            <text x="110" y="143" text-anchor="middle" fill="white" font-size="12">Header</text>
+                        </g>
+                        
+                        <!-- Main -->
+                        <g id="node-main" style="cursor: pointer;" onclick="selectTreeNode('main')">
+                            <rect x="225" y="120" width="100" height="35" fill="#4CAF50" rx="6"/>
+                            <text x="275" y="143" text-anchor="middle" fill="white" font-size="12">Main</text>
+                        </g>
+                        
+                        <!-- Footer -->
+                        <g id="node-footer" style="cursor: pointer;" onclick="selectTreeNode('footer')">
+                            <rect x="390" y="120" width="100" height="35" fill="#4CAF50" rx="6"/>
+                            <text x="440" y="143" text-anchor="middle" fill="white" font-size="12">Footer</text>
+                        </g>
+                        
+                        <!-- Level 3 connections -->
+                        <line x1="85" y1="155" x2="60" y2="190" stroke="#999" stroke-width="1.5" id="line-logo"/>
+                        <line x1="135" y1="155" x2="160" y2="190" stroke="#999" stroke-width="1.5" id="line-nav"/>
+                        <line x1="250" y1="155" x2="200" y2="190" stroke="#999" stroke-width="1.5" id="line-sidebar"/>
+                        <line x1="300" y1="155" x2="350" y2="190" stroke="#999" stroke-width="1.5" id="line-content"/>
+                        
+                        <!-- Level 3 components -->
+                        <g id="node-logo" style="cursor: pointer;" onclick="selectTreeNode('logo')">
+                            <rect x="20" y="190" width="80" height="30" fill="#2196F3" rx="4"/>
+                            <text x="60" y="210" text-anchor="middle" fill="white" font-size="11">Logo</text>
+                        </g>
+                        
+                        <g id="node-nav" style="cursor: pointer;" onclick="selectTreeNode('nav')">
+                            <rect x="120" y="190" width="80" height="30" fill="#2196F3" rx="4"/>
+                            <text x="160" y="210" text-anchor="middle" fill="white" font-size="11">Navigation</text>
+                        </g>
+                        
+                        <g id="node-sidebar" style="cursor: pointer;" onclick="selectTreeNode('sidebar')">
+                            <rect x="160" y="190" width="80" height="30" fill="#2196F3" rx="4"/>
+                            <text x="200" y="210" text-anchor="middle" fill="white" font-size="11">Sidebar</text>
+                        </g>
+                        
+                        <g id="node-content" style="cursor: pointer;" onclick="selectTreeNode('content')">
+                            <rect x="310" y="190" width="80" height="30" fill="#2196F3" rx="4"/>
+                            <text x="350" y="210" text-anchor="middle" fill="white" font-size="11">Content</text>
+                        </g>
+                        
+                        <!-- Level 4 connections -->
+                        <line x1="330" y1="220" x2="300" y2="250" stroke="#999" stroke-width="1" id="line-article"/>
+                        <line x1="370" y1="220" x2="400" y2="250" stroke="#999" stroke-width="1" id="line-comments"/>
+                        
+                        <!-- Level 4 components -->
+                        <g id="node-article" style="cursor: pointer;" onclick="selectTreeNode('article')">
+                            <rect x="260" y="250" width="80" height="28" fill="#FF9800" rx="4"/>
+                            <text x="300" y="268" text-anchor="middle" fill="white" font-size="10">Article</text>
+                        </g>
+                        
+                        <g id="node-comments" style="cursor: pointer;" onclick="selectTreeNode('comments')">
+                            <rect x="360" y="250" width="80" height="28" fill="#FF9800" rx="4"/>
+                            <text x="400" y="268" text-anchor="middle" fill="white" font-size="10">Comments</text>
+                        </g>
+                        
+                        <!-- Info display -->
+                        <rect x="20" y="290" width="510" height="40" fill="white" rx="6" stroke="#667eea" stroke-width="1.5"/>
+                        <text id="tree-info" x="275" y="315" text-anchor="middle" fill="#333" font-size="12">Click a component to see its role and data flow</text>
+                    </svg>
+                </div>
+                
+                <script>
+                function selectTreeNode(node) {
+                    const info = {
+                        app: 'App: Root component. Holds global state, passes data to Header, Main, Footer via props.',
+                        header: 'Header: Receives app title/user data from App. Parent to Logo and Navigation.',
+                        main: 'Main: Receives content data from App. Parent to Sidebar and Content.',
+                        footer: 'Footer: Receives copyright info from App. Usually stateless.',
+                        logo: 'Logo: Receives image/text from Header. Leaf component (no children).',
+                        nav: 'Navigation: Receives menu items from Header. May have onClick callbacks.',
+                        sidebar: 'Sidebar: Receives filter options from Main. Can lift state up via callbacks.',
+                        content: 'Content: Receives articles data from Main. Parent to Article and Comments.',
+                        article: 'Article: Receives article data from Content. Displays post content.',
+                        comments: 'Comments: Receives comments array from Content. May have add comment callback.'
+                    };
+                    
+                    document.getElementById('tree-info').textContent = info[node];
+                    
+                    // Highlight selected node
+                    document.querySelectorAll('[id^="node-"]').forEach(g => {
+                        const rect = g.querySelector('rect');
+                        rect.setAttribute('stroke', g.id === 'node-' + node ? '#333' : 'none');
+                        rect.setAttribute('stroke-width', g.id === 'node-' + node ? '3' : '0');
+                    });
+                }
+                </script>
 
                 <p>This tree structure makes it easy to reason about your application and manage data flow.</p>
             </section>
@@ -909,6 +1333,132 @@ export default Greeting;</code></pre>
                     style D fill:#ffc107,stroke:#333,stroke-width:2px
                     style E fill:#f44336,stroke:#333,stroke-width:2px,color:#fff
                 </div>
+
+                <!-- Interactive Component Lifecycle Simulator -->
+                <div class="card" style="margin-top: 2rem;">
+                    <h4>🎨 Interactive: Component Lifecycle Simulator</h4>
+                    <p>Simulate a component's lifecycle and see which phase it's in:</p>
+                    
+                    <svg id="lifecycle-svg" viewBox="0 0 550 250" style="width: 100%; max-width: 550px; display: block; margin: 1rem auto;" role="img" aria-label="Component lifecycle visualization">
+                        <!-- Background -->
+                        <rect x="0" y="0" width="550" height="250" fill="#f8f9fa" rx="8"/>
+                        
+                        <!-- Title -->
+                        <text x="275" y="25" text-anchor="middle" fill="#667eea" font-weight="bold" font-size="14">Component Lifecycle Phases</text>
+                        
+                        <!-- Mount Phase -->
+                        <g id="phase-mount">
+                            <rect x="30" y="50" width="120" height="80" fill="#e8f5e9" rx="8" stroke="#4CAF50" stroke-width="2"/>
+                            <text x="90" y="75" text-anchor="middle" fill="#4CAF50" font-weight="bold" font-size="13">MOUNT</text>
+                            <text x="90" y="95" text-anchor="middle" fill="#666" font-size="10">Component created</text>
+                            <text x="90" y="110" text-anchor="middle" fill="#666" font-size="10">Initial render</text>
+                            <text x="90" y="125" text-anchor="middle" fill="#666" font-size="10">Added to DOM</text>
+                        </g>
+                        
+                        <!-- Arrow 1 -->
+                        <path d="M 155 90 L 185 90" stroke="#999" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        
+                        <!-- Update Phase -->
+                        <g id="phase-update">
+                            <rect x="190" y="50" width="120" height="80" fill="#fff8e1" rx="8" stroke="#FF9800" stroke-width="2"/>
+                            <text x="250" y="75" text-anchor="middle" fill="#FF9800" font-weight="bold" font-size="13">UPDATE</text>
+                            <text x="250" y="95" text-anchor="middle" fill="#666" font-size="10">State changes</text>
+                            <text x="250" y="110" text-anchor="middle" fill="#666" font-size="10">Props changes</text>
+                            <text x="250" y="125" text-anchor="middle" fill="#666" font-size="10">Re-renders</text>
+                        </g>
+                        
+                        <!-- Loop arrow -->
+                        <path d="M 250 135 Q 250 155 230 155 Q 190 155 190 135" stroke="#FF9800" stroke-width="2" fill="none" stroke-dasharray="4,2"/>
+                        
+                        <!-- Arrow 2 -->
+                        <path d="M 315 90 L 345 90" stroke="#999" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+                        
+                        <!-- Unmount Phase -->
+                        <g id="phase-unmount">
+                            <rect x="350" y="50" width="120" height="80" fill="#ffebee" rx="8" stroke="#f44336" stroke-width="2"/>
+                            <text x="410" y="75" text-anchor="middle" fill="#f44336" font-weight="bold" font-size="13">UNMOUNT</text>
+                            <text x="410" y="95" text-anchor="middle" fill="#666" font-size="10">Cleanup runs</text>
+                            <text x="410" y="110" text-anchor="middle" fill="#666" font-size="10">Removed from DOM</text>
+                            <text x="410" y="125" text-anchor="middle" fill="#666" font-size="10">Resources freed</text>
+                        </g>
+                        
+                        <!-- Arrow marker definition -->
+                        <defs>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#999"/>
+                            </marker>
+                        </defs>
+                        
+                        <!-- Current state indicator -->
+                        <circle id="lifecycle-indicator" cx="90" cy="90" r="8" fill="#4CAF50">
+                            <animate attributeName="opacity" values="1;0.4;1" dur="1s" repeatCount="indefinite"/>
+                        </circle>
+                        
+                        <!-- Status display -->
+                        <rect x="30" y="175" width="490" height="60" fill="white" rx="8" stroke="#667eea" stroke-width="1.5"/>
+                        <text id="lifecycle-status" x="275" y="200" text-anchor="middle" fill="#333" font-size="12">Component is MOUNTED and rendering</text>
+                        <text id="lifecycle-code" x="275" y="220" text-anchor="middle" fill="#667eea" font-family="monospace" font-size="11">useEffect(() => { /* setup */ }, [])</text>
+                    </svg>
+                    
+                    <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem;">
+                        <button onclick="lifecycleMount()" style="padding: 0.4rem 0.8rem; border: none; background: #4CAF50; color: white; border-radius: 4px; cursor: pointer; font-size: 12px;">🚀 Mount</button>
+                        <button onclick="lifecycleUpdate()" style="padding: 0.4rem 0.8rem; border: none; background: #FF9800; color: white; border-radius: 4px; cursor: pointer; font-size: 12px;">🔄 Update State</button>
+                        <button onclick="lifecycleUnmount()" style="padding: 0.4rem 0.8rem; border: none; background: #f44336; color: white; border-radius: 4px; cursor: pointer; font-size: 12px;">🚫 Unmount</button>
+                    </div>
+                </div>
+                
+                <script>
+                (function() {
+                    let currentPhase = 'mount';
+                    
+                    function updateLifecycleDisplay(phase, status, code) {
+                        const indicator = document.getElementById('lifecycle-indicator');
+                        const positions = {
+                            mount: { cx: 90, fill: '#4CAF50' },
+                            update: { cx: 250, fill: '#FF9800' },
+                            unmount: { cx: 410, fill: '#f44336' }
+                        };
+                        
+                        indicator.setAttribute('cx', positions[phase].cx);
+                        indicator.setAttribute('fill', positions[phase].fill);
+                        
+                        document.getElementById('lifecycle-status').textContent = status;
+                        document.getElementById('lifecycle-code').textContent = code;
+                        
+                        // Highlight current phase
+                        ['mount', 'update', 'unmount'].forEach(p => {
+                            const rect = document.querySelector('#phase-' + p + ' rect');
+                            rect.setAttribute('stroke-width', p === phase ? '4' : '2');
+                        });
+                        
+                        currentPhase = phase;
+                    }
+                    
+                    window.lifecycleMount = function() {
+                        updateLifecycleDisplay(
+                            'mount',
+                            'Component MOUNTING: Creating instance, running initial render...',
+                            'useEffect(() => { console.log("Mounted!") }, [])'
+                        );
+                    };
+                    
+                    window.lifecycleUpdate = function() {
+                        updateLifecycleDisplay(
+                            'update',
+                            'Component UPDATING: State/props changed, re-rendering...',
+                            'useEffect(() => { /* runs on update */ }, [dependency])'
+                        );
+                    };
+                    
+                    window.lifecycleUnmount = function() {
+                        updateLifecycleDisplay(
+                            'unmount',
+                            'Component UNMOUNTING: Cleaning up, removing from DOM...',
+                            'useEffect(() => { return () => cleanup() }, [])'
+                        );
+                    };
+                })();
+                </script>
 
                 <h3>The Rendering Process</h3>
                 <p>When a component renders, here's what happens:</p>

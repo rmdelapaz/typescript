@@ -1021,6 +1021,194 @@ useEffect(() => {
                         <li>Working with very small files where the overhead doesn't matter</li>
                     </ul>
                 </div>
+
+                <!-- Interactive Object URL Memory Visualization -->
+                <div class="card" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 12px; padding: 0; margin: 2rem 0; overflow: hidden;">
+                    <div style="background: rgba(102, 126, 234, 0.1); padding: 1rem 1.5rem; border-bottom: 1px solid rgba(102, 126, 234, 0.3);">
+                        <h4 style="color: #667eea; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <span>⚡</span> Interactive: Object URL Memory Leak Visualization
+                        </h4>
+                        <p style="color: #a0a0a0; margin: 0.5rem 0 0 0; font-size: 0.9rem;">See why revoking Object URLs matters — watch memory grow without cleanup!</p>
+                    </div>
+                    <div style="padding: 1.5rem;">
+                        <div id="object-url-memory-viz" style="font-family: system-ui, -apple-system, sans-serif;">
+                            <!-- Memory Bar -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                    <span style="color: #e0e0e0; font-weight: 500;">Browser Memory Usage</span>
+                                    <span id="memory-value" style="color: #667eea; font-weight: bold;">0 MB</span>
+                                </div>
+                                <div style="background: #2a2a4a; border-radius: 8px; height: 24px; overflow: hidden; position: relative;">
+                                    <div id="memory-bar" style="background: linear-gradient(90deg, #667eea, #764ba2); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 8px;"></div>
+                                    <div id="memory-warning" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: #ff6b6b; font-size: 0.8rem; font-weight: bold; display: none;">⚠️ LEAK!</div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; color: #666; font-size: 0.75rem; margin-top: 0.25rem;">
+                                    <span>0 MB</span>
+                                    <span>50 MB (Warning)</span>
+                                    <span>100 MB</span>
+                                </div>
+                            </div>
+
+                            <!-- URL List -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                                <div>
+                                    <h5 style="color: #ff6b6b; margin: 0 0 0.5rem 0; font-size: 0.9rem;">❌ Without Cleanup</h5>
+                                    <div id="url-list-bad" style="background: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.3); border-radius: 8px; padding: 0.75rem; min-height: 120px; max-height: 150px; overflow-y: auto;">
+                                        <p style="color: #666; font-size: 0.8rem; margin: 0; text-align: center;">URLs created here leak memory</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5 style="color: #4CAF50; margin: 0 0 0.5rem 0; font-size: 0.9rem;">✅ With revokeObjectURL()</h5>
+                                    <div id="url-list-good" style="background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76, 175, 80, 0.3); border-radius: 8px; padding: 0.75rem; min-height: 120px; max-height: 150px; overflow-y: auto;">
+                                        <p style="color: #666; font-size: 0.8rem; margin: 0; text-align: center;">URLs created and revoked — no leak!</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Stats -->
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1.5rem;">
+                                <div style="background: rgba(255, 107, 107, 0.1); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                    <div id="urls-created" style="color: #ff6b6b; font-size: 1.5rem; font-weight: bold;">0</div>
+                                    <div style="color: #999; font-size: 0.7rem;">URLs Created</div>
+                                </div>
+                                <div style="background: rgba(255, 193, 7, 0.1); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                    <div id="urls-leaked" style="color: #ffc107; font-size: 1.5rem; font-weight: bold;">0</div>
+                                    <div style="color: #999; font-size: 0.7rem;">Leaked (Not Revoked)</div>
+                                </div>
+                                <div style="background: rgba(76, 175, 80, 0.1); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                    <div id="urls-revoked" style="color: #4CAF50; font-size: 1.5rem; font-weight: bold;">0</div>
+                                    <div style="color: #999; font-size: 0.7rem;">Properly Revoked</div>
+                                </div>
+                                <div style="background: rgba(102, 126, 234, 0.1); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                    <div id="memory-saved" style="color: #667eea; font-size: 1.5rem; font-weight: bold;">0 MB</div>
+                                    <div style="color: #999; font-size: 0.7rem;">Memory Saved</div>
+                                </div>
+                            </div>
+
+                            <!-- Controls -->
+                            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;">
+                                <button onclick="simulateFileSelect()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 0.9rem;">📁 Simulate File Select</button>
+                                <button onclick="simulateBulkUpload()" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 0.9rem;">📸 Bulk Upload (10 files)</button>
+                                <button onclick="resetMemoryDemo()" style="background: #333; color: white; border: 1px solid #555; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 0.9rem;">🔄 Reset</button>
+                            </div>
+
+                            <!-- Insight -->
+                            <div id="memory-insight" style="margin-top: 1rem; padding: 0.75rem; background: rgba(102, 126, 234, 0.1); border-radius: 8px; text-align: center; display: none;">
+                                <p style="color: #667eea; margin: 0; font-size: 0.85rem;"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    // Object URL Memory Visualization State
+                    let memoryState = {
+                        urlsCreated: 0,
+                        urlsLeaked: 0,
+                        urlsRevoked: 0,
+                        memoryUsed: 0,
+                        memorySaved: 0
+                    };
+
+                    function updateMemoryDisplay() {
+                        const memoryBar = document.getElementById('memory-bar');
+                        const memoryValue = document.getElementById('memory-value');
+                        const memoryWarning = document.getElementById('memory-warning');
+                        const urlsCreated = document.getElementById('urls-created');
+                        const urlsLeaked = document.getElementById('urls-leaked');
+                        const urlsRevoked = document.getElementById('urls-revoked');
+                        const memorySaved = document.getElementById('memory-saved');
+                        const insight = document.getElementById('memory-insight');
+
+                        // Update stats
+                        urlsCreated.textContent = memoryState.urlsCreated;
+                        urlsLeaked.textContent = memoryState.urlsLeaked;
+                        urlsRevoked.textContent = memoryState.urlsRevoked;
+                        memorySaved.textContent = memoryState.memorySaved.toFixed(1) + ' MB';
+
+                        // Update memory bar
+                        const percentage = Math.min((memoryState.memoryUsed / 100) * 100, 100);
+                        memoryBar.style.width = percentage + '%';
+                        memoryValue.textContent = memoryState.memoryUsed.toFixed(1) + ' MB';
+
+                        // Color and warning based on memory usage
+                        if (memoryState.memoryUsed > 50) {
+                            memoryBar.style.background = 'linear-gradient(90deg, #ff6b6b, #ee5a24)';
+                            memoryWarning.style.display = 'block';
+                        } else if (memoryState.memoryUsed > 25) {
+                            memoryBar.style.background = 'linear-gradient(90deg, #ffc107, #ff9800)';
+                            memoryWarning.style.display = 'none';
+                        } else {
+                            memoryBar.style.background = 'linear-gradient(90deg, #667eea, #764ba2)';
+                            memoryWarning.style.display = 'none';
+                        }
+
+                        // Show insight
+                        if (memoryState.urlsLeaked > 5) {
+                            insight.style.display = 'block';
+                            insight.querySelector('p').textContent = '💡 Notice how leaked URLs keep consuming memory! In a real app with many files, this causes performance issues and crashes.';
+                        } else if (memoryState.urlsRevoked > 3 && memoryState.memorySaved > 5) {
+                            insight.style.display = 'block';
+                            insight.querySelector('p').textContent = '✨ Great! You\'ve saved ' + memoryState.memorySaved.toFixed(1) + ' MB by properly revoking Object URLs. This is the pattern to use in React with useEffect cleanup!';
+                        } else {
+                            insight.style.display = 'none';
+                        }
+                    }
+
+                    function addUrlToList(listId, url, type) {
+                        const list = document.getElementById(listId);
+                        // Clear placeholder text on first add
+                        if (list.querySelector('p')) {
+                            list.innerHTML = '';
+                        }
+                        const item = document.createElement('div');
+                        item.style.cssText = 'font-size: 0.7rem; color: ' + (type === 'leak' ? '#ff6b6b' : '#4CAF50') + '; padding: 0.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); word-break: break-all;';
+                        item.textContent = (type === 'leak' ? '🔴 ' : '✅ ') + url.substring(0, 40) + '...';
+                        list.appendChild(item);
+                        list.scrollTop = list.scrollHeight;
+                    }
+
+                    function simulateFileSelect() {
+                        // Simulate creating Object URL for a ~2MB image
+                        const fileSize = 1.5 + Math.random() * 1; // 1.5-2.5 MB
+                        const fakeUrl = 'blob:http://localhost/' + Math.random().toString(36).substring(2, 15);
+
+                        // Bad side: create and leak
+                        memoryState.urlsCreated++;
+                        memoryState.urlsLeaked++;
+                        memoryState.memoryUsed += fileSize;
+                        addUrlToList('url-list-bad', fakeUrl, 'leak');
+
+                        // Good side: create and immediately revoke
+                        memoryState.urlsRevoked++;
+                        memoryState.memorySaved += fileSize;
+                        addUrlToList('url-list-good', fakeUrl + ' (revoked)', 'revoked');
+
+                        updateMemoryDisplay();
+                    }
+
+                    function simulateBulkUpload() {
+                        for (let i = 0; i < 10; i++) {
+                            setTimeout(() => simulateFileSelect(), i * 100);
+                        }
+                    }
+
+                    function resetMemoryDemo() {
+                        memoryState = {
+                            urlsCreated: 0,
+                            urlsLeaked: 0,
+                            urlsRevoked: 0,
+                            memoryUsed: 0,
+                            memorySaved: 0
+                        };
+                        document.getElementById('url-list-bad').innerHTML = '<p style="color: #666; font-size: 0.8rem; margin: 0; text-align: center;">URLs created here leak memory</p>';
+                        document.getElementById('url-list-good').innerHTML = '<p style="color: #666; font-size: 0.8rem; margin: 0; text-align: center;">URLs created and revoked — no leak!</p>';
+                        updateMemoryDisplay();
+                    }
+
+                    // Initialize display
+                    updateMemoryDisplay();
+                </script>
             </section>
 
             <!-- Section 7: File Validation -->

@@ -1027,6 +1027,171 @@ function ProductList({ products }: ProductListProps) {
                     <li><strong>Complexity:</strong> More code to read and maintain</li>
                     <li><strong>Bugs:</strong> Wrong dependencies can cause subtle bugs</li>
                 </ul>
+                
+                <!-- Interactive Memoization Cost/Benefit Visualization -->
+                <div class="card" style="padding: 0; overflow: hidden; margin: 2rem 0;">
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 1.5rem;">
+                        <h4 style="color: white; margin: 0;">⚖️ Interactive: Memoization Cost vs Benefit</h4>
+                        <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 0.9rem;">See when memoization helps and when it hurts performance</p>
+                    </div>
+                    <div style="padding: 1.5rem;">
+                        <svg id="memoCostViz" viewBox="0 0 750 400" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; font-family: system-ui, sans-serif;">
+                            <defs>
+                                <linearGradient id="benefitGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style="stop-color:#48bb78"/>
+                                    <stop offset="100%" style="stop-color:#38a169"/>
+                                </linearGradient>
+                                <linearGradient id="costGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style="stop-color:#f56565"/>
+                                    <stop offset="100%" style="stop-color:#c53030"/>
+                                </linearGradient>
+                            </defs>
+                            
+                            <!-- Title -->
+                            <text x="375" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">When Does Memoization Pay Off?</text>
+                            
+                            <!-- Scenario selector labels -->
+                            <text x="375" y="55" text-anchor="middle" font-size="12" fill="#666">Select a scenario to see the trade-off:</text>
+                            
+                            <!-- Chart area -->
+                            <rect x="100" y="100" width="550" height="200" fill="#fafafa" stroke="#e0e0e0" rx="8"/>
+                            
+                            <!-- Y-axis label -->
+                            <text x="60" y="200" text-anchor="middle" font-size="11" fill="#666" transform="rotate(-90, 60, 200)">Time (ms)</text>
+                            
+                            <!-- X-axis labels -->
+                            <text x="250" y="320" text-anchor="middle" font-size="11" fill="#666">Without useMemo</text>
+                            <text x="500" y="320" text-anchor="middle" font-size="11" fill="#666">With useMemo</text>
+                            
+                            <!-- Without useMemo bar -->
+                            <rect id="bar-without" x="175" y="250" width="150" height="0" fill="url(#costGrad)" rx="4">
+                                <animate attributeName="height" from="0" to="0" dur="0.5s" fill="freeze"/>
+                                <animate attributeName="y" from="250" to="250" dur="0.5s" fill="freeze"/>
+                            </rect>
+                            <text id="label-without" x="250" y="245" text-anchor="middle" font-size="12" font-weight="bold" fill="#c53030">0ms</text>
+                            
+                            <!-- With useMemo bar (split into calculation + overhead) -->
+                            <rect id="bar-calc" x="425" y="250" width="150" height="0" fill="url(#benefitGrad)" rx="4">
+                                <animate attributeName="height" from="0" to="0" dur="0.5s" fill="freeze"/>
+                                <animate attributeName="y" from="250" to="250" dur="0.5s" fill="freeze"/>
+                            </rect>
+                            <rect id="bar-overhead" x="425" y="250" width="150" height="0" fill="#ffc107" rx="4">
+                                <animate attributeName="height" from="0" to="0" dur="0.5s" fill="freeze"/>
+                                <animate attributeName="y" from="250" to="250" dur="0.5s" fill="freeze"/>
+                            </rect>
+                            <text id="label-with" x="500" y="245" text-anchor="middle" font-size="12" font-weight="bold" fill="#38a169">0ms</text>
+                            
+                            <!-- Legend -->
+                            <rect x="100" y="340" width="12" height="12" fill="url(#costGrad)" rx="2"/>
+                            <text x="118" y="350" font-size="10" fill="#666">Calculation time</text>
+                            
+                            <rect x="220" y="340" width="12" height="12" fill="#ffc107" rx="2"/>
+                            <text x="238" y="350" font-size="10" fill="#666">Memoization overhead</text>
+                            
+                            <rect x="380" y="340" width="12" height="12" fill="url(#benefitGrad)" rx="2"/>
+                            <text x="398" y="350" font-size="10" fill="#666">Cached (skipped)</text>
+                            
+                            <!-- Verdict -->
+                            <text id="verdict" x="375" y="385" text-anchor="middle" font-size="13" font-weight="bold" fill="#333">Select a scenario above</text>
+                        </svg>
+                        
+                        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;">
+                            <button onclick="showScenario('simple')" style="padding: 0.5rem 1rem; background: #f5f5f5; color: #333; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;" id="btn-simple">Simple Math<br><span style="font-size:0.7rem;color:#888">2 + 2</span></button>
+                            <button onclick="showScenario('small')" style="padding: 0.5rem 1rem; background: #f5f5f5; color: #333; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;" id="btn-small">Small Array<br><span style="font-size:0.7rem;color:#888">100 items</span></button>
+                            <button onclick="showScenario('medium')" style="padding: 0.5rem 1rem; background: #f5f5f5; color: #333; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;" id="btn-medium">Medium Array<br><span style="font-size:0.7rem;color:#888">5,000 items</span></button>
+                            <button onclick="showScenario('large')" style="padding: 0.5rem 1rem; background: #f5f5f5; color: #333; border: 2px solid #ddd; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;" id="btn-large">Large Array<br><span style="font-size:0.7rem;color:#888">50,000 items</span></button>
+                        </div>
+                        
+                        <div id="scenario-explanation" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+                            <p style="margin: 0; font-size: 0.9rem; color: #555;">👆 Click a scenario to see how memoization affects performance. Watch the bars change to understand when useMemo helps vs hurts.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                const scenarios = {
+                    simple: {
+                        without: 0.01,  // Trivial calculation
+                        withCalc: 0,    // Cached, no calc
+                        overhead: 0.05, // But overhead exists!
+                        verdict: '❌ HURTS: Memoization overhead (0.05ms) > calculation time (0.01ms). Just do the math!',
+                        verdictColor: '#c53030',
+                        explanation: '<strong>Simple Math (2 + 2):</strong> The calculation is instant (~0.01ms). But useMemo adds ~0.05ms overhead for dependency comparison and cache lookup. <em>Memoization makes it 5x SLOWER!</em>'
+                    },
+                    small: {
+                        without: 0.5,   // Small array filter/sort
+                        withCalc: 0,    // Cached
+                        overhead: 0.05,
+                        verdict: '⚠️ MARGINAL: Saves 0.45ms but adds complexity. Probably not worth it.',
+                        verdictColor: '#f57c00',
+                        explanation: '<strong>Small Array (100 items):</strong> Filtering/sorting takes ~0.5ms. Memoization saves 0.45ms per re-render. For most apps, this is imperceptible. <em>The code complexity may not be worth the tiny gain.</em>'
+                    },
+                    medium: {
+                        without: 15,    // Medium array - noticeable
+                        withCalc: 0,
+                        overhead: 0.05,
+                        verdict: '✅ HELPS: Saves 15ms per re-render. Worth memoizing!',
+                        verdictColor: '#38a169',
+                        explanation: '<strong>Medium Array (5,000 items):</strong> Processing takes ~15ms - noticeable to users. Memoization reduces re-render time to just 0.05ms. <em>This is a clear win for useMemo!</em>'
+                    },
+                    large: {
+                        without: 150,   // Large array - very slow
+                        withCalc: 0,
+                        overhead: 0.05,
+                        verdict: '✅ ESSENTIAL: Saves 150ms! Without memoization, UI would lag badly.',
+                        verdictColor: '#38a169',
+                        explanation: '<strong>Large Array (50,000 items):</strong> Processing takes ~150ms - causes visible UI lag and dropped frames. Memoization is essential here. <em>Without useMemo, every keystroke would freeze the UI!</em>'
+                    }
+                };
+                
+                function showScenario(type) {
+                    const scenario = scenarios[type];
+                    const maxHeight = 140; // Max bar height in pixels
+                    const maxTime = 150;   // Scale factor
+                    
+                    // Reset button styles
+                    ['simple', 'small', 'medium', 'large'].forEach(t => {
+                        const btn = document.getElementById(`btn-${t}`);
+                        btn.style.background = t === type ? '#667eea' : '#f5f5f5';
+                        btn.style.color = t === type ? 'white' : '#333';
+                        btn.style.borderColor = t === type ? '#667eea' : '#ddd';
+                    });
+                    
+                    // Calculate bar heights (with minimum visible height for small values)
+                    const withoutHeight = Math.max(5, (scenario.without / maxTime) * maxHeight);
+                    const overheadHeight = Math.max(3, (scenario.overhead / maxTime) * maxHeight);
+                    const totalWithHeight = overheadHeight;
+                    
+                    // Update bars
+                    const barWithout = document.getElementById('bar-without');
+                    const barCalc = document.getElementById('bar-calc');
+                    const barOverhead = document.getElementById('bar-overhead');
+                    
+                    barWithout.setAttribute('height', withoutHeight);
+                    barWithout.setAttribute('y', 250 - withoutHeight);
+                    
+                    // For "with memo", show only overhead (calc is cached/skipped)
+                    barCalc.setAttribute('height', 0);
+                    barOverhead.setAttribute('height', totalWithHeight);
+                    barOverhead.setAttribute('y', 250 - totalWithHeight);
+                    
+                    // Update labels
+                    document.getElementById('label-without').textContent = scenario.without >= 1 ? `${scenario.without}ms` : `${scenario.without}ms`;
+                    document.getElementById('label-without').setAttribute('y', 250 - withoutHeight - 8);
+                    
+                    const totalWith = scenario.overhead;
+                    document.getElementById('label-with').textContent = `${totalWith}ms`;
+                    document.getElementById('label-with').setAttribute('y', 250 - totalWithHeight - 8);
+                    
+                    // Update verdict
+                    const verdict = document.getElementById('verdict');
+                    verdict.textContent = scenario.verdict;
+                    verdict.setAttribute('fill', scenario.verdictColor);
+                    
+                    // Update explanation
+                    document.getElementById('scenario-explanation').innerHTML = `<p style="margin: 0; font-size: 0.9rem; color: #555;">${scenario.explanation}</p>`;
+                }
+                </script>
 
                 <div class="code-block">
                     <button class="copy-button">Copy</button>

@@ -1,5 +1,50 @@
 # React TypeScript Course Development - Progress Tracker
 
+## ⚠️ CRITICAL: File System Location
+
+**This project is located on the USER'S COMPUTER at:**
+
+```
+\\wsl$\Ubuntu\home\practicalace\projects\typescript
+```
+
+### 🚨 MANDATORY FILE SYSTEM RULES
+
+Claude has access to TWO different file systems:
+1. **User's Computer** - Paths with `\\wsl$\`, `D:\`, `G:\`, `/Users/`, or `/home/` prefixes
+2. **Claude's Computer** - Paths like `/home/claude` or `/mnt/user-data`
+
+**FOR THIS PROJECT:**
+- ✅ **ALWAYS USE:** `Filesystem:write_file`, `Filesystem:read_text_file`, `Filesystem:list_directory`, `Filesystem:edit_file`
+- ❌ **NEVER USE:** `create_file`, `bash_tool`, `str_replace`, `view` (these are for Claude's computer)
+
+**If you see a path starting with `\\wsl$\` - STOP and use Filesystem tools!**
+
+---
+
+## 🚨 START EVERY SESSION WITH THIS CHECKLIST
+
+Before doing ANY work, Claude must read this file and output:
+
+```
+✓ File system location: \\wsl$\Ubuntu\home\practicalace\projects\typescript
+✓ Tools to use: Filesystem:read_text_file, Filesystem:write_file, Filesystem:edit_file
+✓ Current status: [Fill in from "Current Status" section]
+✓ Next task: [Fill in from "Next Task" field]
+```
+
+**DO NOT PROCEED until this checklist is complete.**
+
+---
+
+## 🔔 TOKEN LIMIT WARNING REQUIREMENT
+
+**CRITICAL USER PREFERENCE:** Ray prefers to be warned when conversations approach token limits so he can start fresh chats rather than allowing automatic compaction to occur.
+
+Claude MUST monitor context length and warn the user BEFORE reaching critical limits. Do not let automatic sub-compaction happen without warning.
+
+---
+
 ## Project Overview
 Creating a comprehensive HTML-based React TypeScript tutorial series for new developers.
 
@@ -81,6 +126,356 @@ When lessons are too large, split into parts (a, b, c, etc.):
 - Close remaining content sections
 - Lesson navigation and footer
 - Script tags and closing HTML tags
+
+---
+
+## Current Enhancement Phase
+
+**Last Updated:** November 27, 2025 (Lesson 10.1 complete - 1 visualization added)
+
+**Current Phase:** Adding Interactive SVG/Canvas Visualizations to Existing Lessons
+
+**Visualization Enhancement Status:**
+- Lesson 4.4 (Advanced Data Fetching): ✅ COMPLETE - 4 visualizations added
+- Lesson 4.5 (Working with APIs): ✅ COMPLETE - 4 visualizations added
+- Lesson 5.1 (useReducer Hook): ✅ COMPLETE - 4 visualizations (2 existing + 2 new)
+- Lesson 5.2 (useContext Hook): ✅ COMPLETE - 4 visualizations added
+- Lesson 5.3 (useRef Hook): ✅ COMPLETE - 4 visualizations added
+- Lesson 5.4 (useMemo/useCallback): ✅ COMPLETE - 1 visualization added
+- Lesson 5.5 (Compound Components): ✅ EVALUATED - 0 visualizations needed
+  - Pattern is structural/organizational, not behavioral
+  - Code examples ARE the visualization - best learned by building
+  - Existing Mermaid diagram covers context flow adequately
+- Lesson 7.1 (Complex Form Handling): ✅ COMPLETE - 2 visualizations added
+- Lesson 7.4 (File Uploads): ✅ COMPLETE - 2 visualizations (1 existing + 1 new)
+- Lesson 7.5 (Advanced Form Patterns): ✅ COMPLETE - 2 visualizations added
+- Lesson 6.1 (React Router Basics): ✅ EVALUATED - 0 visualizations needed
+  - Already has 3 solid Mermaid diagrams (SPA vs MPA, Router flow, route matching)
+  - Routing behavior is immediately visible in browser (URL bar, page content)
+  - Best learned by building and running the code examples
+- Lesson 6.2 (Advanced Routing): ✅ EVALUATED - 0 visualizations needed
+  - Already has 6 Mermaid diagrams covering all key flows
+  - Hooks (useParams, useNavigate, useLocation) are action-oriented, learned by coding
+  - No hidden behavior that interactive visualization would reveal
+- Lesson 6.3 (Route Protection and Loading): ✅ EVALUATED - 0 visualizations needed
+  - Already has 4 Mermaid diagrams (Protected Route Flow, Lazy Loading, Nested Suspense, RBAC)
+  - Topics are decision-based/procedural - simple boolean checks shown in diagrams
+  - Lazy loading benefits best seen in browser DevTools with network throttling
+  - Error boundaries and auth context are best learned through implementation
+  - Suspense timing could potentially benefit but DevTools demonstrates better than SVG
+- Lesson 6.4 (Search and Query Parameters): ✅ EVALUATED - 0 visualizations needed
+  - Already has 3 Mermaid diagrams (URL vs Component State, Filter Cycle, Pagination Flow)
+  - URL parameters are immediately visible in browser address bar - best possible visualization
+  - Heavy implementation focus with extensive production-ready code examples
+  - Browser DevTools (Network tab, URL bar) demonstrate behavior better than SVG
+  - Topics are practical patterns learned through hands-on building
+- Lesson 6.5 (Layout Routes): ✅ EVALUATED - 0 visualizations needed
+  - Already has 4 Mermaid diagrams (Layout Flow, Nested Hierarchy, Breadcrumb Path, Capabilities)
+  - Topics are structural/organizational rather than behavioral - best learned by building
+  - Outlet concept ("child renders here") is intuitive and well-explained by existing diagrams
+  - React DevTools shows real component hierarchy better than any SVG
+  - Results immediately visible when running the application
+- Lesson 8.1 (State Management Overview): ✅ EVALUATED - 0 visualizations needed
+- Lesson 8.2 (Zustand Basics): ✅ COMPLETE - 1 visualization added
+- Lesson 8.3 (Redux Toolkit): ✅ EVALUATED - 0 visualizations needed
+  - Redux DevTools provides superior visualization of Redux behavior in action
+  - Lesson is hands-on tutorial-focused - students learn by building
+  - Two existing Mermaid diagrams cover data flow patterns adequately
+  - No hidden runtime behavior to visualize - Redux's predictability is its core feature
+- Lesson 8.4 (React Query): ✅ COMPLETE - 1 visualization added
+- Lesson 8.5 (Architecture Best Practices): ✅ EVALUATED - 0 visualizations needed
+  - Lesson is about code organization patterns - inherently structural/textual
+  - Already has 4 Mermaid diagrams covering architectural layers and flows
+  - Folder structures are best shown as text (how developers see them in editors)
+  - Patterns (separation of concerns, feature folders) are learned by implementing, not watching
+  - No hidden runtime behavior to visualize - all about file/code organization
+- Lesson 9.1 (Testing Fundamentals): ✅ EVALUATED - 0 visualizations needed
+  - Testing fundamentals are conceptual - vocabulary, mental models, processes
+  - Already has 2 Mermaid diagrams (Testing Pyramid, Ice Cream Cone anti-pattern)
+  - Multiple comparison tables effectively present test types and bug cost stages
+  - The real "visualization" is running actual tests - terminal output with pass/fail
+  - No hidden runtime behavior to visualize - concepts learned through practice
+  - Hands-on exercises (string utils, date utils, shopping cart) are the learning mechanism
+  - AAA pattern is demonstrated effectively through code examples
+- Lesson 9.2 (React Testing Library): ✅ EVALUATED - 0 visualizations needed
+  - Already has 2 Mermaid diagrams (Enzyme vs RTL approach, Developer vs User thinking)
+  - Multiple comparison tables (query priority, query types, fireEvent vs user-event)
+  - Testing is hands-on by nature - test runner output IS the visualization
+  - External tools (Testing Playground) provide better interactive query exploration
+  - RTL's design is self-documenting: good error messages, screen.debug(), logTestingPlaygroundURL()
+  - Extensive code examples students can copy and run themselves
+  - Philosophy (test behavior, not implementation) is learned through practice, not visualization
+- Lesson 9.3 (Testing User Interactions): ✅ EVALUATED - 0 visualizations needed
+  - Already has 2 Mermaid diagrams (user workflow flow, Developer vs User thinking)
+  - 30+ comprehensive code examples covering all major testing scenarios
+  - Testing is inherently hands-on - concepts learned by writing and running tests
+  - Browser DevTools provide better visualization for focus management and accessibility
+  - No hidden behavior to reveal - test output makes everything visible
+  - Keyboard navigation visualization considered but browser interaction is more effective
+  - Practice exercises (Multi-Step Survey, Debounce Search, Modal Focus) are the learning mechanism
+- Lesson 9.4 (Testing Async Code): ✅ EVALUATED - 0 visualizations needed
+  - Already has 2 Mermaid diagrams (Async Lifecycle, Testing Workflow)
+  - 30+ comprehensive code examples covering all async testing scenarios
+  - Related concepts already visualized: React Query cache (8.4), Debounce timing (7.5)
+  - Network DevTools show request timing better than any SVG visualization
+  - Test runner output provides immediate feedback on async behavior
+  - Race condition visualization considered but code examples demonstrate effectively
+  - Practice exercises (Profile Loader, Auto-Save, Notifications) are the learning mechanism
+- Lesson 9.5 (Integration and E2E Testing): ✅ EVALUATED - 0 visualizations needed
+  - Already has 4 Mermaid diagrams (Test Types, E2E Tools, CI/CD Pipeline, Testing Strategy)
+  - 5 comprehensive comparison tables covering tool selection and decision-making
+  - 30+ code examples covering all integration and E2E testing scenarios
+  - Playwright/Cypress provide their own superior debugging visualizations (Trace Viewer, Time Travel)
+  - Testing pyramid already shown both as text art and Mermaid diagram
+  - CI/CD pipeline is sequential/procedural - Mermaid diagram adequate
+  - Browser automation best learned by watching actual browser execution
+  - Testing is inherently hands-on - pass/fail output IS the visualization
+  - No hidden runtime behavior to reveal - results immediately visible
+- Lesson 10.2 (TypeScript Advanced Patterns): ✅ EVALUATED - 0 visualizations needed
+  - TypeScript patterns operate at compile time, not runtime - no behavior to visualize
+  - Already has 2 Mermaid diagrams covering type flow concepts
+  - IDE/compiler behavior (autocomplete, errors, narrowing) IS the "visualization"
+  - Best learned by coding in a TypeScript IDE and experiencing the type system
+- Lesson 10.3 (Accessibility): ✅ EVALUATED - 0 visualizations needed
+  - Accessibility is about assistive technology behavior that can't be accurately simulated
+  - Screen reader announcements must be experienced with actual screen readers (NVDA, VoiceOver)
+  - Keyboard navigation must be tested by using keyboard-only navigation
+  - Already has 4 Mermaid diagrams (Virtuous Cycle, POUR principles, ARIA categories, Mindset)
+  - 30+ code examples with bad vs good comparisons
+  - Browser DevTools Accessibility Inspector provides superior inspection
+  - Any visualization simulating screen reader behavior would be misleading
+- Lesson 10.4 (Build and Deployment): ✅ EVALUATED - 0 visualizations needed
+  - Deployment is about external platform interactions, not internal app behavior
+  - Already has 5 Mermaid diagrams covering deployment pipeline concepts
+  - External tools (Lighthouse, Vercel Dashboard, Netlify Dashboard, GitHub Actions) provide superior real-time visualization
+  - Bundle analysis with rollup-plugin-visualizer provides better visualization with real data
+  - DNS propagation checkers (whatsmydns.net) show actual propagation status
+  - Lesson is tutorial/procedural—step-by-step guides for external platforms
+  - Configuration files (YAML, JSON) are textual by nature
+  - No hidden runtime behavior to visualize
+- Lesson 10.5 (Next Steps and Advanced Topics): ✅ EVALUATED - 0 visualizations needed
+  - This is guidance/reference content, not behavioral concepts lesson
+  - Already has 4+ Mermaid diagrams (Course Journey, Decision Trees, Career Mindmap)
+  - Topics are external technologies (Next.js, animation libs) best learned by using them
+  - Career guidance and portfolio advice don't benefit from interactive visualizations
+- Other lessons: ⬜ Modules 1-4 remaining to evaluate
+
+**IMPORTANT - Visualization Philosophy:**
+The number of visualizations per lesson should be determined by educational value, NOT by hitting a target number. Each visualization should only be added if it:
+1. Explains a concept that's difficult to convey through text/code alone
+2. Provides interactive understanding that static diagrams can't achieve
+3. Doesn't duplicate existing Mermaid diagrams or code examples without adding significant value
+4. Addresses a common point of confusion for learners
+
+Some lessons may need 1-2 visualizations, others may need 5-6, and some may need none. The "4 per lesson" pattern in early lessons was coincidental, not a mandate.
+
+**Retrospective on Lesson 5.3:**
+- Viz 1 (Refs vs Variables): HIGH value - makes persistence concept tangible
+- Viz 2 (DOM Lifecycle): MODERATE value - lesson already had Mermaid diagram covering this; possibly redundant
+- Viz 3 (Ref vs State Re-render): HIGH value - "stale" screen value demonstration is powerful
+- Viz 4 (Focus Management): MODERATE-HIGH value - working demo adds value but concept is fairly intuitive
+- Honest assessment: 2-3 visualizations may have been sufficient
+
+**Visualizations in Lesson 5.1:**
+1. ⚡ Interactive useReducer Cycle (Section 1) - Animated dispatch → reducer → state flow [EXISTING]
+2. 🔄 Interactive Reducer Flow (Section 2) - Clickable step-by-step reducer pattern [EXISTING]
+3. 📊 Interactive Complexity Comparison (Section 3) - useState vs useReducer complexity growth chart [NEW]
+4. 📝 Interactive Todo State Explorer (Section 8) - Live action dispatch showing immutable state updates [NEW]
+
+**Visualizations in Lesson 5.2:**
+1. ⚡ Interactive Prop Drilling vs Context (Section 1) - Animated comparison showing data flow through props vs context "wormhole"
+2. 🎯 Interactive Provider Scope Explorer (Section 4) - Click different scopes to see which components can access context
+3. 🔍 Interactive useContext Flow (Section 5) - Animated trace showing how useContext finds the nearest Provider
+4. 🔄 Interactive Context Re-render Visualizer (Section 10) - Watch components flash when context changes to understand performance implications
+
+**Visualizations in Lesson 5.3:**
+1. ⚡ Interactive Refs vs Variables (Section 2) - See how refs persist while variables reset on re-render
+2. 🎬 Interactive DOM Ref Lifecycle (Section 3) - Animated timeline showing null → element → null lifecycle
+3. 🔄 Interactive Ref vs State Re-render (Section 4) - Compare how state triggers re-renders while refs don't
+4. 🎯 Interactive Focus Management Demo (Section 7) - Working form with programmatic focus control using refs
+
+**Visualizations in Lesson 5.4:**
+1. ⚖️ Interactive Memoization Cost/Benefit (Section 6) - Bar chart comparing scenarios from simple math to large arrays, showing when memoization helps vs hurts
+   - HIGH VALUE: Addresses critical misconception that memoization is "free"
+   - Shows 4 scenarios: Simple Math (hurts), Small Array (marginal), Medium Array (helps), Large Array (essential)
+   - Lesson already well-served by existing Mermaid diagrams and code examples for other concepts
+
+**Module 10 Complete!** All lessons in Module 10 have been evaluated.
+
+**Evaluation Summary for Module 10:**
+- Lesson 10.1 (Performance Optimization): 1 visualization added (Re-render Cascade)
+- Lesson 10.2 (TypeScript Advanced Patterns): 0 visualizations needed (compile-time concepts)
+- Lesson 10.3 (Accessibility): 0 visualizations needed (screen reader behavior can't be simulated)
+- Lesson 10.4 (Build and Deployment): 0 visualizations needed (external platform interactions)
+- Lesson 10.5 (Next Steps): 0 visualizations needed (guidance/reference content)
+
+**Next Task:** Consider reviewing earlier modules (1-4) for potential visualization opportunities, or mark visualization phase complete
+
+**Visualizations in Lesson 10.5:**
+- ✅ EVALUATED - 0 visualizations needed
+- This is guidance/reference content—course recap, technology overview, career advice
+- Already has 4+ Mermaid diagrams (Course Journey path, Next.js Decision Tree, Career Mindmap, Skills Overview)
+- Topics covered are external technologies (Next.js, Server Components, animation libraries) best learned by building with them
+- Component library comparisons are effectively presented in tables
+- Career guidance and portfolio advice are actionable text content, not behavioral concepts
+- The "visualization" for these topics IS building projects with the actual technologies
+- No invisible runtime behavior to reveal—this is about "what to learn next" not "how something works"
+- Similar to course conclusion content—celebratory and forward-looking, not instructional
+
+**Visualizations in Lesson 10.4:**
+- ✅ EVALUATED - 0 visualizations needed
+- Deployment is fundamentally about external platform interactions, not internal React app behavior
+- Already has 5 Mermaid diagrams (Deployment Pipeline, Platform Features, Auto-Deploy Flow, Workflow Summary, Complete Workflow)
+- External tools provide superior visualization:
+  - Vercel/Netlify dashboards show real-time deployment status
+  - GitHub Actions UI visualizes CI/CD pipeline execution
+  - Lighthouse shows performance scores with actual data
+  - rollup-plugin-visualizer creates bundle analysis with real bundle data
+  - whatsmydns.net shows actual DNS propagation status
+- Lesson is heavily tutorial/procedural—step-by-step guides for external platforms
+- Configuration files (YAML, TOML, JSON) are inherently textual
+- Multiple comparison tables effectively present platform differences and pricing
+- Comprehensive troubleshooting section and checklists serve the reference use case
+- No hidden runtime behavior to visualize—deployment is about configuration and external service integration
+- Similar to infrastructure topics—best learned by actually deploying, not watching animations
+
+**Visualizations in Lesson 10.3:**
+- ✅ EVALUATED - 0 visualizations needed
+- Accessibility is fundamentally about assistive technology behavior that cannot be accurately simulated
+- Screen reader announcements must be experienced with actual screen readers (NVDA, VoiceOver, JAWS)
+- Keyboard navigation must be tested by putting away mouse and using Tab/Enter/Space
+- Already has 4 Mermaid diagrams (Virtuous Cycle, WCAG POUR principles, ARIA Categories, Accessibility Mindset)
+- 30+ code examples with bad vs good comparisons demonstrating best practices
+- Multiple comprehensive reference tables for ARIA roles, properties, states, and WCAG criteria
+- 3 hands-on exercises for practical application
+- Lesson explicitly recommends real testing tools (axe DevTools, WAVE, NVDA, VoiceOver)
+- Browser DevTools Accessibility Inspector provides superior inspection of actual accessibility tree
+- Any SVG attempting to simulate screen reader behavior would be misleading and inaccurate
+- Focus indicators ARE visible—the visualization is built into how accessibility works
+- Similar to Lesson 9.5 (Testing)—external tools provide better visualization than any SVG we could create
+
+**Visualizations in Lesson 10.2:**
+- ✅ EVALUATED - 0 visualizations needed
+- TypeScript advanced patterns operate entirely at compile time, not runtime
+- Already has 2 Mermaid diagrams (Generics flow, Utility Types relationships)
+- 30+ comprehensive code examples demonstrating each pattern with actual usage
+- The "invisible behavior" is IDE/compiler behavior (autocomplete, error messages, type narrowing)
+- Best learning mechanism: Writing code in a TypeScript IDE and experiencing the type system firsthand
+- No runtime behavior to visualize—types have no runtime representation
+- 3 comprehensive exercises provide hands-on practice for building understanding
+- Topics (generics, discriminated unions, type guards, utility types, conditional types, template literals) are conceptual patterns learned through coding practice
+- Similar to Lesson 8.5 (Architecture) and Module 1 TypeScript lessons—organizational/conceptual patterns, not behavioral
+
+**Visualizations in Lesson 10.1:**
+- ✅ COMPLETE - 1 visualization added
+- Interactive Re-render Cascade Visualizer (Section 6 - Render Optimization) - HIGH VALUE
+  - Visual component tree with parent + 3 children
+  - Components flash with glow animation when they re-render
+  - Toggle to enable/disable React.memo
+  - Counter child always re-renders (props change), Header/Footer skip with memo
+  - Stats panel: Total Renders, Renders Saved, Efficiency percentage
+  - Dynamic explanation panel changes based on memo state
+  - Makes invisible re-render behavior tangible and immediate
+  - Directly demonstrates the core value proposition of React.memo
+  - Lesson already has 7 Mermaid diagrams for conceptual coverage; this adds runtime behavior visualization
+
+**Visualizations in Lesson 8.4:**
+- ✅ COMPLETE - 1 visualization added
+- Interactive Cache Lifecycle Timeline (Section 4) - HIGH VALUE
+  - Animated timeline showing fresh → stale → garbage collected transitions
+  - Adjustable staleTime and gcTime sliders to experiment with different configurations
+  - "Component Mounts" and "Window Focus" scenario buttons to see behavior at different cache states
+  - Event log showing exactly what happens when: fresh (no refetch), stale (return + background refetch), GC (loading + fetch)
+  - Refetch counter tracks background refetches triggered
+  - Makes the invisible timing relationship between staleTime and gcTime tangible
+  - Critical concept - this timing confusion is a common source of bugs and misunderstandings
+- Other topics (queries, mutations, optimistic updates, query keys) are well-served by:
+  - 7 existing Mermaid diagrams covering state machines and flows
+  - Extensive code examples and patterns
+  - Hands-on exercises for building
+
+**Visualizations in Lesson 8.2:**
+- ✅ COMPLETE - 1 visualization added
+- Interactive Selector Re-render Demo (Section 6) - HIGH VALUE
+  - Shows which components re-render when different parts of store update
+  - Components flash with animation when they re-render, stay static when they don't
+  - DebugPanel (selecting entire store) re-renders on EVERY update vs selective subscriptions
+  - Render count stats show dramatic difference over multiple updates
+  - Makes invisible React re-render behavior visible and tangible
+  - Core performance concept for Zustand - selective subscriptions are THE key feature
+- Other concepts (middleware, TypeScript, async actions) are well-served by extensive code examples
+- Lesson is very hands-on/tutorial focused - students learn by building
+
+**Visualizations in Lesson 8.1:**
+- ✅ EVALUATED - 0 visualizations needed
+- Already has 7 Mermaid diagrams covering key concepts and decision flows
+- Lesson is conceptual/architectural overview - introduces vocabulary and decision frameworks
+- No "hidden" runtime behavior to visualize - concepts are abstract/organizational
+- Comparison tables effectively present library differences and "when to use" guidance
+- Behaviors discussed (Redux, Zustand, React Query) will be hands-on demonstrated in lessons 8.2-8.4
+- Students learn these concepts better by building with the libraries than through abstract visualizations
+
+**Visualizations in Lesson 7.5:**
+1. ⚡ Interactive Conditional Fields Demo (Section 6) - Watch watch() track employment status and dynamically show/hide related fields
+   - HIGH VALUE: Makes cause-and-effect of conditional rendering tangible
+   - Shows how different selections trigger different field visibility
+   - Displays conditional logic evaluation in real-time
+   - Demonstrates visual grouping and smooth transition patterns
+
+2. ⚡ Interactive Auto-Save Debounce Timing (Section 9) - Type and watch keystrokes get coalesced into saves
+   - HIGH VALUE: Makes invisible timing concept visible
+   - Shows event timeline with timestamps (keystrokes, timer resets, save triggers)
+   - Displays keystroke-to-save ratio to demonstrate efficiency
+   - Adjustable delay slider to experiment with different debounce timings
+   - Students can see how rapid typing results in single save vs slow typing = multiple saves
+
+**Visualizations in Lesson 7.4:**
+- ✅ COMPLETE - 2 visualizations total (1 existing + 1 new)
+- Existing: Object URL Memory Leak Visualization (Section 6) - Shows memory accumulation without cleanup
+  - HIGH VALUE: Makes invisible memory issues tangible
+- New: Drag Event Bubbling Visualizer (Section 9) - Interactive demo showing why dragenter/dragleave flicker with child elements
+  - HIGH VALUE: Demonstrates a confusing behavior that causes real bugs
+  - Shows the difference between naive boolean approach (with flickers) vs counter pattern (no flickers)
+  - Event log shows exactly which events fire and when
+  - Students can toggle between modes to see the solution in action
+- Other topics (FileReader, validation, multiple files, progress) are well-served by code examples
+- Lesson already has excellent Mermaid diagram for the overall upload flow
+
+**Visualizations in Lesson 7.3:**
+- ✅ EVALUATED - 0 visualizations needed
+- Zod's benefits are architectural/organizational (schema separation, reusability) rather than behavioral
+- TypeScript type inference is a compile-time feature that can't be visualized at runtime
+- Existing Mermaid diagram adequately covers the Zod → React Hook Form workflow
+- Extensive code examples and comparison tables serve this topic better than interactive visualizations
+- Adding visualizations would feel forced without adding pedagogical value
+
+**Visualizations in Lesson 7.2:**
+1. ⚡ Interactive Re-render Comparison (Section 1) - Side-by-side comparison showing how controlled forms re-render ALL fields on every keystroke while uncontrolled (React Hook Form) forms have zero re-renders
+   - HIGH VALUE: Makes the core performance benefit of React Hook Form visually tangible
+   - Shows field flash animations on controlled side, counter tracks total re-renders
+   - Students can type and see the dramatic difference (e.g., 40 re-renders vs 0)
+
+**Visualizations in Lesson 7.1:**
+1. ⚡ Interactive Validation Timing Comparison (Section 3) - Toggle between onChange, onBlur, onSubmit, and debounced strategies to experience UX differences
+   - HIGH VALUE: Makes abstract timing concepts immediately tangible
+   - Shows keystroke count vs validation count to demonstrate debouncing benefits
+2. 🔄 Interactive Form Re-render Visualization (Section 6) - Watch components flash when they re-render
+   - HIGH VALUE: Makes invisible performance impact visible
+   - Side-by-side comparison of unoptimized (all fields re-render) vs optimized (only changed field re-renders)
+
+---
+
+## Tool Selection Strategy
+
+### Filesystem:edit_file vs Filesystem:write_file
+
+| Use `edit_file` when: | Use `write_file` when: |
+|-----------------------|------------------------|
+| User says "edit", "update", "fix", "change" | User says "create", "write", "make new" |
+| Making targeted changes | Creating brand new files |
+| Updating specific sections | Complete rewrites |
+
+**Default to `edit_file` for updates** unless rewriting is more efficient.
 
 ---
 

@@ -316,6 +316,169 @@ sequenceDiagram
     participant Child2
     
     User->>Child1: Type "25" in Celsius
+
+                <h3>🎮 Interactive Demo: Lifting State in Action</h3>
+                <p>Watch how sibling components communicate through their parent:</p>
+                
+                <div style="background: #f8f9fa; border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;">
+                    <canvas id="liftingStateCanvas" width="750" height="380" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; background: white;"></canvas>
+                    <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 1rem;">
+                        <button id="celsiusUpBtn" style="padding: 0.4rem 1rem; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Celsius +5°</button>
+                        <button id="celsiusDownBtn" style="padding: 0.4rem 1rem; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Celsius -5°</button>
+                        <button id="fahrenheitUpBtn" style="padding: 0.4rem 1rem; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">Fahrenheit +9°</button>
+                        <button id="fahrenheitDownBtn" style="padding: 0.4rem 1rem; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">Fahrenheit -9°</button>
+                    </div>
+                    <p style="text-align: center; color: #666; margin-top: 0.5rem; font-size: 0.9rem;">Both inputs stay synchronized through lifted state!</p>
+                </div>
+                
+                <script>
+                (function() {
+                    const canvas = document.getElementById('liftingStateCanvas');
+                    if (!canvas) return;
+                    const ctx = canvas.getContext('2d');
+                    
+                    let celsius = 20;
+                    let animationPhase = 0;
+                    let animationProgress = 0;
+                    let lastSource = null;
+                    
+                    function celsiusToFahrenheit(c) { return (c * 9/5) + 32; }
+                    
+                    function drawRoundedRect(x, y, w, h, r, fill, stroke, strokeWidth = 2) {
+                        ctx.beginPath();
+                        ctx.roundRect(x, y, w, h, r);
+                        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+                        if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = strokeWidth; ctx.stroke(); }
+                    }
+                    
+                    function drawArrow(fromX, fromY, toX, toY, color, dashed = false) {
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = 3;
+                        if (dashed) ctx.setLineDash([6, 4]);
+                        else ctx.setLineDash([]);
+                        ctx.beginPath();
+                        ctx.moveTo(fromX, fromY);
+                        ctx.lineTo(toX, toY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        
+                        const angle = Math.atan2(toY - fromY, toX - fromX);
+                        ctx.beginPath();
+                        ctx.moveTo(toX, toY);
+                        ctx.lineTo(toX - 12 * Math.cos(angle - 0.4), toY - 12 * Math.sin(angle - 0.4));
+                        ctx.lineTo(toX - 12 * Math.cos(angle + 0.4), toY - 12 * Math.sin(angle + 0.4));
+                        ctx.closePath();
+                        ctx.fillStyle = color;
+                        ctx.fill();
+                    }
+                    
+                    function draw() {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        const fahrenheit = celsiusToFahrenheit(celsius);
+                        
+                        ctx.font = 'bold 16px system-ui';
+                        ctx.fillStyle = '#333';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('Lifting State Up: Temperature Converter', canvas.width / 2, 25);
+                        
+                        // Parent component (owns state)
+                        const parentHighlight = animationPhase >= 2 && animationPhase <= 3;
+                        drawRoundedRect(200, 50, 350, 100, 10, parentHighlight ? '#E8F5E9' : '#f8f4ff', parentHighlight ? '#4CAF50' : '#667eea');
+                        ctx.font = 'bold 14px system-ui';
+                        ctx.fillStyle = '#667eea';
+                        ctx.fillText('📦 TemperatureConverter (Parent)', 375, 75);
+                        
+                        drawRoundedRect(220, 95, 310, 45, 6, 'white', '#ddd', 1);
+                        ctx.font = '12px monospace';
+                        ctx.fillStyle = '#666';
+                        ctx.fillText('const [temperature, setTemperature] = useState(' + celsius + ')', 375, 115);
+                        ctx.font = 'bold 11px system-ui';
+                        ctx.fillStyle = parentHighlight ? '#4CAF50' : '#667eea';
+                        ctx.fillText('Source of Truth', 375, 132);
+                        
+                        // Celsius child
+                        const celsiusHighlight = lastSource === 'celsius' && animationPhase === 1;
+                        drawRoundedRect(50, 220, 200, 130, 10, celsiusHighlight ? '#E3F2FD' : '#f5f5f5', celsiusHighlight ? '#2196F3' : '#ddd');
+                        ctx.font = 'bold 12px system-ui';
+                        ctx.fillStyle = '#2196F3';
+                        ctx.fillText('🌡️ CelsiusInput', 150, 245);
+                        
+                        drawRoundedRect(70, 260, 160, 70, 6, 'white', '#2196F3', 2);
+                        ctx.font = 'bold 28px system-ui';
+                        ctx.fillStyle = '#2196F3';
+                        ctx.fillText(celsius.toFixed(0) + '°C', 150, 305);
+                        
+                        // Fahrenheit child
+                        const fahrenheitHighlight = lastSource === 'fahrenheit' && animationPhase === 1;
+                        drawRoundedRect(500, 220, 200, 130, 10, fahrenheitHighlight ? '#FFF3E0' : '#f5f5f5', fahrenheitHighlight ? '#FF9800' : '#ddd');
+                        ctx.font = 'bold 12px system-ui';
+                        ctx.fillStyle = '#FF9800';
+                        ctx.fillText('🌡️ FahrenheitInput', 600, 245);
+                        
+                        drawRoundedRect(520, 260, 160, 70, 6, 'white', '#FF9800', 2);
+                        ctx.font = 'bold 28px system-ui';
+                        ctx.fillStyle = '#FF9800';
+                        ctx.fillText(fahrenheit.toFixed(0) + '°F', 600, 305);
+                        
+                        // Arrows - props down
+                        drawArrow(300, 150, 150, 215, '#4CAF50');
+                        ctx.font = '10px system-ui';
+                        ctx.fillStyle = '#4CAF50';
+                        ctx.fillText('temp prop', 200, 175);
+                        
+                        drawArrow(450, 150, 600, 215, '#4CAF50');
+                        ctx.fillText('temp prop', 550, 175);
+                        
+                        // Arrows - callbacks up (show during animation)
+                        if (animationPhase >= 1 && lastSource === 'celsius') {
+                            drawArrow(150, 215, 320, 150, '#2196F3', true);
+                            ctx.fillStyle = '#2196F3';
+                            ctx.fillText('onChange', 210, 195);
+                        }
+                        if (animationPhase >= 1 && lastSource === 'fahrenheit') {
+                            drawArrow(600, 215, 430, 150, '#FF9800', true);
+                            ctx.fillStyle = '#FF9800';
+                            ctx.fillText('onChange', 540, 195);
+                        }
+                        
+                        // Legend
+                        ctx.font = '11px system-ui';
+                        ctx.fillStyle = '#666';
+                        ctx.textAlign = 'left';
+                        ctx.fillText('→ Props flow down', 50, 375);
+                        ctx.fillText('⤴ Callbacks flow up', 200, 375);
+                        ctx.fillText('State in parent = synchronized inputs!', 400, 375);
+                        
+                        if (animationPhase > 0 && animationPhase < 4) {
+                            animationProgress += 0.04;
+                            if (animationProgress >= 1) {
+                                animationPhase++;
+                                animationProgress = 0;
+                                if (animationPhase >= 4) {
+                                    animationPhase = 0;
+                                    lastSource = null;
+                                }
+                            }
+                            requestAnimationFrame(draw);
+                        }
+                    }
+                    
+                    function updateTemp(source, delta) {
+                        celsius += delta;
+                        lastSource = source;
+                        animationPhase = 1;
+                        animationProgress = 0;
+                        draw();
+                    }
+                    
+                    document.getElementById('celsiusUpBtn').addEventListener('click', () => updateTemp('celsius', 5));
+                    document.getElementById('celsiusDownBtn').addEventListener('click', () => updateTemp('celsius', -5));
+                    document.getElementById('fahrenheitUpBtn').addEventListener('click', () => updateTemp('fahrenheit', 5));
+                    document.getElementById('fahrenheitDownBtn').addEventListener('click', () => updateTemp('fahrenheit', -5));
+                    
+                    draw();
+                })();
+                </script>
     Child1->>Parent: onTemperatureChange("25")
     Parent->>Parent: Update state, calculate Fahrenheit
     Parent->>Child1: Re-render with temp="25"
@@ -428,6 +591,82 @@ const Author: React.FC&lt;{ user: User }&gt; = ({ user }) => {
                     <tbody>
                         <tr>
                             <td>Verbose code</td>
+
+                <h3>🎨 Visualizing Prop Drilling</h3>
+                <svg viewBox="0 0 800 420" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
+                    <defs>
+                        <linearGradient id="propDrillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#667eea"/>
+                            <stop offset="100%" style="stop-color:#764ba2"/>
+                        </linearGradient>
+                        <marker id="propArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <path d="M0,0 L0,6 L9,3 z" fill="#f44336"/>
+                        </marker>
+                        <marker id="needArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <path d="M0,0 L0,6 L9,3 z" fill="#4CAF50"/>
+                        </marker>
+                    </defs>
+                    
+                    <text x="400" y="25" text-anchor="middle" fill="#333" font-weight="bold" font-size="16">Prop Drilling: User Data Through 5 Levels</text>
+                    
+                    <!-- App (owns state) -->
+                    <rect x="300" y="45" width="200" height="50" rx="8" fill="url(#propDrillGrad)"/>
+                    <text x="400" y="75" text-anchor="middle" fill="white" font-weight="bold" font-size="13">App (owns user state)</text>
+                    
+                    <!-- Level 1 -->
+                    <rect x="300" y="115" width="200" height="40" rx="6" fill="#FFEBEE" stroke="#f44336" stroke-width="2"/>
+                    <text x="400" y="140" text-anchor="middle" fill="#c62828" font-size="12">Layout</text>
+                    <text x="520" y="140" fill="#f44336" font-size="10">passes user ↓</text>
+                    
+                    <!-- Level 2 -->
+                    <rect x="300" y="175" width="200" height="40" rx="6" fill="#FFEBEE" stroke="#f44336" stroke-width="2"/>
+                    <text x="400" y="200" text-anchor="middle" fill="#c62828" font-size="12">Main</text>
+                    <text x="520" y="200" fill="#f44336" font-size="10">passes user ↓</text>
+                    
+                    <!-- Level 3 -->
+                    <rect x="300" y="235" width="200" height="40" rx="6" fill="#FFEBEE" stroke="#f44336" stroke-width="2"/>
+                    <text x="400" y="260" text-anchor="middle" fill="#c62828" font-size="12">Content</text>
+                    <text x="520" y="260" fill="#f44336" font-size="10">passes user ↓</text>
+                    
+                    <!-- Level 4 -->
+                    <rect x="300" y="295" width="200" height="40" rx="6" fill="#FFEBEE" stroke="#f44336" stroke-width="2"/>
+                    <text x="400" y="320" text-anchor="middle" fill="#c62828" font-size="12">Article</text>
+                    <text x="520" y="320" fill="#f44336" font-size="10">passes user ↓</text>
+                    
+                    <!-- Level 5 (actually uses it) -->
+                    <rect x="300" y="355" width="200" height="50" rx="8" fill="#E8F5E9" stroke="#4CAF50" stroke-width="3"/>
+                    <text x="400" y="380" text-anchor="middle" fill="#2E7D32" font-weight="bold" font-size="13">Author (uses user!)</text>
+                    <text x="400" y="395" text-anchor="middle" fill="#4CAF50" font-size="10">Finally needs the data ✓</text>
+                    
+                    <!-- Connecting lines -->
+                    <line x1="400" y1="95" x2="400" y2="115" stroke="#f44336" stroke-width="2" stroke-dasharray="4"/>
+                    <line x1="400" y1="155" x2="400" y2="175" stroke="#f44336" stroke-width="2" stroke-dasharray="4"/>
+                    <line x1="400" y1="215" x2="400" y2="235" stroke="#f44336" stroke-width="2" stroke-dasharray="4"/>
+                    <line x1="400" y1="275" x2="400" y2="295" stroke="#f44336" stroke-width="2" stroke-dasharray="4"/>
+                    <line x1="400" y1="335" x2="400" y2="355" stroke="#4CAF50" stroke-width="3"/>
+                    
+                    <!-- Problem indicators -->
+                    <rect x="50" y="120" width="180" height="200" rx="8" fill="#FFF3E0" stroke="#FF9800"/>
+                    <text x="140" y="145" text-anchor="middle" fill="#E65100" font-weight="bold" font-size="12">⚠️ Problems</text>
+                    <text x="60" y="170" fill="#333" font-size="10">• 4 components just pass data</text>
+                    <text x="60" y="190" fill="#333" font-size="10">• All need user in their props</text>
+                    <text x="60" y="210" fill="#333" font-size="10">• Hard to refactor</text>
+                    <text x="60" y="230" fill="#333" font-size="10">• Tight coupling</text>
+                    <text x="60" y="250" fill="#333" font-size="10">• Can't reuse components</text>
+                    <text x="60" y="270" fill="#333" font-size="10">• Props interfaces bloated</text>
+                    <text x="60" y="295" fill="#f44336" font-size="10" font-weight="bold">These don't even USE user!</text>
+                    
+                    <!-- Solution hint -->
+                    <rect x="570" y="120" width="180" height="200" rx="8" fill="#E8F5E9" stroke="#4CAF50"/>
+                    <text x="660" y="145" text-anchor="middle" fill="#2E7D32" font-weight="bold" font-size="12">✅ Solutions</text>
+                    <text x="580" y="170" fill="#333" font-size="10">1. Composition</text>
+                    <text x="590" y="188" fill="#666" font-size="9">   Pass Author as child</text>
+                    <text x="580" y="210" fill="#333" font-size="10">2. Context API</text>
+                    <text x="590" y="228" fill="#666" font-size="9">   Skip intermediate layers</text>
+                    <text x="580" y="250" fill="#333" font-size="10">3. Restructure</text>
+                    <text x="590" y="268" fill="#666" font-size="9">   Move Author closer to App</text>
+                    <text x="580" y="295" fill="#4CAF50" font-size="10" font-weight="bold">Remove the middlemen!</text>
+                </svg>
                             <td>Every intermediate component needs prop definitions</td>
                         </tr>
                         <tr>
@@ -623,6 +862,85 @@ const Accordion: React.FC = () => {
                             <td><strong>Cleaner Parent Components</strong></td>
                             <td>Parents don't manage irrelevant state</td>
                         </tr>
+
+                <h3>🎨 State Colocation: Before vs After</h3>
+                <svg viewBox="0 0 800 380" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
+                    <text x="400" y="25" text-anchor="middle" fill="#333" font-weight="bold" font-size="16">State Colocation: Keep State Close to Where It's Used</text>
+                    
+                    <!-- BAD: State too high -->
+                    <g transform="translate(20, 50)">
+                        <rect x="0" y="0" width="360" height="310" rx="10" fill="#FFEBEE" stroke="#f44336" stroke-width="2"/>
+                        <rect x="0" y="0" width="360" height="35" rx="10" fill="#f44336"/>
+                        <text x="180" y="24" text-anchor="middle" fill="white" font-weight="bold" font-size="13">❌ State Too High</text>
+                        
+                        <!-- App with unnecessary state -->
+                        <rect x="80" y="50" width="200" height="55" rx="6" fill="#fff" stroke="#f44336" stroke-width="2"/>
+                        <text x="180" y="70" text-anchor="middle" fill="#333" font-size="11" font-weight="bold">App</text>
+                        <text x="180" y="85" text-anchor="middle" fill="#c62828" font-size="9">[openPanel, setOpenPanel]</text>
+                        <text x="180" y="98" text-anchor="middle" fill="#999" font-size="8">Why does App care? 🤔</text>
+                        
+                        <!-- Children that don't need it -->
+                        <rect x="20" y="125" width="70" height="35" rx="4" fill="#fff" stroke="#ddd"/>
+                        <text x="55" y="147" text-anchor="middle" fill="#999" font-size="9">Header</text>
+                        
+                        <rect x="100" y="125" width="70" height="35" rx="4" fill="#fff" stroke="#ddd"/>
+                        <text x="135" y="147" text-anchor="middle" fill="#999" font-size="9">Sidebar</text>
+                        
+                        <rect x="180" y="125" width="90" height="35" rx="4" fill="#fff" stroke="#f44336" stroke-width="2"/>
+                        <text x="225" y="147" text-anchor="middle" fill="#c62828" font-size="9">Accordion</text>
+                        
+                        <rect x="280" y="125" width="60" height="35" rx="4" fill="#fff" stroke="#ddd"/>
+                        <text x="310" y="147" text-anchor="middle" fill="#999" font-size="9">Footer</text>
+                        
+                        <!-- Problem indicators -->
+                        <text x="20" y="185" fill="#c62828" font-size="10">Problems:</text>
+                        <text x="20" y="205" fill="#666" font-size="9">• App re-renders when panel changes</text>
+                        <text x="20" y="220" fill="#666" font-size="9">• All siblings re-render too</text>
+                        <text x="20" y="235" fill="#666" font-size="9">• Props drilling to Accordion</text>
+                        <text x="20" y="250" fill="#666" font-size="9">• App bloated with unrelated state</text>
+                        
+                        <!-- Re-render indicator -->
+                        <rect x="20" y="265" width="320" height="30" rx="4" fill="#ffcdd2"/>
+                        <text x="180" y="285" text-anchor="middle" fill="#c62828" font-size="10" font-weight="bold">🔄 5 components re-render on panel change!</text>
+                    </g>
+                    
+                    <!-- GOOD: State colocated -->
+                    <g transform="translate(420, 50)">
+                        <rect x="0" y="0" width="360" height="310" rx="10" fill="#E8F5E9" stroke="#4CAF50" stroke-width="2"/>
+                        <rect x="0" y="0" width="360" height="35" rx="10" fill="#4CAF50"/>
+                        <text x="180" y="24" text-anchor="middle" fill="white" font-weight="bold" font-size="13">✅ State Colocated</text>
+                        
+                        <!-- App without unnecessary state -->
+                        <rect x="80" y="50" width="200" height="45" rx="6" fill="#fff" stroke="#ddd"/>
+                        <text x="180" y="70" text-anchor="middle" fill="#333" font-size="11" font-weight="bold">App</text>
+                        <text x="180" y="88" text-anchor="middle" fill="#999" font-size="9">No panel state here!</text>
+                        
+                        <!-- Children -->
+                        <rect x="20" y="115" width="70" height="35" rx="4" fill="#fff" stroke="#ddd"/>
+                        <text x="55" y="137" text-anchor="middle" fill="#999" font-size="9">Header</text>
+                        
+                        <rect x="100" y="115" width="70" height="35" rx="4" fill="#fff" stroke="#ddd"/>
+                        <text x="135" y="137" text-anchor="middle" fill="#999" font-size="9">Sidebar</text>
+                        
+                        <rect x="180" y="115" width="90" height="45" rx="4" fill="#E8F5E9" stroke="#4CAF50" stroke-width="2"/>
+                        <text x="225" y="132" text-anchor="middle" fill="#2E7D32" font-size="9" font-weight="bold">Accordion</text>
+                        <text x="225" y="148" text-anchor="middle" fill="#4CAF50" font-size="8">[openPanel] ✓</text>
+                        
+                        <rect x="280" y="115" width="60" height="35" rx="4" fill="#fff" stroke="#ddd"/>
+                        <text x="310" y="137" text-anchor="middle" fill="#999" font-size="9">Footer</text>
+                        
+                        <!-- Benefits */
+                        <text x="20" y="185" fill="#2E7D32" font-size="10">Benefits:</text>
+                        <text x="20" y="205" fill="#666" font-size="9">• Only Accordion manages its state</text>
+                        <text x="20" y="220" fill="#666" font-size="9">• Other components unaffected</text>
+                        <text x="20" y="235" fill="#666" font-size="9">• No props drilling needed</text>
+                        <text x="20" y="250" fill="#666" font-size="9">• Accordion is self-contained</text>
+                        
+                        <!-- Re-render indicator -->
+                        <rect x="20" y="265" width="320" height="30" rx="4" fill="#c8e6c9"/>
+                        <text x="180" y="285" text-anchor="middle" fill="#2E7D32" font-size="10" font-weight="bold">🎯 Only 1 component re-renders!</text>
+                    </g>
+                </svg>
                     </tbody>
                 </table>
 
@@ -801,6 +1119,157 @@ const ShoppingCart: React.FC = () => {
                             <td><code>const [total, ...]</code></td>
                             <td><code>const total = items.reduce(...)</code></td>
                         </tr>
+
+                <h3>🎮 Interactive Demo: Derived State in Action</h3>
+                <p>Add items to the cart and watch how totals are calculated automatically - never stored!</p>
+                
+                <div style="background: #f8f9fa; border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;">
+                    <canvas id="derivedStateCanvas" width="750" height="340" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; background: white;"></canvas>
+                    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
+                        <button id="addAppleBtn" style="padding: 0.4rem 0.8rem; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">🍎 Add Apple ($2)</button>
+                        <button id="addBananaBtn" style="padding: 0.4rem 0.8rem; background: #FFEB3B; color: #333; border: none; border-radius: 4px; cursor: pointer;">🍌 Add Banana ($1)</button>
+                        <button id="addOrangeBtn" style="padding: 0.4rem 0.8rem; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">🍊 Add Orange ($3)</button>
+                        <button id="clearCartBtn" style="padding: 0.4rem 0.8rem; background: #9e9e9e; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear Cart</button>
+                    </div>
+                </div>
+                
+                <script>
+                (function() {
+                    const canvas = document.getElementById('derivedStateCanvas');
+                    if (!canvas) return;
+                    const ctx = canvas.getContext('2d');
+                    
+                    let items = [];
+                    let nextId = 1;
+                    
+                    function draw() {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        
+                        // Derive values (not stored!)
+                        const itemCount = items.length;
+                        const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
+                        const uniqueItems = [...new Set(items.map(i => i.name))].length;
+                        
+                        ctx.font = 'bold 16px system-ui';
+                        ctx.fillStyle = '#333';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('Derived State: Shopping Cart Demo', canvas.width / 2, 25);
+                        
+                        // Source of truth box
+                        ctx.beginPath();
+                        ctx.roundRect(30, 50, 320, 260, 8);
+                        ctx.fillStyle = '#f8f4ff';
+                        ctx.fill();
+                        ctx.strokeStyle = '#667eea';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        
+                        ctx.font = 'bold 12px system-ui';
+                        ctx.fillStyle = '#667eea';
+                        ctx.textAlign = 'left';
+                        ctx.fillText('🗄️ Source of Truth (stored)', 45, 75);
+                        ctx.font = '11px monospace';
+                        ctx.fillStyle = '#666';
+                        ctx.fillText('const [items, setItems] = useState([])', 45, 95);
+                        
+                        // Show items
+                        ctx.font = '11px system-ui';
+                        if (items.length === 0) {
+                            ctx.fillStyle = '#999';
+                            ctx.fillText('Cart is empty', 45, 125);
+                        } else {
+                            items.slice(0, 6).forEach((item, i) => {
+                                ctx.fillStyle = '#333';
+                                ctx.fillText(item.emoji + ' ' + item.name + ' - $' + item.price, 45, 125 + i * 22);
+                            });
+                            if (items.length > 6) {
+                                ctx.fillStyle = '#999';
+                                ctx.fillText('... and ' + (items.length - 6) + ' more items', 45, 125 + 6 * 22);
+                            }
+                        }
+                        
+                        // Derived values box
+                        ctx.beginPath();
+                        ctx.roundRect(400, 50, 320, 260, 8);
+                        ctx.fillStyle = '#E8F5E9';
+                        ctx.fill();
+                        ctx.strokeStyle = '#4CAF50';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        
+                        ctx.font = 'bold 12px system-ui';
+                        ctx.fillStyle = '#2E7D32';
+                        ctx.textAlign = 'left';
+                        ctx.fillText('🔄 Derived Values (calculated)', 415, 75);
+                        
+                        ctx.font = '11px monospace';
+                        ctx.fillStyle = '#666';
+                        ctx.fillText('// Not stored! Calculated each render:', 415, 100);
+                        
+                        ctx.fillText('const itemCount = items.length;', 415, 125);
+                        ctx.font = 'bold 14px system-ui';
+                        ctx.fillStyle = '#4CAF50';
+                        ctx.fillText('→ ' + itemCount, 640, 125);
+                        
+                        ctx.font = '11px monospace';
+                        ctx.fillStyle = '#666';
+                        ctx.fillText('const total = items.reduce(...);', 415, 160);
+                        ctx.font = 'bold 14px system-ui';
+                        ctx.fillStyle = '#4CAF50';
+                        ctx.fillText('→ $' + totalPrice.toFixed(2), 640, 160);
+                        
+                        ctx.font = '11px monospace';
+                        ctx.fillStyle = '#666';
+                        ctx.fillText('const unique = new Set(...).size;', 415, 195);
+                        ctx.font = 'bold 14px system-ui';
+                        ctx.fillStyle = '#4CAF50';
+                        ctx.fillText('→ ' + uniqueItems, 640, 195);
+                        
+                        // Benefits
+                        ctx.font = '10px system-ui';
+                        ctx.fillStyle = '#2E7D32';
+                        ctx.fillText('✓ Always in sync with items', 415, 230);
+                        ctx.fillText('✓ No extra setState calls', 415, 248);
+                        ctx.fillText('✓ Cannot get out of sync!', 415, 266);
+                        ctx.fillText('✓ Single source of truth', 415, 284);
+                        
+                        // Arrow between boxes
+                        ctx.strokeStyle = '#667eea';
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([5, 3]);
+                        ctx.beginPath();
+                        ctx.moveTo(350, 180);
+                        ctx.lineTo(400, 180);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(400, 180);
+                        ctx.lineTo(390, 175);
+                        ctx.lineTo(390, 185);
+                        ctx.closePath();
+                        ctx.fillStyle = '#667eea';
+                        ctx.fill();
+                        
+                        ctx.font = '9px system-ui';
+                        ctx.fillStyle = '#667eea';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('derives', 375, 170);
+                    }
+                    
+                    function addItem(name, price, emoji) {
+                        items.push({ id: nextId++, name, price, emoji });
+                        draw();
+                    }
+                    
+                    document.getElementById('addAppleBtn').addEventListener('click', () => addItem('Apple', 2, '🍎'));
+                    document.getElementById('addBananaBtn').addEventListener('click', () => addItem('Banana', 1, '🍌'));
+                    document.getElementById('addOrangeBtn').addEventListener('click', () => addItem('Orange', 3, '🍊'));
+                    document.getElementById('clearCartBtn').addEventListener('click', () => { items = []; draw(); });
+                    
+                    draw();
+                })();
+                </script>
                         <tr>
                             <td>Boolean check</td>
                             <td><code>const [isEmpty, ...]</code></td>
@@ -1078,6 +1547,73 @@ const Parent: React.FC = () => {
     };
     
     return (
+
+                <h3>🎨 Data Flow Patterns Visualized</h3>
+                <svg viewBox="0 0 800 400" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
+                    <defs>
+                        <marker id="downArrow" markerWidth="10" markerHeight="10" refX="5" refY="10" orient="auto">
+                            <path d="M0,0 L5,10 L10,0" fill="#4CAF50"/>
+                        </marker>
+                        <marker id="upArrow" markerWidth="10" markerHeight="10" refX="5" refY="0" orient="auto">
+                            <path d="M0,10 L5,0 L10,10" fill="#2196F3"/>
+                        </marker>
+                    </defs>
+                    
+                    <text x="400" y="25" text-anchor="middle" fill="#333" font-weight="bold" font-size="16">Component Communication: Unidirectional Data Flow</text>
+                    
+                    <!-- Parent -->
+                    <rect x="280" y="50" width="240" height="70" rx="10" fill="#f8f4ff" stroke="#667eea" stroke-width="2"/>
+                    <text x="400" y="75" text-anchor="middle" fill="#667eea" font-weight="bold" font-size="14">Parent Component</text>
+                    <text x="400" y="95" text-anchor="middle" fill="#666" font-size="10">[state, setState] = useState(...)</text>
+                    <text x="400" y="110" text-anchor="middle" fill="#999" font-size="9">Source of truth</text>
+                    
+                    <!-- Left Child -->
+                    <rect x="100" y="200" width="200" height="80" rx="8" fill="#E8F5E9" stroke="#4CAF50" stroke-width="2"/>
+                    <text x="200" y="225" text-anchor="middle" fill="#2E7D32" font-weight="bold" font-size="12">Child A (Input)</text>
+                    <text x="200" y="245" text-anchor="middle" fill="#666" font-size="10">Receives: value prop</text>
+                    <text x="200" y="265" text-anchor="middle" fill="#666" font-size="10">Sends: onChange callback</text>
+                    
+                    <!-- Right Child -->
+                    <rect x="500" y="200" width="200" height="80" rx="8" fill="#E3F2FD" stroke="#2196F3" stroke-width="2"/>
+                    <text x="600" y="225" text-anchor="middle" fill="#1565C0" font-weight="bold" font-size="12">Child B (Display)</text>
+                    <text x="600" y="245" text-anchor="middle" fill="#666" font-size="10">Receives: value prop</text>
+                    <text x="600" y="265" text-anchor="middle" fill="#666" font-size="10">Read-only display</text>
+                    
+                    <!-- Props down arrows -->
+                    <line x1="330" y1="120" x2="200" y2="195" stroke="#4CAF50" stroke-width="3"/>
+                    <polygon points="200,195 210,180 195,182" fill="#4CAF50"/>
+                    <text x="240" y="155" fill="#4CAF50" font-size="10" font-weight="bold">Props ↓</text>
+                    
+                    <line x1="470" y1="120" x2="600" y2="195" stroke="#4CAF50" stroke-width="3"/>
+                    <polygon points="600,195 590,180 605,182" fill="#4CAF50"/>
+                    <text x="560" y="155" fill="#4CAF50" font-size="10" font-weight="bold">Props ↓</text>
+                    
+                    <!-- Callback up arrow -->
+                    <line x1="200" y1="195" x2="350" y2="125" stroke="#2196F3" stroke-width="3" stroke-dasharray="6,3"/>
+                    <polygon points="350,125 335,130 340,140" fill="#2196F3"/>
+                    <text x="250" y="175" fill="#2196F3" font-size="10" font-weight="bold">Callback ↑</text>
+                    
+                    <!-- Re-render arrow to Child B -->
+                    <path d="M 470 90 Q 550 90 600 195" stroke="#FF9800" stroke-width="2" fill="none" stroke-dasharray="4,2"/>
+                    <polygon points="600,195 595,180 607,185" fill="#FF9800"/>
+                    <text x="560" y="100" fill="#FF9800" font-size="9">Re-render with new props</text>
+                    
+                    <!-- Flow description boxes -->
+                    <rect x="50" y="310" width="200" height="80" rx="6" fill="#E8F5E9"/>
+                    <text x="150" y="335" text-anchor="middle" fill="#2E7D32" font-weight="bold" font-size="11">Props Down</text>
+                    <text x="150" y="355" text-anchor="middle" fill="#666" font-size="9">Data flows from parent to children</text>
+                    <text x="150" y="370" text-anchor="middle" fill="#666" font-size="9">Read-only in children</text>
+                    
+                    <rect x="300" y="310" width="200" height="80" rx="6" fill="#E3F2FD"/>
+                    <text x="400" y="335" text-anchor="middle" fill="#1565C0" font-weight="bold" font-size="11">Callbacks Up</text>
+                    <text x="400" y="355" text-anchor="middle" fill="#666" font-size="9">Children request state changes</text>
+                    <text x="400" y="370" text-anchor="middle" fill="#666" font-size="9">Parent decides what to update</text>
+                    
+                    <rect x="550" y="310" width="200" height="80" rx="6" fill="#FFF3E0"/>
+                    <text x="650" y="335" text-anchor="middle" fill="#E65100" font-weight="bold" font-size="11">Siblings via Parent</text>
+                    <text x="650" y="355" text-anchor="middle" fill="#666" font-size="9">No direct sibling communication</text>
+                    <text x="650" y="370" text-anchor="middle" fill="#666" font-size="9">Parent coordinates all updates</text>
+                </svg>
         &lt;div&gt;
             &lt;Child onValueChange={handleChange} /&gt;
             &lt;p&gt;Parent received: {value}&lt;/p&gt;

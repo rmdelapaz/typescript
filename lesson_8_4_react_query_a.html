@@ -862,3 +862,291 @@ graph TB
                         <li><strong>Infinity:</strong> Static data (won't refetch until invalidated)</li>
                     </ul>
                 </div>
+
+                <!-- Interactive Cache Timeline Visualization -->
+                <div class="card" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 12px; padding: 0; overflow: hidden; margin: 2rem 0;">
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem 1.5rem;">
+                        <h4 style="color: white; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 1.5rem;">⏱️</span> Interactive: Cache Lifecycle Timeline
+                        </h4>
+                        <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 0.9rem;">Watch how data transitions from fresh → stale → garbage collected. Adjust the timing settings!</p>
+                    </div>
+                    <div id="cache-timeline-viz" style="padding: 1.5rem; background: #1a1a2e;">
+                        <!-- Controls -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                            <div>
+                                <label style="color: #9ca3af; font-size: 0.85rem; display: block; margin-bottom: 0.5rem;">staleTime: <span id="stale-time-value" style="color: #4ade80; font-weight: bold;">3 min</span></label>
+                                <input type="range" id="stale-time-slider" min="0" max="10" value="3" 
+                                    style="width: 100%; accent-color: #4ade80;">
+                            </div>
+                            <div>
+                                <label style="color: #9ca3af; font-size: 0.85rem; display: block; margin-bottom: 0.5rem;">gcTime: <span id="gc-time-value" style="color: #f87171; font-weight: bold;">6 min</span></label>
+                                <input type="range" id="gc-time-slider" min="1" max="15" value="6" 
+                                    style="width: 100%; accent-color: #f87171;">
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                                <button id="cache-play-btn" style="flex: 1; background: #4ade80; color: #1a1a2e; border: none; padding: 0.6rem 1rem; border-radius: 6px; font-weight: bold; cursor: pointer;">▶ Start</button>
+                                <button id="cache-reset-btn" style="background: #374151; color: white; border: none; padding: 0.6rem 1rem; border-radius: 6px; cursor: pointer;">↺ Reset</button>
+                            </div>
+                        </div>
+
+                        <!-- Timeline visualization -->
+                        <div style="background: #0f172a; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                            <div style="display: flex; justify-content: space-between; color: #6b7280; font-size: 0.75rem; margin-bottom: 0.5rem;">
+                                <span>0 min</span>
+                                <span>5 min</span>
+                                <span>10 min</span>
+                                <span>15 min</span>
+                            </div>
+                            <div style="position: relative; height: 60px; background: linear-gradient(to right, #22c55e 0%, #22c55e var(--stale-pct, 20%), #f59e0b var(--stale-pct, 20%), #f59e0b var(--gc-pct, 40%), #374151 var(--gc-pct, 40%)); border-radius: 8px; overflow: hidden;" id="timeline-bar">
+                                <!-- Current time marker -->
+                                <div id="time-marker" style="position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: white; box-shadow: 0 0 10px rgba(255,255,255,0.8); transition: left 0.1s linear;"></div>
+                                <!-- Stale boundary -->
+                                <div id="stale-marker" style="position: absolute; top: 0; left: 20%; width: 2px; height: 100%; background: #fbbf24; border-left: 2px dashed #fbbf24;"></div>
+                                <!-- GC boundary -->
+                                <div id="gc-marker" style="position: absolute; top: 0; left: 40%; width: 2px; height: 100%; background: #ef4444; border-left: 2px dashed #ef4444;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: flex-start; gap: 1.5rem; margin-top: 0.75rem;">
+                                <span style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; color: #9ca3af;">
+                                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></span> Fresh
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; color: #9ca3af;">
+                                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 2px;"></span> Stale
+                                </span>
+                                <span style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; color: #9ca3af;">
+                                    <span style="width: 12px; height: 12px; background: #374151; border-radius: 2px;"></span> Garbage Collected
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Current state display -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                            <div id="cache-status-box" style="background: #22c55e; border-radius: 8px; padding: 1rem; text-align: center; transition: background 0.3s;">
+                                <div style="font-size: 1.5rem;">📦</div>
+                                <div style="font-size: 0.9rem; font-weight: bold; color: #1a1a2e;">FRESH</div>
+                            </div>
+                            <div style="background: #1e293b; border-radius: 8px; padding: 1rem; text-align: center;">
+                                <div id="current-time-display" style="font-size: 1.5rem; font-weight: bold; color: white;">0:00</div>
+                                <div style="font-size: 0.75rem; color: #9ca3af;">Elapsed Time</div>
+                            </div>
+                            <div style="background: #1e293b; border-radius: 8px; padding: 1rem; text-align: center;">
+                                <div id="refetch-count" style="font-size: 1.5rem; font-weight: bold; color: #60a5fa;">0</div>
+                                <div style="font-size: 0.75rem; color: #9ca3af;">Background Refetches</div>
+                            </div>
+                        </div>
+
+                        <!-- Event log -->
+                        <div style="background: #0f172a; border-radius: 8px; padding: 1rem; max-height: 150px; overflow-y: auto;">
+                            <div style="color: #6b7280; font-size: 0.75rem; margin-bottom: 0.5rem;">EVENT LOG</div>
+                            <div id="cache-event-log" style="font-family: monospace; font-size: 0.8rem; color: #e5e7eb;">
+                                <div style="color: #4ade80;">➡ t=0:00 - Data fetched and cached as FRESH</div>
+                            </div>
+                        </div>
+
+                        <!-- Scenario buttons -->
+                        <div style="margin-top: 1rem;">
+                            <div style="color: #6b7280; font-size: 0.75rem; margin-bottom: 0.5rem;">TRIGGER SCENARIOS</div>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button id="scenario-mount" style="background: #3b82f6; color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">📱 Component Mounts</button>
+                                <button id="scenario-focus" style="background: #8b5cf6; color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">👁 Window Focus</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                (function() {
+                    const staleSlider = document.getElementById('stale-time-slider');
+                    const gcSlider = document.getElementById('gc-time-slider');
+                    const staleValue = document.getElementById('stale-time-value');
+                    const gcValue = document.getElementById('gc-time-value');
+                    const playBtn = document.getElementById('cache-play-btn');
+                    const resetBtn = document.getElementById('cache-reset-btn');
+                    const timeMarker = document.getElementById('time-marker');
+                    const staleMarker = document.getElementById('stale-marker');
+                    const gcMarker = document.getElementById('gc-marker');
+                    const timelineBar = document.getElementById('timeline-bar');
+                    const statusBox = document.getElementById('cache-status-box');
+                    const currentTimeDisplay = document.getElementById('current-time-display');
+                    const refetchCount = document.getElementById('refetch-count');
+                    const eventLog = document.getElementById('cache-event-log');
+                    const mountBtn = document.getElementById('scenario-mount');
+                    const focusBtn = document.getElementById('scenario-focus');
+
+                    let currentTime = 0;
+                    let isPlaying = false;
+                    let interval = null;
+                    let refetches = 0;
+
+                    function getStaleTime() {
+                        return parseInt(staleSlider.value);
+                    }
+
+                    function getGcTime() {
+                        return parseInt(gcSlider.value);
+                    }
+
+                    function updateMarkers() {
+                        const staleT = getStaleTime();
+                        const gcT = getGcTime();
+                        const maxTime = 15;
+                        
+                        const stalePct = (staleT / maxTime) * 100;
+                        const gcPct = (gcT / maxTime) * 100;
+                        
+                        staleMarker.style.left = stalePct + '%';
+                        gcMarker.style.left = gcPct + '%';
+                        
+                        timelineBar.style.setProperty('--stale-pct', stalePct + '%');
+                        timelineBar.style.setProperty('--gc-pct', gcPct + '%');
+                        
+                        staleValue.textContent = staleT === 0 ? '0 (instant)' : staleT + ' min';
+                        gcValue.textContent = gcT + ' min';
+                    }
+
+                    function getStatus() {
+                        const staleT = getStaleTime();
+                        const gcT = getGcTime();
+                        if (currentTime < staleT) return 'fresh';
+                        if (currentTime < gcT) return 'stale';
+                        return 'gc';
+                    }
+
+                    function updateStatus() {
+                        const status = getStatus();
+                        const maxTime = 15;
+                        const pct = (currentTime / maxTime) * 100;
+                        
+                        timeMarker.style.left = pct + '%';
+                        
+                        const mins = Math.floor(currentTime);
+                        const secs = Math.round((currentTime % 1) * 60);
+                        currentTimeDisplay.textContent = mins + ':' + secs.toString().padStart(2, '0');
+                        
+                        if (status === 'fresh') {
+                            statusBox.style.background = '#22c55e';
+                            statusBox.innerHTML = '<div style="font-size: 1.5rem;">📦</div><div style="font-size: 0.9rem; font-weight: bold; color: #1a1a2e;">FRESH</div>';
+                        } else if (status === 'stale') {
+                            statusBox.style.background = '#f59e0b';
+                            statusBox.innerHTML = '<div style="font-size: 1.5rem;">⏳</div><div style="font-size: 0.9rem; font-weight: bold; color: #1a1a2e;">STALE</div>';
+                        } else {
+                            statusBox.style.background = '#6b7280';
+                            statusBox.innerHTML = '<div style="font-size: 1.5rem;">🗑️</div><div style="font-size: 0.9rem; font-weight: bold; color: white;">GARBAGE COLLECTED</div>';
+                        }
+                    }
+
+                    function addEvent(message, color) {
+                        const mins = Math.floor(currentTime);
+                        const secs = Math.round((currentTime % 1) * 60);
+                        const timeStr = mins + ':' + secs.toString().padStart(2, '0');
+                        const div = document.createElement('div');
+                        div.style.color = color || '#e5e7eb';
+                        div.textContent = '➡ t=' + timeStr + ' - ' + message;
+                        eventLog.appendChild(div);
+                        eventLog.scrollTop = eventLog.scrollHeight;
+                    }
+
+                    function tick() {
+                        const prevStatus = getStatus();
+                        currentTime += 0.05;
+                        const newStatus = getStatus();
+                        
+                        if (prevStatus === 'fresh' && newStatus === 'stale') {
+                            addEvent('Data became STALE', '#fbbf24');
+                        } else if (prevStatus === 'stale' && newStatus === 'gc') {
+                            addEvent('Data GARBAGE COLLECTED from cache', '#ef4444');
+                        }
+                        
+                        updateStatus();
+                        
+                        if (currentTime >= 15) {
+                            stopPlayback();
+                        }
+                    }
+
+                    function startPlayback() {
+                        if (!isPlaying) {
+                            isPlaying = true;
+                            playBtn.textContent = '⏸ Pause';
+                            playBtn.style.background = '#f59e0b';
+                            interval = setInterval(tick, 50);
+                        } else {
+                            stopPlayback();
+                        }
+                    }
+
+                    function stopPlayback() {
+                        isPlaying = false;
+                        playBtn.textContent = '▶ Start';
+                        playBtn.style.background = '#4ade80';
+                        if (interval) {
+                            clearInterval(interval);
+                            interval = null;
+                        }
+                    }
+
+                    function resetSimulation() {
+                        stopPlayback();
+                        currentTime = 0;
+                        refetches = 0;
+                        refetchCount.textContent = '0';
+                        eventLog.innerHTML = '<div style="color: #4ade80;">➡ t=0:00 - Data fetched and cached as FRESH</div>';
+                        updateStatus();
+                    }
+
+                    function handleScenario(type) {
+                        const status = getStatus();
+                        if (type === 'mount') {
+                            if (status === 'fresh') {
+                                addEvent('Component mounted → Using cached FRESH data (no refetch)', '#4ade80');
+                            } else if (status === 'stale') {
+                                addEvent('Component mounted → Returning STALE data + REFETCHING in background', '#fbbf24');
+                                refetches++;
+                                refetchCount.textContent = refetches;
+                            } else {
+                                addEvent('Component mounted → No cache! Showing loading + FETCHING fresh data', '#60a5fa');
+                                refetches++;
+                                refetchCount.textContent = refetches;
+                            }
+                        } else if (type === 'focus') {
+                            if (status === 'fresh') {
+                                addEvent('Window focused → Data still FRESH (no refetch)', '#4ade80');
+                            } else if (status === 'stale') {
+                                addEvent('Window focused → Data is STALE, REFETCHING in background', '#fbbf24');
+                                refetches++;
+                                refetchCount.textContent = refetches;
+                            } else {
+                                addEvent('Window focused → No cached data (nothing to refetch)', '#6b7280');
+                            }
+                        }
+                    }
+
+                    // Event listeners
+                    staleSlider.addEventListener('input', () => {
+                        // Ensure staleTime <= gcTime
+                        if (parseInt(staleSlider.value) > parseInt(gcSlider.value)) {
+                            gcSlider.value = staleSlider.value;
+                        }
+                        updateMarkers();
+                        updateStatus();
+                    });
+
+                    gcSlider.addEventListener('input', () => {
+                        // Ensure gcTime >= staleTime
+                        if (parseInt(gcSlider.value) < parseInt(staleSlider.value)) {
+                            staleSlider.value = gcSlider.value;
+                        }
+                        updateMarkers();
+                        updateStatus();
+                    });
+
+                    playBtn.addEventListener('click', startPlayback);
+                    resetBtn.addEventListener('click', resetSimulation);
+                    mountBtn.addEventListener('click', () => handleScenario('mount'));
+                    focusBtn.addEventListener('click', () => handleScenario('focus'));
+
+                    // Initialize
+                    updateMarkers();
+                    updateStatus();
+                })();
+                </script>
