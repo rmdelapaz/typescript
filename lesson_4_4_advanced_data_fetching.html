@@ -4,43 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Master Advanced Data Fetching in React with TypeScript - Learn race condition handling, debouncing, pagination, infinite scroll, caching strategies, and React Query basics. Build production-ready data fetching solutions.">
-    <meta name="author" content="PracticalAce">
+    <meta name="author" content="Ray de la Paz">
     <title>Advanced Data Fetching - React TypeScript Course</title>
     <link rel="stylesheet" href="styles/main.css">
-    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="icon" type="image/png" href="favicon.png">
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({ 
+        window.__mermaid = mermaid;
+        const isDark = localStorage.getItem('theme') === 'dark' ||
+            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        mermaid.initialize({
             startOnLoad: true,
-            theme: 'default',
-            themeVariables: {
-                primaryColor: '#f0f0f0',
-                primaryTextColor: '#333',
-                primaryBorderColor: '#667eea'
-            }
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#6366f1', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#eff6ff', primaryTextColor: '#1e293b', primaryBorderColor: '#3b82f6', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
         });
     </script>
 </head>
 <body>
     <!-- Skip to main content for accessibility -->
     <a href="#main-content" class="skip-to-main">Skip to main content</a>
-    
-    <!-- Progress indicator -->
-    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
-        <div class="progress-bar"></div>
-    </div>
 
     <!-- Navigation -->
-    <nav>
+    <nav class="main-nav">
         <div class="nav-container">
             <a href="index.html" class="nav-logo">React TypeScript Course</a>
             <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">
                 ☰
             </button>
-            <div class="nav-links" id="nav-links" aria-hidden="false">
+            <div class="nav-links" id="nav-links">
                 <a href="index.html">Home</a>
                 <a href="index.html#modules">All Modules</a>
-                <button id="theme-toggle" aria-label="Toggle theme">🌙</button>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
             </div>
         </div>
     </nav>
@@ -84,11 +83,13 @@
             </header>
 
             <!-- Sticky Table of Contents -->
-            <details class="card" open style="position: sticky; top: 80px; z-index: 100; background: var(--card-bg, white); box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 2rem;">
-                <summary style="cursor: pointer; font-weight: bold; padding: 0.5rem 1rem; user-select: none;">
-                    <h2 style="display: inline; margin: 0;">📑 In This Lesson</h2>
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
                 </summary>
-                <nav aria-label="Table of Contents" style="padding: 0 1rem 1rem 1rem;">
+                <nav aria-label="Table of Contents">
                     <ol>
                         <li><a href="#section1" class="toc-link">Race Conditions: The Silent Bug</a></li>
                         <li><a href="#section2" class="toc-link">Debouncing and Throttling</a></li>
@@ -110,7 +111,7 @@
                 <h2>🏁 Race Conditions: The Silent Bug</h2>
                 <p>Race conditions are one of the trickiest bugs in data fetching. They occur when multiple async operations complete out of order, causing your UI to display stale or incorrect data. Let's understand and fix them!</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 Definition</h4>
                     <p style="color: white;"><strong>Race Condition:</strong> A bug that occurs when the outcome depends on the unpredictable timing of multiple operations. In data fetching, this happens when a later request completes before an earlier one, displaying outdated data.</p>
                 </div>
@@ -118,7 +119,7 @@
                 <h3>The Problem: Out-of-Order Responses</h3>
                 <p>Imagine a user typing in a search box: "react" → "react typescript" → "react query". Three requests fire off, but the network is unpredictable—the "react" request might finish last, showing old results!</p>
 
-                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <div class="card card-warning">
                     <h4>⚠️ Broken Code: Race Condition</h4>
                     <pre><code class="language-typescript">interface SearchProps {
     query: string;
@@ -167,7 +168,7 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
                 <h3>Solution 1: Ignore Flag</h3>
                 <p>Use a boolean flag to track whether the effect is still active:</p>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Fixed with Ignore Flag</h4>
                     <pre><code class="language-typescript">const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
     const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
@@ -216,7 +217,7 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
                 <h3>Solution 2: AbortController (Better!)</h3>
                 <p>AbortController lets you actually cancel the in-flight request, not just ignore it:</p>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Best Solution: AbortController</h4>
                     <pre><code class="language-typescript">const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
     const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
@@ -266,7 +267,7 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>💡 Why AbortController is Better</h4>
                     <ul>
                         <li><strong>Actually cancels the request</strong> - Saves bandwidth and server resources</li>
@@ -299,11 +300,11 @@ sequenceDiagram
                 </div>
 
                 <!-- Interactive Race Condition Visualization -->
-                <div class="card" style="background: #f8f9fa; border: 2px solid #667eea; margin: 2rem 0;">
+                <div class="card" style="border: 2px solid #667eea; margin: 2rem 0;">
                     <h4>🎮 Interactive: Race Condition Simulator</h4>
                     <p>Click the buttons to see how race conditions happen and how AbortController fixes them!</p>
                     <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-                        <svg id="raceConditionSvg" viewBox="0 0 650 320" style="max-width: 100%; height: auto; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" role="img" aria-label="Race condition visualization showing request timing">
+                        <svg class="svg-auto-invert" id="raceConditionSvg" viewBox="0 0 650 320" style="max-width: 100%; height: auto; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" role="img" aria-label="Race condition visualization showing request timing">
                             <!-- Title -->
                             <text id="raceStatusText" x="325" y="25" text-anchor="middle" fill="#333" font-size="14" font-weight="bold">Click a button to start the simulation</text>
                             
@@ -581,7 +582,7 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Key Takeaways: Race Conditions</h4>
                     <ul>
                         <li>Race conditions happen when async operations complete out of order</li>
@@ -598,14 +599,14 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                 <h2>⏱️ Debouncing and Throttling</h2>
                 <p>When users type in a search box, do you really want to make an API call for every single keystroke? That's a lot of unnecessary requests! Debouncing and throttling are techniques to limit how often a function runs. Let's master them!</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 Definitions</h4>
                     <p style="color: white;"><strong>Debouncing:</strong> Delays executing a function until after a certain time has passed since the last call. Perfect for search inputs—wait until the user stops typing.</p>
                     <p style="color: white; margin-top: 1rem;"><strong>Throttling:</strong> Limits how often a function can execute (e.g., at most once every 500ms). Great for scroll handlers or window resize events.</p>
                 </div>
 
                 <h3>The Problem: Too Many Requests</h3>
-                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <div class="card card-warning">
                     <h4>⚠️ Without Debouncing</h4>
                     <pre><code class="language-typescript">const Search: React.FC = () => {
     const [query, setQuery] = useState('');
@@ -637,7 +638,7 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                 <h3>Solution: Debouncing</h3>
                 <p>Let's build a custom <code>useDebounce</code> hook:</p>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ useDebounce Hook</h4>
                     <pre><code class="language-typescript">function useDebounce&lt;T&gt;(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState&lt;T&gt;(value);
@@ -737,13 +738,13 @@ sequenceDiagram
                 </div>
 
                 <!-- Interactive Debounce vs Throttle Visualization -->
-                <div class="card" style="background: #f8f9fa; border: 2px solid #667eea; margin: 2rem 0;">
+                <div class="card" style="border: 2px solid #667eea; margin: 2rem 0;">
                     <h4>🎮 Interactive: Debounce vs Throttle Comparison</h4>
                     <p>Type in the input below and watch how debouncing and throttling handle rapid input differently!</p>
                     <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
                         <input type="text" id="debounceThrottleInput" placeholder="Type quickly here..." style="width: 100%; max-width: 400px; padding: 0.75rem; font-size: 1rem; border: 2px solid #667eea; border-radius: 6px; outline: none;" oninput="handleInputChange(this.value)"/>
                         
-                        <canvas id="debounceThrottleCanvas" width="600" height="280" style="max-width: 100%; border-radius: 8px; background: white; border: 1px solid #e0e0e0;"></canvas>
+                        <canvas class="auto-invert" id="debounceThrottleCanvas" width="600" height="280" style="max-width: 100%; border-radius: 8px; background: white; border: 1px solid #e0e0e0;"></canvas>
                         
                         <div style="display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; font-size: 0.9rem;">
                             <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -976,7 +977,7 @@ const InfiniteList: React.FC = () => {
                 </div>
 
                 <h3>Debounce vs Throttle: When to Use Which?</h3>
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>💡 Quick Guide</h4>
                     <table>
                         <thead>
@@ -1001,7 +1002,7 @@ const InfiniteList: React.FC = () => {
                     </table>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Pro Tips</h4>
                     <ul>
                         <li><strong>Debounce delays:</strong> 300-500ms is typical for search, 1000ms+ for autosave</li>
@@ -1045,7 +1046,7 @@ console.log(signal.aborted); // true</code></pre>
                 <h3>Pattern 1: User-Triggered Cancellation</h3>
                 <p>Let users cancel long-running requests:</p>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Cancellable Request</h4>
                     <pre><code class="language-typescript">interface Report {
     id: string;
@@ -1235,7 +1236,7 @@ const Dashboard: React.FC = () => {
                 <h3>Pattern 4: AbortController in Custom Hooks</h3>
                 <p>Build a robust, reusable fetch hook with cancellation:</p>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Production-Ready useFetch Hook</h4>
                     <pre><code class="language-typescript">interface UseFetchOptions extends RequestInit {
     immediate?: boolean;
@@ -1356,7 +1357,7 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>💡 AbortController Best Practices</h4>
                     <ul>
                         <li><strong>Always clean up:</strong> Abort requests in useEffect cleanup functions</li>
@@ -1374,7 +1375,7 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                 <h2>📄 Pagination Patterns</h2>
                 <p>Large datasets can't be loaded all at once—pagination splits data into manageable chunks. Let's explore different pagination strategies and build a complete pagination system!</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 Definition</h4>
                     <p style="color: white;"><strong>Pagination:</strong> A technique for dividing large datasets into discrete pages, loading only the data needed for the current page. This improves performance, reduces bandwidth, and enhances user experience.</p>
                 </div>
@@ -1416,7 +1417,7 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                 <h3>Pattern 1: Offset-Based Pagination</h3>
                 <p>The most common pagination pattern:</p>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Complete Pagination Component</h4>
                     <pre><code class="language-typescript">interface Product {
     id: number;
@@ -1796,7 +1797,7 @@ const ProductList: React.FC = () => {
 // And the page state is preserved! ✅</code></pre>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Pagination Best Practices</h4>
                     <ul>
                         <li><strong>Show total count:</strong> Users want to know how much data exists</li>
@@ -1816,7 +1817,7 @@ const ProductList: React.FC = () => {
                 <h2>♾️ Infinite Scroll</h2>
                 <p>Instead of clicking "Next Page," what if content just loaded as you scroll down? That's infinite scroll—popular on social media and modern web apps. Let's build it!</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 Definition</h4>
                     <p style="color: white;"><strong>Infinite Scroll:</strong> A UX pattern where new content automatically loads as the user scrolls down the page. Instead of pagination controls, scrolling triggers data fetching, creating a seamless, continuous browsing experience.</p>
                 </div>
@@ -1851,7 +1852,7 @@ sequenceDiagram
                 </div>
 
                 <!-- Interactive Infinite Scroll Visualization -->
-                <div class="card" style="background: #f8f9fa; border: 2px solid #667eea; margin: 2rem 0;">
+                <div class="card" style="border: 2px solid #667eea; margin: 2rem 0;">
                     <h4>🎮 Interactive: Infinite Scroll Demo</h4>
                     <p>Scroll down in the container below to see how Intersection Observer triggers data loading!</p>
                     <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
@@ -2030,7 +2031,7 @@ function useInfiniteScroll(callback: () => void) {
                 </div>
 
                 <h3>Pattern 1: Basic Infinite Scroll</h3>
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Complete Infinite Scroll Component</h4>
                     <pre><code class="language-typescript">interface Post {
     id: number;
@@ -2362,7 +2363,7 @@ const PostFeed: React.FC = () => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>💡 Infinite Scroll Best Practices</h4>
                     <ul>
                         <li><strong>Use Intersection Observer:</strong> More performant than scroll event listeners</li>
@@ -2376,7 +2377,7 @@ const PostFeed: React.FC = () => {
                     </ul>
                 </div>
 
-                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <div class="card card-warning">
                     <h4>⚠️ When NOT to Use Infinite Scroll</h4>
                     <ul>
                         <li><strong>Footer is important:</strong> Users can never reach a footer with infinite scroll!</li>
@@ -2393,7 +2394,7 @@ const PostFeed: React.FC = () => {
                 <h2>💾 Client-Side Caching</h2>
                 <p>Why fetch the same data multiple times? Caching stores fetched data so you can reuse it without making redundant API calls. Let's build a smart caching system!</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 Definition</h4>
                     <p style="color: white;"><strong>Client-Side Caching:</strong> Storing API responses in memory (or browser storage) to avoid redundant network requests. This improves performance, reduces server load, and provides instant data access for frequently accessed resources.</p>
                 </div>
@@ -2418,7 +2419,7 @@ const PostFeed: React.FC = () => {
                 </div>
 
                 <h3>Pattern 1: Simple In-Memory Cache</h3>
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Basic Cache Implementation</h4>
                     <pre><code class="language-typescript">// Simple cache object
 const cache = new Map&lt;string, any&gt;();
@@ -2583,11 +2584,11 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
     );
 
                 <!-- Interactive Cache Visualization -->
-                <div class="card" style="background: #f8f9fa; border: 2px solid #667eea; margin: 2rem 0;">
+                <div class="card" style="border: 2px solid #667eea; margin: 2rem 0;">
                     <h4>🎮 Interactive: Cache Hit/Miss Simulator</h4>
                     <p>Click "Fetch" buttons to see how caching works. First request is a cache miss (slow), subsequent requests are cache hits (instant)!</p>
                     <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-                        <svg id="cacheSvg" viewBox="0 0 600 250" style="max-width: 100%; height: auto; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" role="img" aria-label="Cache visualization">
+                        <svg class="svg-auto-invert" id="cacheSvg" viewBox="0 0 600 250" style="max-width: 100%; height: auto; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" role="img" aria-label="Cache visualization">
                             <!-- Client -->
                             <rect x="30" y="80" width="100" height="60" rx="8" fill="#667eea"/>
                             <text x="80" y="115" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Client</text>
@@ -2810,7 +2811,7 @@ const persistentCache = new PersistentCache();</code></pre>
                 </div>
 
                 <h3>Cache Invalidation Strategies</h3>
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>💡 When to Invalidate Cache</h4>
                     <ul>
                         <li><strong>Time-based (TTL):</strong> Expire after X minutes</li>
@@ -2844,7 +2845,7 @@ const useUpdateUser = () => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Caching Best Practices</h4>
                     <ul>
                         <li><strong>Use appropriate TTLs:</strong> Frequently changing data needs shorter TTLs</li>
@@ -2856,7 +2857,7 @@ const useUpdateUser = () => {
                     </ul>
                 </div>
 
-                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <div class="card card-warning">
                     <h4>⚠️ Cache Pitfalls to Avoid</h4>
                     <ul>
                         <li><strong>Caching user-specific data globally:</strong> User A sees User B's data!</li>
@@ -2873,7 +2874,7 @@ const useUpdateUser = () => {
                 <h2>🔮 Introduction to React Query</h2>
                 <p>We've built custom hooks for caching, pagination, and infinite scroll. But what if there was a library that handled all of this (and more) out of the box? Meet React Query (TanStack Query)—the most powerful data fetching library for React!</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 What is React Query?</h4>
                     <p style="color: white;"><strong>React Query (TanStack Query):</strong> A powerful data synchronization library that handles caching, background updates, stale data revalidation, pagination, and more—all with minimal code. It treats server state as fundamentally different from client state and provides tools specifically for managing it.</p>
                 </div>
@@ -2964,7 +2965,7 @@ function App() {
                 <h3>Basic Usage: useQuery</h3>
                 <p>Replace your custom fetch hooks with <code>useQuery</code>:</p>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Before (Custom Hook)</h4>
                     <pre><code class="language-typescript">const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
     const [user, setUser] = useState&lt;User | null&gt;(null);
@@ -3203,7 +3204,7 @@ const PostFeed: React.FC = () => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>💡 React Query Superpowers</h4>
                     <ul>
                         <li><strong>Automatic caching:</strong> No manual cache management needed</li>
@@ -3217,7 +3218,7 @@ const PostFeed: React.FC = () => {
                     </ul>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ When to Use React Query</h4>
                     <ul>
                         <li>Any app that fetches data from APIs</li>
@@ -3236,7 +3237,7 @@ const PostFeed: React.FC = () => {
                 <h2>⚡ Optimistic Updates</h2>
                 <p>Why make users wait to see their changes? Optimistic updates instantly show changes in the UI before the server responds, creating a lightning-fast user experience!</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 Definition</h4>
                     <p style="color: white;"><strong>Optimistic Update:</strong> A UX pattern where the UI is immediately updated to reflect a user's action, assuming the server operation will succeed. If it fails, the UI rolls back to the previous state. This creates the illusion of instant responses.</p>
                 </div>
@@ -3332,7 +3333,7 @@ sequenceDiagram
                 <h3>Pattern 2: Optimistic Updates with React Query</h3>
                 <p>React Query makes optimistic updates much easier:</p>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ React Query Optimistic Update</h4>
                     <pre><code class="language-typescript">import { useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -3514,7 +3515,7 @@ const TodoList: React.FC = () => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>💡 Optimistic Update Best Practices</h4>
                     <ul>
                         <li><strong>Always provide rollback:</strong> If the mutation fails, restore previous state</li>
@@ -3526,7 +3527,7 @@ const TodoList: React.FC = () => {
                     </ul>
                 </div>
 
-                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <div class="card card-warning">
                     <h4>⚠️ When NOT to Use Optimistic Updates</h4>
                     <ul>
                         <li><strong>Critical operations:</strong> Financial transactions, medical records</li>
@@ -3544,7 +3545,7 @@ const TodoList: React.FC = () => {
                 <h2>🏋️ Hands-on Practice</h2>
                 <p>Time to apply everything you've learned! These exercises will solidify your advanced data fetching skills.</p>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h3>🏋️ Exercise 1: Debounced Search with Cache</h3>
                     <p>Build a search component that debounces user input and caches results.</p>
                     
@@ -3648,7 +3649,7 @@ const SearchComponent: React.FC = () => {
                     </details>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h3>🏋️ Exercise 2: Paginated Product Catalog</h3>
                     <p>Build a product catalog with pagination and URL state management.</p>
                     
@@ -3831,7 +3832,7 @@ const ProductCatalog: React.FC = () => {
                     </details>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h3>🏋️ Exercise 3: Infinite Scroll Feed</h3>
                     <p>Create an infinite scroll social media feed with loading states.</p>
                     
@@ -3963,7 +3964,7 @@ const SocialFeed: React.FC = () => {
                     </details>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h3>🏋️ Challenge: React Query Data Dashboard</h3>
                     <p>Build a data dashboard using React Query with multiple queries, mutations, and optimistic updates.</p>
                     
@@ -4027,7 +4028,7 @@ const SocialFeed: React.FC = () => {
                     <li><strong>Use skeleton screens</strong> - Instead of spinners, show content-shaped placeholders for better perceived performance.</li>
                 </ul>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Data Fetching Checklist</h4>
                     <ul>
                         <li>✅ AbortController used for request cancellation</li>
@@ -4067,7 +4068,7 @@ const SocialFeed: React.FC = () => {
             <section id="section11" class="lesson-section">
                 <h2>📚 Summary</h2>
                 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h3>🎉 Key Takeaways</h3>
                     <ul>
                         <li><strong>Race conditions are silent bugs</strong> - Always use AbortController to cancel old requests when new ones start.</li>
@@ -4206,7 +4207,7 @@ const SocialFeed: React.FC = () => {
                 </div>
 
                 <!-- Encouragement Card -->
-                <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-align: center; padding: 2rem; margin-top: 2rem;">
+                <div class="card card-accent" style="text-align: center; padding: 2rem; margin-top: 2rem;">
                     <h3 style="color: white;">🎉 Congratulations!</h3>
                     <p style="color: white; font-size: 1.1rem;">You've completed Lesson 4.4: Advanced Data Fetching! You now have professional-grade data fetching skills that will serve you throughout your React career.</p>
                     <p style="color: white; margin-top: 1rem;">You've learned techniques used by major tech companies to build fast, efficient, user-friendly applications. Keep practicing! 🚀</p>
@@ -4223,9 +4224,14 @@ const SocialFeed: React.FC = () => {
     </main>
 
     <!-- Footer -->
-    <footer style="background: var(--primary-gradient); color: white; padding: 2rem; text-align: center; margin-top: 4rem;">
-        <p>&copy; 2024 PracticalAce. All rights reserved.</p>
-        <p style="margin-top: 0.5rem; opacity: 0.9;">Empowering learners to achieve their goals.</p>
+    <footer class="site-footer">
+        <p>&copy; 2026 All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
     </footer>
 
     <!-- JavaScript -->

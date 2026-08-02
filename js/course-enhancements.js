@@ -1,20 +1,16 @@
 /**
  * Course Enhancement JavaScript
- * Provides interactive features, smooth scrolling, progress tracking, and more
+ * Interactive features, progress tracking, theme toggle, Mermaid dark mode
  */
 
-// Wait for DOM to be ready
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Course enhancements loaded');
-    
-    // Initialize all enhancements
+    initThemeToggle();        // must run first — sets data-theme
     initProgressIndicator();
     initSmoothScrolling();
     initCodeCopyButtons();
     initInteractiveTOC();
     initSearchFunctionality();
     initKeyboardShortcuts();
-    initThemeToggle();
     initLessonProgress();
     initQuizInteractivity();
     initMobileMenu();
@@ -23,641 +19,384 @@ document.addEventListener('DOMContentLoaded', function() {
     initAnalytics();
 });
 
-/**
- * Progress Indicator - Shows reading progress
- */
-function initProgressIndicator() {
-    const progressBar = document.querySelector('.progress-bar');
-    if (!progressBar) return;
-    
-    window.addEventListener('scroll', () => {
-        const windowHeight = window.innerHeight;
-        const documentHeight = document.documentElement.scrollHeight - windowHeight;
-        const scrolled = window.scrollY;
-        const progress = (scrolled / documentHeight) * 100;
-        
-        progressBar.style.width = `${Math.min(progress, 100)}%`;
-        
-        // Update ARIA attributes for accessibility
-        const progressIndicator = document.querySelector('.progress-indicator');
-        if (progressIndicator) {
-            progressIndicator.setAttribute('aria-valuenow', Math.round(progress));
-        }
-    });
+/* ===========================
+   Theme Toggle (Light / Dark)
+   =========================== */
+
+function initThemeToggle() {
+    const toggle = document.getElementById('theme-toggle');
+
+    // Determine initial theme
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = saved || (prefersDark ? 'dark' : 'light');
+
+    applyTheme(theme);
+
+    if (toggle) {
+        toggle.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme') || 'light';
+            const next = current === 'light' ? 'dark' : 'light';
+            applyTheme(next);
+            localStorage.setItem('theme', next);
+        });
+    }
 }
 
-/**
- * Smooth Scrolling for internal links
- */
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+
+    // Update all toggle buttons (in case there are multiple)
+    document.querySelectorAll('#theme-toggle').forEach(btn => {
+        btn.textContent = theme === 'light' ? '🌙' : '☀️';
+        btn.setAttribute('aria-label', theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
+    });
+
+    // Re-initialize Mermaid if available
+    reinitMermaid(theme);
+}
+
+function reinitMermaid(theme) {
+    const mermaid = window.__mermaid;
+    if (!mermaid) return;
+
+    const isDark = theme === 'dark';
+    mermaid.initialize({
+        startOnLoad: false,
+        theme: isDark ? 'dark' : 'default',
+        themeVariables: isDark
+            ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#6366f1', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+            : { primaryColor: '#eff6ff', primaryTextColor: '#1e293b', primaryBorderColor: '#3b82f6', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+    });
+
+    // Re-render all diagrams
+    document.querySelectorAll('.mermaid').forEach(el => {
+        // Preserve the original source
+        if (!el.dataset.src) {
+            el.dataset.src = el.textContent.trim();
+        }
+        el.removeAttribute('data-processed');
+        el.innerHTML = el.dataset.src;
+    });
+
+    try { mermaid.run(); } catch (_) { /* diagram may not exist on this page */ }
+}
+
+/* ===========================
+   Progress Indicator
+   =========================== */
+
+function initProgressIndicator() {
+    const bar = document.querySelector('.progress-indicator .progress-bar');
+    if (!bar) return;
+
+    const update = () => {
+        const docH = document.documentElement.scrollHeight - window.innerHeight;
+        if (docH <= 0) return;
+        bar.style.width = Math.min((window.scrollY / docH) * 100, 100) + '%';
+    };
+
+    window.addEventListener('scroll', throttle(update, 50));
+    update();
+}
+
+/* ===========================
+   Smooth Scrolling
+   =========================== */
+
 function initSmoothScrolling() {
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function(e) {
-            e.preventDefault();
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+        a.addEventListener('click', function(e) {
             const target = document.querySelector(this.getAttribute('href'));
-            if (target) {
-                const headerOffset = 70;
-                const elementPosition = target.getBoundingClientRect().top;
-                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                
-                window.scrollTo({
-                    top: offsetPosition,
-                    behavior: 'smooth'
-                });
-                
-                // Update URL without jumping
-                history.pushState(null, null, this.getAttribute('href'));
-            }
+            if (!target) return;
+            e.preventDefault();
+            const offset = 80;
+            window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - offset, behavior: 'smooth' });
+            history.pushState(null, null, this.getAttribute('href'));
         });
     });
 }
 
-/**
- * Code Copy Buttons - Already handled by clipboard.js
- * This function enhances it with notifications
- */
+/* ===========================
+   Code Copy Buttons enhancement
+   =========================== */
+
 function initCodeCopyButtons() {
-    // Add visual feedback for copy action
-    document.querySelectorAll('.copy-button').forEach(button => {
-        button.addEventListener('click', function() {
-            const originalText = this.textContent;
+    document.querySelectorAll('.copy-button').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const orig = this.textContent;
             this.textContent = 'Copied!';
             this.classList.add('copied');
-            
-            setTimeout(() => {
-                this.textContent = originalText;
-                this.classList.remove('copied');
-            }, 2000);
+            setTimeout(() => { this.textContent = orig; this.classList.remove('copied'); }, 2000);
         });
     });
 }
 
-/**
- * Interactive Table of Contents
- */
+/* ===========================
+   Interactive Table of Contents
+   =========================== */
+
 function initInteractiveTOC() {
-    // Highlight current section in TOC
     const tocLinks = document.querySelectorAll('.toc-link');
-    const sections = document.querySelectorAll('h2, h3');
-    
-    if (tocLinks.length === 0 || sections.length === 0) return;
-    
-    const observerOptions = {
-        root: null,
-        rootMargin: '-20% 0px -70% 0px',
-        threshold: 0
-    };
-    
-    const observerCallback = (entries) => {
+    if (!tocLinks.length) return;
+
+    const observer = new IntersectionObserver(entries => {
         entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
             const id = entry.target.getAttribute('id');
-            const tocLink = document.querySelector(`.toc-link[href="#${id}"]`);
-            
-            if (tocLink) {
-                if (entry.isIntersecting) {
-                    // Remove active class from all links
-                    tocLinks.forEach(link => link.classList.remove('active'));
-                    // Add active class to current link
-                    tocLink.classList.add('active');
-                }
+            const link = document.querySelector(`.toc-link[href="#${id}"]`);
+            if (link) {
+                tocLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
             }
         });
-    };
-    
-    const observer = new IntersectionObserver(observerCallback, observerOptions);
-    sections.forEach(section => observer.observe(section));
+    }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+
+    // Observe sections that TOC links point to
+    tocLinks.forEach(link => {
+        const id = link.getAttribute('href')?.slice(1);
+        const section = id && document.getElementById(id);
+        if (section) observer.observe(section);
+    });
 }
 
-/**
- * Search Functionality
- */
+/* ===========================
+   Search
+   =========================== */
+
 function initSearchFunctionality() {
-    const searchInput = document.getElementById('search-input');
-    const searchResults = document.getElementById('search-results');
-    
-    if (!searchInput || !searchResults) return;
-    
-    let searchIndex = [];
-    
-    // Build search index from page content
-    function buildSearchIndex() {
-        const content = document.querySelectorAll('h1, h2, h3, p, li');
-        content.forEach((element, index) => {
-            searchIndex.push({
-                id: index,
-                text: element.textContent.toLowerCase(),
-                element: element,
-                type: element.tagName.toLowerCase()
-            });
-        });
-    }
-    
-    // Perform search
-    function performSearch(query) {
-        const results = [];
-        const searchQuery = query.toLowerCase().trim();
-        
-        if (searchQuery.length < 2) {
-            searchResults.innerHTML = '';
-            searchResults.style.display = 'none';
-            return;
-        }
-        
-        searchIndex.forEach(item => {
-            if (item.text.includes(searchQuery)) {
-                results.push(item);
-            }
-        });
-        
-        displayResults(results.slice(0, 10)); // Show top 10 results
-    }
-    
-    // Display search results
-    function displayResults(results) {
-        if (results.length === 0) {
-            searchResults.innerHTML = '<div class="no-results">No results found</div>';
-            searchResults.style.display = 'block';
-            return;
-        }
-        
-        let html = '<ul class="search-results-list">';
-        results.forEach(result => {
-            const excerpt = getExcerpt(result.text, searchInput.value.toLowerCase());
-            html += `
-                <li class="search-result-item" data-index="${result.id}">
-                    <span class="result-type">${result.type.toUpperCase()}</span>
-                    <span class="result-text">${excerpt}</span>
-                </li>
-            `;
-        });
-        html += '</ul>';
-        
-        searchResults.innerHTML = html;
-        searchResults.style.display = 'block';
-        
-        // Add click handlers to results
-        document.querySelectorAll('.search-result-item').forEach(item => {
-            item.addEventListener('click', function() {
-                const index = this.getAttribute('data-index');
-                const element = searchIndex[index].element;
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                element.classList.add('highlight');
-                setTimeout(() => element.classList.remove('highlight'), 2000);
-                
-                // Clear search
-                searchInput.value = '';
-                searchResults.style.display = 'none';
-            });
-        });
-    }
-    
-    // Get excerpt with highlighted search term
-    function getExcerpt(text, query) {
-        const index = text.indexOf(query);
-        const start = Math.max(0, index - 30);
-        const end = Math.min(text.length, index + query.length + 30);
-        
-        let excerpt = text.substring(start, end);
-        if (start > 0) excerpt = '...' + excerpt;
-        if (end < text.length) excerpt = excerpt + '...';
-        
-        // Highlight the search term
-        const regex = new RegExp(query, 'gi');
-        excerpt = excerpt.replace(regex, `<mark>$&</mark>`);
-        
-        return excerpt;
-    }
-    
-    // Initialize
-    buildSearchIndex();
-    
-    // Event listeners
-    searchInput.addEventListener('input', (e) => {
-        performSearch(e.target.value);
+    const input = document.getElementById('search-input');
+    const results = document.getElementById('search-results');
+    if (!input || !results) return;
+
+    const index = [];
+    document.querySelectorAll('h1, h2, h3, p, li').forEach((el, i) => {
+        index.push({ id: i, text: el.textContent.toLowerCase(), element: el, type: el.tagName.toLowerCase() });
     });
-    
-    // Close search results when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-            searchResults.style.display = 'none';
+
+    input.addEventListener('input', debounce(e => {
+        const q = e.target.value.toLowerCase().trim();
+        if (q.length < 2) { results.style.display = 'none'; return; }
+
+        const hits = index.filter(item => item.text.includes(q)).slice(0, 10);
+        if (!hits.length) {
+            results.innerHTML = '<div style="padding:0.75rem 1rem;color:var(--text-light);">No results found</div>';
+            results.style.display = 'block';
+            return;
         }
+
+        results.innerHTML = hits.map(h => {
+            const idx = h.text.indexOf(q);
+            const start = Math.max(0, idx - 30);
+            const end = Math.min(h.text.length, idx + q.length + 30);
+            let excerpt = (start > 0 ? '…' : '') + h.text.substring(start, end) + (end < h.text.length ? '…' : '');
+            excerpt = excerpt.replace(new RegExp(q, 'gi'), '<mark>$&</mark>');
+            return `<div class="search-result-item" data-idx="${h.id}"><small style="color:var(--text-light);">${h.type}</small> ${excerpt}</div>`;
+        }).join('');
+        results.style.display = 'block';
+
+        results.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const el = index[item.dataset.idx].element;
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('highlight');
+                setTimeout(() => el.classList.remove('highlight'), 2000);
+                input.value = '';
+                results.style.display = 'none';
+            });
+        });
+    }, 200));
+
+    document.addEventListener('click', e => {
+        if (!input.contains(e.target) && !results.contains(e.target)) results.style.display = 'none';
     });
 }
 
-/**
- * Keyboard Shortcuts
- */
+/* ===========================
+   Keyboard Shortcuts
+   =========================== */
+
 function initKeyboardShortcuts() {
-    const shortcuts = {
-        '/': () => {
-            // Focus search
-            const searchInput = document.getElementById('search-input');
-            if (searchInput) {
-                searchInput.focus();
-                return false; // Prevent default
-            }
-        },
-        'Escape': () => {
-            // Close search or modal
-            const searchResults = document.getElementById('search-results');
-            if (searchResults) {
-                searchResults.style.display = 'none';
-            }
-            const searchInput = document.getElementById('search-input');
-            if (searchInput) {
-                searchInput.blur();
-            }
-        },
-        'ArrowLeft': () => {
-            // Previous lesson
-            const prevLink = document.querySelector('.prev-lesson');
-            if (prevLink) {
-                window.location.href = prevLink.href;
-            }
-        },
-        'ArrowRight': () => {
-            // Next lesson
-            const nextLink = document.querySelector('.next-lesson');
-            if (nextLink) {
-                window.location.href = nextLink.href;
-            }
-        },
-        'h': () => {
-            // Go home
-            window.location.href = '/index.html';
-        },
-        '?': () => {
-            // Show keyboard shortcuts help
-            showKeyboardShortcuts();
-        }
-    };
-    
-    document.addEventListener('keydown', (e) => {
-        // Don't trigger shortcuts when typing in input fields
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            return;
-        }
-        
-        const key = e.key;
-        if (shortcuts[key]) {
-            const preventDefault = shortcuts[key]();
-            if (preventDefault === false) {
-                e.preventDefault();
-            }
-        }
-    });
-    
-    function showKeyboardShortcuts() {
-        const modal = document.createElement('div');
-        modal.className = 'shortcuts-modal';
-        modal.innerHTML = `
-            <div class="shortcuts-content">
-                <h3>Keyboard Shortcuts</h3>
-                <button class="close-modal">&times;</button>
-                <dl>
-                    <dt>/</dt><dd>Focus search</dd>
-                    <dt>ESC</dt><dd>Close search/modal</dd>
-                    <dt>←</dt><dd>Previous lesson</dd>
-                    <dt>→</dt><dd>Next lesson</dd>
-                    <dt>H</dt><dd>Go to home</dd>
-                    <dt>?</dt><dd>Show this help</dd>
-                </dl>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Close modal
-        modal.querySelector('.close-modal').addEventListener('click', () => {
-            modal.remove();
-        });
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
-        });
-    }
-}
+    document.addEventListener('keydown', e => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-/**
- * Theme Toggle (Light/Dark mode)
- */
-function initThemeToggle() {
-    const themeToggle = document.getElementById('theme-toggle');
-    if (!themeToggle) return;
-    
-    // Check for saved theme preference or default to light
-    const currentTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', currentTheme);
-    
-    themeToggle.addEventListener('click', () => {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-        
-        // Update button text/icon
-        themeToggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
-        
-        // Smooth transition
-        document.documentElement.style.transition = 'background-color 0.3s, color 0.3s';
+        switch (e.key) {
+            case '/': {
+                const s = document.getElementById('search-input');
+                if (s) { e.preventDefault(); s.focus(); }
+                break;
+            }
+            case 'Escape': {
+                const r = document.getElementById('search-results');
+                if (r) r.style.display = 'none';
+                document.getElementById('search-input')?.blur();
+                document.querySelector('.shortcuts-modal')?.remove();
+                break;
+            }
+            case 'ArrowLeft': {
+                const prev = document.querySelector('.prev-lesson');
+                if (prev) window.location.href = prev.href;
+                break;
+            }
+            case 'ArrowRight': {
+                const next = document.querySelector('.next-lesson');
+                if (next) window.location.href = next.href;
+                break;
+            }
+            case 'h': window.location.href = 'index.html'; break;
+            case '?': showShortcutsModal(); break;
+        }
     });
 }
 
-/**
- * Lesson Progress Tracking
- */
+function showShortcutsModal() {
+    if (document.querySelector('.shortcuts-modal')) return;
+    const modal = document.createElement('div');
+    modal.className = 'shortcuts-modal';
+    modal.innerHTML = `
+        <div class="shortcuts-content">
+            <h3>Keyboard Shortcuts</h3>
+            <button class="close-modal">&times;</button>
+            <dl>
+                <dt>/</dt><dd>Focus search</dd>
+                <dt>ESC</dt><dd>Close search/modal</dd>
+                <dt>←</dt><dd>Previous lesson</dd>
+                <dt>→</dt><dd>Next lesson</dd>
+                <dt>H</dt><dd>Go to home</dd>
+                <dt>?</dt><dd>Show this help</dd>
+            </dl>
+        </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+/* ===========================
+   Lesson Progress
+   =========================== */
+
 function initLessonProgress() {
-    const currentPage = window.location.pathname.split('/').pop().replace('.html', '');
-    if (!currentPage) return;
-    
-    // Get or initialize progress data
-    let progress = JSON.parse(localStorage.getItem('lessonProgress') || '{}');
-    
-    // Mark current page as visited
-    progress[currentPage] = {
-        visited: true,
-        lastVisited: new Date().toISOString(),
-        scrollPosition: 0
-    };
-    
-    // Save progress
+    const page = window.location.pathname.split('/').pop().replace('.html', '') || 'index';
+    const progress = JSON.parse(localStorage.getItem('lessonProgress') || '{}');
+
+    progress[page] = { visited: true, lastVisited: new Date().toISOString(), scrollPosition: 0 };
     localStorage.setItem('lessonProgress', JSON.stringify(progress));
-    
-    // Update progress indicators on index page
-    if (currentPage === 'index') {
-        updateProgressIndicators(progress);
-    }
-    
-    // Save scroll position on page leave
+
+    // Save scroll on leave
     window.addEventListener('beforeunload', () => {
-        progress[currentPage].scrollPosition = window.scrollY;
+        progress[page].scrollPosition = window.scrollY;
         localStorage.setItem('lessonProgress', JSON.stringify(progress));
     });
-    
-    // Restore scroll position
-    const savedPosition = progress[currentPage]?.scrollPosition;
-    if (savedPosition && savedPosition > 0) {
-        // Wait for content to load
-        setTimeout(() => {
-            window.scrollTo(0, savedPosition);
-        }, 100);
-    }
+
+    // Restore scroll
+    const saved = progress[page]?.scrollPosition;
+    if (saved > 0) setTimeout(() => window.scrollTo(0, saved), 100);
 }
 
-/**
- * Update progress indicators on index page
- */
-function updateProgressIndicators(progress) {
-    const lessonLinks = document.querySelectorAll('.lesson-link');
-    let completedCount = 0;
-    
-    lessonLinks.forEach(link => {
-        const href = link.getAttribute('href');
-        const pageName = href.replace('.html', '');
-        
-        if (progress[pageName]?.visited) {
-            link.classList.add('visited');
-            completedCount++;
-            
-            // Add checkmark
-            if (!link.querySelector('.checkmark')) {
-                const checkmark = document.createElement('span');
-                checkmark.className = 'checkmark';
-                checkmark.textContent = '✓';
-                link.appendChild(checkmark);
-            }
-        }
-    });
-    
-    // Update overall progress
-    const totalLessons = lessonLinks.length;
-    const progressPercentage = (completedCount / totalLessons) * 100;
-    
-    const overallProgress = document.getElementById('overall-progress');
-    if (overallProgress) {
-        overallProgress.innerHTML = `
-            <h3>Your Progress</h3>
-            <div class="progress-bar-container">
-                <div class="progress-bar" style="width: ${progressPercentage}%"></div>
-            </div>
-            <p>${completedCount} of ${totalLessons} lessons completed (${Math.round(progressPercentage)}%)</p>
-        `;
-    }
-}
+/* ===========================
+   Quiz
+   =========================== */
 
-/**
- * Quiz Interactivity
- */
 function initQuizInteractivity() {
-    const quizzes = document.querySelectorAll('.quiz-container');
-    
-    quizzes.forEach(quiz => {
-        const questions = quiz.querySelectorAll('.quiz-question');
-        
-        questions.forEach(question => {
-            const options = question.querySelectorAll('.quiz-option');
-            const feedback = question.querySelector('.quiz-feedback');
-            
-            options.forEach(option => {
-                option.addEventListener('click', () => {
-                    // Remove previous selections
-                    options.forEach(opt => opt.classList.remove('selected', 'correct', 'incorrect'));
-                    
-                    // Mark selected
-                    option.classList.add('selected');
-                    
-                    // Check answer
-                    const isCorrect = option.dataset.correct === 'true';
-                    if (isCorrect) {
-                        option.classList.add('correct');
-                        if (feedback) {
-                            feedback.textContent = 'Correct! ' + (option.dataset.explanation || '');
-                            feedback.className = 'quiz-feedback correct';
-                        }
-                    } else {
-                        option.classList.add('incorrect');
-                        if (feedback) {
-                            feedback.textContent = 'Try again. ' + (option.dataset.hint || '');
-                            feedback.className = 'quiz-feedback incorrect';
-                        }
-                    }
-                });
+    document.querySelectorAll('.quiz-question').forEach(q => {
+        const options = q.querySelectorAll('.quiz-option');
+        const feedback = q.querySelector('.quiz-feedback');
+        options.forEach(opt => {
+            opt.addEventListener('click', () => {
+                options.forEach(o => o.classList.remove('selected', 'correct', 'incorrect'));
+                opt.classList.add('selected');
+                const ok = opt.dataset.correct === 'true';
+                opt.classList.add(ok ? 'correct' : 'incorrect');
+                if (feedback) {
+                    feedback.textContent = ok ? ('Correct! ' + (opt.dataset.explanation || '')) : ('Try again. ' + (opt.dataset.hint || ''));
+                    feedback.className = 'quiz-feedback ' + (ok ? 'correct' : 'incorrect');
+                }
             });
         });
     });
 }
 
-/**
- * Mobile Menu Toggle
- */
+/* ===========================
+   Mobile Menu
+   =========================== */
+
 function initMobileMenu() {
-    const menuToggle = document.getElementById('mobile-menu-toggle');
-    const navLinks = document.querySelector('.nav-links');
-    
-    if (!menuToggle || !navLinks) return;
-    
-    menuToggle.addEventListener('click', () => {
-        navLinks.classList.toggle('active');
-        menuToggle.classList.toggle('active');
-        
-        // Update ARIA attributes
-        const isOpen = navLinks.classList.contains('active');
-        menuToggle.setAttribute('aria-expanded', isOpen);
-        navLinks.setAttribute('aria-hidden', !isOpen);
+    const btn = document.getElementById('mobile-menu-toggle');
+    const nav = document.querySelector('.nav-links');
+    if (!btn || !nav) return;
+
+    btn.addEventListener('click', () => {
+        const open = nav.classList.toggle('active');
+        btn.setAttribute('aria-expanded', open);
+        btn.textContent = open ? '✕' : '☰';
     });
-    
-    // Close menu when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!menuToggle.contains(e.target) && !navLinks.contains(e.target)) {
-            navLinks.classList.remove('active');
-            menuToggle.classList.remove('active');
+
+    document.addEventListener('click', e => {
+        if (!btn.contains(e.target) && !nav.contains(e.target)) {
+            nav.classList.remove('active');
+            btn.setAttribute('aria-expanded', 'false');
+            btn.textContent = '☰';
         }
     });
 }
 
-/**
- * Accessibility Features
- */
+/* ===========================
+   Accessibility
+   =========================== */
+
 function initAccessibilityFeatures() {
-    // Skip to main content
-    const skipLink = document.querySelector('.skip-to-main');
-    if (skipLink) {
-        skipLink.addEventListener('click', (e) => {
+    const skip = document.querySelector('.skip-to-main');
+    if (skip) {
+        skip.addEventListener('click', e => {
             e.preventDefault();
             const main = document.getElementById('main-content');
-            if (main) {
-                main.tabIndex = -1;
-                main.focus();
-            }
+            if (main) { main.tabIndex = -1; main.focus(); }
         });
     }
-    
-    // Announce page changes for screen readers
-    const announcer = document.createElement('div');
-    announcer.className = 'sr-only';
-    announcer.setAttribute('aria-live', 'polite');
-    announcer.setAttribute('aria-atomic', 'true');
-    document.body.appendChild(announcer);
-    
-    // Improve focus visibility
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Tab') {
-            document.body.classList.add('keyboard-nav');
-        }
-    });
-    
-    document.addEventListener('mousedown', () => {
-        document.body.classList.remove('keyboard-nav');
-    });
-    
-    // Add ARIA labels to interactive elements
-    document.querySelectorAll('button, a, input').forEach(element => {
-        if (!element.getAttribute('aria-label') && !element.textContent.trim()) {
-            // Try to find a meaningful label
-            const title = element.getAttribute('title');
-            if (title) {
-                element.setAttribute('aria-label', title);
-            }
-        }
-    });
+
+    // Keyboard vs mouse focus ring
+    document.addEventListener('keydown', e => { if (e.key === 'Tab') document.body.classList.add('keyboard-nav'); });
+    document.addEventListener('mousedown', () => document.body.classList.remove('keyboard-nav'));
 }
 
-/**
- * Print Styles Enhancement
- */
+/* ===========================
+   Print
+   =========================== */
+
 function initPrintStyles() {
-    // Add print button
-    const printButton = document.getElementById('print-button');
-    if (printButton) {
-        printButton.addEventListener('click', () => {
-            window.print();
-        });
-    }
-    
-    // Prepare content for printing
+    document.getElementById('print-button')?.addEventListener('click', e => { e.preventDefault(); window.print(); });
     window.addEventListener('beforeprint', () => {
-        // Expand all collapsible sections
-        document.querySelectorAll('details').forEach(details => {
-            details.setAttribute('open', 'true');
-        });
-        
-        // Remove interactive elements
-        document.body.classList.add('printing');
-    });
-    
-    window.addEventListener('afterprint', () => {
-        document.body.classList.remove('printing');
+        document.querySelectorAll('details').forEach(d => d.setAttribute('open', 'true'));
     });
 }
 
-/**
- * Simple Analytics (Privacy-friendly)
- */
+/* ===========================
+   Analytics (local only)
+   =========================== */
+
 function initAnalytics() {
-    // Track page views
-    const pageView = {
-        page: window.location.pathname,
-        timestamp: new Date().toISOString(),
-        referrer: document.referrer
-    };
-    
-    // Store locally (no external tracking)
-    let analytics = JSON.parse(localStorage.getItem('courseAnalytics') || '[]');
-    analytics.push(pageView);
-    
-    // Keep only last 100 entries
-    if (analytics.length > 100) {
-        analytics = analytics.slice(-100);
-    }
-    
-    localStorage.setItem('courseAnalytics', JSON.stringify(analytics));
-    
-    // Track time on page
-    const startTime = Date.now();
-    window.addEventListener('beforeunload', () => {
-        const timeSpent = Math.round((Date.now() - startTime) / 1000);
-        console.log(`Time on page: ${timeSpent} seconds`);
-    });
+    let a = JSON.parse(localStorage.getItem('courseAnalytics') || '[]');
+    a.push({ page: location.pathname, ts: new Date().toISOString() });
+    if (a.length > 100) a = a.slice(-100);
+    localStorage.setItem('courseAnalytics', JSON.stringify(a));
 }
 
-/**
- * Utility Functions
- */
+/* ===========================
+   Utilities
+   =========================== */
 
-// Debounce function for performance
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
+function debounce(fn, ms) {
+    let t;
+    return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
 }
 
-// Throttle function for performance
-function throttle(func, limit) {
-    let inThrottle;
+function throttle(fn, ms) {
+    let last = 0;
     return function(...args) {
-        if (!inThrottle) {
-            func.apply(this, args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
+        const now = Date.now();
+        if (now - last >= ms) { last = now; fn.apply(this, args); }
     };
 }
 
-// Export for use in other scripts
-window.courseEnhancements = {
-    debounce,
-    throttle,
-    initProgressIndicator,
-    initSmoothScrolling,
-    updateProgressIndicators
-};
-
-console.log('Course enhancements initialized successfully');
+// Expose for other scripts
+window.courseEnhancements = { debounce, throttle, applyTheme, reinitMermaid };

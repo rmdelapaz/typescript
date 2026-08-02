@@ -4,43 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Learn essential state management patterns in React - Master lifting state up, understand prop drilling, state colocation, and derived state for building scalable applications.">
-    <meta name="author" content="PracticalAce">
+    <meta name="author" content="Ray de la Paz">
     <title>State Management Patterns - React TypeScript Course</title>
     <link rel="stylesheet" href="styles/main.css">
-    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="icon" type="image/png" href="favicon.png">
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({ 
+        window.__mermaid = mermaid;
+        const isDark = localStorage.getItem('theme') === 'dark' ||
+            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        mermaid.initialize({
             startOnLoad: true,
-            theme: 'default',
-            themeVariables: {
-                primaryColor: '#f0f0f0',
-                primaryTextColor: '#333',
-                primaryBorderColor: '#667eea'
-            }
+            theme: isDark ? 'dark' : 'default',
+            themeVariables: isDark
+                ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#6366f1', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
+                : { primaryColor: '#eff6ff', primaryTextColor: '#1e293b', primaryBorderColor: '#3b82f6', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
         });
     </script>
 </head>
 <body>
     <!-- Skip to main content for accessibility -->
     <a href="#main-content" class="skip-to-main">Skip to main content</a>
-    
-    <!-- Progress indicator -->
-    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
-        <div class="progress-bar"></div>
-    </div>
 
     <!-- Navigation -->
-    <nav>
+    <nav class="main-nav">
         <div class="nav-container">
             <a href="index.html" class="nav-logo">React TypeScript Course</a>
             <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">
                 ☰
             </button>
-            <div class="nav-links" id="nav-links" aria-hidden="false">
+            <div class="nav-links" id="nav-links">
                 <a href="index.html">Home</a>
                 <a href="index.html#modules">All Modules</a>
-                <button id="theme-toggle" aria-label="Toggle theme">🌙</button>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
             </div>
         </div>
     </nav>
@@ -60,10 +59,10 @@
             <!-- Lesson Header -->
             <header>
                 <h1>🎯 State Management Patterns</h1>
-                <p class="lead">You've learned how to use useState in individual components - awesome! But real applications have multiple components that need to share and communicate data. How do you decide where to put state? When should components share state? How do you pass data between components efficiently? These are the questions that separate beginners from confident React developers. In this lesson, we'll explore the essential patterns for organizing state in your applications. Let's level up your state management skills! 🚀</p>
-                
+                <p class="lead">You've learned how to use <code>useState</code> inside a single component - awesome! But real applications are made of many components that need to share and coordinate data. Where should a piece of state live? When should components share it, and when should they keep it to themselves? How do you move data around without turning your app into a tangle of props? These questions are exactly what separates a beginner from a confident React developer. In this lesson we'll work through the essential patterns for organizing state in a modern React 19 app - all with function components and TypeScript. Let's level up your state management skills! 🚀</p>
+
                 <!-- Learning objectives -->
-                <div class="card">
+                <div class="card card-info">
                     <h2>🎯 Learning Objectives</h2>
                     <p>By the end of this lesson, you will be able to:</p>
                     <ul>
@@ -82,11 +81,13 @@
             </header>
 
             <!-- Sticky Table of Contents -->
-            <details class="card" open style="position: sticky; top: 80px; z-index: 100; background: var(--card-bg, white); box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 2rem;">
-                <summary style="cursor: pointer; font-weight: bold; padding: 0.5rem 1rem; user-select: none;">
-                    <h2 style="display: inline; margin: 0;">📑 In This Lesson</h2>
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
                 </summary>
-                <nav aria-label="Table of Contents" style="padding: 0 1rem 1rem 1rem;">
+                <nav aria-label="Table of Contents">
                     <ol>
                         <li><a href="#section1" class="toc-link">State Placement Principles</a></li>
                         <li><a href="#section2" class="toc-link">Lifting State Up</a></li>
@@ -108,22 +109,22 @@
                 <h2>📍 State Placement Principles</h2>
                 <p>The most important question in state management is: <strong>"Where should I put this state?"</strong> Let's learn the principles that guide this decision.</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                    <h4 style="color: white;">📖 The Golden Rule</h4>
-                    <p style="color: white;"><strong>State should live at the lowest common ancestor of all components that need it.</strong></p>
-                    <p style="color: white;">In other words: Keep state as close as possible to where it's used, but high enough that all components that need it can access it.</p>
+                <div class="card card-accent">
+                    <h4>📖 The Golden Rule</h4>
+                    <p><strong>State should live at the lowest common ancestor of all the components that need it.</strong></p>
+                    <p>In other words: keep state as close as possible to where it's used, but high enough that every component that needs it can reach it. Put it too low and siblings can't share it; put it too high and you drown unrelated components in re-renders and prop plumbing.</p>
                 </div>
 
                 <h3>The State Placement Decision Tree</h3>
                 <pre class="mermaid">
 graph TD
-    A[Need to add state] --> B{Used by one component?}
+    A[Need to add state] --> B{"Used by only one component?"}
     B -->|Yes| C[Keep it local in that component]
-    B -->|No| D{Used by sibling components?}
-    D -->|Yes| E[Lift to parent]
-    D -->|No| F{Used by distant relatives?}
-    F -->|Yes| G[Lift to common ancestor]
-    
+    B -->|No| D{"Used by sibling components?"}
+    D -->|Yes| E[Lift to their shared parent]
+    D -->|No| F{"Used by distant relatives?"}
+    F -->|Yes| G[Lift to the common ancestor]
+
     style C fill:#4CAF50,color:#fff
     style E fill:#2196F3,color:#fff
     style G fill:#FF9800,color:#fff
@@ -172,7 +173,7 @@ graph TD
                     </tbody>
                 </table>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>💡 Mental Model: The State Tree</h4>
                     <p>Think of your component tree as an actual tree:</p>
                     <ul>
@@ -187,28 +188,29 @@ graph TD
             <!-- Section 2: Lifting State Up -->
             <section id="section2" class="lesson-section">
                 <h2>⬆️ Lifting State Up</h2>
-                <p>Lifting state up is one of the most fundamental patterns in React. It's how sibling components share data.</p>
+                <p>Lifting state up is one of the most fundamental patterns in React - so fundamental that the official React docs teach it before almost anything else about sharing data. It's the answer to a very common question: "I have two components that need the same data. Where do I put it?"</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Lifting State Up:</strong> Moving state from a child component to a parent component so that multiple children can share and synchronize that state.</p>
+                <div class="card card-accent">
+                    <h4>📖 Definition</h4>
+                    <p><strong>Lifting State Up:</strong> moving state out of a child component and into a shared parent, so that several children can read and update the same value and stay in sync.</p>
                 </div>
 
                 <h3>The Problem: Siblings Can't Talk Directly</h3>
                 <div class="card">
                     <h4>Scenario: Temperature Converter</h4>
-                    <p>Imagine two input fields - one for Celsius, one for Fahrenheit. When you type in either, the other should update. But they're sibling components!</p>
-                    
+                    <p>Imagine two input fields - one for Celsius, one for Fahrenheit. Type into either one and the other should update to match. The catch: they're sibling components, and in React data only flows <em>downward</em> from parent to child. Siblings have no direct line to each other.</p>
+
                     <pre class="mermaid">
 graph TD
     A[App] --> B[CelsiusInput]
     A --> C[FahrenheitInput]
-    
-    B -.Can't talk directly!.-> C
-    
+
+    B -.->|"no direct path"| C
+
     style B fill:#f44336,color:#fff
     style C fill:#f44336,color:#fff
 </pre>
+                    <p>Think of two kids in different rooms who can only talk to a parent, never to each other directly. If they need to coordinate, the message has to go <em>up</em> to the parent and back <em>down</em>. That is exactly what lifting state up sets up.</p>
                 </div>
 
                 <h3>The Solution: Lift State to Parent</h3>
@@ -236,7 +238,7 @@ const FahrenheitInput: React.FC = () => {
         /&gt;
     );
 };</code></pre>
-                    <p style="color: #f44336;">❌ They can't synchronize - each has separate state!</p>
+                    <p><strong>❌ They can't synchronize</strong> - each input owns a separate, independent piece of state. Typing in one has no way to reach the other.</p>
                 </div>
 
                 <div class="card">
@@ -321,7 +323,7 @@ sequenceDiagram
                 <p>Watch how sibling components communicate through their parent:</p>
                 
                 <div style="background: #f8f9fa; border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;">
-                    <canvas id="liftingStateCanvas" width="750" height="380" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; background: white;"></canvas>
+                    <canvas class="auto-invert" id="liftingStateCanvas" width="750" height="380" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; background: white;"></canvas>
                     <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 1rem;">
                         <button id="celsiusUpBtn" style="padding: 0.4rem 1rem; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Celsius +5°</button>
                         <button id="celsiusDownBtn" style="padding: 0.4rem 1rem; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Celsius -5°</button>
@@ -500,7 +502,7 @@ sequenceDiagram
                     </ol>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Benefits of Lifting State</h4>
                     <ul>
                         <li><strong>Single source of truth</strong> - One place owns the data</li>
@@ -516,7 +518,7 @@ sequenceDiagram
                 <h2>🕳️ Prop Drilling Problem</h2>
                 <p>As your component tree grows, you might find yourself passing props through many layers of components that don't actually use them. This is called "prop drilling" - and it's a code smell!</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 Definition</h4>
                     <p style="color: white;"><strong>Prop Drilling:</strong> Passing props through multiple component layers, where intermediate components don't use the props - they just pass them down to deeper children.</p>
                 </div>
@@ -593,7 +595,7 @@ const Author: React.FC&lt;{ user: User }&gt; = ({ user }) => {
                             <td>Verbose code</td>
 
                 <h3>🎨 Visualizing Prop Drilling</h3>
-                <svg viewBox="0 0 800 420" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
+                <svg class="svg-auto-invert" viewBox="0 0 800 420" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
                     <defs>
                         <linearGradient id="propDrillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                             <stop offset="0%" style="stop-color:#667eea"/>
@@ -741,7 +743,7 @@ const Author: React.FC = () => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <div class="card card-warning">
                     <h4>⚠️ When is Prop Drilling Okay?</h4>
                     <p>Prop drilling isn't always bad! It's fine when:</p>
                     <ul>
@@ -759,7 +761,7 @@ const Author: React.FC = () => {
                 <h2>📍 State Colocation</h2>
                 <p>While we've talked about lifting state up, sometimes the opposite is true - you should push state down! This is called state colocation.</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 Definition</h4>
                     <p style="color: white;"><strong>State Colocation:</strong> Keeping state as close as possible to where it's used. If only one component (or a small component subtree) needs the state, keep it there instead of unnecessarily lifting it up.</p>
                 </div>
@@ -864,7 +866,7 @@ const Accordion: React.FC = () => {
                         </tr>
 
                 <h3>🎨 State Colocation: Before vs After</h3>
-                <svg viewBox="0 0 800 380" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
+                <svg class="svg-auto-invert" viewBox="0 0 800 380" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
                     <text x="400" y="25" text-anchor="middle" fill="#333" font-weight="bold" font-size="16">State Colocation: Keep State Close to Where It's Used</text>
                     
                     <!-- BAD: State too high -->
@@ -991,7 +993,7 @@ const App: React.FC = () => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ When to Colocate State</h4>
                     <ul>
                         <li>UI state (open/closed, hover, focus)</li>
@@ -1002,7 +1004,7 @@ const App: React.FC = () => {
                     </ul>
                 </div>
 
-                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <div class="card card-warning">
                     <h4>⚠️ When NOT to Colocate</h4>
                     <ul>
                         <li>Multiple components need to read the state</li>
@@ -1018,7 +1020,7 @@ const App: React.FC = () => {
                 <h2>🔄 Derived State</h2>
                 <p>One of the most common mistakes in React is storing data that can be calculated from existing state or props. This creates unnecessary complexity and potential bugs!</p>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h4 style="color: white;">📖 Definition</h4>
                     <p style="color: white;"><strong>Derived State:</strong> Data that can be calculated from existing state or props. Instead of storing it in state, compute it during render.</p>
                 </div>
@@ -1124,7 +1126,7 @@ const ShoppingCart: React.FC = () => {
                 <p>Add items to the cart and watch how totals are calculated automatically - never stored!</p>
                 
                 <div style="background: #f8f9fa; border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;">
-                    <canvas id="derivedStateCanvas" width="750" height="340" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; background: white;"></canvas>
+                    <canvas class="auto-invert" id="derivedStateCanvas" width="750" height="340" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; background: white;"></canvas>
                     <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
                         <button id="addAppleBtn" style="padding: 0.4rem 0.8rem; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">🍎 Add Apple ($2)</button>
                         <button id="addBananaBtn" style="padding: 0.4rem 0.8rem; background: #FFEB3B; color: #333; border: none; border-radius: 4px; cursor: pointer;">🍌 Add Banana ($1)</button>
@@ -1330,13 +1332,13 @@ const TodoList: React.FC = () => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>💡 Performance Note</h4>
                     <p>You might worry: "Doesn't recalculating every render hurt performance?"</p>
                     <p><strong>Usually, no!</strong> JavaScript is fast at simple operations. Only optimize if you have actual performance problems. For expensive calculations, you can use <code>useMemo</code> (we'll learn that in Module 5).</p>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Benefits of Derived State</h4>
                     <ul>
                         <li><strong>Single source of truth</strong> - No risk of state getting out of sync</li>
@@ -1404,7 +1406,7 @@ const Counter: React.FC&lt;CounterProps&gt; = ({ initialCount }) => {
 };</code></pre>
                 </div>
 
-                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <div class="card card-warning">
                     <h4>⚠️ Important: Props Don't Re-Initialize State</h4>
                     <pre><code class="language-typescript">// Parent changes initialCount
 &lt;Counter initialCount={10} /&gt;  // First render: count = 10
@@ -1549,7 +1551,7 @@ const Parent: React.FC = () => {
     return (
 
                 <h3>🎨 Data Flow Patterns Visualized</h3>
-                <svg viewBox="0 0 800 400" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
+                <svg class="svg-auto-invert" viewBox="0 0 800 400" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
                     <defs>
                         <marker id="downArrow" markerWidth="10" markerHeight="10" refX="5" refY="10" orient="auto">
                             <path d="M0,0 L5,10 L10,0" fill="#4CAF50"/>
@@ -1690,7 +1692,7 @@ const MouseTracker: React.FC&lt;MouseTrackerProps&gt; = ({ children }) => {
 &lt;/MouseTracker&gt;</code></pre>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ Communication Best Practices</h4>
                     <ul>
                         <li><strong>Prefer props and callbacks</strong> - Simple and explicit</li>
@@ -1707,7 +1709,7 @@ const MouseTracker: React.FC&lt;MouseTrackerProps&gt; = ({ children }) => {
                 <h2>🏋️ Hands-on Practice</h2>
                 <p>Time to apply these patterns! Let's build components that demonstrate proper state management.</p>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h3>🏋️ Exercise 1: Filter and List</h3>
                     <p><strong>Goal:</strong> Build a searchable list where search input and list are siblings.</p>
                     
@@ -1809,7 +1811,7 @@ export default SearchableList;</code></pre>
                     </details>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h3>🏋️ Exercise 2: Tabs Component</h3>
                     <p><strong>Goal:</strong> Build a tabs component that manages its own active tab state.</p>
                     
@@ -1920,7 +1922,7 @@ export default App;</code></pre>
                     </details>
                 </div>
 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h3>🏋️ Exercise 3: Parent-Child Sync</h3>
                     <p><strong>Goal:</strong> Build a color picker where RGB inputs sync with a color preview.</p>
                     
@@ -2047,7 +2049,7 @@ export default ColorPicker;</code></pre>
                 <h2>🔧 Refactoring Exercise</h2>
                 <p>Let's take poorly organized state and refactor it to follow best practices!</p>
 
-                <div class="card" style="background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <div class="card card-warning">
                     <h3>❌ Bad Code: Multiple Issues</h3>
                     <p>This code has several state management problems. Can you spot them?</p>
                     <pre><code class="language-typescript">// 🚨 PROBLEMS IN THIS CODE!
@@ -2084,7 +2086,7 @@ const BadTodoApp: React.FC = () => {
                     </ol>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h3>✅ Good Code: Refactored</h3>
                     <pre><code class="language-typescript">// ✨ FIXED VERSION
 interface Todo {
@@ -2264,7 +2266,7 @@ const TodoList: React.FC&lt;TodoListProps&gt; = ({ todos, onToggle, onDelete }) 
                 <h2>✨ Best Practices</h2>
                 <p>Let's consolidate everything you've learned into actionable best practices.</p>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ 1. Single Source of Truth</h4>
                     <p>Each piece of data should have exactly one source of truth:</p>
                     <ul>
@@ -2274,7 +2276,7 @@ const TodoList: React.FC&lt;TodoListProps&gt; = ({ todos, onToggle, onDelete }) 
                     </ul>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ 2. Minimize State</h4>
                     <p>Before adding state, ask: "Can I calculate this?"</p>
                     <pre><code class="language-typescript">// ❌ Don't store what you can calculate
@@ -2286,7 +2288,7 @@ const [items, setItems] = useState([]);
 const count = items.length;</code></pre>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ 3. Colocate State</h4>
                     <p>Keep state as local as possible:</p>
                     <ul>
@@ -2296,7 +2298,7 @@ const count = items.length;</code></pre>
                     </ul>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ 4. Use Composition Over Prop Drilling</h4>
                     <p>When passing props through multiple layers, consider composition:</p>
                     <pre><code class="language-typescript">// ❌ Prop drilling
@@ -2314,7 +2316,7 @@ const count = items.length;</code></pre>
 &lt;/Layout&gt;</code></pre>
                 </div>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✅ 5. Name Callbacks Clearly</h4>
                     <p>Use consistent naming for callbacks:</p>
                     <pre><code class="language-typescript">// ✅ Good naming
@@ -2430,7 +2432,7 @@ graph TD
                     </ul>
                 </div>
 
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card card-accent">
                     <h3 style="color: white;">🎯 Key Takeaways</h3>
                     <ul style="color: white;">
                         <li><strong>Minimize state</strong> - Don't store what you can calculate</li>
@@ -2445,7 +2447,7 @@ graph TD
                 <h3>🚀 Next Steps</h3>
                 <p>With these patterns mastered, you're ready for more advanced topics:</p>
                 
-                <div class="card" style="background: #e3f2fd; border-left: 4px solid #2196F3;">
+                <div class="card card-info">
                     <h4>📖 Coming Up Next</h4>
                     <p><strong>Lesson 3.3: Forms in React</strong></p>
                     <ul>
@@ -2467,7 +2469,7 @@ graph TD
                     <li><strong>Kanban Board</strong> - Drag and drop with columns sharing task state</li>
                 </ul>
 
-                <div class="card" style="background: #e8f5e9; border-left: 4px solid #4CAF50;">
+                <div class="card card-success">
                     <h4>✨ Remember</h4>
                     <p>Good state management is about making deliberate decisions. Before adding state, think: Where should it live? Can it be derived? Who needs access? These patterns will guide you to cleaner, more maintainable React applications!</p>
                 </div>
@@ -2482,7 +2484,7 @@ graph TD
                     </ul>
                 </div>
 
-                <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                <div class="card card-accent">
                     <h3 style="color: white;">🎉 Congratulations!</h3>
                     <p style="color: white;">You've completed Lesson 3.2 and learned professional state management patterns! You now know how to organize state in scalable React applications. These patterns will serve you throughout your React career. Excellent work! 🚀</p>
                 </div>
@@ -2508,15 +2510,14 @@ graph TD
     </div>
 
     <!-- Footer -->
-    <footer>
-        <div class="container">
-            <p>&copy; 2024 React TypeScript Course. All rights reserved.</p>
-            <p>
-                <a href="index.html">Home</a> |
-                <a href="index.html#modules">Modules</a> |
-                <a href="https://github.com/practicalace" target="_blank" rel="noopener noreferrer">GitHub</a>
-            </p>
+    <footer class="site-footer">
+        <p>&copy; 2026 All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
         </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
     </footer>
 
     <script src="js/clipboard.js"></script>
