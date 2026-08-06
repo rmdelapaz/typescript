@@ -128,9 +128,9 @@
     required: 'Password is required',
     minLength: { value: 8, message: 'At least 8 characters' },
     validate: {
-      hasUpper: v => /[A-Z]/.test(v) || 'Need uppercase',
-      hasLower: v => /[a-z]/.test(v) || 'Need lowercase',
-      hasNumber: v => /\d/.test(v) || 'Need number'
+      hasUpper: v =&gt; /[A-Z]/.test(v) || 'Need uppercase',
+      hasLower: v =&gt; /[a-z]/.test(v) || 'Need lowercase',
+      hasNumber: v =&gt; /\d/.test(v) || 'Need number'
     }
   })}
 /&gt;</code></pre>
@@ -152,16 +152,13 @@
                 <p>Now see the same form with Zod:</p>
 
                 <pre><code class="language-typescript">// Zod schema - define once, use everywhere
-import { z } from 'zod';
+import { z } from 'zod'; // Zod 4
 
 const formSchema = z.object({
-  email: z.string()
-    .min(1, 'Email is required')
-    .email('Invalid email format')
-    .min(5, 'Email must be at least 5 characters'),
-  
+  // Zod 4: string formats are top-level helpers (z.email, not z.string().email)
+  email: z.email('Please enter a valid email'),
+
   password: z.string()
-    .min(1, 'Password is required')
     .min(8, 'At least 8 characters')
     .regex(/[A-Z]/, 'Need uppercase letter')
     .regex(/[a-z]/, 'Need lowercase letter')
@@ -191,16 +188,18 @@ const { register, handleSubmit } = useForm&lt;FormData&gt;({
                         <li><strong>Runtime + build time</strong> - Validation at both stages</li>
                         <li><strong>Chainable API</strong> - Beautiful, readable validation chains</li>
                         <li><strong>Rich validation</strong> - 40+ built-in validators</li>
-                        <li><strong>Tiny bundle</strong> - Only 8KB minified + gzipped</li>
+                        <li><strong>Small &amp; tree-shakable</strong> - Zod 4 slimmed the core, and <code>zod/mini</code> lets bundlers drop unused validators</li>
                     </ul>
                 </div>
 
                 <h3>What is Zod?</h3>
-                <p>Zod is a <strong>TypeScript-first schema validation library</strong>. Think of it as a way to define the "shape" of your data—what fields exist, what types they are, and what rules they must follow—all in one place.</p>
+                <p>Zod is a <strong>TypeScript-first schema validation library</strong>. Think of it as a way to describe the "shape" of your data—what fields exist, what types they are, and what rules they must follow—all in one place. Here's the mental model that makes Zod click: a schema is a <em>value</em> you build at runtime that doubles as a <em>type</em> at compile time. You write the rules once, and TypeScript reads them right back to you as a fully-typed object. No more keeping a hand-written <code>interface</code> in sync with a separate pile of validation checks—the schema <em>is</em> both.</p>
+
+                <p>Why does that matter so much? Because the boundary of your app—form inputs, URL params, API responses, <code>localStorage</code>—is where <code>unknown</code> data sneaks in. TypeScript's types vanish at runtime, so a value the compiler <em>believes</em> is a <code>number</code> can still arrive as the string <code>"25"</code> from an <code>&lt;input&gt;</code>. Zod stands at that boundary like a bouncer checking IDs: nothing gets inside your typed code until it has proven it matches the schema. This lesson uses <strong>Zod 4</strong> (the current major version), which is faster, smaller, and moves the common string formats to friendlier top-level helpers.</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Key Concepts</h4>
-                    <ul style="color: white;">
+                    <h4>📖 Key Concepts</h4>
+                    <ul>
                         <li><strong>Schema</strong> - A definition of what valid data looks like</li>
                         <li><strong>Validation</strong> - Checking if data matches the schema</li>
                         <li><strong>Parsing</strong> - Validating and transforming data</li>
@@ -210,12 +209,13 @@ const { register, handleSubmit } = useForm&lt;FormData&gt;({
                 </div>
 
                 <h3>Zod vs Other Validation Libraries</h3>
-                <div class="card">
+                <div class="table-wrap">
                     <table>
                         <thead>
                             <tr>
                                 <th>Feature</th>
-                                <th>Zod</th>
+                                <th>Zod 4</th>
+                                <th>Valibot</th>
                                 <th>Yup</th>
                                 <th>Joi</th>
                             </tr>
@@ -224,24 +224,28 @@ const { register, handleSubmit } = useForm&lt;FormData&gt;({
                             <tr>
                                 <td><strong>TypeScript</strong></td>
                                 <td>Native, first-class</td>
+                                <td>Native, first-class</td>
                                 <td>Via types package</td>
                                 <td>Limited support</td>
                             </tr>
                             <tr>
                                 <td><strong>Type inference</strong></td>
                                 <td>Automatic ✅</td>
+                                <td>Automatic ✅</td>
                                 <td>Manual</td>
                                 <td>Manual</td>
                             </tr>
                             <tr>
                                 <td><strong>Bundle size</strong></td>
-                                <td>8KB</td>
-                                <td>15KB</td>
-                                <td>Not browser-friendly</td>
+                                <td>Small core; <code>zod/mini</code> tree-shakes to ~2KB</td>
+                                <td>Tiny (~1–2KB, fully modular)</td>
+                                <td>~15KB</td>
+                                <td>Large; server-oriented</td>
                             </tr>
                             <tr>
                                 <td><strong>API style</strong></td>
-                                <td>Chainable, modern</td>
+                                <td>Chainable methods</td>
+                                <td>Composable functions (pipe)</td>
                                 <td>Chainable</td>
                                 <td>Object-based</td>
                             </tr>
@@ -249,16 +253,23 @@ const { register, handleSubmit } = useForm&lt;FormData&gt;({
                                 <td><strong>Learning curve</strong></td>
                                 <td>Easy</td>
                                 <td>Easy</td>
+                                <td>Easy</td>
                                 <td>Moderate</td>
                             </tr>
                             <tr>
-                                <td><strong>Popularity</strong></td>
-                                <td>Growing fast 🚀</td>
+                                <td><strong>Ecosystem</strong></td>
+                                <td>Huge (RHF, tRPC, etc.) 🚀</td>
+                                <td>Growing</td>
                                 <td>Established</td>
                                 <td>Server-focused</td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 What about Valibot?</h4>
+                    <p><a href="https://valibot.dev/" target="_blank" rel="noopener">Valibot</a> is the up-and-coming alternative worth knowing. Instead of chained methods, it uses standalone functions you compose with <code>pipe()</code>—so bundlers can drop every validator you don't import. That makes it exceptionally small (often 1–2KB), which is a big deal for size-sensitive apps. Zod answered back in v4 with <code>zod/mini</code>, a functional variant with the same tree-shaking benefit. For most React apps the ergonomics and giant ecosystem make Zod the default choice; reach for Valibot or <code>zod/mini</code> when bundle size is your top constraint. Both plug into React Hook Form through <code>@hookform/resolvers</code>.</p>
                 </div>
 
                 <h3>How Zod Works with React Hook Form</h3>
@@ -271,14 +282,13 @@ const { register, handleSubmit } = useForm&lt;FormData&gt;({
                     C --> D[4. Register inputs]
                     D --> E[5. User submits form]
                     E --> F[6. Zod validates data]
-                    F --> G{Valid?}
+                    F --> G{"Valid?"}
                     G -->|Yes| H[Call onSubmit with typed data]
                     G -->|No| I[Show Zod error messages]
                     
                     style A fill:#667eea,color:#fff
                     style H fill:#48bb78,color:#fff
                     style I fill:#f56565,color:#fff
-                </graph>
                 </div>
 
                 <div class="card card-info">
@@ -348,13 +358,13 @@ pnpm add @hookform/resolvers</code></pre>
 
                 <div class="card card-info">
                     <h4>💡 What is a Resolver?</h4>
-                    <p>A <strong>resolver</strong> is a bridge that connects validation libraries (like Zod, Yup, Joi) to React Hook Form. It tells React Hook Form:</p>
+                    <p>A <strong>resolver</strong> is a bridge that connects validation libraries (like Zod, Valibot, Yup, or Joi) to React Hook Form. Think of it as an adapter plug: React Hook Form speaks one "shape" of validation result, your schema library speaks another, and the resolver translates between them. It tells React Hook Form:</p>
                     <ul>
                         <li>How to validate form data using your schema</li>
-                        <li>How to format error messages</li>
+                        <li>How to map schema errors onto the right fields</li>
                         <li>When to trigger validation</li>
                     </ul>
-                    <p>The <code>@hookform/resolvers</code> package includes resolvers for all major validation libraries.</p>
+                    <p>The <code>@hookform/resolvers</code> package ships resolvers for all major libraries. For Zod 4 you want <strong>@hookform/resolvers v3.10 or newer</strong>—the import path is still <code>@hookform/resolvers/zod</code>.</p>
                 </div>
 
                 <h3>Step 3: Import and Set Up</h3>
@@ -369,9 +379,9 @@ import { useForm } from 'react-hook-form';
 // 3. Import the Zod resolver
 import { zodResolver } from '@hookform/resolvers/zod';
 
-// 4. Define your schema
+// 4. Define your schema (Zod 4: z.email is a top-level format helper)
 const schema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(8)
 });
 
@@ -388,17 +398,17 @@ function MyForm() {
     resolver: zodResolver(schema) // Connect Zod to React Hook Form!
   });
 
-  const onSubmit = (data: FormData) => {
+  const onSubmit = (data: FormData) =&gt; {
     console.log(data); // Fully validated and typed!
   };
 
   return (
     &lt;form onSubmit={handleSubmit(onSubmit)}&gt;
       &lt;input {...register('email')} /&gt;
-      {errors.email && &lt;span&gt;{errors.email.message}&lt;/span&gt;}
+      {errors.email &amp;&amp; &lt;span&gt;{errors.email.message}&lt;/span&gt;}
       
       &lt;input type="password" {...register('password')} /&gt;
-      {errors.password && &lt;span&gt;{errors.password.message}&lt;/span&gt;}
+      {errors.password &amp;&amp; &lt;span&gt;{errors.password.message}&lt;/span&gt;}
       
       &lt;button type="submit"&gt;Submit&lt;/button&gt;
     &lt;/form&gt;
@@ -437,7 +447,7 @@ function SimpleForm() {
   });
 
   return (
-    &lt;form onSubmit={handleSubmit(data => console.log(data))}&gt;
+    &lt;form onSubmit={handleSubmit(data =&gt; console.log(data))}&gt;
       &lt;input {...register('name')} /&gt;
       &lt;button&gt;Submit&lt;/button&gt;
     &lt;/form&gt;
@@ -449,7 +459,7 @@ function SimpleForm() {
                     <ul>
                         <li>❌ Forgetting to install <code>@hookform/resolvers</code></li>
                         <li>❌ Using <code>zod</code> resolver instead of <code>zodResolver</code></li>
-                        <li>❌ Not passing the resolver to <code>useForm</code></li>
+                        <li>❌ Not passing the resolver to <code>useForm&lt;/code></li>
                         <li>❌ Defining the schema inside the component (will recreate on every render)</li>
                     </ul>
                     <p><strong>Always define schemas outside your component!</strong></p>
@@ -482,9 +492,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 // Define schema outside component
 const loginSchema = z.object({
-  email: z.string()
-    .min(1, 'Email is required')
-    .email('Invalid email address'),
+  email: z.email('Invalid email address'),
   password: z.string()
     .min(1, 'Password is required')
     .min(6, 'Password must be at least 6 characters')
@@ -502,7 +510,7 @@ function LoginForm() {
     resolver: zodResolver(loginSchema)
   });
 
-  const onSubmit = (data: LoginFormData) => {
+  const onSubmit = (data: LoginFormData) =&gt; {
     console.log('Login data:', data);
     alert(`Logging in with email: ${data.email}`);
   };
@@ -529,7 +537,7 @@ function LoginForm() {
             borderRadius: '4px'
           }}
         /&gt;
-        {errors.email && (
+        {errors.email &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.email.message}
           &lt;/span&gt;
@@ -551,7 +559,7 @@ function LoginForm() {
             borderRadius: '4px'
           }}
         /&gt;
-        {errors.password && (
+        {errors.password &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.password.message}
           &lt;/span&gt;
@@ -629,14 +637,33 @@ try {
                 <div class="card card-info">
                     <h4>💡 Key Zod Methods</h4>
                     <ul>
-                        <li><code>.parse(data)</code> - Validate and return data (throws error if invalid)</li>
-                        <li><code>.safeParse(data)</code> - Validate and return {success, data} or {success, error}</li>
-                        <li><code>.parseAsync(data)</code> - Async version of parse</li>
+                        <li><code>.parse(data)</code> - Validate and return typed data; <strong>throws</strong> a <code>ZodError</code> if invalid</li>
+                        <li><code>.safeParse(data)</code> - Validate and return <code>{ success: true, data }</code> or <code>{ success: false, error }</code> (never throws)</li>
+                        <li><code>.parseAsync(data)</code> / <code>.safeParseAsync(data)</code> - Async versions (needed when a schema uses async <code>.refine</code>)</li>
                         <li><code>.partial()</code> - Make all fields optional</li>
                         <li><code>.required()</code> - Make all fields required</li>
-                        <li><code>.extend()</code> - Add more fields to schema</li>
+                        <li><code>.extend({...})</code> - Add more fields to a schema</li>
                     </ul>
                 </div>
+
+                <h3>parse vs safeParse: Throw or Return?</h3>
+                <p>This is the single most important decision when you run a schema, so let's make it concrete. <code>.parse()</code> is the confident option: it hands you clean, typed data or it throws. Great inside a <code>try/catch</code>, or on a trusted server boundary where a failure genuinely is exceptional. <code>.safeParse()</code> is the calm option: it never throws, returning a discriminated result you branch on. That's usually what you want in UI code—an invalid form isn't an "exception", it's Tuesday. React Hook Form's <code>zodResolver</code> uses <code>safeParse</code> under the hood so a validation failure becomes field errors, not a crash.</p>
+
+                <figure>
+                    <figcaption>How a value flows through a schema—valid data comes out typed, invalid data comes out as structured issues.</figcaption>
+                    <div class="mermaid">
+                        graph LR
+                            A["Unknown input"] --> B["schema.safeParse(input)"]
+                            B --> C{"result.success?"}
+                            C -->|"true"| D["result.data<br/>(fully typed)"]
+                            C -->|"false"| E["result.error<br/>(ZodError.issues)"]
+                            D --> F["Use safely in typed code"]
+                            E --> G["Show messages per field"]
+
+                            style D fill:#48bb78,color:#fff
+                            style E fill:#f56565,color:#fff
+                    </div>
+                </figure>
 
                 <h3>Building a Schema Step by Step</h3>
                 <p>Let's build a registration form schema progressively:</p>
@@ -649,10 +676,10 @@ const step1 = z.object({
   email: z.string()
 });
 
-// Add validation rules
+// Add validation rules (Zod 4: z.email() is the top-level format helper)
 const step2 = z.object({
   username: z.string().min(3).max(20),
-  email: z.string().email()
+  email: z.email()
 });
 
 // Add custom error messages
@@ -660,8 +687,7 @@ const step3 = z.object({
   username: z.string()
     .min(3, 'Username must be at least 3 characters')
     .max(20, 'Username must be at most 20 characters'),
-  email: z.string()
-    .email('Invalid email address')
+  email: z.email('Invalid email address')
 });
 
 // Add more fields
@@ -669,8 +695,7 @@ const step4 = z.object({
   username: z.string()
     .min(3, 'Username must be at least 3 characters')
     .max(20, 'Username must be at most 20 characters'),
-  email: z.string()
-    .email('Invalid email address'),
+  email: z.email('Invalid email address'),
   password: z.string()
     .min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string()
@@ -681,13 +706,12 @@ const registrationSchema = z.object({
   username: z.string()
     .min(3, 'Username must be at least 3 characters')
     .max(20, 'Username must be at most 20 characters'),
-  email: z.string()
-    .email('Invalid email address'),
+  email: z.email('Invalid email address'),
   password: z.string()
     .min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string()
-}).refine(data => data.password === data.confirmPassword, {
-  message: 'Passwords do not match',
+}).refine(data =&gt; data.password === data.confirmPassword, {
+  error: 'Passwords do not match',
   path: ['confirmPassword'] // Error will show on confirmPassword field
 });
 
@@ -727,7 +751,7 @@ const addressSchema = z.object({
 
 const contactSchema = z.object({
   phone: z.string().regex(/^\d{10}$/, 'Phone must be 10 digits'),
-  email: z.string().email('Invalid email')
+  email: z.email('Invalid email')
 });
 
 // Compose them into a larger schema
@@ -775,7 +799,7 @@ type UserProfile = z.infer&lt;typeof userProfileSchema&gt;;
                 <pre><code class="language-typescript">import { z } from 'zod';
 
 const userSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   age: z.number().min(18)
 });
 
@@ -792,14 +816,31 @@ console.log(result2);
 // { success: false, error: ZodError { issues: [...] } }
 
 if (!result2.success) {
+  // error.issues is the canonical, flat list of what went wrong
   console.log('Validation errors:');
-  result2.error.issues.forEach(issue => {
+  result2.error.issues.forEach(issue =&gt; {
     console.log(`${issue.path.join('.')}: ${issue.message}`);
   });
+
+  // Zod 4 also gives you higher-level formatters:
+  console.log(z.prettifyError(result2.error)); // human-readable multi-line string
+  const tree = z.treeifyError(result2.error);  // nested { errors, properties } shape
+  console.log(tree.properties?.email?.errors);  // ['Invalid email address']
 }
 // Output:
-// email: Invalid email
-// age: Number must be greater than or equal to 18</code></pre>
+// email: Invalid email address
+// age: Too small: expected number to be &gt;=18</code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 Zod 4 error formatting</h4>
+                    <p>Reach for the right tool depending on what you're building:</p>
+                    <ul>
+                        <li><code>error.issues</code> - the raw array; loop it for custom UI (this is what resolvers read).</li>
+                        <li><code>z.treeifyError(error)</code> - a nested object mirroring your schema's shape; ideal for attaching messages to nested/array fields. (Replaces the old <code>error.format()</code>.)</li>
+                        <li><code>z.flattenError(error)</code> - <code>{ formErrors, fieldErrors }</code> for simple flat forms. (Replaces <code>error.flatten()</code>.)</li>
+                        <li><code>z.prettifyError(error)</code> - a ready-to-print string, perfect for logs and CLI tools.</li>
+                    </ul>
+                </div>
 
                 <div class="card card-success">
                     <h4>✅ Best Practice: Test Your Schemas</h4>
@@ -833,36 +874,36 @@ const registrationSchema = z.object({
     .max(20, 'Username cannot exceed 20 characters')
     .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'),
   
-  email: z.string()
-    .min(1, 'Email is required')
-    .email('Invalid email address'),
-  
+  email: z.email('Invalid email address'),
+
+  // Zod 4: one `error` replaces the old required_error / invalid_type_error pair.
+  // Pass a function if you want different text for "missing" vs "wrong type".
   age: z.number({
-    required_error: 'Age is required',
-    invalid_type_error: 'Age must be a number'
+    error: (issue) =&gt;
+      issue.input === undefined ? 'Age is required' : 'Age must be a number'
   })
     .min(18, 'You must be at least 18 years old')
     .max(120, 'Please enter a valid age'),
-  
+
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
     .regex(/[0-9]/, 'Password must contain at least one number'),
-  
+
   confirmPassword: z.string(),
-  
+
   terms: z.boolean()
-    .refine(val => val === true, {
-      message: 'You must accept the terms and conditions'
+    .refine(val =&gt; val === true, {
+      error: 'You must accept the terms and conditions'
     })
-}).refine(data => data.password === data.confirmPassword, {
-  message: 'Passwords do not match',
+}).refine(data =&gt; data.password === data.confirmPassword, {
+  error: 'Passwords do not match',
   path: ['confirmPassword']
 });
 
 // 2. Infer TypeScript type
-type RegistrationFormData = z.infer<typeof registrationSchema>;
+type RegistrationFormData = z.infer&lt;typeof registrationSchema&gt;;
 
 // 3. Create the form component
 function RegistrationForm() {
@@ -870,14 +911,14 @@ function RegistrationForm() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting }
-  } = useForm<RegistrationFormData>({
+  } = useForm&lt;RegistrationFormData&gt;({
     resolver: zodResolver(registrationSchema)
   });
 
-  const onSubmit = async (data: RegistrationFormData) => {
+  const onSubmit = async (data: RegistrationFormData) =&gt; {
     console.log('Form data:', data);
     // Data is already validated by Zod!
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve =&gt; setTimeout(resolve, 1000));
     alert('Registration successful!');
   };
 
@@ -897,7 +938,7 @@ function RegistrationForm() {
             border: `1px solid ${errors.username ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.username && (
+        {errors.username &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.username.message}
           &lt;/span&gt;
@@ -917,7 +958,7 @@ function RegistrationForm() {
             border: `1px solid ${errors.email ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.email && (
+        {errors.email &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.email.message}
           &lt;/span&gt;
@@ -937,7 +978,7 @@ function RegistrationForm() {
             border: `1px solid ${errors.age ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.age && (
+        {errors.age &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.age.message}
           &lt;/span&gt;
@@ -957,7 +998,7 @@ function RegistrationForm() {
             border: `1px solid ${errors.password ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.password && (
+        {errors.password &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.password.message}
           &lt;/span&gt;
@@ -977,7 +1018,7 @@ function RegistrationForm() {
             border: `1px solid ${errors.confirmPassword ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.confirmPassword && (
+        {errors.confirmPassword &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.confirmPassword.message}
           &lt;/span&gt;
@@ -989,7 +1030,7 @@ function RegistrationForm() {
           &lt;input type="checkbox" {...register('terms')} /&gt;
           I accept the terms and conditions *
         &lt;/label&gt;
-        {errors.terms && (
+        {errors.terms &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.terms.message}
           &lt;/span&gt;
@@ -1033,25 +1074,25 @@ export default RegistrationForm;</code></pre>
                 <p>Control when Zod validates your form:</p>
 
                 <pre><code class="language-typescript">// Validate on submit only (default)
-const { register } = useForm<FormData>({
+const { register } = useForm&lt;FormData&gt;({
   resolver: zodResolver(schema),
   mode: 'onSubmit'
 });
 
 // Validate on blur (good UX)
-const { register } = useForm<FormData>({
+const { register } = useForm&lt;FormData&gt;({
   resolver: zodResolver(schema),
   mode: 'onBlur'
 });
 
 // Validate on change (real-time feedback)
-const { register } = useForm<FormData>({
+const { register } = useForm&lt;FormData&gt;({
   resolver: zodResolver(schema),
   mode: 'onChange'
 });
 
 // Validate on blur, then on change (best UX)
-const { register } = useForm<FormData>({
+const { register } = useForm&lt;FormData&gt;({
   resolver: zodResolver(schema),
   mode: 'onTouched'
 });</code></pre>
@@ -1076,10 +1117,10 @@ const { register } = useForm<FormData>({
   quantity: z.number().int().positive()
 });
 
-type FormData = z.infer<typeof schema>;
+type FormData = z.infer&lt;typeof schema&gt;;
 
 function NumberDateForm() {
-  const { register, handleSubmit } = useForm<FormData>({
+  const { register, handleSubmit } = useForm&lt;FormData&gt;({
     resolver: zodResolver(schema)
   });
 
@@ -1157,36 +1198,34 @@ const profileSchema = z.object({
     .min(2, 'Last name must be at least 2 characters')
     .max(50, 'Last name cannot exceed 50 characters'),
   
-  email: z.string()
-    .min(1, 'Email is required')
-    .email('Invalid email address'),
-  
+  email: z.email('Invalid email address'),
+
   age: z.number({
-    required_error: 'Age is required',
-    invalid_type_error: 'Age must be a number'
+    error: (issue) =&gt;
+      issue.input === undefined ? 'Age is required' : 'Age must be a number'
   })
     .min(18, 'You must be at least 18 years old')
     .max(120, 'Please enter a valid age'),
-  
+
   bio: z.string()
     .max(200, 'Bio cannot exceed 200 characters')
     .optional()
 });
 
 // Infer TypeScript type
-type ProfileFormData = z.infer<typeof profileSchema>;
+type ProfileFormData = z.infer&lt;typeof profileSchema&gt;;
 
 function ProfileForm() {
   const {
     register,
     handleSubmit,
     formState: { errors }
-  } = useForm<ProfileFormData>({
+  } = useForm&lt;ProfileFormData&gt;({
     resolver: zodResolver(profileSchema),
     mode: 'onTouched'
   });
 
-  const onSubmit = (data: ProfileFormData) => {
+  const onSubmit = (data: ProfileFormData) =&gt; {
     console.log('Profile data:', data);
     alert('Profile updated successfully!');
   };
@@ -1207,7 +1246,7 @@ function ProfileForm() {
             border: `1px solid ${errors.firstName ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.firstName && (
+        {errors.firstName &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.firstName.message}
           &lt;/span&gt;
@@ -1226,7 +1265,7 @@ function ProfileForm() {
             border: `1px solid ${errors.lastName ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.lastName && (
+        {errors.lastName &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.lastName.message}
           &lt;/span&gt;
@@ -1246,7 +1285,7 @@ function ProfileForm() {
             border: `1px solid ${errors.email ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.email && (
+        {errors.email &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.email.message}
           &lt;/span&gt;
@@ -1266,7 +1305,7 @@ function ProfileForm() {
             border: `1px solid ${errors.age ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.age && (
+        {errors.age &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.age.message}
           &lt;/span&gt;
@@ -1288,7 +1327,7 @@ function ProfileForm() {
             border: `1px solid ${errors.bio ? '#f56565' : '#ddd'}`
           }}
         /&gt;
-        {errors.bio && (
+        {errors.bio &amp;&amp; (
           &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
             {errors.bio.message}
           &lt;/span&gt;
@@ -1377,15 +1416,15 @@ voidSchema.parse(undefined); // ✅</code></pre>
     .min(8, 'At least 8 characters')
     .max(100, 'Maximum 100 characters'),
   
-  // Email validation
-  email: z.string().email('Invalid email'),
-  
+  // Email validation (Zod 4: top-level helper)
+  email: z.email('Invalid email'),
+
   // URL validation
-  website: z.string().url('Invalid URL'),
-  
+  website: z.url('Invalid URL'),
+
   // UUID validation
-  id: z.string().uuid('Invalid UUID'),
-  
+  id: z.uuid('Invalid UUID'),
+
   // Custom regex
   phone: z.string().regex(/^\d{10}$/, 'Phone must be 10 digits'),
   
@@ -1447,8 +1486,8 @@ voidSchema.parse(undefined); // ✅</code></pre>
   
   // Boolean that must be true (for terms acceptance)
   terms: z.boolean()
-    .refine(val => val === true, {
-      message: 'You must accept the terms'
+    .refine(val =&gt; val === true, {
+      error: 'You must accept the terms'
     }),
   
   // Optional boolean
@@ -1500,11 +1539,11 @@ const addressSchema = z.object({
 
 const userSchema = z.object({
   name: z.string(),
-  email: z.string().email(),
+  email: z.email(),
   address: addressSchema, // Nested object
-  
-  // Object with dynamic keys
-  metadata: z.record(z.string(), z.any()),
+
+  // Object with dynamic keys (Zod 4 requires both key and value schemas)
+  metadata: z.record(z.string(), z.unknown()),
   
   // Optional object
   preferences: z.object({
@@ -1522,14 +1561,14 @@ roleSchema.parse('superuser'); // ❌ Error
 // In a form
 const schema = z.object({
   role: z.enum(['admin', 'user', 'guest']),
-  
-  // With custom error
+
+  // With custom error (Zod 4: a plain `error` string replaces the old errorMap)
   status: z.enum(['active', 'inactive', 'pending'], {
-    errorMap: () => ({ message: 'Invalid status' })
+    error: 'Invalid status'
   }),
-  
-  // From TypeScript enum
-  priority: z.nativeEnum(Priority) // where Priority is a TS enum
+
+  // From a TypeScript enum
+  priority: z.enum(Priority) // where Priority is a TS enum
 });
 
 // TypeScript enum example
@@ -1539,9 +1578,10 @@ enum Priority {
   High = 'high'
 }
 
+// Zod 4: z.enum() accepts native TS enums directly (z.nativeEnum is now deprecated)
 const taskSchema = z.object({
   title: z.string(),
-  priority: z.nativeEnum(Priority)
+  priority: z.enum(Priority)
 });</code></pre>
 
                 <h3>Union Types</h3>
@@ -1556,12 +1596,17 @@ const schema = z.object({
   // Field can be string or number
   identifier: z.union([z.string(), z.number()]),
   
-  // Contact preference
-  contact: z.union([
-    z.object({ type: z.literal('email'), email: z.string().email() }),
+  // Contact preference (a discriminated union — see the tip below)
+  contact: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('email'), email: z.email() }),
     z.object({ type: z.literal('phone'), phone: z.string() })
   ])
 });</code></pre>
+
+                <div class="card card-success">
+                    <h4>✅ Prefer discriminatedUnion for tagged shapes</h4>
+                    <p>When each branch of a union carries a shared literal "tag" field (like <code>type: 'email'</code> vs <code>type: 'phone'</code>), use <code>z.discriminatedUnion('type', [...])</code> instead of a plain <code>z.union</code>. Zod reads the tag first and validates <em>only</em> the matching branch, so it's faster and—crucially—produces a precise error on the right field instead of a confusing "no union member matched" dump. TypeScript infers it as a clean discriminated union too, so <code>switch (contact.type)</code> narrows perfectly.</p>
+                </div>
 
                 <div class="card card-info">
                     <h4>💡 Type Reference Quick Guide</h4>
@@ -1688,37 +1733,48 @@ const schema = z.object({
 });</code></pre>
 
                 <h3>Format Validation</h3>
+                <p>In <strong>Zod 4</strong>, the common string formats graduated from chained methods (<code>z.string().email()</code>) to standalone top-level helpers (<code>z.email()</code>). The old forms still work but are deprecated—and the top-level versions tree-shake better, since a bundle only pulls in the formats you actually import. Here's the modern lineup:</p>
                 <pre><code class="language-typescript">const schema = z.object({
   // Email validation
-  email: z.string().email('Invalid email address'),
-  
+  email: z.email('Invalid email address'),
+
   // URL validation
-  website: z.string().url('Invalid URL'),
-  
+  website: z.url('Invalid URL'),
+
   // UUID validation
-  id: z.string().uuid('Invalid UUID'),
-  
-  // CUID validation
-  userId: z.string().cuid('Invalid CUID'),
-  
-  // CUID2 validation
-  sessionId: z.string().cuid2('Invalid CUID2'),
-  
-  // ULID validation
-  transactionId: z.string().ulid('Invalid ULID'),
-  
-  // ISO datetime validation
-  createdAt: z.string().datetime('Invalid datetime'),
-  
-  // IP address validation
-  ipAddress: z.string().ip('Invalid IP address'),
-  
-  // IPv4 specific
-  ipv4: z.string().ip({ version: 'v4', message: 'Invalid IPv4' }),
-  
-  // IPv6 specific
-  ipv6: z.string().ip({ version: 'v6', message: 'Invalid IPv6' })
+  id: z.uuid('Invalid UUID'),
+
+  // CUID / CUID2 / ULID / nanoid
+  userId: z.cuid('Invalid CUID'),
+  sessionId: z.cuid2('Invalid CUID2'),
+  transactionId: z.ulid('Invalid ULID'),
+  shortId: z.nanoid('Invalid nanoid'),
+
+  // ISO date &amp; time formats now live under z.iso.*
+  createdAt: z.iso.datetime('Invalid datetime'), // '2026-08-06T12:00:00Z'
+  birthday: z.iso.date('Invalid date'),          // '2026-08-06'
+  startsAt: z.iso.time('Invalid time'),          // '12:00:00'
+
+  // IP addresses are split into explicit versions (the old .ip() is gone)
+  ipv4: z.ipv4('Invalid IPv4 address'),
+  ipv6: z.ipv6('Invalid IPv6 address'),
+
+  // CIDR ranges got dedicated helpers too
+  subnet: z.cidrv4('Invalid CIDR block')
 });</code></pre>
+
+                <div class="card card-warning">
+                    <h4>⚠️ Migrating from Zod 3</h4>
+                    <p>If you're updating older code, these are the renames you'll hit most:</p>
+                    <pre><code class="language-typescript">// Zod 3 (deprecated)          →  Zod 4 (preferred)
+z.string().email()             // →  z.email()
+z.string().url()               // →  z.url()
+z.string().uuid()              // →  z.uuid()
+z.string().datetime()          // →  z.iso.datetime()
+z.string().ip()                // →  z.ipv4() or z.ipv6()
+z.number({ invalid_type_error })  // →  z.number({ error })</code></pre>
+                    <p>The deprecated forms still run in Zod 4, so you can migrate gradually—but new code should use the top-level helpers.</p>
+                </div>
 
                 <h3>Pattern Matching (Regex)</h3>
                 <pre><code class="language-typescript">const schema = z.object({
@@ -1777,7 +1833,7 @@ const schema = z.object({
     .min(3, 'At least 3 characters'),
   
   // Custom transformation
-  slug: z.string().transform(val => 
+  slug: z.string().transform(val =&gt; 
     val.toLowerCase().replace(/\s+/g, '-')
   )
 });
@@ -1900,17 +1956,16 @@ const contactSchema = z.object({
     .max(50, 'Name cannot exceed 50 characters')
     .regex(/^[A-Z]/, 'Name must start with a capital letter'),
   
+  // Clean the value first, THEN validate it as an email (.pipe chains schemas)
   email: z.string()
     .trim()
-    .min(1, 'Email is required')
-    .email('Invalid email address')
-    .toLowerCase(),
-  
+    .toLowerCase()
+    .pipe(z.email('Invalid email address')),
+
   phone: z.string()
     .regex(/^\d{3}-\d{3}-\d{4}$/, 'Phone must be in format: 123-456-7890'),
-  
-  website: z.string()
-    .url('Invalid URL')
+
+  website: z.url('Invalid URL')
     .optional()
     .or(z.literal('')), // Allow empty string
   
@@ -2089,16 +2144,16 @@ const schema = z.object({
   // Less than or equal (inclusive)
   percentage: z.number().lte(100, 'Percentage cannot exceed 100'),
   
-  // Positive (> 0)
+  // Positive (&gt; 0)
   price: z.number().positive('Price must be positive'),
   
-  // Non-negative (>= 0)
+  // Non-negative (&gt;= 0)
   quantity: z.number().nonnegative('Quantity cannot be negative'),
   
-  // Negative (< 0)
+  // Negative (&lt; 0)
   temperature: z.number().negative('Temperature must be negative'),
   
-  // Non-positive (<= 0)
+  // Non-positive (&lt;= 0)
   debt: z.number().nonpositive('Debt cannot be positive'),
   
   // Multiple of (divisible by)
@@ -2153,17 +2208,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 const productSchema = z.object({
   name: z.string().min(1, 'Product name is required'),
   
-  price: z.number({
-    required_error: 'Price is required',
-    invalid_type_error: 'Price must be a number'
-  })
+  price: z.number({ error: 'Price must be a number' })
     .positive('Price must be positive')
     .multipleOf(0.01, 'Price can have at most 2 decimal places'),
-  
-  quantity: z.number({
-    required_error: 'Quantity is required',
-    invalid_type_error: 'Quantity must be a number'
-  })
+
+  quantity: z.number({ error: 'Quantity must be a number' })
     .int('Quantity must be a whole number')
     .positive('Quantity must be positive'),
   
@@ -2260,11 +2309,11 @@ const schema = z.object({
   
   // Age validation (must be 18+ years old)
   dateOfBirth: z.date()
-    .refine(date => {
+    .refine(date =&gt; {
       const age = Math.floor((Date.now() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-      return age >= 18;
+      return age &gt;= 18;
     }, {
-      message: 'You must be at least 18 years old'
+      error: 'You must be at least 18 years old'
     })
 });</code></pre>
 
@@ -2279,18 +2328,12 @@ today.setHours(0, 0, 0, 0);
 const eventSchema = z.object({
   eventName: z.string().min(1, 'Event name is required'),
   
-  startDate: z.date({
-    required_error: 'Start date is required',
-    invalid_type_error: 'Invalid date'
-  })
+  startDate: z.date({ error: 'A valid start date is required' })
     .min(today, 'Start date must be today or later'),
-  
-  endDate: z.date({
-    required_error: 'End date is required',
-    invalid_type_error: 'Invalid date'
-  })
-}).refine(data => data.endDate >= data.startDate, {
-  message: 'End date must be after or equal to start date',
+
+  endDate: z.date({ error: 'A valid end date is required' })
+}).refine(data =&gt; data.endDate &gt;= data.startDate, {
+  error: 'End date must be after or equal to start date',
   path: ['endDate']
 });
 
@@ -2353,22 +2396,25 @@ function EventForm() {
 
 // Validate ISO date string
 const schema = z.object({
-  // ISO 8601 datetime string
-  createdAt: z.string().datetime(),
-  
+  // ISO 8601 datetime string (Zod 4: z.iso.datetime, not z.string().datetime)
+  createdAt: z.iso.datetime(),
+
+  // Just the calendar date, no time component
+  publishedOn: z.iso.date(), // '2026-08-06'
+
   // Custom date string format
   birthDate: z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format')
-    .refine(dateStr => {
+    .refine(dateStr =&gt; {
       const date = new Date(dateStr);
       return !isNaN(date.getTime());
     }, {
-      message: 'Invalid date'
+      error: 'Invalid date'
     }),
   
   // Transform date string to Date object
   eventDate: z.string()
-    .transform(str => new Date(str))
+    .transform(str =&gt; new Date(str))
     .pipe(z.date().min(new Date(), 'Date must be in the future'))
 });</code></pre>
 
@@ -2427,11 +2473,11 @@ function FlexibleForm() {
 const userSchema = z.object({
   name: z.string(),
   age: z.number(),
-  email: z.string().email()
+  email: z.email()
 });
 
 // Infer the TypeScript type
-type User = z.infer<typeof userSchema>;
+type User = z.infer&lt;typeof userSchema&gt;;
 
 // Result is equivalent to:
 // type User = {
@@ -2456,7 +2502,7 @@ const user: User = {
   optionalNullable: z.string().optional().nullable()
 });
 
-type InferredType = z.infer<typeof schema>;
+type InferredType = z.infer&lt;typeof schema&gt;;
 
 // Result:
 // type InferredType = {
@@ -2480,11 +2526,11 @@ type InferredType = z.infer<typeof schema>;
   
   contacts: z.array(z.object({
     name: z.string(),
-    email: z.string().email()
+    email: z.email()
   }))
 });
 
-type InferredType = z.infer<typeof schema>;
+type InferredType = z.infer&lt;typeof schema&gt;;
 
 // Result:
 // type InferredType = {
@@ -2495,10 +2541,10 @@ type InferredType = z.infer<typeof schema>;
 //     city: string;
 //     zipCode: string;
 //   };
-//   contacts: Array<{
+//   contacts: Array&lt;{
 //     name: string;
 //     email: string;
-//   }>;
+//   }&gt;;
 // }</code></pre>
 
                 <h3>Inference with Enums and Unions</h3>
@@ -2514,7 +2560,7 @@ type InferredType = z.infer<typeof schema>;
   identifier: z.union([z.string(), z.number()])
 });
 
-type InferredType = z.infer<typeof schema>;
+type InferredType = z.infer&lt;typeof schema&gt;;
 
 // Result:
 // type InferredType = {
@@ -2529,19 +2575,19 @@ type InferredType = z.infer<typeof schema>;
                 <pre><code class="language-typescript">const schema = z.object({
   name: z.string().trim(), // Transform: trims whitespace
   email: z.string().toLowerCase(), // Transform: converts to lowercase
-  age: z.string().transform(val => parseInt(val)) // Transform: string to number
+  age: z.string().transform(val =&gt; parseInt(val)) // Transform: string to number
 });
 
 // Input type (what goes in)
-type Input = z.input<typeof schema>;
+type Input = z.input&lt;typeof schema&gt;;
 // Result: { name: string; email: string; age: string; }
 
 // Output type (what comes out after validation)
-type Output = z.output<typeof schema>;
+type Output = z.output&lt;typeof schema&gt;;
 // Result: { name: string; email: string; age: number; }
 
 // z.infer is an alias for z.output
-type InferredOutput = z.infer<typeof schema>;
+type InferredOutput = z.infer&lt;typeof schema&gt;;
 // Same as Output</code></pre>
 
                 <h3>Extracting Nested Types</h3>
@@ -2557,17 +2603,17 @@ const userSchema = z.object({
 });
 
 // Extract the entire user type
-type User = z.infer<typeof userSchema>;
+type User = z.infer&lt;typeof userSchema&gt;;
 
 // Extract just the address type
-type Address = z.infer<typeof addressSchema>;
+type Address = z.infer&lt;typeof addressSchema&gt;;
 
 // Or extract from nested schema
 type AddressFromUser = User['address'];</code></pre>
 
                 <h3>Reusing Schema Pieces</h3>
                 <pre><code class="language-typescript">// Define reusable schemas
-const emailSchema = z.string().email();
+const emailSchema = z.email();
 const passwordSchema = z.string().min(8);
 const phoneSchema = z.string().regex(/^\d{3}-\d{3}-\d{4}$/);
 
@@ -2585,8 +2631,8 @@ const registrationSchema = z.object({
 });
 
 // Both share the same email and password validation!
-type LoginData = z.infer<typeof loginSchema>;
-type RegistrationData = z.infer<typeof registrationSchema>;</code></pre>
+type LoginData = z.infer&lt;typeof loginSchema&gt;;
+type RegistrationData = z.infer&lt;typeof registrationSchema&gt;;</code></pre>
 
                 <div class="card card-success">
                     <h4>✅ Type Inference Benefits</h4>
@@ -2604,7 +2650,7 @@ type RegistrationData = z.infer<typeof registrationSchema>;</code></pre>
                 <pre><code class="language-typescript">// Base schema
 const baseUserSchema = z.object({
   name: z.string(),
-  email: z.string().email()
+  email: z.email()
 });
 
 // Extend with more fields
@@ -2636,10 +2682,10 @@ const partialUserSchema = baseUserSchema.partial();
 const requiredUserSchema = partialUserSchema.required();
 
 // Infer types from all variants
-type Admin = z.infer<typeof adminSchema>;
-type UserWithAddress = z.infer<typeof userWithAddressSchema>;
-type EmailOnly = z.infer<typeof emailOnlySchema>;
-type PartialUser = z.infer<typeof partialUserSchema>;</code></pre>
+type Admin = z.infer&lt;typeof adminSchema&gt;;
+type UserWithAddress = z.infer&lt;typeof userWithAddressSchema&gt;;
+type EmailOnly = z.infer&lt;typeof emailOnlySchema&gt;;
+type PartialUser = z.infer&lt;typeof partialUserSchema&gt;;</code></pre>
 
                 <div class="card card-info">
                     <h4>💡 Schema Manipulation Methods</h4>
@@ -2699,59 +2745,56 @@ type PartialUser = z.infer<typeof partialUserSchema>;</code></pre>
     .max(20, 'Username cannot exceed 20 characters')
     .regex(/^[a-zA-Z0-9_]+$/, 'Only letters, numbers, and underscores allowed'),
   
-  email: z.string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
-  
+  email: z.email('Please enter a valid email address'),
+
   age: z.number({
-    required_error: 'Age is required',
-    invalid_type_error: 'Age must be a number'
+    error: (issue) =&gt;
+      issue.input === undefined ? 'Age is required' : 'Age must be a number'
   })
     .min(18, 'You must be at least 18 years old')
     .max(120, 'Please enter a valid age')
 });</code></pre>
 
-                <h3>Custom Error Maps</h3>
-                <p>Override default error messages globally:</p>
+                <h3>Global Custom Errors</h3>
+                <p>Instead of writing the same message on every field, you can register one error function that Zod consults for <em>every</em> validation. In <strong>Zod 4</strong> this replaces the old <code>z.setErrorMap</code>/<code>ZodErrorMap</code> API: you pass a <code>customError</code> function to <code>z.config()</code>. The function receives the <code>issue</code> and returns a string—or <code>undefined</code> to let the next error source (a per-field message, then Zod's default) take over.</p>
 
                 <pre><code class="language-typescript">import { z } from 'zod';
 
-const customErrorMap: z.ZodErrorMap = (issue, ctx) => {
-  if (issue.code === z.ZodIssueCode.invalid_type) {
-    if (issue.expected === 'string') {
-      return { message: 'This field must be text' };
+// Zod 4: register a global error via z.config({ customError })
+z.config({
+  customError: (issue) =&gt; {
+    if (issue.code === 'invalid_type') {
+      if (issue.expected === 'string') return 'This field must be text';
+      if (issue.expected === 'number') return 'This field must be a number';
     }
-    if (issue.expected === 'number') {
-      return { message: 'This field must be a number' };
-    }
-  }
-  
-  if (issue.code === z.ZodIssueCode.too_small) {
-    if (issue.type === 'string') {
-      return { message: `Minimum ${issue.minimum} characters required` };
-    }
-  }
-  
-  if (issue.code === z.ZodIssueCode.too_big) {
-    if (issue.type === 'string') {
-      return { message: `Maximum ${issue.maximum} characters allowed` };
-    }
-  }
-  
-  // Fallback to default message
-  return { message: ctx.defaultError };
-};
 
-// Use custom error map
-z.setErrorMap(customErrorMap);
+    // In Zod 4, size issues carry `origin` ('string' | 'number' | 'array' | ...)
+    if (issue.code === 'too_small' &amp;&amp; issue.origin === 'string') {
+      return `Minimum ${issue.minimum} characters required`;
+    }
+    if (issue.code === 'too_big' &amp;&amp; issue.origin === 'string') {
+      return `Maximum ${issue.maximum} characters allowed`;
+    }
 
-// Or use per-schema
+    // Return undefined to fall back to the default message
+    return undefined;
+  }
+});
+
+// You can also scope an error function to a single schema via the `error` param
 const schema = z.object({
   name: z.string().min(3)
-}, { errorMap: customErrorMap });</code></pre>
+}, {
+  error: (issue) =&gt; 'Please check the highlighted fields'
+});</code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 The error-precedence ladder</h4>
+                    <p>When several messages could apply, Zod 4 picks in this order (most specific wins): the <strong>per-check</strong> message you passed (e.g. <code>.min(8, 'Too short')</code>) → the <strong>per-schema</strong> <code>error</code> → the <strong>global</strong> <code>z.config</code> error → Zod's built-in default. That's why a global error function usually returns <code>undefined</code> for cases it doesn't care about—so your specific messages still win.</p>
+                </div>
 
                 <h3>Error Messages with Field Names</h3>
-                <pre><code class="language-typescript">const createSchema = (fieldName: string) => {
+                <pre><code class="language-typescript">const createSchema = (fieldName: string) =&gt; {
   return z.string()
     .min(1, `${fieldName} is required`)
     .min(3, `${fieldName} must be at least 3 characters`);
@@ -2774,16 +2817,16 @@ const errorMessages = {
   en: {
     required: 'This field is required',
     email: 'Invalid email address',
-    minLength: (min: number) => `Minimum ${min} characters required`
+    minLength: (min: number) =&gt; `Minimum ${min} characters required`
   },
   es: {
     required: 'Este campo es obligatorio',
     email: 'Dirección de correo electrónico no válida',
-    minLength: (min: number) => `Mínimo ${min} caracteres requeridos`
+    minLength: (min: number) =&gt; `Mínimo ${min} caracteres requeridos`
   }
 };
 
-const createLocalizedSchema = (lang: 'en' | 'es') => {
+const createLocalizedSchema = (lang: 'en' | 'es') =&gt; {
   const msg = errorMessages[lang];
   
   return z.object({
@@ -2810,13 +2853,46 @@ const schema = createLocalizedSchema('en'); // or 'es'</code></pre>
     .regex(/[^A-Za-z0-9]/, 'Password must contain a special character'),
   
   confirmPassword: z.string()
-}).refine(data => data.password === data.confirmPassword, {
-  message: 'Passwords do not match',
+}).refine(data =&gt; data.password === data.confirmPassword, {
+  error: 'Passwords do not match',
   path: ['confirmPassword'] // Show error on confirmPassword field
-}).refine(data => data.password !== 'password123', {
-  message: 'This password is too common. Please choose a different one.',
+}).refine(data =&gt; data.password !== 'password123', {
+  error: 'This password is too common. Please choose a different one.',
   path: ['password']
 });</code></pre>
+
+                <h3>refine vs superRefine</h3>
+                <p><code>.refine()</code> is perfect for a single yes/no check with one message. But sometimes one rule needs to raise <em>several</em> errors, on <em>different</em> fields, with different messages—that's where <code>.superRefine()</code> earns its keep. It hands you the value plus a <code>ctx</code> you can call <code>ctx.addIssue()</code> on as many times as you like:</p>
+
+                <pre><code class="language-typescript">const signupSchema = z.object({
+  password: z.string(),
+  confirmPassword: z.string()
+}).superRefine((data, ctx) =&gt; {
+  // Raise a rich, targeted issue for each problem we find
+  if (data.password.length &lt; 8) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Password must be at least 8 characters',
+      path: ['password']
+    });
+  }
+  if (data.password !== data.confirmPassword) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Passwords do not match',
+      path: ['confirmPassword']
+    });
+  }
+});</code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 Which refinement should I use?</h4>
+                    <ul>
+                        <li><strong><code>.refine()</code></strong> - one condition, one message. The 90% case (password confirmation, "must be 18+").</li>
+                        <li><strong><code>.superRefine()</code></strong> - multiple conditional issues, custom issue <code>code</code>s, or errors spread across several fields in a single pass.</li>
+                        <li>Both run <em>after</em> the basic field types pass, so inside them your data is already typed.</li>
+                    </ul>
+                </div>
 
                 <div class="card card-success">
                     <h4>✅ Error Message Best Practices</h4>
@@ -2935,10 +3011,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 // 1. Reusable schema pieces
-const emailSchema = z.string()
-  .min(1, 'Email is required')
-  .email('Invalid email address')
-  .toLowerCase();
+const emailSchema = z.email('Invalid email address').toLowerCase();
 
 const passwordSchema = z.string()
   .min(8, 'Password must be at least 8 characters')
@@ -2977,8 +3050,8 @@ const userRegistrationSchema = z.object({
   
   // Number validation
   age: z.number({
-    required_error: 'Age is required',
-    invalid_type_error: 'Age must be a number'
+    error: (issue) =&gt;
+      issue.input === undefined ? 'Age is required' : 'Age must be a number'
   })
     .int('Age must be a whole number')
     .min(18, 'Must be at least 18 years old')
@@ -2987,9 +3060,9 @@ const userRegistrationSchema = z.object({
   // Date validation
   birthDate: z.date()
     .max(new Date(), 'Birth date cannot be in the future')
-    .refine(date => {
+    .refine(date =&gt; {
       const age = Math.floor((Date.now() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-      return age >= 18;
+      return age &gt;= 18;
     }, 'Must be at least 18 years old'),
   
   // Nested schema
@@ -3005,7 +3078,7 @@ const userRegistrationSchema = z.object({
   
   // Boolean validation
   terms: z.boolean()
-    .refine(val => val === true, 'You must accept the terms'),
+    .refine(val =&gt; val === true, 'You must accept the terms'),
   
   // Optional fields
   bio: z.string()
@@ -3016,13 +3089,13 @@ const userRegistrationSchema = z.object({
   notifications: z.boolean().default(true)
 })
 // 4. Cross-field validation
-.refine(data => data.password === data.confirmPassword, {
-  message: 'Passwords do not match',
+.refine(data =&gt; data.password === data.confirmPassword, {
+  error: 'Passwords do not match',
   path: ['confirmPassword']
 });
 
 // 5. Infer TypeScript type
-type UserRegistrationData = z.infer<typeof userRegistrationSchema>;
+type UserRegistrationData = z.infer&lt;typeof userRegistrationSchema&gt;;
 
 // 6. Create form component
 function UserRegistrationForm() {
@@ -3030,25 +3103,25 @@ function UserRegistrationForm() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting }
-  } = useForm<UserRegistrationData>({
+  } = useForm&lt;UserRegistrationData&gt;({
     resolver: zodResolver(userRegistrationSchema),
     mode: 'onTouched'
   });
 
-  const onSubmit = async (data: UserRegistrationData) => {
+  const onSubmit = async (data: UserRegistrationData) =&gt; {
     console.log('Validated data:', data);
     // Data is fully validated and typed!
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve =&gt; setTimeout(resolve, 1000));
     alert('Registration successful!');
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    &lt;form onSubmit={handleSubmit(onSubmit)}&gt;
       {/* All fields would go here */}
-      <button type="submit" disabled={isSubmitting}>
+      &lt;button type="submit" disabled={isSubmitting}&gt;
         {isSubmitting ? 'Registering...' : 'Register'}
-      </button>
-    </form>
+      &lt;/button&gt;
+    &lt;/form&gt;
   );
 }</code></pre>
 
@@ -3075,8 +3148,13 @@ function UserRegistrationForm() {
                     <pre><code class="language-typescript">// Required string
 z.string().min(1, 'Required')
 
-// Email
-z.string().email('Invalid email')
+// Email / URL / UUID (Zod 4 top-level formats)
+z.email('Invalid email')
+z.url()
+z.uuid()
+
+// ISO date/time
+z.iso.datetime()
 
 // Password (strong)
 z.string()
@@ -3114,8 +3192,8 @@ z.object({
 })
 
 // Cross-field validation
-schema.refine(data => data.password === data.confirm, {
-  message: 'Must match',
+schema.refine(data =&gt; data.password === data.confirm, {
+  error: 'Must match',
   path: ['confirm']
 })
 
@@ -3126,11 +3204,17 @@ z.string().trim().toLowerCase()
 z.coerce.number()
 z.coerce.date()
 
-// Union
+// Union / discriminated union
 z.union([z.string(), z.number()])
+z.discriminatedUnion('type', [/* ...tagged objects */])
 
 // Regex validation
-z.string().regex(/pattern/, 'Message')</code></pre>
+z.string().regex(/pattern/, 'Message')
+
+// Read errors (Zod 4)
+result.error.issues        // raw array
+z.treeifyError(result.error)   // nested, mirrors schema
+z.prettifyError(result.error)  // printable string</code></pre>
                 </div>
 
                 <h3>When to Use Zod</h3>
@@ -3188,25 +3272,25 @@ function MyForm() { ... }</code></pre>
 bio: z.string().optional()
 
 // For optional but allow empty string
-website: z.string().url().optional().or(z.literal(''))</code></pre>
+website: z.url().optional().or(z.literal(''))</code></pre>
 
                     <h4>Problem: Cross-field validation error on wrong field</h4>
                     <p><strong>Solution:</strong> Specify <code>path</code> in refine</p>
-                    <pre><code>.refine(data => data.password === data.confirm, {
-  message: 'Passwords must match',
+                    <pre><code>.refine(data =&gt; data.password === data.confirm, {
+  error: 'Passwords must match',
   path: ['confirm'] // Show error on confirm field
 })</code></pre>
                 </div>
 
                 <div class="card card-accent">
-                    <h3 style="color: white;">🎯 What's Next?</h3>
-                    <p style="color: white;">In the upcoming lessons, you'll learn:</p>
-                    <ul style="color: white;">
+                    <h3>🎯 What's Next?</h3>
+                    <p>In the upcoming lessons, you'll learn:</p>
+                    <ul>
                         <li><strong>Lesson 7.4: File Uploads</strong> - Handle file inputs, image previews, and validation</li>
                         <li><strong>Lesson 7.5: Advanced Form Patterns</strong> - Dynamic field arrays, multi-step wizards, conditional fields</li>
                         <li><strong>Module Project</strong> - Build a complete user registration system with everything you've learned</li>
                     </ul>
-                    <p style="color: white;">You now have professional-grade form validation skills!</p>
+                    <p>You now have professional-grade form validation skills!</p>
                 </div>
 
                 <div class="card card-success">
@@ -3258,9 +3342,9 @@ website: z.string().url().optional().or(z.literal(''))</code></pre>
                 </div>
 
                 <div class="card card-accent" style="text-align: center; padding: 2rem;">
-                    <h2 style="color: white; margin-top: 0;">🎉 Congratulations!</h2>
-                    <p style="color: white; font-size: 1.2rem;">You've completed Lesson 7.3: Form Validation with Zod</p>
-                    <p style="color: white;">You now have the skills to build professional, type-safe forms that are maintainable, reusable, and user-friendly. Combined with React Hook Form, you have one of the most powerful form solutions available in the React ecosystem!</p>
+                    <h2 style="margin-top: 0;">🎉 Congratulations!</h2>
+                    <p style="font-size: 1.2rem;">You've completed Lesson 7.3: Form Validation with Zod</p>
+                    <p>You now have the skills to build professional, type-safe forms that are maintainable, reusable, and user-friendly. Combined with React Hook Form, you have one of the most powerful form solutions available in the React ecosystem!</p>
                 </div>
             </section>
         </div>

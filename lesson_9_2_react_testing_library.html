@@ -107,13 +107,15 @@
             <section id="introduction" class="lesson-section">
                 <h2>📖 Introduction to React Testing Library</h2>
                 
-                <p>In the previous lesson, we learned to test utility functions with Jest. But React applications aren't just functions—they're interactive user interfaces built with components. How do we test something visual and interactive?</p>
+                <p>In the previous lesson, we learned to test utility functions with plain assertions. A function is easy to reason about: give it an input, check the output. But React applications aren't just functions — they're interactive user interfaces built from components that render markup, hold state, and respond to clicks and keystrokes. How do you test something visual and interactive without a real browser and a human clicking through it?</p>
 
-                <p>Enter <strong>React Testing Library (RTL)</strong>—the most popular and recommended way to test React components. It's built on a simple but powerful philosophy: <em>test your components the way users use them</em>.</p>
+                <p>Think of it like inspecting a vending machine. 🥤 One way is to unscrew the back panel and verify each internal relay is in the right position — fiddly, and the moment someone rewires the machine your checklist is worthless. The better way is to stand in front of it like a customer: press the button for a soda and confirm a soda drops out. You don't care <em>how</em> it's wired, only that it behaves correctly. That is exactly the mindset React Testing Library asks you to adopt.</p>
+
+                <p>Enter <strong>React Testing Library (RTL)</strong> — the most popular and recommended way to test React components, and the approach the React team itself points you to. It's built on a simple but powerful philosophy: <em>test your components the way users use them</em>. Instead of poking at internal state, you find elements the way a person (or a screen reader) would, interact with them the way a person would, and assert on what a person would actually see.</p>
 
                 <div class="card card-accent">
                     <h4>📖 What is React Testing Library?</h4>
-                    <p style="color: white;"><strong>React Testing Library</strong> is a lightweight testing library that provides utilities for testing React components by interacting with them as a user would. It encourages testing behavior over implementation details.</p>
+                    <p><strong>React Testing Library</strong> is a lightweight testing library that provides utilities for testing React components by interacting with them as a user would. It encourages testing behavior over implementation details.</p>
                 </div>
 
                 <h3>Why React Testing Library?</h3>
@@ -121,13 +123,13 @@
 
                 <div class="mermaid">
                     graph LR
-                    A[Old Approach<br/>Enzyme] --> B[Test Internal State]
-                    A --> C[Test Props]
-                    A --> D[Test Methods]
+                    A["Old Approach (Enzyme)"] --> B[Test Internal State]
+                    A --> C[Test Props Directly]
+                    A --> D[Test Instance Methods]
                     E[RTL Approach] --> F[Test What User Sees]
                     E --> G[Test User Interactions]
                     E --> H[Test UI Changes]
-                    
+
                     style A fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
                     style E fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
                 </div>
@@ -169,35 +171,36 @@
 
                 <div class="card card-success">
                     <h4>❌ Bad: Testing Implementation</h4>
-                    <pre><code class="language-typescript">
-// DON'T DO THIS
-test('counter increments state', () => {
+                    <pre><code class="language-typescript">// DON'T DO THIS (old Enzyme-style thinking)
+test('counter increments state', () =&gt; {
   const { container } = render(&lt;Counter /&gt;);
   const component = container.querySelector('.counter');
-  
-  // Testing internal state - BAD!
+
+  // Reaching into internal state and instance methods - BAD!
+  // This breaks the instant you refactor, and RTL won't even give
+  // you .state or .instance() — those belong to a bygone era.
   expect(component.state.count).toBe(0);
   component.instance().increment();
   expect(component.state.count).toBe(1);
 });
-                    </code></pre>
+</code></pre>
 
                     <h4>✅ Good: Testing Behavior</h4>
-                    <pre><code class="language-typescript">
-// DO THIS INSTEAD
-test('counter displays incremented value when button is clicked', () => {
+                    <pre><code class="language-typescript">// DO THIS INSTEAD
+test('counter displays incremented value when button is clicked', async () =&gt; {
+  const user = userEvent.setup();
   render(&lt;Counter /&gt;);
-  
+
   // Test what the user sees
   expect(screen.getByText('Count: 0')).toBeInTheDocument();
-  
-  // Test user interaction
-  fireEvent.click(screen.getByRole('button', { name: /increment/i }));
-  
+
+  // Test the interaction the way a real user performs it
+  await user.click(screen.getByRole('button', { name: /increment/i }));
+
   // Verify the visible result
   expect(screen.getByText('Count: 1')).toBeInTheDocument();
 });
-                    </code></pre>
+</code></pre>
                 </div>
 
                 <h3>Principle 2: Query By Accessibility</h3>
@@ -254,8 +257,40 @@ test('counter displays incremented value when button is clicked', () => {
 
                 <div class="card card-warning">
                     <h4>⚠️ Why Query Priority Matters</h4>
-                    <p>Using <code>getByRole</code> first ensures your components are accessible. If you can't find an element by role, it might not be accessible to screen reader users. This makes your tests a tool for improving accessibility!</p>
+                    <p>Using <code>getByRole</code> first ensures your components are accessible. If you can't find an element by role, that is often a signal the element isn't reachable by screen reader users either — so a failing query is doing double duty, flagging both a test problem and a real accessibility gap. This makes your tests a tool for improving accessibility!</p>
                 </div>
+
+                <p>When you're staring at an element and wondering which query to reach for, walk down this ladder — stop at the first rung that fits:</p>
+
+                <figure>
+                    <svg class="svg-auto-invert" viewBox="0 0 640 250" width="100%" style="max-width: 640px;" role="img" aria-labelledby="priority-ladder-title priority-ladder-desc">
+                        <title id="priority-ladder-title">Query Priority Ladder</title>
+                        <desc id="priority-ladder-desc">Ordered from most preferred to last resort: getByRole, getByLabelText, getByPlaceholderText, getByText, then getByTestId as a last resort.</desc>
+                        <rect x="20" y="20" width="380" height="34" rx="6" fill="#51cf66" fill-opacity="0.25" stroke="#2f9e44" stroke-width="2"/>
+                        <text x="34" y="42" font-family="system-ui, sans-serif" font-size="14" font-weight="bold">1. getByRole</text>
+                        <text x="200" y="42" font-family="system-ui, sans-serif" font-size="11">buttons, links, headings, inputs (accessible)</text>
+                        <rect x="20" y="62" width="360" height="34" rx="6" fill="#51cf66" fill-opacity="0.18" stroke="#2f9e44" stroke-width="1.5"/>
+                        <text x="34" y="84" font-family="system-ui, sans-serif" font-size="13" font-weight="bold">2. getByLabelText</text>
+                        <text x="210" y="84" font-family="system-ui, sans-serif" font-size="11">form fields tied to a &lt;label&gt;</text>
+                        <rect x="20" y="104" width="340" height="34" rx="6" fill="#4dabf7" fill-opacity="0.15" stroke="#1971c2" stroke-width="1.5"/>
+                        <text x="34" y="126" font-family="system-ui, sans-serif" font-size="13">3. getByPlaceholderText / getByText</text>
+                        <rect x="20" y="146" width="320" height="34" rx="6" fill="#ffd43b" fill-opacity="0.2" stroke="#f08c00" stroke-width="1.5"/>
+                        <text x="34" y="168" font-family="system-ui, sans-serif" font-size="12">4. getByDisplayValue / getByAltText / getByTitle</text>
+                        <rect x="20" y="188" width="300" height="34" rx="6" fill="#ff6b6b" fill-opacity="0.18" stroke="#c92a2a" stroke-width="1.5"/>
+                        <text x="34" y="210" font-family="system-ui, sans-serif" font-size="12" font-weight="bold">5. getByTestId — last resort only</text>
+                        <path d="M 470 20 L 470 210" stroke="currentColor" stroke-width="2" marker-end="url(#ladder-arrow)"/>
+                        <text x="486" y="30" font-family="system-ui, sans-serif" font-size="11">most like</text>
+                        <text x="486" y="44" font-family="system-ui, sans-serif" font-size="11">a real user</text>
+                        <text x="486" y="200" font-family="system-ui, sans-serif" font-size="11">furthest from</text>
+                        <text x="486" y="214" font-family="system-ui, sans-serif" font-size="11">the user</text>
+                        <defs>
+                            <marker id="ladder-arrow" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+                                <polygon points="0 0, 10 4, 0 8" fill="currentColor"/>
+                            </marker>
+                        </defs>
+                    </svg>
+                    <figcaption>Figure: The query priority ladder. Prefer queries near the top — they mirror how real users and assistive tech find things. Reach for <code>getByTestId</code> only when nothing else works.</figcaption>
+                </figure>
 
                 <h3>Principle 3: No Implementation Details</h3>
                 <p>RTL intentionally doesn't give you access to component internals. You can't access:</p>
@@ -328,29 +363,25 @@ getByRole('button', { name: /submit registration/i })
                 <h3>Installation</h3>
                 <p>Install React Testing Library and its dependencies:</p>
 
-                <pre><code class="language-bash">
-# Core testing libraries
+                <pre><code class="language-bash"># Core Testing Library packages
 npm install --save-dev @testing-library/react
 npm install --save-dev @testing-library/jest-dom
 npm install --save-dev @testing-library/user-event
 
-# TypeScript types
-npm install --save-dev @types/jest
-npm install --save-dev @types/react
-npm install --save-dev @types/react-dom
-
-# If using Vitest (for Vite projects)
+# Test runner + a browser-like DOM environment
 npm install --save-dev vitest jsdom @vitest/ui
-                </code></pre>
+</code></pre>
 
                 <div class="card card-info">
                     <h4>💡 Package Breakdown</h4>
                     <ul>
-                        <li><strong>@testing-library/react:</strong> Core RTL functionality for rendering and querying</li>
-                        <li><strong>@testing-library/jest-dom:</strong> Custom matchers for asserting on DOM nodes</li>
-                        <li><strong>@testing-library/user-event:</strong> Realistic user interaction simulation</li>
-                        <li><strong>jsdom:</strong> Browser-like environment for Node.js</li>
+                        <li><strong>@testing-library/react:</strong> the core of RTL — <code>render</code>, <code>screen</code>, and the query methods</li>
+                        <li><strong>@testing-library/jest-dom:</strong> custom matchers for asserting on DOM nodes, like <code>toBeInTheDocument()</code> and <code>toBeDisabled()</code></li>
+                        <li><strong>@testing-library/user-event:</strong> realistic user interaction simulation (the modern companion to RTL)</li>
+                        <li><strong>vitest:</strong> a fast, Vite-native test runner with a Jest-compatible API</li>
+                        <li><strong>jsdom:</strong> a browser-like DOM implementation so your components can render in Node.js (prefer <code>happy-dom</code> if you want a lighter, faster environment)</li>
                     </ul>
+                    <p>Notice there's no <code>@types/jest</code> here. With Vitest you get types from <code>vitest/globals</code> instead — mixing in Jest's types can cause clashing matcher definitions. <code>@types/react</code> and <code>@types/react-dom</code> already come in with React in a Vite + TypeScript project, so you rarely install them separately.</p>
                 </div>
 
                 <h3>Configure Vitest (for Vite Projects)</h3>
@@ -380,7 +411,7 @@ import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
 // Cleanup after each test
-afterEach(() => {
+afterEach(() =&gt; {
   cleanup();
 });
                 </code></pre>
@@ -444,8 +475,8 @@ src/
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 
-describe('Setup Test', () => {
-  it('renders without crashing', () => {
+describe('Setup Test', () =&gt; {
+  it('renders without crashing', () =&gt; {
     render(&lt;div&gt;Hello, Testing!&lt;/div&gt;);
     expect(screen.getByText('Hello, Testing!')).toBeInTheDocument();
   });
@@ -479,7 +510,22 @@ Test Files  1 passed (1)
             <section id="rendering" class="lesson-section">
                 <h2>🎨 Rendering Components</h2>
                 
-                <p>The first step in testing a React component is rendering it. React Testing Library provides the <code>render</code> function to mount components in a test environment.</p>
+                <p>The first step in testing a React component is rendering it. React Testing Library provides the <code>render</code> function to mount components into a simulated DOM. Almost every component test you'll ever write follows the same three-beat rhythm, often called <strong>Arrange–Act–Assert</strong>: render the component, interact with it or query it, then assert on what a user would see.</p>
+
+                <div class="mermaid">
+                    graph LR
+                    A["render(&lt;Component /&gt;)"] --> B["screen.getBy... / findBy..."]
+                    B --> C["expect(...).toBeInTheDocument()"]
+                    A2["Arrange"] -.-> A
+                    B2["Act / Query"] -.-> B
+                    C2["Assert"] -.-> C
+
+                    style A fill:#4dabf7,stroke:#1971c2,stroke-width:2px,color:#fff
+                    style B fill:#845ef7,stroke:#5f3dc4,stroke-width:2px,color:#fff
+                    style C fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
+                </div>
+
+                <p>Keep that flow in your head and most tests almost write themselves. Let's see it in action.</p>
 
                 <h3>Basic Rendering</h3>
                 <p>Let's start with a simple component and test it:</p>
@@ -501,9 +547,9 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { Greeting } from './Greeting';
 
-describe('Greeting', () => {
-  it('displays the greeting with the provided name', () => {
-    // Arrange & Act: Render the component
+describe('Greeting', () =&gt; {
+  it('displays the greeting with the provided name', () =&gt; {
+    // Arrange &amp; Act: Render the component
     render(&lt;Greeting name="Alice" /&gt;);
     
     // Assert: Check if the text appears
@@ -514,7 +560,7 @@ describe('Greeting', () => {
 
                 <div class="card card-accent">
                     <h4>📖 Understanding render()</h4>
-                    <p style="color: white;"><strong>render()</strong> mounts a React component in a test environment and provides utilities to query and interact with it. It returns an object with query methods, but we usually use the <code>screen</code> object instead for more readable tests.</p>
+                    <p><strong>render()</strong> mounts a React component into a container attached to <code>document.body</code>, inside the jsdom (or happy-dom) environment your test runner provides. It returns an object with query methods and utilities like <code>rerender</code> and <code>unmount</code>, but we usually reach for the global <code>screen</code> object instead — it queries the whole document and keeps tests consistent and readable.</p>
                 </div>
 
                 <h3>The screen Object</h3>
@@ -540,7 +586,7 @@ interface ButtonProps {
   label: string;
   variant?: 'primary' | 'secondary';
   disabled?: boolean;
-  onClick?: () => void;
+  onClick?: () =&gt; void;
 }
 
 export function Button({ 
@@ -567,25 +613,25 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { Button } from './Button';
 
-describe('Button', () => {
-  it('renders with label text', () => {
+describe('Button', () =&gt; {
+  it('renders with label text', () =&gt; {
     render(&lt;Button label="Click me" /&gt;);
     expect(screen.getByRole('button', { name: 'Click me' })).toBeInTheDocument();
   });
   
-  it('applies primary variant by default', () => {
+  it('applies primary variant by default', () =&gt; {
     render(&lt;Button label="Submit" /&gt;);
     const button = screen.getByRole('button');
     expect(button).toHaveClass('btn-primary');
   });
   
-  it('applies secondary variant when specified', () => {
+  it('applies secondary variant when specified', () =&gt; {
     render(&lt;Button label="Cancel" variant="secondary" /&gt;);
     const button = screen.getByRole('button');
     expect(button).toHaveClass('btn-secondary');
   });
   
-  it('renders as disabled when disabled prop is true', () => {
+  it('renders as disabled when disabled prop is true', () =&gt; {
     render(&lt;Button label="Disabled" disabled /&gt;);
     expect(screen.getByRole('button')).toBeDisabled();
   });
@@ -631,8 +677,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { Card } from './Card';
 
-describe('Card', () => {
-  it('renders title and children', () => {
+describe('Card', () =&gt; {
+  it('renders title and children', () =&gt; {
     render(
       &lt;Card title="My Card"&gt;
         &lt;p&gt;Card content here&lt;/p&gt;
@@ -643,7 +689,7 @@ describe('Card', () => {
     expect(screen.getByText('Card content here')).toBeInTheDocument();
   });
   
-  it('renders multiple children', () => {
+  it('renders multiple children', () =&gt; {
     render(
       &lt;Card title="Multiple Items"&gt;
         &lt;p&gt;First paragraph&lt;/p&gt;
@@ -674,7 +720,7 @@ export function Counter({ initialCount = 0 }: CounterProps) {
   return (
     &lt;div&gt;
       &lt;p&gt;Count: {count}&lt;/p&gt;
-      &lt;button onClick={() => setCount(c => c + 1)}&gt;Increment&lt;/button&gt;
+      &lt;button onClick={() =&gt; setCount(c =&gt; c + 1)}&gt;Increment&lt;/button&gt;
     &lt;/div&gt;
   );
 }
@@ -686,8 +732,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { Counter } from './Counter';
 
-describe('Counter', () => {
-  it('updates when initialCount prop changes', () => {
+describe('Counter', () =&gt; {
+  it('updates when initialCount prop changes', () =&gt; {
     // Initial render
     const { rerender } = render(&lt;Counter initialCount={0} /&gt;);
     expect(screen.getByText('Count: 0')).toBeInTheDocument();
@@ -714,12 +760,12 @@ describe('Counter', () => {
                 <p>Test cleanup and unmounting behavior:</p>
 
                 <pre><code class="language-typescript">
-describe('Component cleanup', () => {
-  it('cleans up resources on unmount', () => {
+describe('Component cleanup', () =&gt; {
+  it('cleans up resources on unmount', () =&gt; {
     const cleanup = vi.fn();
     
     function ComponentWithCleanup() {
-      React.useEffect(() => {
+      React.useEffect(() =&gt; {
         return cleanup; // Cleanup function
       }, []);
       
@@ -745,10 +791,18 @@ describe('Component cleanup', () => {
             <section id="queries" class="lesson-section">
                 <h2>🔍 Query Methods</h2>
                 
-                <p>React Testing Library provides three types of query methods, each with different behavior. Understanding when to use each type is crucial for writing effective tests.</p>
+                <p>Once a component is rendered, you need to find elements inside it before you can assert or interact. RTL gives you a family of query methods, and the trick to using them well is realizing they split along two axes: <em>what</em> you search by (role, label, text…) and <em>how</em> the query behaves when the element is missing (throw, return null, or wait). Get those two axes straight and query selection stops feeling like guesswork.</p>
 
                 <h3>Query Types: getBy, queryBy, findBy</h3>
-                <p>Each query comes in three variants with different behaviors:</p>
+                <p>Each query comes in three variants, and choosing the right one is really a question of intent — think of them as three different ways of asking about an element:</p>
+
+                <ul>
+                    <li><strong><code>getBy…</code></strong> — "This <em>must</em> be here right now." Throws a helpful error (printing the DOM) if it's missing. Your everyday default.</li>
+                    <li><strong><code>queryBy…</code></strong> — "Tell me if this exists, and don't panic if it doesn't." Returns <code>null</code> instead of throwing, which is exactly what you want when asserting something is <em>absent</em>.</li>
+                    <li><strong><code>findBy…</code></strong> — "This will show up soon — wait for it." Returns a Promise and retries for a short window, perfect for content that appears after an async operation.</li>
+                </ul>
+
+                <p>Here's the full grid, including the <code>*AllBy</code> variants for matching multiple elements:</p>
 
                 <table>
                     <thead>
@@ -810,7 +864,7 @@ describe('Component cleanup', () => {
                 <p>Use <code>getBy</code> when you expect the element to be in the document:</p>
 
                 <pre><code class="language-typescript">
-test('getBy examples', () => {
+test('getBy examples', () =&gt; {
   render(
     &lt;div&gt;
       &lt;h1&gt;Welcome&lt;/h1&gt;
@@ -842,7 +896,7 @@ test('getBy examples', () => {
                 <p>Use <code>queryBy</code> when checking if an element does NOT exist:</p>
 
                 <pre><code class="language-typescript">
-test('queryBy examples', () => {
+test('queryBy examples', () =&gt; {
   render(&lt;div&gt;&lt;p&gt;Visible content&lt;/p&gt;&lt;/div&gt;);
   
   // This works - element exists
@@ -870,14 +924,14 @@ function ConditionalContent({ isLoggedIn }: { isLoggedIn: boolean }) {
   );
 }
 
-test('shows login button when not logged in', () => {
+test('shows login button when not logged in', () =&gt; {
   render(&lt;ConditionalContent isLoggedIn={false} /&gt;);
   
   expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Logout' })).not.toBeInTheDocument();
 });
 
-test('shows logout button when logged in', () => {
+test('shows logout button when logged in', () =&gt; {
   render(&lt;ConditionalContent isLoggedIn={true} /&gt;);
   
   expect(screen.getByRole('button', { name: 'Logout' })).toBeInTheDocument();
@@ -902,9 +956,9 @@ test('shows logout button when logged in', () => {
 function AsyncComponent() {
   const [data, setData] = React.useState&lt;string | null&gt;(null);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     // Simulate async data loading
-    setTimeout(() => {
+    setTimeout(() =&gt; {
       setData('Loaded data!');
     }, 100);
   }, []);
@@ -916,7 +970,7 @@ function AsyncComponent() {
   );
 }
 
-test('displays data after loading', async () => {
+test('displays data after loading', async () =&gt; {
   render(&lt;AsyncComponent /&gt;);
   
   // Initially shows loading
@@ -935,13 +989,13 @@ test('displays data after loading', async () => {
                     <h4>⚠️ Common Mistake: Using getBy for Async</h4>
                     <pre><code class="language-typescript">
 // ❌ This will fail - getBy doesn't wait
-test('wrong approach', () => {
+test('wrong approach', () =&gt; {
   render(&lt;AsyncComponent /&gt;);
   expect(screen.getByText('Loaded data!')).toBeInTheDocument(); // Error!
 });
 
 // ✅ Use findBy instead
-test('correct approach', async () => {
+test('correct approach', async () =&gt; {
   render(&lt;AsyncComponent /&gt;);
   expect(await screen.findByText('Loaded data!')).toBeInTheDocument();
 });
@@ -1017,7 +1071,7 @@ screen.getByRole('heading', {
                 <p>When a query fails, RTL provides helpful debugging tools:</p>
 
                 <pre><code class="language-typescript">
-test('debugging example', () => {
+test('debugging example', () =&gt; {
   render(&lt;MyComponent /&gt;);
   
   // Print the current DOM
@@ -1050,7 +1104,7 @@ test('debugging example', () => {
             <section id="user-interactions" class="lesson-section">
                 <h2>👆 Simulating User Interactions</h2>
                 
-                <p>Testing how components respond to user interactions is where React Testing Library really shines. We'll use <code>@testing-library/user-event</code> for realistic user interactions.</p>
+                <p>Testing how components respond to user interactions is where React Testing Library really shines. Rendering proves a component <em>looks</em> right; interaction proves it <em>works</em>. We'll use <code>@testing-library/user-event</code> — the modern companion library that simulates interactions the way a real person performs them, dispatching the full sequence of events a browser would fire rather than a single synthetic one.</p>
 
                 <h3>user-event vs fireEvent</h3>
                 <p>RTL provides two ways to simulate interactions:</p>
@@ -1103,8 +1157,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect } from 'vitest';
 
-describe('Component with interactions', () => {
-  it('handles user interactions', async () => {
+describe('Component with interactions', () =&gt; {
+  it('handles user interactions', async () =&gt; {
     // Setup user-event
     const user = userEvent.setup();
     
@@ -1124,14 +1178,14 @@ function ClickCounter() {
   return (
     &lt;div&gt;
       &lt;p&gt;Count: {count}&lt;/p&gt;
-      &lt;button onClick={() => setCount(c => c + 1)}&gt;
+      &lt;button onClick={() =&gt; setCount(c =&gt; c + 1)}&gt;
         Increment
       &lt;/button&gt;
     &lt;/div&gt;
   );
 }
 
-test('increments count when button is clicked', async () => {
+test('increments count when button is clicked', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;ClickCounter /&gt;);
   
@@ -1156,7 +1210,7 @@ function SearchForm() {
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState&lt;string[]&gt;([]);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     setResults([`Result for: ${query}`]);
   };
@@ -1168,12 +1222,12 @@ function SearchForm() {
         id="search"
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) =&gt; setQuery(e.target.value)}
       /&gt;
       &lt;button type="submit"&gt;Search&lt;/button&gt;
       
       &lt;ul&gt;
-        {results.map((result, i) => (
+        {results.map((result, i) =&gt; (
           &lt;li key={i}&gt;{result}&lt;/li&gt;
         ))}
       &lt;/ul&gt;
@@ -1181,7 +1235,7 @@ function SearchForm() {
   );
 }
 
-test('searches when user types and submits', async () => {
+test('searches when user types and submits', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;SearchForm /&gt;);
   
@@ -1202,7 +1256,7 @@ test('searches when user types and submits', async () => {
 
                 <h3>Typing Special Keys</h3>
                 <pre><code class="language-typescript">
-test('handles keyboard shortcuts', async () => {
+test('handles keyboard shortcuts', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;TextEditor /&gt;);
   
@@ -1212,7 +1266,7 @@ test('handles keyboard shortcuts', async () => {
   await user.type(textarea, 'Hello World');
   
   // Select all (Ctrl+A)
-  await user.keyboard('{Control>}a{/Control}');
+  await user.keyboard('{Control&gt;}a{/Control}');
   
   // Delete
   await user.keyboard('{Backspace}');
@@ -1220,7 +1274,7 @@ test('handles keyboard shortcuts', async () => {
   expect(textarea).toHaveValue('');
 });
 
-test('handles Enter key', async () => {
+test('handles Enter key', async () =&gt; {
   const user = userEvent.setup();
   const handleSubmit = vi.fn();
   
@@ -1243,7 +1297,7 @@ function CountrySelector() {
       &lt;select 
         id="country" 
         value={country}
-        onChange={(e) => setCountry(e.target.value)}
+        onChange={(e) =&gt; setCountry(e.target.value)}
       &gt;
         &lt;option value=""&gt;Select a country&lt;/option&gt;
         &lt;option value="us"&gt;United States&lt;/option&gt;
@@ -1251,12 +1305,12 @@ function CountrySelector() {
         &lt;option value="ca"&gt;Canada&lt;/option&gt;
       &lt;/select&gt;
       
-      {country && &lt;p&gt;Selected: {country}&lt;/p&gt;}
+      {country &amp;&amp; &lt;p&gt;Selected: {country}&lt;/p&gt;}
     &lt;/div&gt;
   );
 }
 
-test('selects a country from dropdown', async () => {
+test('selects a country from dropdown', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;CountrySelector /&gt;);
   
@@ -1284,7 +1338,7 @@ function NewsletterForm() {
         &lt;input
           type="checkbox"
           checked={agreed}
-          onChange={(e) => setAgreed(e.target.checked)}
+          onChange={(e) =&gt; setAgreed(e.target.checked)}
         /&gt;
         I agree to receive newsletters
       &lt;/label&gt;
@@ -1297,7 +1351,7 @@ function NewsletterForm() {
             name="frequency"
             value="daily"
             checked={frequency === 'daily'}
-            onChange={(e) => setFrequency(e.target.value)}
+            onChange={(e) =&gt; setFrequency(e.target.value)}
           /&gt;
           Daily
         &lt;/label&gt;
@@ -1307,7 +1361,7 @@ function NewsletterForm() {
             name="frequency"
             value="weekly"
             checked={frequency === 'weekly'}
-            onChange={(e) => setFrequency(e.target.value)}
+            onChange={(e) =&gt; setFrequency(e.target.value)}
           /&gt;
           Weekly
         &lt;/label&gt;
@@ -1316,7 +1370,7 @@ function NewsletterForm() {
   );
 }
 
-test('handles checkbox and radio interactions', async () => {
+test('handles checkbox and radio interactions', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;NewsletterForm /&gt;);
   
@@ -1340,17 +1394,17 @@ function Tooltip() {
   return (
     &lt;div&gt;
       &lt;button
-        onMouseEnter={() => setVisible(true)}
-        onMouseLeave={() => setVisible(false)}
+        onMouseEnter={() =&gt; setVisible(true)}
+        onMouseLeave={() =&gt; setVisible(false)}
       &gt;
         Hover me
       &lt;/button&gt;
-      {visible && &lt;div role="tooltip"&gt;Tooltip content&lt;/div&gt;}
+      {visible &amp;&amp; &lt;div role="tooltip"&gt;Tooltip content&lt;/div&gt;}
     &lt;/div&gt;
   );
 }
 
-test('shows tooltip on hover', async () => {
+test('shows tooltip on hover', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;Tooltip /&gt;);
   
@@ -1391,7 +1445,9 @@ test('shows tooltip on hover', async () => {
             <section id="async-testing" class="lesson-section">
                 <h2>⏱️ Testing Async Behavior</h2>
                 
-                <p>Modern React applications are full of asynchronous operations—data fetching, delayed interactions, animations. Testing these requires special techniques to wait for changes to happen.</p>
+                <p>Modern React applications are full of asynchronous operations — data fetching, delayed interactions, animations, debounced inputs. Testing these means learning to <em>wait</em> patiently instead of checking too soon.</p>
+
+                <p>Imagine ordering food at a counter. 🍔 If you demand your burger the instant you finish ordering, you'll be told there's nothing there — not because the order failed, but because it isn't ready yet. A synchronous <code>getBy</code> query is exactly that impatient customer: it looks once, immediately, and gives up. Async queries like <code>findBy</code> are the patient customer who waits by the counter and picks up the burger the moment it's placed down. The component isn't broken; your test just needs to wait for the right moment.</p>
 
                 <h3>The Problem with Async</h3>
                 <p>Consider this component that fetches data:</p>
@@ -1401,10 +1457,10 @@ function UserProfile({ userId }: { userId: string }) {
   const [user, setUser] = React.useState&lt;User | null&gt;(null);
   const [loading, setLoading] = React.useState(true);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     fetch(`/api/users/${userId}`)
-      .then(res => res.json())
-      .then(data => {
+      .then(res =&gt; res.json())
+      .then(data =&gt; {
         setUser(data);
         setLoading(false);
       });
@@ -1421,7 +1477,7 @@ function UserProfile({ userId }: { userId: string }) {
 
                 <pre><code class="language-typescript">
 // ❌ This test fails - doesn't wait for data
-test('displays user name', () => {
+test('displays user name', () =&gt; {
   render(&lt;UserProfile userId="123" /&gt;);
   
   // This will fail - still showing loading state!
@@ -1433,7 +1489,7 @@ test('displays user name', () => {
                 <p>The simplest solution is using <code>findBy</code> queries, which automatically wait:</p>
 
                 <pre><code class="language-typescript">
-test('displays user name after loading', async () => {
+test('displays user name after loading', async () =&gt; {
   render(&lt;UserProfile userId="123" /&gt;);
   
   // findBy waits up to 1000ms by default
@@ -1448,9 +1504,15 @@ test('displays user name after loading', async () => {
                     <ul>
                         <li>Return a Promise that resolves when the element appears</li>
                         <li>Retry multiple times (default: every 50ms for up to 1000ms)</li>
-                        <li>Reject if element never appears</li>
-                        <li>Perfect for elements that appear after async operations</li>
+                        <li>Reject if the element never appears</li>
+                        <li>Are perfect for elements that appear after async operations</li>
                     </ul>
+                    <p>Under the hood, a <code>findBy</code> is just a <code>getBy</code> wrapped in <code>waitFor</code> — so reach for it whenever the element you want isn't on screen yet.</p>
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Where does the data come from? Mock the network, not your component</h4>
+                    <p>The examples below assume a <code>fetch</code> call resolves with test data. In a real suite, don't let your tests hit a live server. The modern, recommended approach is <strong><a href="https://mswjs.io/" target="_blank" rel="noopener">Mock Service Worker (MSW)</a></strong>: it intercepts requests at the network layer, so your component runs its real <code>fetch</code> code and you control the response. That keeps tests fast, deterministic, and free of implementation coupling. For a quick one-off you can still stub <code>global.fetch</code> with <code>vi.fn()</code> (as the error-state example does), but MSW scales far better across a real project.</p>
                 </div>
 
                 <h3>Solution 2: waitFor</h3>
@@ -1459,11 +1521,11 @@ test('displays user name after loading', async () => {
                 <pre><code class="language-typescript">
 import { render, screen, waitFor } from '@testing-library/react';
 
-test('handles multiple async updates', async () => {
+test('handles multiple async updates', async () =&gt; {
   render(&lt;ComplexComponent /&gt;);
   
   // Wait for multiple conditions
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByText('Data loaded')).toBeInTheDocument();
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
   });
@@ -1472,7 +1534,7 @@ test('handles multiple async updates', async () => {
 
                 <h3>Testing Loading States</h3>
                 <pre><code class="language-typescript">
-test('shows loading state then data', async () => {
+test('shows loading state then data', async () =&gt; {
   render(&lt;UserProfile userId="123" /&gt;);
   
   // Initially shows loading
@@ -1493,17 +1555,17 @@ function UserProfileWithError({ userId }: { userId: string }) {
   const [error, setError] = React.useState&lt;string | null&gt;(null);
   const [loading, setLoading] = React.useState(true);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     fetch(`/api/users/${userId}`)
-      .then(res => {
+      .then(res =&gt; {
         if (!res.ok) throw new Error('Failed to fetch');
         return res.json();
       })
-      .then(data => {
+      .then(data =&gt; {
         setUser(data);
         setLoading(false);
       })
-      .catch(err => {
+      .catch(err =&gt; {
         setError(err.message);
         setLoading(false);
       });
@@ -1516,9 +1578,9 @@ function UserProfileWithError({ userId }: { userId: string }) {
   return &lt;div&gt;{user.name}&lt;/div&gt;;
 }
 
-test('displays error message when fetch fails', async () => {
+test('displays error message when fetch fails', async () =&gt; {
   // Mock fetch to simulate failure
-  global.fetch = vi.fn(() => 
+  global.fetch = vi.fn(() =&gt; 
     Promise.reject(new Error('Failed to fetch'))
   );
   
@@ -1534,7 +1596,7 @@ test('displays error message when fetch fails', async () => {
                 <p>Adjust timeout for slower operations:</p>
 
                 <pre><code class="language-typescript">
-test('waits for slow operation', async () => {
+test('waits for slow operation', async () =&gt; {
   render(&lt;SlowComponent /&gt;);
   
   // Wait up to 5 seconds
@@ -1543,11 +1605,11 @@ test('waits for slow operation', async () => {
 });
 
 // Or with waitFor
-test('waits with custom timeout', async () => {
+test('waits with custom timeout', async () =&gt; {
   render(&lt;SlowComponent /&gt;);
   
   await waitFor(
-    () => {
+    () =&gt; {
       expect(screen.getByText('Done')).toBeInTheDocument();
     },
     { timeout: 5000 }
@@ -1562,14 +1624,14 @@ function SearchWithDebounce() {
   const [results, setResults] = React.useState&lt;string[]&gt;([]);
   
   // Debounced search (waits 300ms after last keystroke)
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
+  React.useEffect(() =&gt; {
+    const timer = setTimeout(() =&gt; {
       if (query) {
         setResults([`Result for: ${query}`]);
       }
     }, 300);
     
-    return () => clearTimeout(timer);
+    return () =&gt; clearTimeout(timer);
   }, [query]);
   
   return (
@@ -1577,11 +1639,11 @@ function SearchWithDebounce() {
       &lt;input
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) =&gt; setQuery(e.target.value)}
         placeholder="Search..."
       /&gt;
       &lt;ul&gt;
-        {results.map((result, i) => (
+        {results.map((result, i) =&gt; (
           &lt;li key={i}&gt;{result}&lt;/li&gt;
         ))}
       &lt;/ul&gt;
@@ -1589,7 +1651,7 @@ function SearchWithDebounce() {
   );
 }
 
-test('debounces search input', async () => {
+test('debounces search input', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;SearchWithDebounce /&gt;);
   
@@ -1623,7 +1685,7 @@ test('debounces search input', async () => {
                 <pre><code class="language-typescript">
 import { waitForElementToBeRemoved } from '@testing-library/react';
 
-test('loading spinner disappears after data loads', async () => {
+test('loading spinner disappears after data loads', async () =&gt; {
   render(&lt;DataComponent /&gt;);
   
   const spinner = screen.getByText('Loading...');
@@ -1641,7 +1703,7 @@ test('loading spinner disappears after data loads', async () => {
             <section id="typescript-typing" class="lesson-section">
                 <h2>📘 TypeScript and Testing</h2>
                 
-                <p>TypeScript provides excellent type safety for your tests. Let's explore how to write properly typed tests.</p>
+                <p>Tests are code too — and code deserves the same type safety as the app it verifies. TypeScript makes your tests autocomplete-friendly, catches mistakes like passing the wrong prop shape to a component before the test even runs, and turns your mocks and helpers into self-documenting building blocks. Let's explore the patterns that keep your test suite fully typed.</p>
 
                 <h3>Typing Component Props</h3>
                 <pre><code class="language-typescript">
@@ -1652,7 +1714,7 @@ interface UserCardProps {
     name: string;
     email: string;
   };
-  onEdit?: (id: string) => void;
+  onEdit?: (id: string) =&gt; void;
 }
 
 function UserCard({ user, onEdit }: UserCardProps) {
@@ -1660,15 +1722,15 @@ function UserCard({ user, onEdit }: UserCardProps) {
     &lt;div&gt;
       &lt;h2&gt;{user.name}&lt;/h2&gt;
       &lt;p&gt;{user.email}&lt;/p&gt;
-      {onEdit && (
-        &lt;button onClick={() => onEdit(user.id)}&gt;Edit&lt;/button&gt;
+      {onEdit &amp;&amp; (
+        &lt;button onClick={() =&gt; onEdit(user.id)}&gt;Edit&lt;/button&gt;
       )}
     &lt;/div&gt;
   );
 }
 
 // Type-safe test
-test('displays user information', () => {
+test('displays user information', () =&gt; {
   const mockUser: UserCardProps['user'] = {
     id: '1',
     name: 'Alice',
@@ -1686,11 +1748,12 @@ test('displays user information', () => {
                 <pre><code class="language-typescript">
 import { vi } from 'vitest';
 
-test('calls onEdit with correct user ID', async () => {
+test('calls onEdit with correct user ID', async () =&gt; {
   const user = userEvent.setup();
   
-  // Properly typed mock function
-  const mockOnEdit = vi.fn&lt;[string], void&gt;();
+  // Properly typed mock function.
+  // Modern Vitest types the mock by its full call signature:
+  const mockOnEdit = vi.fn&lt;(id: string) =&gt; void&gt;();
   
   const mockUser: UserCardProps['user'] = {
     id: '123',
@@ -1740,7 +1803,7 @@ export { customRender as render };
 // Using the custom render
 import { render, screen } from './test-utils';
 
-test('renders with theme provider', () => {
+test('renders with theme provider', () =&gt; {
   render(&lt;ThemedComponent /&gt;, { theme: 'dark' });
   expect(screen.getByTestId('theme')).toHaveTextContent('dark');
 });
@@ -1748,7 +1811,7 @@ test('renders with theme provider', () => {
 
                 <h3>Typing Async Queries</h3>
                 <pre><code class="language-typescript">
-test('properly types async queries', async () => {
+test('properly types async queries', async () =&gt; {
   render(&lt;AsyncComponent /&gt;);
   
   // findBy returns Promise&lt;HTMLElement&gt;
@@ -1765,7 +1828,7 @@ test('properly types async queries', async () => {
 import userEvent from '@testing-library/user-event';
 import type { UserEvent } from '@testing-library/user-event';
 
-test('types user event correctly', async () => {
+test('types user event correctly', async () =&gt; {
   const user: UserEvent = userEvent.setup();
   
   render(&lt;Form /&gt;);
@@ -1778,7 +1841,7 @@ test('types user event correctly', async () => {
 
                 <h3>Asserting on Typed Elements</h3>
                 <pre><code class="language-typescript">
-test('asserts on specific element types', () => {
+test('asserts on specific element types', () =&gt; {
   render(&lt;Form /&gt;);
   
   // Get element as specific type
@@ -1817,18 +1880,15 @@ import '@testing-library/jest-dom';
 const input = screen.getByRole('textbox') as HTMLInputElement;
 
 // Problem: Mock function type errors
-// Solution: Explicitly type the mock
-const mockFn = vi.fn&lt;[string, number], boolean&gt;();
+// Solution: Type the mock by its call signature (modern Vitest)
+const mockFn = vi.fn&lt;(a: string, b: number) =&gt; boolean&gt;();
 
-// Problem: Custom matcher not recognized
-// Solution: Extend jest matchers
-declare global {
-  namespace Vi {
-    interface Matchers&lt;R&gt; {
-      toBeInTheDocument(): R;
-    }
-  }
-}
+// Problem: jest-dom matchers like toBeInTheDocument() are not recognized
+// Solution: import '@testing-library/jest-dom' in your setup file and add
+// its types to tsconfig. Modern @testing-library/jest-dom ships the type
+// augmentation for you, so you almost never hand-write a `declare module`.
+// In tsconfig.json:
+//   "types": ["vitest/globals", "@testing-library/jest-dom"]
                 </code></pre>
             </section>
 
@@ -1852,7 +1912,7 @@ export function TodoList() {
   const [todos, setTodos] = React.useState&lt;Todo[]&gt;([]);
   const [input, setInput] = React.useState('');
   
-  const addTodo = () => {
+  const addTodo = () =&gt; {
     if (input.trim()) {
       setTodos([...todos, {
         id: Date.now().toString(),
@@ -1863,14 +1923,14 @@ export function TodoList() {
     }
   };
   
-  const toggleTodo = (id: string) => {
-    setTodos(todos.map(todo =>
+  const toggleTodo = (id: string) =&gt; {
+    setTodos(todos.map(todo =&gt;
       todo.id === id ? { ...todo, completed: !todo.completed } : todo
     ));
   };
   
-  const deleteTodo = (id: string) => {
-    setTodos(todos.filter(todo => todo.id !== id));
+  const deleteTodo = (id: string) =&gt; {
+    setTodos(todos.filter(todo =&gt; todo.id !== id));
   };
   
   return (
@@ -1878,18 +1938,18 @@ export function TodoList() {
       &lt;input
         type="text"
         value={input}
-        onChange={(e) => setInput(e.target.value)}
+        onChange={(e) =&gt; setInput(e.target.value)}
         placeholder="Add todo..."
       /&gt;
       &lt;button onClick={addTodo}&gt;Add&lt;/button&gt;
       
       &lt;ul&gt;
-        {todos.map(todo => (
+        {todos.map(todo =&gt; (
           &lt;li key={todo.id}&gt;
             &lt;input
               type="checkbox"
               checked={todo.completed}
-              onChange={() => toggleTodo(todo.id)}
+              onChange={() =&gt; toggleTodo(todo.id)}
               aria-label={`Toggle ${todo.text}`}
             /&gt;
             &lt;span style={{ 
@@ -1897,7 +1957,7 @@ export function TodoList() {
             }}&gt;
               {todo.text}
             &lt;/span&gt;
-            &lt;button onClick={() => deleteTodo(todo.id)}&gt;Delete&lt;/button&gt;
+            &lt;button onClick={() =&gt; deleteTodo(todo.id)}&gt;Delete&lt;/button&gt;
           &lt;/li&gt;
         ))}
       &lt;/ul&gt;
@@ -1928,8 +1988,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect } from 'vitest';
 import { TodoList } from './TodoList';
 
-describe('TodoList', () => {
-  it('adds a new todo when Add button is clicked', async () => {
+describe('TodoList', () =&gt; {
+  it('adds a new todo when Add button is clicked', async () =&gt; {
     const user = userEvent.setup();
     render(&lt;TodoList /&gt;);
     
@@ -1942,7 +2002,7 @@ describe('TodoList', () => {
     expect(screen.getByText('Buy groceries')).toBeInTheDocument();
   });
   
-  it('toggles todo completed status', async () => {
+  it('toggles todo completed status', async () =&gt; {
     const user = userEvent.setup();
     render(&lt;TodoList /&gt;);
     
@@ -1961,7 +2021,7 @@ describe('TodoList', () => {
     expect(checkbox).not.toBeChecked();
   });
   
-  it('deletes a todo', async () => {
+  it('deletes a todo', async () =&gt; {
     const user = userEvent.setup();
     render(&lt;TodoList /&gt;);
     
@@ -1977,7 +2037,7 @@ describe('TodoList', () => {
     expect(screen.queryByText('To delete')).not.toBeInTheDocument();
   });
   
-  it('does not add empty todos', async () => {
+  it('does not add empty todos', async () =&gt; {
     const user = userEvent.setup();
     render(&lt;TodoList /&gt;);
     
@@ -1990,7 +2050,7 @@ describe('TodoList', () => {
     expect(screen.queryByRole('listitem')).not.toBeInTheDocument();
   });
   
-  it('clears input after adding todo', async () => {
+  it('clears input after adding todo', async () =&gt; {
     const user = userEvent.setup();
     render(&lt;TodoList /&gt;);
     
@@ -2013,7 +2073,7 @@ describe('TodoList', () => {
                     <h4>Component to Test:</h4>
                     <pre><code class="language-typescript">
 interface LoginFormProps {
-  onSubmit: (email: string, password: string) => Promise&lt;void&gt;;
+  onSubmit: (email: string, password: string) =&gt; Promise&lt;void&gt;;
 }
 
 export function LoginForm({ onSubmit }: LoginFormProps) {
@@ -2022,7 +2082,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
   const [errors, setErrors] = React.useState&lt;string[]&gt;([]);
   const [loading, setLoading] = React.useState(false);
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) =&gt; {
     e.preventDefault();
     
     const newErrors: string[] = [];
@@ -2031,7 +2091,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
     if (!password) newErrors.push('Password is required');
     if (password.length &lt; 6) newErrors.push('Password must be at least 6 characters');
     
-    if (newErrors.length > 0) {
+    if (newErrors.length &gt; 0) {
       setErrors(newErrors);
       return;
     }
@@ -2053,7 +2113,7 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
         id="email"
         type="email"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) =&gt; setEmail(e.target.value)}
       /&gt;
       
       &lt;label htmlFor="password"&gt;Password&lt;/label&gt;
@@ -2061,16 +2121,16 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
         id="password"
         type="password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(e) =&gt; setPassword(e.target.value)}
       /&gt;
       
       &lt;button type="submit" disabled={loading}&gt;
         {loading ? 'Logging in...' : 'Login'}
       &lt;/button&gt;
       
-      {errors.length > 0 && (
+      {errors.length &gt; 0 &amp;&amp; (
         &lt;ul role="alert"&gt;
-          {errors.map((error, i) => (
+          {errors.map((error, i) =&gt; (
             &lt;li key={i}&gt;{error}&lt;/li&gt;
           ))}
         &lt;/ul&gt;
@@ -2097,8 +2157,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { LoginForm } from './LoginForm';
 
-describe('LoginForm', () => {
-  it('shows validation errors for empty fields', async () => {
+describe('LoginForm', () =&gt; {
+  it('shows validation errors for empty fields', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn();
     
@@ -2111,7 +2171,7 @@ describe('LoginForm', () => {
     expect(mockOnSubmit).not.toHaveBeenCalled();
   });
   
-  it('shows validation error for invalid email', async () => {
+  it('shows validation error for invalid email', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn();
     
@@ -2124,7 +2184,7 @@ describe('LoginForm', () => {
     expect(screen.getByText('Email must be valid')).toBeInTheDocument();
   });
   
-  it('shows validation error for short password', async () => {
+  it('shows validation error for short password', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn();
     
@@ -2137,7 +2197,7 @@ describe('LoginForm', () => {
     expect(screen.getByText('Password must be at least 6 characters')).toBeInTheDocument();
   });
   
-  it('calls onSubmit with correct values when valid', async () => {
+  it('calls onSubmit with correct values when valid', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn().mockResolvedValue(undefined);
     
@@ -2150,10 +2210,10 @@ describe('LoginForm', () => {
     expect(mockOnSubmit).toHaveBeenCalledWith('test@example.com', 'password123');
   });
   
-  it('shows loading state during submission', async () => {
+  it('shows loading state during submission', async () =&gt; {
     const user = userEvent.setup();
-    const mockOnSubmit = vi.fn(() => 
-      new Promise(resolve => setTimeout(resolve, 100))
+    const mockOnSubmit = vi.fn(() =&gt; 
+      new Promise(resolve =&gt; setTimeout(resolve, 100))
     );
     
     render(&lt;LoginForm onSubmit={mockOnSubmit} /&gt;);
@@ -2186,7 +2246,7 @@ screen.getByLabelText('Email')
 
 // ❌ Avoid - brittle and not accessibility-focused
 screen.getByTestId('submit-btn')
-screen.getByClassName('email-input')
+container.querySelector('.email-input') // not user-facing at all
                 </code></pre>
 
                 <h4>2. Use user-event Over fireEvent</h4>
@@ -2204,7 +2264,7 @@ fireEvent.change(input, { target: { value: 'text' } });
                 <h4>3. Test Behavior, Not Implementation</h4>
                 <pre><code class="language-typescript">
 // ✅ Good - tests user-facing behavior
-test('increments counter', async () => {
+test('increments counter', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;Counter /&gt;);
   
@@ -2214,7 +2274,7 @@ test('increments counter', async () => {
 });
 
 // ❌ Avoid - tests implementation
-test('calls setState with incremented value', () => {
+test('calls setState with incremented value', () =&gt; {
   // Don't test internal state or methods
 });
                 </code></pre>
@@ -2222,13 +2282,13 @@ test('calls setState with incremented value', () => {
                 <h4>4. Use findBy for Async Elements</h4>
                 <pre><code class="language-typescript">
 // ✅ Good - waits for element
-test('loads data', async () => {
+test('loads data', async () =&gt; {
   render(&lt;AsyncComponent /&gt;);
   expect(await screen.findByText('Data loaded')).toBeInTheDocument();
 });
 
 // ❌ Wrong - doesn't wait
-test('loads data', () => {
+test('loads data', () =&gt; {
   render(&lt;AsyncComponent /&gt;);
   expect(screen.getByText('Data loaded')).toBeInTheDocument(); // Fails!
 });
@@ -2259,13 +2319,13 @@ screen.getByText('Submit');
                 <h4>2. Don't Test Third-Party Libraries</h4>
                 <pre><code class="language-typescript">
 // ❌ Don't test that React Router works
-test('Route component renders', () => {
+test('Route component renders', () =&gt; {
   render(&lt;Route path="/" component={Home} /&gt;);
   // Testing React Router, not your code
 });
 
 // ✅ Test your component's behavior with routing
-test('navigates to profile on click', async () => {
+test('navigates to profile on click', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;App /&gt;);
   
@@ -2279,22 +2339,22 @@ test('navigates to profile on click', async () => {
 // ❌ Bad - tests depend on order
 let component;
 
-test('renders component', () => {
+test('renders component', () =&gt; {
   component = render(&lt;MyComponent /&gt;);
 });
 
-test('handles click', () => {
+test('handles click', () =&gt; {
   // Depends on previous test
   fireEvent.click(component.getByRole('button'));
 });
 
 // ✅ Good - independent tests
-test('renders component', () => {
+test('renders component', () =&gt; {
   render(&lt;MyComponent /&gt;);
   expect(screen.getByRole('button')).toBeInTheDocument();
 });
 
-test('handles click', async () => {
+test('handles click', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;MyComponent /&gt;);
   await user.click(screen.getByRole('button'));
@@ -2305,7 +2365,7 @@ test('handles click', async () => {
 
                 <h4>1. Use screen.debug() for Troubleshooting</h4>
                 <pre><code class="language-typescript">
-test('debugging test', () => {
+test('debugging test', () =&gt; {
   render(&lt;MyComponent /&gt;);
   
   // See the entire DOM
@@ -2332,7 +2392,7 @@ export function renderWithProviders(ui: React.ReactElement) {
 
                 <h4>3. Use Testing Playground</h4>
                 <pre><code class="language-typescript">
-test('get query suggestions', () => {
+test('get query suggestions', () =&gt; {
   render(&lt;MyComponent /&gt;);
   
   // Logs URL to testing playground
@@ -2344,8 +2404,8 @@ test('get query suggestions', () => {
 
                 <h4>4. Test Error Boundaries</h4>
                 <pre><code class="language-typescript">
-test('error boundary catches errors', () => {
-  const ThrowError = () => {
+test('error boundary catches errors', () =&gt; {
+  const ThrowError = () =&gt; {
     throw new Error('Test error');
   };
   
@@ -2417,9 +2477,9 @@ test('error boundary catches errors', () => {
 
                 <!-- Encouragement Card -->
                 <div class="card card-accent" style="text-align: center; padding: 2rem;">
-                    <h3 style="color: white;">🎉 Congratulations!</h3>
-                    <p style="color: white;">You've mastered React Testing Library! You now know how to render components, query elements accessibly, simulate user interactions, and test async behavior. These skills will help you build robust, user-focused React applications with confidence.</p>
-                    <p style="color: white; margin-top: 1rem;">Keep practicing, and remember: every test you write makes your application better!</p>
+                    <h3>🎉 Congratulations!</h3>
+                    <p>You've mastered React Testing Library! You now know how to render components, query elements accessibly, simulate user interactions, and test async behavior. These skills will help you build robust, user-focused React applications with confidence.</p>
+                    <p style="margin-top: 1rem;">Keep practicing, and remember: every test you write makes your application better!</p>
                 </div>
             </section>
 

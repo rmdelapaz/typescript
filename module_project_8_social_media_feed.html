@@ -128,10 +128,10 @@ graph TB
     C --> L[Reply to Comment]
     
     D --> M[User Profile]
-    D --> N[Follow/Unfollow]
+    D --> N["Follow/Unfollow"]
     D --> O[User Stats]
-    
-    E --> P[Login/Signup]
+
+    E --> P["Login/Signup"]
     E --> Q[Auth State]
     
     style A fill:#667eea,stroke:#333,stroke-width:3px,color:#fff
@@ -197,8 +197,8 @@ graph TB
                 </div>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">🎓 What You'll Learn</h4>
-                    <ul style="color: white;">
+                    <h4>🎓 What You'll Learn</h4>
+                    <ul>
                         <li><strong>Real-World Architecture:</strong> See how professional applications are structured</li>
                         <li><strong>State Management Patterns:</strong> When to use React Query vs Zustand</li>
                         <li><strong>Scalable Code Organization:</strong> Feature folders that grow with your app</li>
@@ -223,8 +223,8 @@ graph TB
                     <tbody>
                         <tr>
                             <td><strong>Framework</strong></td>
-                            <td>React 18 + TypeScript</td>
-                            <td>Core application framework</td>
+                            <td>React 19 + TypeScript 5.x (Vite)</td>
+                            <td>Core application framework, scaffolded with Vite on Node 20+/22</td>
                         </tr>
                         <tr>
                             <td><strong>Server State</strong></td>
@@ -487,6 +487,46 @@ graph TB
 
                 <h3>State Management Strategy</h3>
 
+                <p>The single most important decision in this project is <em>where each piece of state lives</em>. Get this right and the rest of the architecture falls into place; get it wrong and you'll fight cache bugs and stale data forever. The key insight is that there are really two different kinds of state, and they have opposite needs:</p>
+
+                <ul>
+                    <li><strong>Server state</strong> — data that lives on the backend and you only ever hold a <em>copy</em> of: posts, comments, users, follower counts. It can go stale the moment someone else changes it, so it needs caching, background refetching, retries, and invalidation. That is exactly what <strong>TanStack Query</strong> gives you — you never store this in a global store yourself.</li>
+                    <li><strong>Client state</strong> — data that is born and dies in the browser and no server owns: is the login modal open, who is the current user, which toast is showing. It's synchronous and fully under your control, so a small typed store like <strong>Zustand</strong> is the right home for it.</li>
+                </ul>
+
+                <p>A useful rule of thumb: <em>if answering "is this value up to date?" requires talking to the server, it's server state and belongs to TanStack Query.</em> Everything else is client state.</p>
+
+                <figure>
+                    <svg class="svg-auto-invert" id="svg-state-split" viewBox="0 0 520 300" width="100%" style="max-width: 520px;" aria-labelledby="split-title split-desc" role="img">
+                        <title id="split-title">Server State vs Client State</title>
+                        <desc id="split-desc">Two columns showing that TanStack Query owns server state such as posts and comments, while Zustand owns client state such as auth and UI, with the component reading from both.</desc>
+                        <!-- Server state column -->
+                        <rect x="15" y="20" width="230" height="200" rx="10" fill="#667eea" fill-opacity="0.12" stroke="#667eea" stroke-width="2"/>
+                        <text x="130" y="45" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#4a3f9f">Server State</text>
+                        <text x="130" y="63" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#5a4faf">TanStack Query</text>
+                        <text x="130" y="95" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#333">📰 Posts feed</text>
+                        <text x="130" y="118" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#333">💬 Comments</text>
+                        <text x="130" y="141" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#333">👥 Users &amp; followers</text>
+                        <text x="130" y="164" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#333">❤️ Like counts</text>
+                        <text x="130" y="196" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#667eea" font-style="italic">cache · refetch · invalidate</text>
+                        <!-- Client state column -->
+                        <rect x="275" y="20" width="230" height="200" rx="10" fill="#4CAF50" fill-opacity="0.12" stroke="#4CAF50" stroke-width="2"/>
+                        <text x="390" y="45" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#2e7d32">Client State</text>
+                        <text x="390" y="63" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#388e3c">Zustand</text>
+                        <text x="390" y="95" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#333">🔐 Auth / current user</text>
+                        <text x="390" y="118" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#333">🪟 Modal open/closed</text>
+                        <text x="390" y="141" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#333">🔔 Toast notifications</text>
+                        <text x="390" y="164" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#333">🎚️ UI preferences</text>
+                        <text x="390" y="196" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#2e7d32" font-style="italic">synchronous · browser-owned</text>
+                        <!-- Component consuming both -->
+                        <rect x="160" y="255" width="200" height="35" rx="8" fill="#764ba2" fill-opacity="0.15" stroke="#764ba2" stroke-width="2"/>
+                        <text x="260" y="277" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#764ba2">Your Component</text>
+                        <line x1="130" y1="220" x2="230" y2="255" stroke="#667eea" stroke-width="2"/>
+                        <line x1="390" y1="220" x2="290" y2="255" stroke="#4CAF50" stroke-width="2"/>
+                    </svg>
+                    <figcaption>Figure 1: Two stores, two jobs. TanStack Query owns everything the backend is the source of truth for; Zustand owns everything the browser is the source of truth for. A component simply reads from whichever it needs.</figcaption>
+                </figure>
+
                 <div class="card card-info">
                     <h4>📊 When to Use What</h4>
                     
@@ -609,8 +649,8 @@ sequenceDiagram
 
 // 1. API Layer (Axios Interceptor)
 axios.interceptors.response.use(
-  response => response,
-  error => {
+  response =&gt; response,
+  error =&gt; {
     // Transform HTTP errors to custom errors
     if (error.response?.status === 401) {
       throw new AuthError('Please log in');
@@ -632,7 +672,7 @@ export const postService = {
 export function useLikePost() {
   return useMutation({
     mutationFn: postService.like,
-    onError: (error) => {
+    onError: (error) =&gt; {
       // React Query handles rollback
       toast.error(error.message);
     }
@@ -643,7 +683,7 @@ export function useLikePost() {
 function PostCard({ post }: { post: Post }) {
   const likeMutation = useLikePost();
   
-  const handleLike = () => {
+  const handleLike = () =&gt; {
     likeMutation.mutate(post.id);
     // No try-catch needed, React Query handles it
   };
@@ -848,17 +888,20 @@ npm install</code></pre>
 
                 <h3>Step 2: Install Required Dependencies</h3>
 
-                <pre><code class="language-bash"># State Management & Data Fetching
+                <pre><code class="language-bash"># State Management &amp; Data Fetching
 npm install @tanstack/react-query zustand
 npm install axios
 
 # Routing
 npm install react-router-dom
 
-# Forms & Validation
+# Forms &amp; Validation
 npm install react-hook-form @hookform/resolvers zod
 
-# UI & Icons
+# Dates (relative timestamps like "2 hours ago")
+npm install date-fns
+
+# UI &amp; Icons
 npm install lucide-react
 npm install react-hot-toast
 
@@ -995,22 +1038,22 @@ export const apiClient: AxiosInstance = axios.create({
 
 // Request interceptor - Add auth token
 apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  (config: InternalAxiosRequestConfig) =&gt; {
     const token = localStorage.getItem('authToken');
-    if (token && config.headers) {
+    if (token &amp;&amp; config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
+  (error) =&gt; {
     return Promise.reject(error);
   }
 );
 
 // Response interceptor - Handle errors globally
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response) =&gt; response,
+  (error) =&gt; {
     // Handle common errors
     if (error.response?.status === 401) {
       // Clear auth and redirect to login
@@ -1031,7 +1074,7 @@ export class AppError extends Error {
     message: string,
     public code: string,
     public statusCode: number,
-    public details?: any
+    public details?: unknown
   ) {
     super(message);
     this.name = 'AppError';
@@ -1043,7 +1086,7 @@ export class AppError extends Error {
 import { AppError } from './AppError';
 
 export class ApiError extends AppError {
-  constructor(message: string, statusCode = 500, details?: any) {
+  constructor(message: string, statusCode = 500, details?: unknown) {
     super(message, 'API_ERROR', statusCode, details);
     this.name = 'ApiError';
   }
@@ -1089,12 +1132,12 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
       retry: 1,
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      retryDelay: (attemptIndex) =&gt; Math.min(1000 * 2 ** attemptIndex, 30000),
     },
     mutations: {
       // Global mutation defaults
       retry: 0,
-      onError: (error) => {
+      onError: (error) =&gt; {
         console.error('Mutation error:', error);
       },
     },
@@ -1124,7 +1167,7 @@ export interface ApiError {
   message: string;
   code: string;
   statusCode: number;
-  details?: Record&lt;string, any&gt;;
+  details?: Record&lt;string, unknown&gt;;
 }
 
 export type Nullable&lt;T&gt; = T | null;
@@ -1167,10 +1210,10 @@ export function formatDateTime(date: string | Date): string {
 
 // src/shared/utils/formatNumber.ts
 export function formatNumber(num: number): string {
-  if (num >= 1000000) {
+  if (num &gt;= 1000000) {
     return `${(num / 1000000).toFixed(1)}M`;
   }
-  if (num >= 1000) {
+  if (num &gt;= 1000) {
     return `${(num / 1000).toFixed(1)}K`;
   }
   return num.toString();
@@ -1194,7 +1237,7 @@ export function isStrongPassword(password: string): boolean {
 }
 
 export function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text;
+  if (text.length &lt;= maxLength) return text;
   return text.slice(0, maxLength) + '...';
 }</code></pre>
 
@@ -1206,12 +1249,12 @@ import { useState, useEffect } from 'react';
 export function useDebounce&lt;T&gt;(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState&lt;T&gt;(value);
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
+  useEffect(() =&gt; {
+    const handler = setTimeout(() =&gt; {
       setDebouncedValue(value);
     }, delay);
 
-    return () => clearTimeout(handler);
+    return () =&gt; clearTimeout(handler);
   }, [value, delay]);
 
   return debouncedValue;
@@ -1223,8 +1266,8 @@ import { useState, useEffect } from 'react';
 export function useLocalStorage&lt;T&gt;(
   key: string,
   initialValue: T
-): [T, (value: T | ((val: T) => T)) => void] {
-  const [storedValue, setStoredValue] = useState&lt;T&gt;(() => {
+): [T, (value: T | ((val: T) =&gt; T)) =&gt; void] {
+  const [storedValue, setStoredValue] = useState&lt;T&gt;(() =&gt; {
     try {
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
@@ -1234,7 +1277,7 @@ export function useLocalStorage&lt;T&gt;(
     }
   });
 
-  const setValue = (value: T | ((val: T) => T)) => {
+  const setValue = (value: T | ((val: T) =&gt; T)) =&gt; {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
@@ -1252,21 +1295,21 @@ import { useEffect, useRef, useState } from 'react';
 
 export function useIntersectionObserver(
   options?: IntersectionObserverInit
-): [React.RefObject&lt;HTMLDivElement&gt;, boolean] {
+): [React.RefObject&lt;HTMLDivElement | null&gt;, boolean] {
   const ref = useRef&lt;HTMLDivElement&gt;(null);
   const [isIntersecting, setIsIntersecting] = useState(false);
 
-  useEffect(() => {
+  useEffect(() =&gt; {
     const element = ref.current;
     if (!element) return;
 
-    const observer = new IntersectionObserver(([entry]) => {
+    const observer = new IntersectionObserver(([entry]) =&gt; {
       setIsIntersecting(entry.isIntersecting);
     }, options);
 
     observer.observe(element);
 
-    return () => observer.disconnect();
+    return () =&gt; observer.disconnect();
   }, [options]);
 
   return [ref, isIntersecting];
@@ -1323,10 +1366,10 @@ interface AvatarProps {
 }
 
 export function Avatar({ src, alt, size = 'medium', fallback }: AvatarProps) {
-  const getInitials = (name: string): string => {
+  const getInitials = (name: string): string =&gt; {
     return name
       .split(' ')
-      .map(n => n[0])
+      .map(n =&gt; n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -1386,7 +1429,7 @@ export function Spinner({ size = 'medium', text }: SpinnerProps) {
   return (
     &lt;div className="spinner-container"&gt;
       &lt;div className={`spinner spinner-${size}`}&gt;&lt;/div&gt;
-      {text && &lt;p className="spinner-text"&gt;{text}&lt;/p&gt;}
+      {text &amp;&amp; &lt;p className="spinner-text"&gt;{text}&lt;/p&gt;}
     &lt;/div&gt;
   );
 }</code></pre>
@@ -1397,7 +1440,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
-  fallback?: (error: Error, reset: () => void) => ReactNode;
+  fallback?: (error: Error, reset: () =&gt; void) =&gt; ReactNode;
 }
 
 interface State {
@@ -1419,12 +1462,12 @@ export class ErrorBoundary extends Component&lt;Props, State&gt; {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
   }
 
-  reset = () => {
+  reset = () =&gt; {
     this.setState({ hasError: false, error: null });
   };
 
   render() {
-    if (this.state.hasError && this.state.error) {
+    if (this.state.hasError &amp;&amp; this.state.error) {
       if (this.props.fallback) {
         return this.props.fallback(this.state.error, this.reset);
       }
@@ -1585,12 +1628,12 @@ export const postService = {
                 <pre><code class="language-typescript">// src/features/posts/hooks/postKeys.ts
 export const postKeys = {
   all: ['posts'] as const,
-  lists: () => [...postKeys.all, 'list'] as const,
-  list: (filters: string) => [...postKeys.lists(), { filters }] as const,
-  infinite: () => [...postKeys.all, 'infinite'] as const,
-  details: () => [...postKeys.all, 'detail'] as const,
-  detail: (id: string) => [...postKeys.details(), id] as const,
-  byUser: (userId: string) => [...postKeys.all, 'user', userId] as const,
+  lists: () =&gt; [...postKeys.all, 'list'] as const,
+  list: (filters: string) =&gt; [...postKeys.lists(), { filters }] as const,
+  infinite: () =&gt; [...postKeys.all, 'infinite'] as const,
+  details: () =&gt; [...postKeys.all, 'detail'] as const,
+  detail: (id: string) =&gt; [...postKeys.details(), id] as const,
+  byUser: (userId: string) =&gt; [...postKeys.all, 'user', userId] as const,
 };</code></pre>
 
                 <h4>useInfinitePosts Hook</h4>
@@ -1602,14 +1645,16 @@ import { postKeys } from './postKeys';
 export function useInfinitePosts() {
   return useInfiniteQuery({
     queryKey: postKeys.infinite(),
-    queryFn: ({ pageParam }) => postService.getInfinitePosts(pageParam),
+    queryFn: ({ pageParam }) =&gt; postService.getInfinitePosts(pageParam),
     initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => {
+    getNextPageParam: (lastPage) =&gt; {
       return lastPage.hasMore ? lastPage.nextCursor : undefined;
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
 }</code></pre>
+
+                <p>Two things to notice. First, <code>useInfiniteQuery</code> stores an <em>array of pages</em>, not a flat list — each fetch appends a page, which is why the component later calls <code>data.pages.flatMap(...)</code> to render them. Second, we use <strong>cursor</strong> pagination (<code>nextCursor</code>) rather than page numbers. In a feed where new posts arrive constantly, offset-based paging (<code>?page=2</code>) would show duplicates or skip items as the list shifts; a cursor points at a stable position in the data, so "load more" always continues from exactly where you left off. Returning <code>undefined</code> from <code>getNextPageParam</code> is how you tell Query there are no more pages, which flips <code>hasNextPage</code> to <code>false</code>.</p>
 
                 <h4>usePost Hook</h4>
                 <pre><code class="language-typescript">// src/features/posts/hooks/usePost.ts
@@ -1620,7 +1665,7 @@ import { postKeys } from './postKeys';
 export function usePost(id: string) {
   return useQuery({
     queryKey: postKeys.detail(id),
-    queryFn: () => postService.getById(id),
+    queryFn: () =&gt; postService.getById(id),
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }</code></pre>
@@ -1637,15 +1682,15 @@ export function useCreatePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreatePostDto) => postService.create(data),
-    onSuccess: (newPost: Post) => {
+    mutationFn: (data: CreatePostDto) =&gt; postService.create(data),
+    onSuccess: (newPost: Post) =&gt; {
       // Invalidate infinite query to show new post
       queryClient.invalidateQueries({ queryKey: postKeys.infinite() });
       queryClient.invalidateQueries({ queryKey: postKeys.lists() });
       
       toast.success('Post created successfully!');
     },
-    onError: (error: Error) => {
+    onError: (error: Error) =&gt; {
       toast.error(error.message || 'Failed to create post');
     },
   });
@@ -1663,9 +1708,9 @@ export function useUpdatePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdatePostDto }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdatePostDto }) =&gt;
       postService.update(id, data),
-    onSuccess: (updatedPost) => {
+    onSuccess: (updatedPost) =&gt; {
       // Update specific post cache
       queryClient.setQueryData(postKeys.detail(updatedPost.id), updatedPost);
       
@@ -1675,7 +1720,7 @@ export function useUpdatePost() {
       
       toast.success('Post updated successfully!');
     },
-    onError: (error: Error) => {
+    onError: (error: Error) =&gt; {
       toast.error(error.message || 'Failed to update post');
     },
   });
@@ -1692,8 +1737,8 @@ export function useDeletePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (postId: string) => postService.delete(postId),
-    onSuccess: (_, deletedId) => {
+    mutationFn: (postId: string) =&gt; postService.delete(postId),
+    onSuccess: (_, deletedId) =&gt; {
       // Remove from cache
       queryClient.removeQueries({ queryKey: postKeys.detail(deletedId) });
       
@@ -1703,7 +1748,7 @@ export function useDeletePost() {
       
       toast.success('Post deleted successfully!');
     },
-    onError: (error: Error) => {
+    onError: (error: Error) =&gt; {
       toast.error(error.message || 'Failed to delete post');
     },
   });
@@ -1720,10 +1765,10 @@ export function useLikePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (postId: string) => postService.toggleLike(postId),
+    mutationFn: (postId: string) =&gt; postService.toggleLike(postId),
     
     // Optimistic update
-    onMutate: async (postId) => {
+    onMutate: async (postId) =&gt; {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: postKeys.detail(postId) });
       
@@ -1733,7 +1778,7 @@ export function useLikePost() {
       );
       
       // Optimistically update cache
-      queryClient.setQueryData&lt;Post&gt;(postKeys.detail(postId), (old) => {
+      queryClient.setQueryData&lt;Post&gt;(postKeys.detail(postId), (old) =&gt; {
         if (!old) return old;
         
         const isCurrentlyLiked = old.isLiked;
@@ -1749,19 +1794,32 @@ export function useLikePost() {
     },
     
     // Rollback on error
-    onError: (error, postId, context) => {
+    onError: (error, postId, context) =&gt; {
       if (context?.previousPost) {
         queryClient.setQueryData(postKeys.detail(postId), context.previousPost);
       }
     },
     
     // Always refetch after success or error
-    onSettled: (data, error, postId) => {
+    onSettled: (data, error, postId) =&gt; {
       queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) });
       queryClient.invalidateQueries({ queryKey: postKeys.infinite() });
     },
   });
 }</code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 Why the three-callback dance?</h4>
+                    <p>A "like" should feel instant — the user shouldn't watch a spinner while a round-trip completes. Optimistic updates make the UI reflect the change <em>before</em> the server confirms it, then reconcile once the truth comes back. TanStack Query gives you exactly three hooks to do this safely:</p>
+                    <ul>
+                        <li><strong><code>onMutate</code></strong> runs immediately. It <em>cancels</em> any in-flight refetch (so a slow response can't overwrite our optimistic value), <em>snapshots</em> the current post so we can undo, and writes the new liked state into the cache. Whatever it returns becomes the <code>context</code> passed to the other callbacks.</li>
+                        <li><strong><code>onError</code></strong> runs only if the request fails. It reads <code>context.previousPost</code> and rolls the cache back, so a failed like silently reverts instead of leaving a lie on screen.</li>
+                        <li><strong><code>onSettled</code></strong> runs after success <em>or</em> failure. It invalidates the affected queries so the next render pulls the authoritative server value — closing the gap between our optimistic guess and reality.</li>
+                    </ul>
+                    <p>Cancel → snapshot → apply → (rollback on error) → invalidate. Memorize that order; it's the same recipe for any optimistic mutation you'll ever write.</p>
+                </div>
+
+                <p>Trace this flow visually in the <a href="#section3">Data Flow Architecture sequence diagram</a> above — the "Optimistic Update" note and the <code>alt Success / Error</code> branches map one-to-one onto these three callbacks.</p>
 
                 <h3>Step 4: Export Public API</h3>
 
@@ -1818,8 +1876,8 @@ import type { Post } from '../types/post.types';
 
 interface PostCardProps {
   post: Post;
-  onEdit?: (post: Post) => void;
-  onCommentClick?: (post: Post) => void;
+  onEdit?: (post: Post) =&gt; void;
+  onCommentClick?: (post: Post) =&gt; void;
 }
 
 export function PostCard({ post, onEdit, onCommentClick }: PostCardProps) {
@@ -1827,11 +1885,11 @@ export function PostCard({ post, onEdit, onCommentClick }: PostCardProps) {
   const deleteMutation = useDeletePost();
   const currentUserId = 'current-user-id'; // Get from auth store
 
-  const handleLike = () => {
+  const handleLike = () =&gt; {
     likeMutation.mutate(post.id);
   };
 
-  const handleDelete = () => {
+  const handleDelete = () =&gt; {
     if (window.confirm('Are you sure you want to delete this post?')) {
       deleteMutation.mutate(post.id);
     }
@@ -1875,17 +1933,17 @@ export function PostCard({ post, onEdit, onCommentClick }: PostCardProps) {
 
         &lt;button
           className="post-action-btn"
-          onClick={() => onCommentClick?.(post)}
+          onClick={() =&gt; onCommentClick?.(post)}
         &gt;
           &lt;MessageCircle /&gt;
           &lt;span&gt;{formatNumber(post.commentsCount)}&lt;/span&gt;
         &lt;/button&gt;
 
-        {isOwnPost && (
+        {isOwnPost &amp;&amp; (
           &lt;&gt;
             &lt;button
               className="post-action-btn"
-              onClick={() => onEdit?.(post)}
+              onClick={() =&gt; onEdit?.(post)}
             &gt;
               &lt;Edit2 size={18} /&gt;
             &lt;/button&gt;
@@ -1928,8 +1986,8 @@ export function PostList() {
     threshold: 0.5,
   });
 
-  useEffect(() => {
-    if (isIntersecting && hasNextPage && !isFetchingNextPage) {
+  useEffect(() =&gt; {
+    if (isIntersecting &amp;&amp; hasNextPage &amp;&amp; !isFetchingNextPage) {
       fetchNextPage();
     }
   }, [isIntersecting, hasNextPage, isFetchingNextPage, fetchNextPage]);
@@ -1942,12 +2000,12 @@ export function PostList() {
     return (
       &lt;div className="error-message"&gt;
         &lt;p&gt;Error loading posts: {error.message}&lt;/p&gt;
-        &lt;button onClick={() => window.location.reload()}&gt;Retry&lt;/button&gt;
+        &lt;button onClick={() =&gt; window.location.reload()}&gt;Retry&lt;/button&gt;
       &lt;/div&gt;
     );
   }
 
-  const posts = data?.pages.flatMap((page) => page.posts) ?? [];
+  const posts = data?.pages.flatMap((page) =&gt; page.posts) ?? [];
 
   if (posts.length === 0) {
     return (
@@ -1959,16 +2017,16 @@ export function PostList() {
 
   return (
     &lt;div className="post-list"&gt;
-      {posts.map((post) => (
+      {posts.map((post) =&gt; (
         &lt;PostCard key={post.id} post={post} /&gt;
       ))}
 
       {/* Load more trigger */}
       &lt;div ref={loadMoreRef} className="load-more-trigger"&gt;
-        {isFetchingNextPage && &lt;Spinner text="Loading more..." /&gt;}
+        {isFetchingNextPage &amp;&amp; &lt;Spinner text="Loading more..." /&gt;}
       &lt;/div&gt;
 
-      {!hasNextPage && posts.length > 0 && (
+      {!hasNextPage &amp;&amp; posts.length &gt; 0 &amp;&amp; (
         &lt;p className="end-message"&gt;You've reached the end!&lt;/p&gt;
       )}
     &lt;/div&gt;
@@ -1978,7 +2036,6 @@ export function PostList() {
                 <h3>PostForm Component</h3>
 
                 <pre><code class="language-typescript">// src/features/posts/components/PostForm.tsx
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -1997,7 +2054,6 @@ type PostFormData = z.infer&lt;typeof postSchema&gt;;
 
 export function PostForm() {
   const createMutation = useCreatePost();
-  const [charCount, setCharCount] = useState(0);
 
   const {
     register,
@@ -2007,18 +2063,16 @@ export function PostForm() {
     watch,
   } = useForm&lt;PostFormData&gt;({
     resolver: zodResolver(postSchema),
+    defaultValues: { content: '' },
   });
 
-  // Watch content for character count
-  const content = watch('content', '');
-  useEffect(() => {
-    setCharCount(content.length);
-  }, [content]);
+  // Derive the character count straight from the watched field —
+  // no useState/useEffect needed, so there's nothing to keep in sync.
+  const charCount = watch('content').length;
 
-  const onSubmit = async (data: PostFormData) => {
+  const onSubmit = async (data: PostFormData) =&gt; {
     await createMutation.mutateAsync(data);
     reset();
-    setCharCount(0);
   };
 
   return (
@@ -2030,12 +2084,12 @@ export function PostForm() {
         rows={3}
       /&gt;
 
-      {errors.content && (
+      {errors.content &amp;&amp; (
         &lt;p className="error-text"&gt;{errors.content.message}&lt;/p&gt;
       )}
 
       &lt;div className="post-form-footer"&gt;
-        &lt;span className={`char-count ${charCount > 280 ? 'error' : ''}`}&gt;
+        &lt;span className={`char-count ${charCount &gt; 280 ? 'error' : ''}`}&gt;
           {charCount}/280
         &lt;/span&gt;
         &lt;Button
@@ -2142,13 +2196,13 @@ import { commentService } from '../api/commentService';
 
 export const commentKeys = {
   all: ['comments'] as const,
-  byPost: (postId: string) => [...commentKeys.all, 'post', postId] as const,
+  byPost: (postId: string) =&gt; [...commentKeys.all, 'post', postId] as const,
 };
 
 export function useComments(postId: string) {
   return useQuery({
     queryKey: commentKeys.byPost(postId),
-    queryFn: () => commentService.getByPost(postId),
+    queryFn: () =&gt; commentService.getByPost(postId),
     staleTime: 1000 * 60 * 2,
   });
 }
@@ -2165,7 +2219,7 @@ export function useAddComment() {
 
   return useMutation({
     mutationFn: commentService.create,
-    onSuccess: (newComment) => {
+    onSuccess: (newComment) =&gt; {
       // Invalidate comments for this post
       queryClient.invalidateQueries({ 
         queryKey: commentKeys.byPost(newComment.postId) 
@@ -2178,7 +2232,7 @@ export function useAddComment() {
       
       toast.success('Comment added!');
     },
-    onError: (error: Error) => {
+    onError: (error: Error) =&gt; {
       toast.error(error.message || 'Failed to add comment');
     },
   });
@@ -2216,11 +2270,11 @@ export function CommentList({ postId }: CommentListProps) {
       &lt;CommentForm postId={postId} /&gt;
 
       &lt;div className="comments-list"&gt;
-        {comments?.map((comment) => (
+        {comments?.map((comment) =&gt; (
           &lt;CommentItem
             key={comment.id}
             comment={comment}
-            onReply={() => setReplyingTo(comment.id)}
+            onReply={() =&gt; setReplyingTo(comment.id)}
           /&gt;
         ))}
       &lt;/div&gt;
@@ -2263,30 +2317,30 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
-  login: (user: User, token: string) => void;
-  logout: () => void;
-  updateUser: (user: Partial&lt;User&gt;) => void;
+  login: (user: User, token: string) =&gt; void;
+  logout: () =&gt; void;
+  updateUser: (user: Partial&lt;User&gt;) =&gt; void;
 }
 
 export const useAuthStore = create&lt;AuthState&gt;()(
   persist(
-    (set) => ({
+    (set) =&gt; ({
       user: null,
       token: null,
       isAuthenticated: false,
 
-      login: (user, token) => {
+      login: (user, token) =&gt; {
         localStorage.setItem('authToken', token);
         set({ user, token, isAuthenticated: true });
       },
 
-      logout: () => {
+      logout: () =&gt; {
         localStorage.removeItem('authToken');
         set({ user: null, token: null, isAuthenticated: false });
       },
 
-      updateUser: (userData) => {
-        set((state) => ({
+      updateUser: (userData) =&gt; {
+        set((state) =&gt; ({
           user: state.user ? { ...state.user, ...userData } : null,
         }));
       },
@@ -2308,7 +2362,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isAuthenticated = useAuthStore((state) =&gt; state.isAuthenticated);
 
   if (!isAuthenticated) {
     return &lt;Navigate to="/login" replace /&gt;;
@@ -2343,9 +2397,9 @@ export function App() {
 }</code></pre>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">🎉 Congratulations!</h4>
-                    <p style="color: white;">You've built a complete, production-ready social media feed application with:</p>
-                    <ul style="color: white;">
+                    <h4>🎉 Congratulations!</h4>
+                    <p>You've built a complete, production-ready social media feed application with:</p>
+                    <ul>
                         <li>✅ Feature-based architecture</li>
                         <li>✅ React Query for server state</li>
                         <li>✅ Zustand for client state</li>
@@ -2429,8 +2483,8 @@ export function App() {
                 </div>
 
                 <div class="card card-accent">
-                    <h3 style="color: white;">🎯 Key Achievements</h3>
-                    <ol style="color: white;">
+                    <h3>🎯 Key Achievements</h3>
+                    <ol>
                         <li><strong>Professional Architecture:</strong> Your code is organized like production applications at top companies</li>
                         <li><strong>Scalable Patterns:</strong> The patterns you used scale from small projects to enterprise apps</li>
                         <li><strong>Best Practices:</strong> Separation of concerns, DRY, single responsibility throughout</li>
@@ -2479,9 +2533,9 @@ export function App() {
                 </div>
 
                 <div class="card card-accent">
-                    <h3 style="color: white;">💼 Portfolio Presentation</h3>
-                    <p style="color: white;">This project is portfolio-ready! When presenting it:</p>
-                    <ul style="color: white;">
+                    <h3>💼 Portfolio Presentation</h3>
+                    <p>This project is portfolio-ready! When presenting it:</p>
+                    <ul>
                         <li><strong>Highlight the architecture:</strong> Explain your feature-based structure</li>
                         <li><strong>Discuss state management decisions:</strong> Why React Query vs Zustand for different state types</li>
                         <li><strong>Show the code organization:</strong> Service layer, custom hooks, component separation</li>

@@ -116,7 +116,7 @@
                 </div>
 
                 <h3>The State Placement Decision Tree</h3>
-                <pre class="mermaid">
+                <div class="mermaid">
 graph TD
     A[Need to add state] --> B{"Used by only one component?"}
     B -->|Yes| C[Keep it local in that component]
@@ -128,7 +128,7 @@ graph TD
     style C fill:#4CAF50,color:#fff
     style E fill:#2196F3,color:#fff
     style G fill:#FF9800,color:#fff
-</pre>
+</div>
 
                 <h3>Three Key Questions</h3>
                 <div class="card">
@@ -200,7 +200,7 @@ graph TD
                     <h4>Scenario: Temperature Converter</h4>
                     <p>Imagine two input fields - one for Celsius, one for Fahrenheit. Type into either one and the other should update to match. The catch: they're sibling components, and in React data only flows <em>downward</em> from parent to child. Siblings have no direct line to each other.</p>
 
-                    <pre class="mermaid">
+                    <div class="mermaid">
 graph TD
     A[App] --> B[CelsiusInput]
     A --> C[FahrenheitInput]
@@ -209,7 +209,7 @@ graph TD
 
     style B fill:#f44336,color:#fff
     style C fill:#f44336,color:#fff
-</pre>
+</div>
                     <p>Think of two kids in different rooms who can only talk to a parent, never to each other directly. If they need to coordinate, the message has to go <em>up</em> to the parent and back <em>down</em>. That is exactly what lifting state up sets up.</p>
                 </div>
 
@@ -217,24 +217,24 @@ graph TD
                 <div class="card">
                     <h4>Before: State in Children (Doesn't Work)</h4>
                     <pre><code class="language-typescript">// ❌ Problem: Each has its own independent state
-const CelsiusInput: React.FC = () => {
+const CelsiusInput: React.FC = () =&gt; {
     const [temperature, setTemperature] = useState('');
     
     return (
         &lt;input 
             value={temperature}
-            onChange={(e) => setTemperature(e.target.value)}
+            onChange={(e) =&gt; setTemperature(e.target.value)}
         /&gt;
     );
 };
 
-const FahrenheitInput: React.FC = () => {
+const FahrenheitInput: React.FC = () =&gt; {
     const [temperature, setTemperature] = useState('');
     
     return (
         &lt;input 
             value={temperature}
-            onChange={(e) => setTemperature(e.target.value)}
+            onChange={(e) =&gt; setTemperature(e.target.value)}
         /&gt;
     );
 };</code></pre>
@@ -246,7 +246,7 @@ const FahrenheitInput: React.FC = () => {
                     <pre><code class="language-typescript">// ✅ Solution: Lift state to parent
 interface TemperatureInputProps {
     temperature: string;
-    onTemperatureChange: (temp: string) => void;
+    onTemperatureChange: (temp: string) =&gt; void;
     scale: 'c' | 'f';
 }
 
@@ -254,7 +254,7 @@ const TemperatureInput: React.FC&lt;TemperatureInputProps&gt; = ({
     temperature,
     onTemperatureChange,
     scale
-}) => {
+}) =&gt; {
     const scaleName = scale === 'c' ? 'Celsius' : 'Fahrenheit';
     
     return (
@@ -262,23 +262,23 @@ const TemperatureInput: React.FC&lt;TemperatureInputProps&gt; = ({
             &lt;label&gt;{scaleName}:&lt;/label&gt;
             &lt;input 
                 value={temperature}
-                onChange={(e) => onTemperatureChange(e.target.value)}
+                onChange={(e) =&gt; onTemperatureChange(e.target.value)}
             /&gt;
         &lt;/div&gt;
     );
 };
 
 // Parent component manages the shared state
-const TemperatureConverter: React.FC = () => {
+const TemperatureConverter: React.FC = () =&gt; {
     const [temperature, setTemperature] = useState('');
     const [scale, setScale] = useState&lt;'c' | 'f'&gt;('c');
     
-    const handleCelsiusChange = (temp: string) => {
+    const handleCelsiusChange = (temp: string) =&gt; {
         setScale('c');
         setTemperature(temp);
     };
     
-    const handleFahrenheitChange = (temp: string) => {
+    const handleFahrenheitChange = (temp: string) =&gt; {
         setScale('f');
         setTemperature(temp);
     };
@@ -306,189 +306,55 @@ const TemperatureConverter: React.FC = () => {
         &lt;/div&gt;
     );
 };</code></pre>
-                    <p style="color: #4CAF50;">✅ Now they stay synchronized through the parent!</p>
+                    <p>✅ Now both fields stay synchronized through the parent — one value, two views.</p>
                 </div>
 
                 <h3>How Lifting State Works</h3>
-                <pre class="mermaid">
+                <p>Follow a single keystroke through the tree. When the user types into the Celsius field, the child does <em>not</em> update itself — it calls the <code>onTemperatureChange</code> callback it was handed. The parent updates the one value it owns, recomputes the other scale, and re-renders <strong>both</strong> children with fresh props. The data makes a round trip: up via a callback, back down via props. That round trip is the whole trick.</p>
+                <div class="mermaid">
 sequenceDiagram
     participant User
-    participant Child1
-    participant Parent
-    participant Child2
-    
-    User->>Child1: Type "25" in Celsius
+    participant CelsiusInput
+    participant Parent as TemperatureConverter
+    participant FahrenheitInput
+    User->>CelsiusInput: Types 25 in the Celsius field
+    CelsiusInput->>Parent: onTemperatureChange(25)
+    Parent->>Parent: setTemperature(25), convert to Fahrenheit
+    Parent->>CelsiusInput: Re-render with 25
+    Parent->>FahrenheitInput: Re-render with 77
+    FahrenheitInput->>User: Shows 77 automatically
+    Note over Parent: The parent is the single source of truth
+</div>
 
-                <h3>🎮 Interactive Demo: Lifting State in Action</h3>
-                <p>Watch how sibling components communicate through their parent:</p>
-                
-                <div style="background: #f8f9fa; border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;">
-                    <canvas class="auto-invert" id="liftingStateCanvas" width="750" height="380" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; background: white;"></canvas>
-                    <div style="display: flex; justify-content: center; gap: 1rem; margin-top: 1rem;">
-                        <button id="celsiusUpBtn" style="padding: 0.4rem 1rem; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Celsius +5°</button>
-                        <button id="celsiusDownBtn" style="padding: 0.4rem 1rem; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Celsius -5°</button>
-                        <button id="fahrenheitUpBtn" style="padding: 0.4rem 1rem; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">Fahrenheit +9°</button>
-                        <button id="fahrenheitDownBtn" style="padding: 0.4rem 1rem; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">Fahrenheit -9°</button>
+                <h3>🎮 Try It: One Source of Truth, Two Synced Views</h3>
+                <p>Pick a temperature below. Notice you never set Fahrenheit directly — the parent owns a single Celsius value and <em>derives</em> Fahrenheit from it, so the two readouts can never disagree.</p>
+                <div class="card ts-demo" id="demo-lifting" aria-live="polite">
+                    <p class="ts-demo-sig"><code>const [celsius, setCelsius] = useState(20); // the parent owns the truth</code></p>
+                    <div class="ts-demo-buttons">
+                        <button type="button" class="ts-demo-btn" data-c="0">Set 0°C (freezing)</button>
+                        <button type="button" class="ts-demo-btn" data-c="20">Set 20°C (room)</button>
+                        <button type="button" class="ts-demo-btn" data-c="37">Set 37°C (body)</button>
+                        <button type="button" class="ts-demo-btn" data-c="100">Set 100°C (boiling)</button>
                     </div>
-                    <p style="text-align: center; color: #666; margin-top: 0.5rem; font-size: 0.9rem;">Both inputs stay synchronized through lifted state!</p>
+                    <p class="ts-demo-result ts-demo-idle">👆 Choose a temperature to watch both children re-render in sync.</p>
                 </div>
-                
                 <script>
-                (function() {
-                    const canvas = document.getElementById('liftingStateCanvas');
-                    if (!canvas) return;
-                    const ctx = canvas.getContext('2d');
-                    
-                    let celsius = 20;
-                    let animationPhase = 0;
-                    let animationProgress = 0;
-                    let lastSource = null;
-                    
-                    function celsiusToFahrenheit(c) { return (c * 9/5) + 32; }
-                    
-                    function drawRoundedRect(x, y, w, h, r, fill, stroke, strokeWidth = 2) {
-                        ctx.beginPath();
-                        ctx.roundRect(x, y, w, h, r);
-                        if (fill) { ctx.fillStyle = fill; ctx.fill(); }
-                        if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = strokeWidth; ctx.stroke(); }
-                    }
-                    
-                    function drawArrow(fromX, fromY, toX, toY, color, dashed = false) {
-                        ctx.strokeStyle = color;
-                        ctx.lineWidth = 3;
-                        if (dashed) ctx.setLineDash([6, 4]);
-                        else ctx.setLineDash([]);
-                        ctx.beginPath();
-                        ctx.moveTo(fromX, fromY);
-                        ctx.lineTo(toX, toY);
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                        
-                        const angle = Math.atan2(toY - fromY, toX - fromX);
-                        ctx.beginPath();
-                        ctx.moveTo(toX, toY);
-                        ctx.lineTo(toX - 12 * Math.cos(angle - 0.4), toY - 12 * Math.sin(angle - 0.4));
-                        ctx.lineTo(toX - 12 * Math.cos(angle + 0.4), toY - 12 * Math.sin(angle + 0.4));
-                        ctx.closePath();
-                        ctx.fillStyle = color;
-                        ctx.fill();
-                    }
-                    
-                    function draw() {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        const fahrenheit = celsiusToFahrenheit(celsius);
-                        
-                        ctx.font = 'bold 16px system-ui';
-                        ctx.fillStyle = '#333';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('Lifting State Up: Temperature Converter', canvas.width / 2, 25);
-                        
-                        // Parent component (owns state)
-                        const parentHighlight = animationPhase >= 2 && animationPhase <= 3;
-                        drawRoundedRect(200, 50, 350, 100, 10, parentHighlight ? '#E8F5E9' : '#f8f4ff', parentHighlight ? '#4CAF50' : '#667eea');
-                        ctx.font = 'bold 14px system-ui';
-                        ctx.fillStyle = '#667eea';
-                        ctx.fillText('📦 TemperatureConverter (Parent)', 375, 75);
-                        
-                        drawRoundedRect(220, 95, 310, 45, 6, 'white', '#ddd', 1);
-                        ctx.font = '12px monospace';
-                        ctx.fillStyle = '#666';
-                        ctx.fillText('const [temperature, setTemperature] = useState(' + celsius + ')', 375, 115);
-                        ctx.font = 'bold 11px system-ui';
-                        ctx.fillStyle = parentHighlight ? '#4CAF50' : '#667eea';
-                        ctx.fillText('Source of Truth', 375, 132);
-                        
-                        // Celsius child
-                        const celsiusHighlight = lastSource === 'celsius' && animationPhase === 1;
-                        drawRoundedRect(50, 220, 200, 130, 10, celsiusHighlight ? '#E3F2FD' : '#f5f5f5', celsiusHighlight ? '#2196F3' : '#ddd');
-                        ctx.font = 'bold 12px system-ui';
-                        ctx.fillStyle = '#2196F3';
-                        ctx.fillText('🌡️ CelsiusInput', 150, 245);
-                        
-                        drawRoundedRect(70, 260, 160, 70, 6, 'white', '#2196F3', 2);
-                        ctx.font = 'bold 28px system-ui';
-                        ctx.fillStyle = '#2196F3';
-                        ctx.fillText(celsius.toFixed(0) + '°C', 150, 305);
-                        
-                        // Fahrenheit child
-                        const fahrenheitHighlight = lastSource === 'fahrenheit' && animationPhase === 1;
-                        drawRoundedRect(500, 220, 200, 130, 10, fahrenheitHighlight ? '#FFF3E0' : '#f5f5f5', fahrenheitHighlight ? '#FF9800' : '#ddd');
-                        ctx.font = 'bold 12px system-ui';
-                        ctx.fillStyle = '#FF9800';
-                        ctx.fillText('🌡️ FahrenheitInput', 600, 245);
-                        
-                        drawRoundedRect(520, 260, 160, 70, 6, 'white', '#FF9800', 2);
-                        ctx.font = 'bold 28px system-ui';
-                        ctx.fillStyle = '#FF9800';
-                        ctx.fillText(fahrenheit.toFixed(0) + '°F', 600, 305);
-                        
-                        // Arrows - props down
-                        drawArrow(300, 150, 150, 215, '#4CAF50');
-                        ctx.font = '10px system-ui';
-                        ctx.fillStyle = '#4CAF50';
-                        ctx.fillText('temp prop', 200, 175);
-                        
-                        drawArrow(450, 150, 600, 215, '#4CAF50');
-                        ctx.fillText('temp prop', 550, 175);
-                        
-                        // Arrows - callbacks up (show during animation)
-                        if (animationPhase >= 1 && lastSource === 'celsius') {
-                            drawArrow(150, 215, 320, 150, '#2196F3', true);
-                            ctx.fillStyle = '#2196F3';
-                            ctx.fillText('onChange', 210, 195);
-                        }
-                        if (animationPhase >= 1 && lastSource === 'fahrenheit') {
-                            drawArrow(600, 215, 430, 150, '#FF9800', true);
-                            ctx.fillStyle = '#FF9800';
-                            ctx.fillText('onChange', 540, 195);
-                        }
-                        
-                        // Legend
-                        ctx.font = '11px system-ui';
-                        ctx.fillStyle = '#666';
-                        ctx.textAlign = 'left';
-                        ctx.fillText('→ Props flow down', 50, 375);
-                        ctx.fillText('⤴ Callbacks flow up', 200, 375);
-                        ctx.fillText('State in parent = synchronized inputs!', 400, 375);
-                        
-                        if (animationPhase > 0 && animationPhase < 4) {
-                            animationProgress += 0.04;
-                            if (animationProgress >= 1) {
-                                animationPhase++;
-                                animationProgress = 0;
-                                if (animationPhase >= 4) {
-                                    animationPhase = 0;
-                                    lastSource = null;
-                                }
-                            }
-                            requestAnimationFrame(draw);
-                        }
-                    }
-                    
-                    function updateTemp(source, delta) {
-                        celsius += delta;
-                        lastSource = source;
-                        animationPhase = 1;
-                        animationProgress = 0;
-                        draw();
-                    }
-                    
-                    document.getElementById('celsiusUpBtn').addEventListener('click', () => updateTemp('celsius', 5));
-                    document.getElementById('celsiusDownBtn').addEventListener('click', () => updateTemp('celsius', -5));
-                    document.getElementById('fahrenheitUpBtn').addEventListener('click', () => updateTemp('fahrenheit', 5));
-                    document.getElementById('fahrenheitDownBtn').addEventListener('click', () => updateTemp('fahrenheit', -5));
-                    
-                    draw();
+                (function () {
+                    const wrap = document.getElementById('demo-lifting');
+                    if (!wrap) return;
+                    wrap.querySelectorAll('.ts-demo-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            const demo = btn.closest('.ts-demo');
+                            const result = demo.querySelector('.ts-demo-result');
+                            const c = Number(btn.getAttribute('data-c'));
+                            const f = (c * 9) / 5 + 32;
+                            result.classList.remove('ts-demo-idle', 'ts-demo-err');
+                            result.classList.add('ts-demo-ok');
+                            result.textContent = '✅ CelsiusInput shows ' + c + '°C and FahrenheitInput shows ' + f + '°F — both derived from one lifted value.';
+                        });
+                    });
                 })();
                 </script>
-    Child1->>Parent: onTemperatureChange("25")
-    Parent->>Parent: Update state, calculate Fahrenheit
-    Parent->>Child1: Re-render with temp="25"
-    Parent->>Child2: Re-render with temp="77"
-    Child2->>User: Display "77" Fahrenheit
-    
-    Note over Parent: Parent is "source of truth"
-</pre>
 
                 <h3>Key Steps to Lift State</h3>
                 <div class="card">
@@ -519,12 +385,12 @@ sequenceDiagram
                 <p>As your component tree grows, you might find yourself passing props through many layers of components that don't actually use them. This is called "prop drilling" - and it's a code smell!</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Prop Drilling:</strong> Passing props through multiple component layers, where intermediate components don't use the props - they just pass them down to deeper children.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Prop Drilling:</strong> Passing props through multiple component layers, where intermediate components don't use the props - they just pass them down to deeper children.</p>
                 </div>
 
                 <h3>The Problem Illustrated</h3>
-                <pre class="mermaid">
+                <div class="mermaid">
 graph TD
     A[App - has user state] --> B[Header]
     A --> C[Main]
@@ -545,7 +411,7 @@ graph TD
     style E fill:#f44336,color:#fff
     style F fill:#f44336,color:#fff
     style G fill:#4CAF50,color:#fff
-</pre>
+</div>
 
                 <div class="card">
                     <h4>Example: Prop Drilling Code</h4>
@@ -555,29 +421,29 @@ interface User {
     avatar: string;
 }
 
-const App: React.FC = () => {
+const App: React.FC = () =&gt; {
     const [user, setUser] = useState&lt;User&gt;({ name: 'Alice', avatar: '👤' });
     
     return &lt;Main user={user} /&gt;;
 };
 
 // Main doesn't use user, just passes it down
-const Main: React.FC&lt;{ user: User }&gt; = ({ user }) => {
+const Main: React.FC&lt;{ user: User }&gt; = ({ user }) =&gt; {
     return &lt;Content user={user} /&gt;;
 };
 
 // Content doesn't use user, just passes it down
-const Content: React.FC&lt;{ user: User }&gt; = ({ user }) => {
+const Content: React.FC&lt;{ user: User }&gt; = ({ user }) =&gt; {
     return &lt;Article user={user} /&gt;;
 };
 
 // Article doesn't use user, just passes it down
-const Article: React.FC&lt;{ user: User }&gt; = ({ user }) => {
+const Article: React.FC&lt;{ user: User }&gt; = ({ user }) =&gt; {
     return &lt;Author user={user} /&gt;;
 };
 
 // Finally! Author actually uses it
-const Author: React.FC&lt;{ user: User }&gt; = ({ user }) => {
+const Author: React.FC&lt;{ user: User }&gt; = ({ user }) =&gt; {
     return &lt;div&gt;{user.avatar} {user.name}&lt;/div&gt;;
 };</code></pre>
                 </div>
@@ -593,8 +459,29 @@ const Author: React.FC&lt;{ user: User }&gt; = ({ user }) => {
                     <tbody>
                         <tr>
                             <td>Verbose code</td>
+                            <td>Every intermediate component needs prop definitions</td>
+                        </tr>
+                        <tr>
+                            <td>Hard to refactor</td>
+                            <td>Adding/removing props affects many files</td>
+                        </tr>
+                        <tr>
+                            <td>Tight coupling</td>
+                            <td>Intermediate components know about data they don't use</td>
+                        </tr>
+                        <tr>
+                            <td>Poor reusability</td>
+                            <td>Components can't be reused without the drilled props</td>
+                        </tr>
+                        <tr>
+                            <td>Confusing</td>
+                            <td>Hard to track where data comes from and goes to</td>
+                        </tr>
+                    </tbody>
+                </table>
 
                 <h3>🎨 Visualizing Prop Drilling</h3>
+                <figure>
                 <svg class="svg-auto-invert" viewBox="0 0 800 420" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
                     <defs>
                         <linearGradient id="propDrillGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -669,33 +556,14 @@ const Author: React.FC&lt;{ user: User }&gt; = ({ user }) => {
                     <text x="590" y="268" fill="#666" font-size="9">   Move Author closer to App</text>
                     <text x="580" y="295" fill="#4CAF50" font-size="10" font-weight="bold">Remove the middlemen!</text>
                 </svg>
-                            <td>Every intermediate component needs prop definitions</td>
-                        </tr>
-                        <tr>
-                            <td>Hard to refactor</td>
-                            <td>Adding/removing props affects many files</td>
-                        </tr>
-                        <tr>
-                            <td>Tight coupling</td>
-                            <td>Intermediate components know about data they don't use</td>
-                        </tr>
-                        <tr>
-                            <td>Poor reusability</td>
-                            <td>Components can't be reused without the drilled props</td>
-                        </tr>
-                        <tr>
-                            <td>Confusing</td>
-                            <td>Hard to track where data comes from and goes to</td>
-                        </tr>
-                    </tbody>
-                </table>
-
+                    <figcaption>Figure: The same <code>user</code> object is threaded through four components that never read it — the hallmark of prop drilling. Composition or Context lets you remove the middlemen.</figcaption>
+                </figure>
                 <h3>Solutions to Prop Drilling</h3>
                 <div class="card">
                     <h4>1. Component Composition (Recommended)</h4>
                     <p>Instead of passing props down, pass components as children:</p>
                     <pre><code class="language-typescript">// ✅ Better: Use composition
-const App: React.FC = () => {
+const App: React.FC = () =&gt; {
     const [user, setUser] = useState&lt;User&gt;({ name: 'Alice', avatar: '👤' });
     
     return (
@@ -710,11 +578,11 @@ const App: React.FC = () => {
 };
 
 // Now these components don't need to know about user!
-const Main: React.FC&lt;{ children: React.ReactNode }&gt; = ({ children }) => {
+const Main: React.FC&lt;{ children: React.ReactNode }&gt; = ({ children }) =&gt; {
     return &lt;main&gt;{children}&lt;/main&gt;;
 };
 
-const Content: React.FC&lt;{ children: React.ReactNode }&gt; = ({ children }) => {
+const Content: React.FC&lt;{ children: React.ReactNode }&gt; = ({ children }) =&gt; {
     return &lt;div className="content"&gt;{children}&lt;/div&gt;;
 };</code></pre>
                 </div>
@@ -726,7 +594,7 @@ const Content: React.FC&lt;{ children: React.ReactNode }&gt; = ({ children }) =>
 const UserContext = React.createContext&lt;User | null&gt;(null);
 
 // Provider at top
-const App: React.FC = () => {
+const App: React.FC = () =&gt; {
     const [user, setUser] = useState&lt;User&gt;({ name: 'Alice', avatar: '👤' });
     
     return (
@@ -737,7 +605,7 @@ const App: React.FC = () => {
 };
 
 // Consumer deep in tree - no prop drilling!
-const Author: React.FC = () => {
+const Author: React.FC = () =&gt; {
     const user = useContext(UserContext);
     return &lt;div&gt;{user?.avatar} {user?.name}&lt;/div&gt;;
 };</code></pre>
@@ -762,14 +630,14 @@ const Author: React.FC = () => {
                 <p>While we've talked about lifting state up, sometimes the opposite is true - you should push state down! This is called state colocation.</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>State Colocation:</strong> Keeping state as close as possible to where it's used. If only one component (or a small component subtree) needs the state, keep it there instead of unnecessarily lifting it up.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>State Colocation:</strong> Keeping state as close as possible to where it's used. If only one component (or a small component subtree) needs the state, keep it there instead of unnecessarily lifting it up.</p>
                 </div>
 
                 <h3>The Colocation Principle</h3>
                 <div class="card">
                     <h4>Kent C. Dodds' Rule</h4>
-                    <blockquote style="border-left: 4px solid #667eea; padding-left: 1rem; margin: 1rem 0; font-style: italic;">
+                    <blockquote>
                         "Place code as close to where it's relevant as possible"
                     </blockquote>
                     <p>Don't lift state higher than necessary. Each component should own the minimal amount of state it needs.</p>
@@ -779,7 +647,7 @@ const Author: React.FC = () => {
                 <div class="card">
                     <h4>Example: Accordion Component</h4>
                     <pre><code class="language-typescript">// ❌ Bad: App manages accordion state it doesn't need
-const App: React.FC = () => {
+const App: React.FC = () =&gt; {
     const [openPanel, setOpenPanel] = useState&lt;number | null&gt;(null);
     
     return (
@@ -799,7 +667,7 @@ const App: React.FC = () => {
                 <div class="card">
                     <h4>Better: State Lives Where It's Used</h4>
                     <pre><code class="language-typescript">// ✅ Good: Accordion manages its own state
-const App: React.FC = () => {
+const App: React.FC = () =&gt; {
     return (
         &lt;div&gt;
             &lt;Header /&gt;
@@ -810,7 +678,7 @@ const App: React.FC = () => {
     );
 };
 
-const Accordion: React.FC = () => {
+const Accordion: React.FC = () =&gt; {
     // State lives here - only this component needs it
     const [openPanel, setOpenPanel] = useState&lt;number | null&gt;(null);
     
@@ -819,14 +687,14 @@ const Accordion: React.FC = () => {
             &lt;AccordionPanel
                 id={0}
                 isOpen={openPanel === 0}
-                onToggle={() => setOpenPanel(openPanel === 0 ? null : 0)}
+                onToggle={() =&gt; setOpenPanel(openPanel === 0 ? null : 0)}
             &gt;
                 Panel 1 Content
             &lt;/AccordionPanel&gt;
             &lt;AccordionPanel
                 id={1}
                 isOpen={openPanel === 1}
-                onToggle={() => setOpenPanel(openPanel === 1 ? null : 1)}
+                onToggle={() =&gt; setOpenPanel(openPanel === 1 ? null : 1)}
             &gt;
                 Panel 2 Content
             &lt;/AccordionPanel&gt;
@@ -864,8 +732,11 @@ const Accordion: React.FC = () => {
                             <td><strong>Cleaner Parent Components</strong></td>
                             <td>Parents don't manage irrelevant state</td>
                         </tr>
+                    </tbody>
+                </table>
 
                 <h3>🎨 State Colocation: Before vs After</h3>
+                <figure>
                 <svg class="svg-auto-invert" viewBox="0 0 800 380" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
                     <text x="400" y="25" text-anchor="middle" fill="#333" font-weight="bold" font-size="16">State Colocation: Keep State Close to Where It's Used</text>
                     
@@ -931,7 +802,7 @@ const Accordion: React.FC = () => {
                         <rect x="280" y="115" width="60" height="35" rx="4" fill="#fff" stroke="#ddd"/>
                         <text x="310" y="137" text-anchor="middle" fill="#999" font-size="9">Footer</text>
                         
-                        <!-- Benefits */
+                        <!-- Benefits -->
                         <text x="20" y="185" fill="#2E7D32" font-size="10">Benefits:</text>
                         <text x="20" y="205" fill="#666" font-size="9">• Only Accordion manages its state</text>
                         <text x="20" y="220" fill="#666" font-size="9">• Other components unaffected</text>
@@ -943,8 +814,8 @@ const Accordion: React.FC = () => {
                         <text x="180" y="285" text-anchor="middle" fill="#2E7D32" font-size="10" font-weight="bold">🎯 Only 1 component re-renders!</text>
                     </g>
                 </svg>
-                    </tbody>
-                </table>
+                    <figcaption>Figure: Parking state too high in <code>App</code> re-renders unrelated siblings on every change; colocating it inside <code>Accordion</code> keeps both the re-renders and the prop plumbing local.</figcaption>
+                </figure>
 
                 <h3>Real-World Example: Modal Dialog</h3>
                 <div class="card">
@@ -955,21 +826,21 @@ interface ModalProps {
     children: React.ReactNode;
 }
 
-const Modal: React.FC&lt;ModalProps&gt; = ({ trigger, children }) => {
+const Modal: React.FC&lt;ModalProps&gt; = ({ trigger, children }) =&gt; {
     // State is colocated with the component that uses it
     const [isOpen, setIsOpen] = useState(false);
     
     return (
         &lt;&gt;
-            &lt;div onClick={() => setIsOpen(true)}&gt;
+            &lt;div onClick={() =&gt; setIsOpen(true)}&gt;
                 {trigger}
             &lt;/div&gt;
             
-            {isOpen && (
-                &lt;div className="modal-overlay" onClick={() => setIsOpen(false)}&gt;
-                    &lt;div className="modal-content" onClick={(e) => e.stopPropagation()}&gt;
+            {isOpen &amp;&amp; (
+                &lt;div className="modal-overlay" onClick={() =&gt; setIsOpen(false)}&gt;
+                    &lt;div className="modal-content" onClick={(e) =&gt; e.stopPropagation()}&gt;
                         {children}
-                        &lt;button onClick={() => setIsOpen(false)}&gt;Close&lt;/button&gt;
+                        &lt;button onClick={() =&gt; setIsOpen(false)}&gt;Close&lt;/button&gt;
                     &lt;/div&gt;
                 &lt;/div&gt;
             )}
@@ -978,7 +849,7 @@ const Modal: React.FC&lt;ModalProps&gt; = ({ trigger, children }) => {
 };
 
 // Easy to use anywhere!
-const App: React.FC = () => {
+const App: React.FC = () =&gt; {
     return (
         &lt;div&gt;
             &lt;Modal trigger={&lt;button&gt;Open Settings&lt;/button&gt;}&gt;
@@ -1021,8 +892,8 @@ const App: React.FC = () => {
                 <p>One of the most common mistakes in React is storing data that can be calculated from existing state or props. This creates unnecessary complexity and potential bugs!</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Derived State:</strong> Data that can be calculated from existing state or props. Instead of storing it in state, compute it during render.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Derived State:</strong> Data that can be calculated from existing state or props. Instead of storing it in state, compute it during render.</p>
                 </div>
 
                 <h3>The Problem: Redundant State</h3>
@@ -1036,12 +907,12 @@ interface CartItem {
     quantity: number;
 }
 
-const ShoppingCart: React.FC = () => {
+const ShoppingCart: React.FC = () =&gt; {
     const [items, setItems] = useState&lt;CartItem[]&gt;([]);
     const [itemCount, setItemCount] = useState(0);      // Redundant!
     const [totalPrice, setTotalPrice] = useState(0);    // Redundant!
     
-    const addItem = (item: CartItem) => {
+    const addItem = (item: CartItem) =&gt; {
         setItems([...items, item]);
         setItemCount(itemCount + 1);                     // Extra work!
         setTotalPrice(totalPrice + item.price);          // Extra work!
@@ -1063,15 +934,15 @@ interface CartItem {
     quantity: number;
 }
 
-const ShoppingCart: React.FC = () => {
+const ShoppingCart: React.FC = () =&gt; {
     // Only store the source of truth
     const [items, setItems] = useState&lt;CartItem[]&gt;([]);
     
     // Derive everything else
-    const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-    const totalPrice = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const itemCount = items.reduce((sum, item) =&gt; sum + item.quantity, 0);
+    const totalPrice = items.reduce((sum, item) =&gt; sum + (item.price * item.quantity), 0);
     
-    const addItem = (item: CartItem) => {
+    const addItem = (item: CartItem) =&gt; {
         setItems([...items, item]);
         // That's it! Counts update automatically
     };
@@ -1121,157 +992,6 @@ const ShoppingCart: React.FC = () => {
                             <td><code>const [total, ...]</code></td>
                             <td><code>const total = items.reduce(...)</code></td>
                         </tr>
-
-                <h3>🎮 Interactive Demo: Derived State in Action</h3>
-                <p>Add items to the cart and watch how totals are calculated automatically - never stored!</p>
-                
-                <div style="background: #f8f9fa; border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0;">
-                    <canvas class="auto-invert" id="derivedStateCanvas" width="750" height="340" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; background: white;"></canvas>
-                    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;">
-                        <button id="addAppleBtn" style="padding: 0.4rem 0.8rem; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">🍎 Add Apple ($2)</button>
-                        <button id="addBananaBtn" style="padding: 0.4rem 0.8rem; background: #FFEB3B; color: #333; border: none; border-radius: 4px; cursor: pointer;">🍌 Add Banana ($1)</button>
-                        <button id="addOrangeBtn" style="padding: 0.4rem 0.8rem; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">🍊 Add Orange ($3)</button>
-                        <button id="clearCartBtn" style="padding: 0.4rem 0.8rem; background: #9e9e9e; color: white; border: none; border-radius: 4px; cursor: pointer;">Clear Cart</button>
-                    </div>
-                </div>
-                
-                <script>
-                (function() {
-                    const canvas = document.getElementById('derivedStateCanvas');
-                    if (!canvas) return;
-                    const ctx = canvas.getContext('2d');
-                    
-                    let items = [];
-                    let nextId = 1;
-                    
-                    function draw() {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        
-                        // Derive values (not stored!)
-                        const itemCount = items.length;
-                        const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
-                        const uniqueItems = [...new Set(items.map(i => i.name))].length;
-                        
-                        ctx.font = 'bold 16px system-ui';
-                        ctx.fillStyle = '#333';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('Derived State: Shopping Cart Demo', canvas.width / 2, 25);
-                        
-                        // Source of truth box
-                        ctx.beginPath();
-                        ctx.roundRect(30, 50, 320, 260, 8);
-                        ctx.fillStyle = '#f8f4ff';
-                        ctx.fill();
-                        ctx.strokeStyle = '#667eea';
-                        ctx.lineWidth = 2;
-                        ctx.stroke();
-                        
-                        ctx.font = 'bold 12px system-ui';
-                        ctx.fillStyle = '#667eea';
-                        ctx.textAlign = 'left';
-                        ctx.fillText('🗄️ Source of Truth (stored)', 45, 75);
-                        ctx.font = '11px monospace';
-                        ctx.fillStyle = '#666';
-                        ctx.fillText('const [items, setItems] = useState([])', 45, 95);
-                        
-                        // Show items
-                        ctx.font = '11px system-ui';
-                        if (items.length === 0) {
-                            ctx.fillStyle = '#999';
-                            ctx.fillText('Cart is empty', 45, 125);
-                        } else {
-                            items.slice(0, 6).forEach((item, i) => {
-                                ctx.fillStyle = '#333';
-                                ctx.fillText(item.emoji + ' ' + item.name + ' - $' + item.price, 45, 125 + i * 22);
-                            });
-                            if (items.length > 6) {
-                                ctx.fillStyle = '#999';
-                                ctx.fillText('... and ' + (items.length - 6) + ' more items', 45, 125 + 6 * 22);
-                            }
-                        }
-                        
-                        // Derived values box
-                        ctx.beginPath();
-                        ctx.roundRect(400, 50, 320, 260, 8);
-                        ctx.fillStyle = '#E8F5E9';
-                        ctx.fill();
-                        ctx.strokeStyle = '#4CAF50';
-                        ctx.lineWidth = 2;
-                        ctx.stroke();
-                        
-                        ctx.font = 'bold 12px system-ui';
-                        ctx.fillStyle = '#2E7D32';
-                        ctx.textAlign = 'left';
-                        ctx.fillText('🔄 Derived Values (calculated)', 415, 75);
-                        
-                        ctx.font = '11px monospace';
-                        ctx.fillStyle = '#666';
-                        ctx.fillText('// Not stored! Calculated each render:', 415, 100);
-                        
-                        ctx.fillText('const itemCount = items.length;', 415, 125);
-                        ctx.font = 'bold 14px system-ui';
-                        ctx.fillStyle = '#4CAF50';
-                        ctx.fillText('→ ' + itemCount, 640, 125);
-                        
-                        ctx.font = '11px monospace';
-                        ctx.fillStyle = '#666';
-                        ctx.fillText('const total = items.reduce(...);', 415, 160);
-                        ctx.font = 'bold 14px system-ui';
-                        ctx.fillStyle = '#4CAF50';
-                        ctx.fillText('→ $' + totalPrice.toFixed(2), 640, 160);
-                        
-                        ctx.font = '11px monospace';
-                        ctx.fillStyle = '#666';
-                        ctx.fillText('const unique = new Set(...).size;', 415, 195);
-                        ctx.font = 'bold 14px system-ui';
-                        ctx.fillStyle = '#4CAF50';
-                        ctx.fillText('→ ' + uniqueItems, 640, 195);
-                        
-                        // Benefits
-                        ctx.font = '10px system-ui';
-                        ctx.fillStyle = '#2E7D32';
-                        ctx.fillText('✓ Always in sync with items', 415, 230);
-                        ctx.fillText('✓ No extra setState calls', 415, 248);
-                        ctx.fillText('✓ Cannot get out of sync!', 415, 266);
-                        ctx.fillText('✓ Single source of truth', 415, 284);
-                        
-                        // Arrow between boxes
-                        ctx.strokeStyle = '#667eea';
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash([5, 3]);
-                        ctx.beginPath();
-                        ctx.moveTo(350, 180);
-                        ctx.lineTo(400, 180);
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                        
-                        ctx.beginPath();
-                        ctx.moveTo(400, 180);
-                        ctx.lineTo(390, 175);
-                        ctx.lineTo(390, 185);
-                        ctx.closePath();
-                        ctx.fillStyle = '#667eea';
-                        ctx.fill();
-                        
-                        ctx.font = '9px system-ui';
-                        ctx.fillStyle = '#667eea';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('derives', 375, 170);
-                    }
-                    
-                    function addItem(name, price, emoji) {
-                        items.push({ id: nextId++, name, price, emoji });
-                        draw();
-                    }
-                    
-                    document.getElementById('addAppleBtn').addEventListener('click', () => addItem('Apple', 2, '🍎'));
-                    document.getElementById('addBananaBtn').addEventListener('click', () => addItem('Banana', 1, '🍌'));
-                    document.getElementById('addOrangeBtn').addEventListener('click', () => addItem('Orange', 3, '🍊'));
-                    document.getElementById('clearCartBtn').addEventListener('click', () => { items = []; draw(); });
-                    
-                    draw();
-                })();
-                </script>
                         <tr>
                             <td>Boolean check</td>
                             <td><code>const [isEmpty, ...]</code></td>
@@ -1279,6 +999,45 @@ const ShoppingCart: React.FC = () => {
                         </tr>
                     </tbody>
                 </table>
+
+                <h3>🎮 Try It: Values You Never Store</h3>
+                <p>Add items to the cart. The count, the total, and the number of unique products are <strong>recomputed on every click</strong> from the single array we store — so they can never drift out of sync with it.</p>
+                <div class="card ts-demo" id="demo-derived" aria-live="polite">
+                    <p class="ts-demo-sig"><code>const [items, setItems] = useState&lt;CartItem[]&gt;([]); // the only stored state</code></p>
+                    <div class="ts-demo-buttons">
+                        <button type="button" class="ts-demo-btn" data-name="Apple" data-price="2">🍎 Add Apple ($2)</button>
+                        <button type="button" class="ts-demo-btn" data-name="Banana" data-price="1">🍌 Add Banana ($1)</button>
+                        <button type="button" class="ts-demo-btn" data-name="Orange" data-price="3">🍊 Add Orange ($3)</button>
+                        <button type="button" class="ts-demo-btn" data-clear="true">🧹 Clear cart</button>
+                    </div>
+                    <p class="ts-demo-result ts-demo-idle">👆 Add items and watch the derived values keep themselves in sync.</p>
+                </div>
+                <script>
+                (function () {
+                    const wrap = document.getElementById('demo-derived');
+                    if (!wrap) return;
+                    let items = [];
+                    wrap.querySelectorAll('.ts-demo-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            const demo = btn.closest('.ts-demo');
+                            const result = demo.querySelector('.ts-demo-result');
+                            if (btn.getAttribute('data-clear') === 'true') {
+                                items = [];
+                            } else {
+                                items.push({ name: btn.getAttribute('data-name'), price: Number(btn.getAttribute('data-price')) });
+                            }
+                            const count = items.length;
+                            const total = items.reduce(function (sum, it) { return sum + it.price; }, 0);
+                            const unique = new Set(items.map(function (it) { return it.name; })).size;
+                            result.classList.remove('ts-demo-idle', 'ts-demo-err');
+                            result.classList.add('ts-demo-ok');
+                            result.textContent = count === 0
+                                ? '🧹 Cart empty — count 0, total $0.00, 0 unique. Every value derived from an empty array.'
+                                : '✅ Derived now: ' + count + ' item' + (count === 1 ? '' : 's') + ' • total $' + total.toFixed(2) + ' • ' + unique + ' unique. Nothing extra was stored.';
+                        });
+                    });
+                })();
+                </script>
 
                 <h3>Real Example: Todo List with Filters</h3>
                 <div class="card">
@@ -1291,13 +1050,13 @@ const ShoppingCart: React.FC = () => {
 
 type Filter = 'all' | 'active' | 'completed';
 
-const TodoList: React.FC = () => {
+const TodoList: React.FC = () =&gt; {
     // Store only the essential state
     const [todos, setTodos] = useState&lt;Todo[]&gt;([]);
     const [filter, setFilter] = useState&lt;Filter&gt;('all');
     
     // Derive filtered list (recalculated every render)
-    const filteredTodos = todos.filter(todo => {
+    const filteredTodos = todos.filter(todo =&gt; {
         if (filter === 'active') return !todo.completed;
         if (filter === 'completed') return todo.completed;
         return true; // 'all'
@@ -1305,25 +1064,25 @@ const TodoList: React.FC = () => {
     
     // Derive statistics
     const totalCount = todos.length;
-    const activeCount = todos.filter(t => !t.completed).length;
-    const completedCount = todos.filter(t => t.completed).length;
+    const activeCount = todos.filter(t =&gt; !t.completed).length;
+    const completedCount = todos.filter(t =&gt; t.completed).length;
     
     return (
         &lt;div&gt;
             &lt;div&gt;
-                &lt;button onClick={() => setFilter('all')}&gt;
+                &lt;button onClick={() =&gt; setFilter('all')}&gt;
                     All ({totalCount})
                 &lt;/button&gt;
-                &lt;button onClick={() => setFilter('active')}&gt;
+                &lt;button onClick={() =&gt; setFilter('active')}&gt;
                     Active ({activeCount})
                 &lt;/button&gt;
-                &lt;button onClick={() => setFilter('completed')}&gt;
+                &lt;button onClick={() =&gt; setFilter('completed')}&gt;
                     Completed ({completedCount})
                 &lt;/button&gt;
             &lt;/div&gt;
             
             &lt;ul&gt;
-                {filteredTodos.map(todo => (
+                {filteredTodos.map(todo =&gt; (
                     &lt;li key={todo.id}&gt;{todo.text}&lt;/li&gt;
                 ))}
             &lt;/ul&gt;
@@ -1352,7 +1111,7 @@ const TodoList: React.FC = () => {
             <!-- Section 6: State Initialization -->
             <section id="section6" class="lesson-section">
                 <h2>🎬 State Initialization</h2>
-                <p>How you initialize state matters! Let's explore different initialization strategies and when to use each.</p>
+                <p>The value you hand to <code>useState</code> is the seed your component grows from — and how you plant that seed matters. Pass a value directly and it's computed on <em>every</em> render (even though React only uses the first one). Pass a function and React runs it lazily, exactly once. Getting this right keeps expensive setup cheap and prevents a whole class of "why did my state reset?" surprises. Let's walk through each strategy and when to reach for it.</p>
 
                 <h3>Basic Initialization</h3>
                 <div class="card">
@@ -1372,13 +1131,13 @@ const [todos, setTodos] = useState(loadTodosFromLocalStorage());
 // loadTodosFromLocalStorage() runs every time, but only first value is used!
 
 // ✅ Good: Lazy initialization - runs only once
-const [todos, setTodos] = useState(() => loadTodosFromLocalStorage());
+const [todos, setTodos] = useState(() =&gt; loadTodosFromLocalStorage());
 // Function only called on first render
 
 // Another example
-const [bigArray, setBigArray] = useState(() => {
+const [bigArray, setBigArray] = useState(() =&gt; {
     console.log('Computing initial state...');
-    return Array.from({ length: 10000 }, (_, i) => i);
+    return Array.from({ length: 10000 }, (_, i) =&gt; i);
 });
 // Expensive computation only happens once!</code></pre>
                 </div>
@@ -1391,7 +1150,7 @@ interface CounterProps {
     initialCount: number;
 }
 
-const Counter: React.FC&lt;CounterProps&gt; = ({ initialCount }) => {
+const Counter: React.FC&lt;CounterProps&gt; = ({ initialCount }) =&gt; {
     const [count, setCount] = useState(initialCount);
     
     // Note: This only uses initialCount on first render
@@ -1400,7 +1159,7 @@ const Counter: React.FC&lt;CounterProps&gt; = ({ initialCount }) => {
     return (
         &lt;div&gt;
             &lt;p&gt;Count: {count}&lt;/p&gt;
-            &lt;button onClick={() => setCount(count + 1)}&gt;+&lt;/button&gt;
+            &lt;button onClick={() =&gt; setCount(count + 1)}&gt;+&lt;/button&gt;
         &lt;/div&gt;
     );
 };</code></pre>
@@ -1470,9 +1229,9 @@ const Counter: React.FC&lt;CounterProps&gt; = ({ initialCount }) => {
                 <h3>Local Storage Pattern</h3>
                 <div class="card">
                     <h4>Persisting State Across Page Loads</h4>
-                    <pre><code class="language-typescript">const useLocalStorage = &lt;T,&gt;(key: string, initialValue: T) => {
+                    <pre><code class="language-typescript">const useLocalStorage = &lt;T,&gt;(key: string, initialValue: T) =&gt; {
     // Lazy initialization from localStorage
-    const [value, setValue] = useState&lt;T&gt;(() => {
+    const [value, setValue] = useState&lt;T&gt;(() =&gt; {
         try {
             const item = window.localStorage.getItem(key);
             return item ? JSON.parse(item) : initialValue;
@@ -1483,7 +1242,7 @@ const Counter: React.FC&lt;CounterProps&gt; = ({ initialCount }) => {
     });
     
     // Update localStorage when state changes
-    const setStoredValue = (newValue: T) => {
+    const setStoredValue = (newValue: T) =&gt; {
         try {
             setValue(newValue);
             window.localStorage.setItem(key, JSON.stringify(newValue));
@@ -1504,10 +1263,10 @@ const [name, setName] = useLocalStorage('userName', '');
             <!-- Section 7: Component Communication Patterns -->
             <section id="section7" class="lesson-section">
                 <h2>💬 Component Communication Patterns</h2>
-                <p>Components need to communicate! Let's explore the different ways components can share information.</p>
+                <p>Components rarely live in isolation — they form a family, and families need to talk. React gives that conversation strict rules: data flows <strong>down</strong> through props and requests flow <strong>up</strong> through callbacks. It feels limiting at first, but this one-way street is exactly what makes React apps predictable: at any moment you can trace where a value came from and who's allowed to change it. Let's walk through the handful of patterns that cover almost every conversation your components will ever have.</p>
 
                 <h3>Communication Flow Directions</h3>
-                <pre class="mermaid">
+                <div class="mermaid">
 graph TD
     A[Parent] -->|Props down| B[Child]
     B -->|Callbacks up| A
@@ -1519,19 +1278,19 @@ graph TD
     
     style A fill:#667eea,color:#fff
     style E fill:#667eea,color:#fff
-</pre>
+</div>
 
                 <h3>Pattern 1: Parent to Child (Props)</h3>
                 <div class="card">
                     <h4>Passing Data Down</h4>
                     <pre><code class="language-typescript">// Parent passes data to child via props
-const Parent: React.FC = () => {
+const Parent: React.FC = () =&gt; {
     const [message, setMessage] = useState('Hello!');
     
     return &lt;Child message={message} /&gt;;
 };
 
-const Child: React.FC&lt;{ message: string }&gt; = ({ message }) => {
+const Child: React.FC&lt;{ message: string }&gt; = ({ message }) =&gt; {
     return &lt;p&gt;{message}&lt;/p&gt;;
 };</code></pre>
                 </div>
@@ -1540,17 +1299,34 @@ const Child: React.FC&lt;{ message: string }&gt; = ({ message }) => {
                 <div class="card">
                     <h4>Passing Data Up</h4>
                     <pre><code class="language-typescript">// Child calls parent's function to send data up
-const Parent: React.FC = () => {
+const Parent: React.FC = () =&gt; {
     const [value, setValue] = useState('');
     
-    const handleChange = (newValue: string) => {
+    const handleChange = (newValue: string) =&gt; {
         setValue(newValue);
         console.log('Child sent:', newValue);
     };
     
     return (
+        &lt;div&gt;
+            &lt;Child onValueChange={handleChange} /&gt;
+            &lt;p&gt;Parent received: {value}&lt;/p&gt;
+        &lt;/div&gt;
+    );
+};
+
+const Child: React.FC&lt;{ onValueChange: (value: string) =&gt; void }&gt; = ({ onValueChange }) =&gt; {
+    return (
+        &lt;input 
+            onChange={(e) =&gt; onValueChange(e.target.value)}
+            placeholder="Type something..."
+        /&gt;
+    );
+};</code></pre>
+                </div>
 
                 <h3>🎨 Data Flow Patterns Visualized</h3>
+                <figure>
                 <svg class="svg-auto-invert" viewBox="0 0 800 400" style="width: 100%; max-width: 800px; height: auto; margin: 2rem auto; display: block; font-family: system-ui, sans-serif;">
                     <defs>
                         <marker id="downArrow" markerWidth="10" markerHeight="10" refX="5" refY="10" orient="auto">
@@ -1616,28 +1392,14 @@ const Parent: React.FC = () => {
                     <text x="650" y="355" text-anchor="middle" fill="#666" font-size="9">No direct sibling communication</text>
                     <text x="650" y="370" text-anchor="middle" fill="#666" font-size="9">Parent coordinates all updates</text>
                 </svg>
-        &lt;div&gt;
-            &lt;Child onValueChange={handleChange} /&gt;
-            &lt;p&gt;Parent received: {value}&lt;/p&gt;
-        &lt;/div&gt;
-    );
-};
-
-const Child: React.FC&lt;{ onValueChange: (value: string) => void }&gt; = ({ onValueChange }) => {
-    return (
-        &lt;input 
-            onChange={(e) => onValueChange(e.target.value)}
-            placeholder="Type something..."
-        /&gt;
-    );
-};</code></pre>
-                </div>
+                    <figcaption>Figure: Data flows one way — props down, callbacks up. Siblings never talk directly; the parent coordinates every update and re-renders the children that need it.</figcaption>
+                </figure>
 
                 <h3>Pattern 3: Sibling to Sibling (via Parent)</h3>
                 <div class="card">
                     <h4>Sharing Data Between Siblings</h4>
                     <pre><code class="language-typescript">// Siblings communicate through shared parent state
-const Parent: React.FC = () => {
+const Parent: React.FC = () =&gt; {
     const [sharedValue, setSharedValue] = useState('');
     
     return (
@@ -1648,11 +1410,11 @@ const Parent: React.FC = () => {
     );
 };
 
-const InputChild: React.FC&lt;{ onValueChange: (v: string) => void }&gt; = ({ onValueChange }) => {
-    return &lt;input onChange={(e) => onValueChange(e.target.value)} /&gt;;
+const InputChild: React.FC&lt;{ onValueChange: (v: string) =&gt; void }&gt; = ({ onValueChange }) =&gt; {
+    return &lt;input onChange={(e) =&gt; onValueChange(e.target.value)} /&gt;;
 };
 
-const DisplayChild: React.FC&lt;{ value: string }&gt; = ({ value }) => {
+const DisplayChild: React.FC&lt;{ value: string }&gt; = ({ value }) =&gt; {
     return &lt;p&gt;Sibling says: {value}&lt;/p&gt;;
 };</code></pre>
                 </div>
@@ -1667,13 +1429,13 @@ interface MousePosition {
 }
 
 interface MouseTrackerProps {
-    children: (position: MousePosition) => React.ReactNode;
+    children: (position: MousePosition) =&gt; React.ReactNode;
 }
 
-const MouseTracker: React.FC&lt;MouseTrackerProps&gt; = ({ children }) => {
+const MouseTracker: React.FC&lt;MouseTrackerProps&gt; = ({ children }) =&gt; {
     const [position, setPosition] = useState({ x: 0, y: 0 });
     
-    const handleMouseMove = (e: React.MouseEvent) => {
+    const handleMouseMove = (e: React.MouseEvent) =&gt; {
         setPosition({ x: e.clientX, y: e.clientY });
     };
     
@@ -1686,7 +1448,7 @@ const MouseTracker: React.FC&lt;MouseTrackerProps&gt; = ({ children }) => {
 
 // Usage - consumer controls what to render
 &lt;MouseTracker&gt;
-    {({ x, y }) => (
+    {({ x, y }) =&gt; (
         &lt;p&gt;Mouse position: {x}, {y}&lt;/p&gt;
     )}
 &lt;/MouseTracker&gt;</code></pre>
@@ -1725,10 +1487,10 @@ const MouseTracker: React.FC&lt;MouseTrackerProps&gt; = ({ children }) => {
                     <details>
                         <summary>💡 Hint</summary>
                         <p>Structure your components like this:</p>
-                        <pre><code class="language-typescript">const App = () => {
+                        <pre><code class="language-typescript">const App = () =&gt; {
     const [searchTerm, setSearchTerm] = useState('');
     const items = ['Apple', 'Banana', 'Cherry', ...];
-    const filtered = items.filter(item => 
+    const filtered = items.filter(item =&gt; 
         item.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
@@ -1747,15 +1509,15 @@ const MouseTracker: React.FC&lt;MouseTrackerProps&gt; = ({ children }) => {
 
 interface SearchInputProps {
     value: string;
-    onChange: (value: string) => void;
+    onChange: (value: string) =&gt; void;
 }
 
-const SearchInput: React.FC&lt;SearchInputProps&gt; = ({ value, onChange }) => {
+const SearchInput: React.FC&lt;SearchInputProps&gt; = ({ value, onChange }) =&gt; {
     return (
         &lt;input
             type="text"
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) =&gt; onChange(e.target.value)}
             placeholder="Search..."
             style={{ padding: '0.5rem', width: '100%', marginBottom: '1rem' }}
         /&gt;
@@ -1766,13 +1528,13 @@ interface FilteredListProps {
     items: string[];
 }
 
-const FilteredList: React.FC&lt;FilteredListProps&gt; = ({ items }) => {
+const FilteredList: React.FC&lt;FilteredListProps&gt; = ({ items }) =&gt; {
     return (
         &lt;ul style={{ listStyle: 'none', padding: 0 }}&gt;
             {items.length === 0 ? (
                 &lt;li style={{ color: '#999' }}&gt;No items found&lt;/li&gt;
             ) : (
-                items.map((item, index) => (
+                items.map((item, index) =&gt; (
                     &lt;li key={index} style={{ padding: '0.5rem', borderBottom: '1px solid #eee' }}&gt;
                         {item}
                     &lt;/li&gt;
@@ -1782,7 +1544,7 @@ const FilteredList: React.FC&lt;FilteredListProps&gt; = ({ items }) => {
     );
 };
 
-const SearchableList: React.FC = () => {
+const SearchableList: React.FC = () =&gt; {
     const [searchTerm, setSearchTerm] = useState('');
     
     const items = [
@@ -1793,7 +1555,7 @@ const SearchableList: React.FC = () => {
     ];
     
     // Derive filtered list - don't store it!
-    const filteredItems = items.filter(item =>
+    const filteredItems = items.filter(item =&gt;
         item.toLowerCase().includes(searchTerm.toLowerCase())
     );
     
@@ -1832,7 +1594,7 @@ export default SearchableList;</code></pre>
     content: React.ReactNode;
 }
 
-const Tabs: React.FC&lt;{ tabs: Tab[] }&gt; = ({ tabs }) => {
+const Tabs: React.FC&lt;{ tabs: Tab[] }&gt; = ({ tabs }) =&gt; {
     const [activeTab, setActiveTab] = useState(tabs[0].id);
     // Render tabs and content...
 };</code></pre>
@@ -1852,20 +1614,20 @@ interface TabsProps {
     tabs: Tab[];
 }
 
-const Tabs: React.FC&lt;TabsProps&gt; = ({ tabs }) => {
+const Tabs: React.FC&lt;TabsProps&gt; = ({ tabs }) =&gt; {
     // State is colocated - only Tabs needs to know which tab is active
     const [activeTab, setActiveTab] = useState(tabs[0]?.id || '');
     
-    const activeContent = tabs.find(tab => tab.id === activeTab)?.content;
+    const activeContent = tabs.find(tab =&gt; tab.id === activeTab)?.content;
     
     return (
         &lt;div style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}&gt;
             {/* Tab buttons */}
             &lt;div style={{ display: 'flex', borderBottom: '2px solid #ddd' }}&gt;
-                {tabs.map(tab => (
+                {tabs.map(tab =&gt; (
                     &lt;button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() =&gt; setActiveTab(tab.id)}
                         style={{
                             flex: 1,
                             padding: '1rem',
@@ -1891,7 +1653,7 @@ const Tabs: React.FC&lt;TabsProps&gt; = ({ tabs }) => {
 };
 
 // Usage - parent doesn't need to manage tab state!
-const App: React.FC = () => {
+const App: React.FC = () =&gt; {
     const tabs = [
         {
             id: 'profile',
@@ -1955,11 +1717,11 @@ interface RGB {
 interface ColorSliderProps {
     label: string;
     value: number;
-    onChange: (value: number) => void;
+    onChange: (value: number) =&gt; void;
     color: string;
 }
 
-const ColorSlider: React.FC&lt;ColorSliderProps&gt; = ({ label, value, onChange, color }) => {
+const ColorSlider: React.FC&lt;ColorSliderProps&gt; = ({ label, value, onChange, color }) =&gt; {
     return (
         &lt;div style={{ marginBottom: '1rem' }}&gt;
             &lt;label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}&gt;
@@ -1970,18 +1732,18 @@ const ColorSlider: React.FC&lt;ColorSliderProps&gt; = ({ label, value, onChange,
                 min="0"
                 max="255"
                 value={value}
-                onChange={(e) => onChange(parseInt(e.target.value))}
+                onChange={(e) =&gt; onChange(parseInt(e.target.value))}
                 style={{ width: '100%', accentColor: color }}
             /&gt;
         &lt;/div&gt;
     );
 };
 
-const ColorPicker: React.FC = () => {
+const ColorPicker: React.FC = () =&gt; {
     const [rgb, setRgb] = useState&lt;RGB&gt;({ r: 100, g: 150, b: 200 });
     
     // Derive hex color - don't store it!
-    const toHex = (n: number) => n.toString(16).padStart(2, '0');
+    const toHex = (n: number) =&gt; n.toString(16).padStart(2, '0');
     const hexColor = `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
     
     return (
@@ -2000,7 +1762,7 @@ const ColorPicker: React.FC = () => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: rgb.r + rgb.g + rgb.b > 382 ? '#000' : '#fff',
+                    color: rgb.r + rgb.g + rgb.b &gt; 382 ? '#000' : '#fff',
                     fontSize: '1.5rem',
                     fontWeight: 'bold'
                 }}
@@ -2012,21 +1774,21 @@ const ColorPicker: React.FC = () => {
             &lt;ColorSlider
                 label="Red"
                 value={rgb.r}
-                onChange={(r) => setRgb({ ...rgb, r })}
+                onChange={(r) =&gt; setRgb({ ...rgb, r })}
                 color="#ff0000"
             /&gt;
             
             &lt;ColorSlider
                 label="Green"
                 value={rgb.g}
-                onChange={(g) => setRgb({ ...rgb, g })}
+                onChange={(g) =&gt; setRgb({ ...rgb, g })}
                 color="#00ff00"
             /&gt;
             
             &lt;ColorSlider
                 label="Blue"
                 value={rgb.b}
-                onChange={(b) => setRgb({ ...rgb, b })}
+                onChange={(b) =&gt; setRgb({ ...rgb, b })}
                 color="#0000ff"
             /&gt;
             
@@ -2053,22 +1815,22 @@ export default ColorPicker;</code></pre>
                     <h3>❌ Bad Code: Multiple Issues</h3>
                     <p>This code has several state management problems. Can you spot them?</p>
                     <pre><code class="language-typescript">// 🚨 PROBLEMS IN THIS CODE!
-const BadTodoApp: React.FC = () => {
+const BadTodoApp: React.FC = () =&gt; {
     const [todos, setTodos] = useState&lt;Todo[]&gt;([]);
     const [completedCount, setCompletedCount] = useState(0);  // Problem 1
     const [activeCount, setActiveCount] = useState(0);        // Problem 1
     const [filteredTodos, setFilteredTodos] = useState&lt;Todo[]&gt;([]);  // Problem 1
     const [filter, setFilter] = useState('all');
     
-    const addTodo = (text: string) => {
+    const addTodo = (text: string) =&gt; {
         const newTodo = { id: Date.now(), text, completed: false };
         setTodos([...todos, newTodo]);
         setActiveCount(activeCount + 1);  // Problem 2: Easy to forget
         setFilteredTodos([...filteredTodos, newTodo]);  // Problem 2
     };
     
-    const toggleTodo = (id: number) => {
-        const updated = todos.map(t => 
+    const toggleTodo = (id: number) =&gt; {
+        const updated = todos.map(t =&gt; 
             t.id === id ? { ...t, completed: !t.completed } : t
         );
         setTodos(updated);
@@ -2097,21 +1859,21 @@ interface Todo {
 
 type Filter = 'all' | 'active' | 'completed';
 
-const GoodTodoApp: React.FC = () => {
+const GoodTodoApp: React.FC = () =&gt; {
     // Store only essential state
     const [todos, setTodos] = useState&lt;Todo[]&gt;([]);
     const [filter, setFilter] = useState&lt;Filter&gt;('all');
     
     // Derive everything else
-    const completedCount = todos.filter(t => t.completed).length;
-    const activeCount = todos.filter(t => !t.completed).length;
-    const filteredTodos = todos.filter(t => {
+    const completedCount = todos.filter(t =&gt; t.completed).length;
+    const activeCount = todos.filter(t =&gt; !t.completed).length;
+    const filteredTodos = todos.filter(t =&gt; {
         if (filter === 'active') return !t.completed;
         if (filter === 'completed') return t.completed;
         return true;
     });
     
-    const addTodo = (text: string) => {
+    const addTodo = (text: string) =&gt; {
         if (!text.trim()) return;
         const newTodo: Todo = {
             id: Date.now(),
@@ -2122,15 +1884,15 @@ const GoodTodoApp: React.FC = () => {
         // That's it! Counts update automatically ✨
     };
     
-    const toggleTodo = (id: number) => {
-        setTodos(todos.map(t =>
+    const toggleTodo = (id: number) =&gt; {
+        setTodos(todos.map(t =&gt;
             t.id === id ? { ...t, completed: !t.completed } : t
         ));
         // Counts update automatically here too! ✨
     };
     
-    const deleteTodo = (id: number) => {
-        setTodos(todos.filter(t => t.id !== id));
+    const deleteTodo = (id: number) =&gt; {
+        setTodos(todos.filter(t =&gt; t.id !== id));
     };
     
     return (
@@ -2142,13 +1904,13 @@ const GoodTodoApp: React.FC = () => {
             
             {/* Filter Buttons */}
             &lt;div style={{ margin: '1rem 0', display: 'flex', gap: '0.5rem' }}&gt;
-                &lt;button onClick={() => setFilter('all')}&gt;
+                &lt;button onClick={() =&gt; setFilter('all')}&gt;
                     All ({todos.length})
                 &lt;/button&gt;
-                &lt;button onClick={() => setFilter('active')}&gt;
+                &lt;button onClick={() =&gt; setFilter('active')}&gt;
                     Active ({activeCount})
                 &lt;/button&gt;
-                &lt;button onClick={() => setFilter('completed')}&gt;
+                &lt;button onClick={() =&gt; setFilter('completed')}&gt;
                     Completed ({completedCount})
                 &lt;/button&gt;
             &lt;/div&gt;
@@ -2165,13 +1927,13 @@ const GoodTodoApp: React.FC = () => {
 
 // Separate components for better organization
 interface TodoInputProps {
-    onAddTodo: (text: string) => void;
+    onAddTodo: (text: string) =&gt; void;
 }
 
-const TodoInput: React.FC&lt;TodoInputProps&gt; = ({ onAddTodo }) => {
+const TodoInput: React.FC&lt;TodoInputProps&gt; = ({ onAddTodo }) =&gt; {
     const [text, setText] = useState('');
     
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) =&gt; {
         e.preventDefault();
         onAddTodo(text);
         setText('');
@@ -2181,7 +1943,7 @@ const TodoInput: React.FC&lt;TodoInputProps&gt; = ({ onAddTodo }) => {
         &lt;form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}&gt;
             &lt;input
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) =&gt; setText(e.target.value)}
                 placeholder="Add a todo..."
                 style={{ flex: 1, padding: '0.5rem' }}
             /&gt;
@@ -2192,18 +1954,18 @@ const TodoInput: React.FC&lt;TodoInputProps&gt; = ({ onAddTodo }) => {
 
 interface TodoListProps {
     todos: Todo[];
-    onToggle: (id: number) => void;
-    onDelete: (id: number) => void;
+    onToggle: (id: number) =&gt; void;
+    onDelete: (id: number) =&gt; void;
 }
 
-const TodoList: React.FC&lt;TodoListProps&gt; = ({ todos, onToggle, onDelete }) => {
+const TodoList: React.FC&lt;TodoListProps&gt; = ({ todos, onToggle, onDelete }) =&gt; {
     if (todos.length === 0) {
         return &lt;p style={{ textAlign: 'center', color: '#999' }}&gt;No todos yet!&lt;/p&gt;;
     }
     
     return (
         &lt;ul style={{ listStyle: 'none', padding: 0 }}&gt;
-            {todos.map(todo => (
+            {todos.map(todo =&gt; (
                 &lt;li
                     key={todo.id}
                     style={{
@@ -2218,7 +1980,7 @@ const TodoList: React.FC&lt;TodoListProps&gt; = ({ todos, onToggle, onDelete }) 
                     &lt;input
                         type="checkbox"
                         checked={todo.completed}
-                        onChange={() => onToggle(todo.id)}
+                        onChange={() =&gt; onToggle(todo.id)}
                         style={{ marginRight: '0.75rem' }}
                     /&gt;
                     &lt;span
@@ -2231,7 +1993,7 @@ const TodoList: React.FC&lt;TodoListProps&gt; = ({ todos, onToggle, onDelete }) 
                         {todo.text}
                     &lt;/span&gt;
                     &lt;button
-                        onClick={() => onDelete(todo.id)}
+                        onClick={() =&gt; onDelete(todo.id)}
                         style={{
                             background: '#f44336',
                             color: 'white',
@@ -2327,7 +2089,7 @@ change, submit, click, close</code></pre>
                 </div>
 
                 <h3>State Management Decision Tree</h3>
-                <pre class="mermaid">
+                <div class="mermaid">
 graph TD
     A[Need to add data] --> B{Can it be calculated?}
     B -->|Yes| C[Don't store it!<br/>Derive it instead]
@@ -2340,7 +2102,7 @@ graph TD
     style E fill:#4CAF50,color:#fff
     style F fill:#2196F3,color:#fff
     style G fill:#FF9800,color:#fff
-</pre>
+</div>
 
                 <h3>Checklist for Good State Management</h3>
                 <table>
@@ -2433,8 +2195,8 @@ graph TD
                 </div>
 
                 <div class="card card-accent">
-                    <h3 style="color: white;">🎯 Key Takeaways</h3>
-                    <ul style="color: white;">
+                    <h3>🎯 Key Takeaways</h3>
+                    <ul>
                         <li><strong>Minimize state</strong> - Don't store what you can calculate</li>
                         <li><strong>Single source of truth</strong> - Each piece of data has one owner</li>
                         <li><strong>Lift judiciously</strong> - Only lift when necessary</li>
@@ -2485,8 +2247,8 @@ graph TD
                 </div>
 
                 <div class="card card-accent">
-                    <h3 style="color: white;">🎉 Congratulations!</h3>
-                    <p style="color: white;">You've completed Lesson 3.2 and learned professional state management patterns! You now know how to organize state in scalable React applications. These patterns will serve you throughout your React career. Excellent work! 🚀</p>
+                    <h3>🎉 Congratulations!</h3>
+                    <p>You've completed Lesson 3.2 and learned professional state management patterns! You now know how to organize state in scalable React applications. These patterns will serve you throughout your React career. Excellent work! 🚀</p>
                 </div>
             </section>
 

@@ -59,24 +59,29 @@
             <!-- Lesson Header -->
             <header>
                 <h1>🔒 Lesson 6.3: Route Protection and Loading</h1>
-                <p class="lead">Secure your application routes with authentication guards, optimize performance with lazy loading, and create smooth user experiences with loading states and error boundaries. Build production-ready routing architectures for real-world applications.</p>
-                
+                <p class="lead">Every serious app has rooms that not everyone should walk into — a dashboard, an admin panel, a billing page. In this lesson you'll learn to put a friendly-but-firm bouncer on those doors (authentication guards), speed up the whole building by only loading rooms as people enter them (lazy loading + Suspense), and keep visitors comfortable while they wait or when something breaks (loading states and error boundaries). By the end you'll be able to build the routing layer of a real, production-ready React app. 🏛️</p>
+
+                <div class="card card-info">
+                    <h4>🧭 Versions used in this lesson</h4>
+                    <p>The code here targets <strong>React 19</strong>, <strong>TypeScript 5.x</strong>, and <strong>React Router v7</strong> (the current major release). We use function components throughout. Where React Router offers two ways to do something — the classic component-guard approach and the newer data-router approach with loaders — we'll show both and call out which one to reach for. In v7, the router APIs live in the <code>react-router</code> package; the older <code>react-router-dom</code> still re-exports them, but new code should import from <code>react-router</code>.</p>
+                </div>
+
                 <!-- Learning objectives -->
-                <div class="card">
+                <div class="card card-info">
                     <h2>🎯 Learning Objectives</h2>
                     <p>By the end of this lesson, you will be able to:</p>
                     <ul>
-                        <li>Implement protected routes that require authentication</li>
-                        <li>Create flexible redirect patterns for unauthorized access</li>
-                        <li>Use React.lazy() and Suspense for code splitting</li>
+                        <li>Implement protected routes that require authentication (both a guard component and a loader-based redirect)</li>
+                        <li>Create flexible redirect patterns that preserve the user's intended destination</li>
+                        <li>Use <code>React.lazy()</code> and <code>&lt;Suspense&gt;</code> for code splitting</li>
                         <li>Optimize bundle size with lazy-loaded routes</li>
-                        <li>Implement loading states for better user experience</li>
+                        <li>Show global pending UI with the data router's <code>useNavigation()</code>, and stream data with deferred loaders</li>
                         <li>Handle routing errors with error boundaries</li>
-                        <li>Build role-based access control for routes</li>
-                        <li>Type authentication and loading states properly</li>
+                        <li>Build role-based and permission-based access control for routes</li>
+                        <li>Type authentication and loading states properly with TypeScript</li>
                     </ul>
                     <p><strong>Estimated Time:</strong> 75-90 minutes</p>
-                    <p><strong>Prerequisites:</strong> Lessons 6.1 & 6.2 - React Router Basics and Advanced Routing</p>
+                    <p><strong>Prerequisites:</strong> Lessons 6.1 &amp; 6.2 - React Router Basics and Advanced Routing</p>
                 </div>
             </header>
 
@@ -105,32 +110,34 @@
             <!-- Section 1: Protected Routes Overview -->
             <section id="section1" aria-labelledby="section1-title">
                 <h2 id="section1-title">🛡️ Protected Routes Overview</h2>
-                <p>Protected routes are essential for securing parts of your application that require authentication or specific permissions. They control access to sensitive content and redirect unauthorized users appropriately.</p>
+                <p>Think of a protected route as a velvet rope outside a club. Anyone can walk up to the door, but before they step inside, a bouncer checks their wristband. No wristband? You get politely pointed to the sign-up desk — and once you sort things out, you're walked right back to the door you were trying to reach. That "walk them back to where they wanted to go" detail is what separates a thoughtful app from an annoying one, and we'll build it properly.</p>
+
+                <p>In React, a "protected route" is any route whose component only renders when the user meets some condition — usually "is logged in," sometimes "has the right role." If the condition fails, we redirect instead of rendering. Simple idea, but the details (loading states, preserving the destination, avoiding redirect loops) are where real apps live or die.</p>
 
                 <div class="card card-accent">
                     <h4>📖 Why Protected Routes Matter</h4>
-                    <ul style="color: white;">
+                    <ul>
                         <li><strong>Security</strong> - Prevent unauthorized access to sensitive data</li>
-                        <li><strong>User Experience</strong> - Guide users to login when needed</li>
+                        <li><strong>User Experience</strong> - Guide users to login exactly when they need it, then send them back</li>
                         <li><strong>Authorization</strong> - Control access based on user roles or permissions</li>
-                        <li><strong>Data Protection</strong> - Ensure only authenticated users can view/modify data</li>
-                        <li><strong>Session Management</strong> - Handle expired sessions gracefully</li>
+                        <li><strong>Data Protection</strong> - Ensure only authenticated users can view or modify data</li>
+                        <li><strong>Session Management</strong> - Handle expired sessions gracefully instead of showing a broken page</li>
                     </ul>
                 </div>
 
                 <h3>The Protected Route Pattern</h3>
-                <p>A protected route checks authentication status before rendering. If the user is not authenticated, they're redirected to a login page:</p>
+                <p>A protected route checks authentication status before rendering. If the user isn't authenticated, we redirect to the login page — but we first remember where they were headed, so we can return them there after they sign in:</p>
 
                 <div class="mermaid">
                 flowchart TD
-                    A[User Navigates to Protected Route] --> B{Authenticated?}
+                    A[User Navigates to Protected Route] --> B{"Authenticated?"}
                     B -->|Yes| C[Render Protected Component]
                     B -->|No| D[Redirect to Login]
                     D --> E[Store Original Destination]
                     E --> F[Show Login Page]
                     F --> G[User Logs In]
                     G --> H[Redirect to Original Destination]
-                    
+
                     style A fill:#667eea,color:#fff
                     style C fill:#48bb78,color:#fff
                     style D fill:#fc8181,color:#fff
@@ -218,10 +225,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
             <!-- Section 2: Implementing Authentication Guards -->
             <section id="section2" aria-labelledby="section2-title">
                 <h2 id="section2-title">🔐 Implementing Authentication Guards</h2>
-                <p>Let's build a production-ready protected route system with TypeScript, proper authentication checks, and redirect handling.</p>
+                <p>Time to build the bouncer for real. A production auth guard has three moving parts: a <strong>source of truth</strong> for "who is logged in" (an auth context), a <strong>guard component</strong> that reads it and decides render-or-redirect, and a <strong>login flow</strong> that sends the user back where they came from. We'll build all three with full TypeScript typing so the compiler catches mistakes like forgetting to handle the loading state.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Two ways to guard a route in React Router v7</h4>
+                    <p>There are two idiomatic patterns, and this lesson covers both:</p>
+                    <ul>
+                        <li><strong>Guard component</strong> (this section) — wrap the page in a <code>&lt;ProtectedRoute&gt;</code> that reads context and renders <code>&lt;Navigate&gt;</code> when access is denied. Great when auth lives in React state/context.</li>
+                        <li><strong>Loader redirect</strong> (Section 3) — with the data router, a route's <code>loader</code> checks auth and throws <code>redirect()</code> <em>before</em> the component ever renders. This avoids a render-then-bounce flicker and is the modern default for data-router apps.</li>
+                    </ul>
+                    <p>Pick one style per app and stay consistent. We start with the guard component because it maps most directly to "check a value, then render or redirect."</p>
+                </div>
 
                 <h3>Setting Up Authentication Context</h3>
-                <p>First, we'll create an authentication context to manage auth state across the application:</p>
+                <p>First, we'll create an authentication context — the single source of truth for auth state across the whole app. Think of it as the guest list the bouncer keeps checking:</p>
 
                 <pre><code class="language-typescript">// contexts/AuthContext.tsx
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -237,8 +254,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise&lt;void&gt;;
-  logout: () => void;
+  login: (email: string, password: string) =&gt; Promise&lt;void&gt;;
+  logout: () =&gt; void;
 }
 
 const AuthContext = createContext&lt;AuthContextType | undefined&gt;(undefined);
@@ -248,8 +265,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   
   // Check authentication status on mount
-  useEffect(() => {
-    const checkAuth = async () => {
+  useEffect(() =&gt; {
+    const checkAuth = async () =&gt; {
       try {
         // Check if user has valid token in localStorage
         const token = localStorage.getItem('authToken');
@@ -280,7 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
   
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string) =&gt; {
     setIsLoading(true);
     
     try {
@@ -311,7 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
   
-  const logout = () => {
+  const logout = () =&gt; {
     localStorage.removeItem('authToken');
     setUser(null);
   };
@@ -346,7 +363,7 @@ export function useAuth() {
                 <p>Now let's create a reusable ProtectedRoute component with proper TypeScript typing:</p>
 
                 <pre><code class="language-typescript">// components/ProtectedRoute.tsx
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
@@ -396,7 +413,7 @@ export function ProtectedRoute({
                 <p>Here's how to set up your application with authentication and protected routes:</p>
 
                 <pre><code class="language-typescript">// App.tsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -467,7 +484,7 @@ export default App;</code></pre>
 
                 <pre><code class="language-typescript">// pages/Login.tsx
 import { useState, FormEvent } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LocationState {
@@ -490,7 +507,7 @@ export default function Login() {
   const state = location.state as LocationState;
   const from = state?.from?.pathname || '/dashboard';
   
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) =&gt; {
     e.preventDefault();
     setError('');
     setIsLoading(true);
@@ -511,14 +528,14 @@ export default function Login() {
     &lt;div className="login-container"&gt;
       &lt;h1&gt;Login&lt;/h1&gt;
       
-      {state?.from && (
+      {state?.from &amp;&amp; (
         &lt;p className="info-message"&gt;
           Please log in to access {state.from.pathname}
         &lt;/p&gt;
       )}
       
       &lt;form onSubmit={handleSubmit}&gt;
-        {error && (
+        {error &amp;&amp; (
           &lt;div className="error-message"&gt;{error}&lt;/div&gt;
         )}
         
@@ -528,7 +545,7 @@ export default function Login() {
             id="email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) =&gt; setEmail(e.target.value)}
             required
             disabled={isLoading}
           /&gt;
@@ -540,7 +557,7 @@ export default function Login() {
             id="password"
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) =&gt; setPassword(e.target.value)}
             required
             disabled={isLoading}
           /&gt;
@@ -585,7 +602,7 @@ export default function Login() {
                         <p>Use the useAuth hook to access user data and logout function:</p>
                         <pre><code>const { user, logout } = useAuth();
 
-const handleLogout = () => {
+const handleLogout = () =&gt; {
   logout();
   navigate('/');
 };</code></pre>
@@ -595,13 +612,13 @@ const handleLogout = () => {
                         <summary>✅ Solution</summary>
                         <pre><code class="language-typescript">// pages/UserProfile.tsx
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 export default function UserProfile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
-  const handleLogout = () => {
+  const handleLogout = () =&gt; {
     logout();
     navigate('/', { replace: true });
   };
@@ -659,7 +676,48 @@ export default function UserProfile() {
             <!-- Section 3: Redirect Patterns and Strategies -->
             <section id="section3" aria-labelledby="section3-title">
                 <h2 id="section3-title">🔄 Redirect Patterns and Strategies</h2>
-                <p>Beyond basic authentication, there are many scenarios where you need to redirect users. Let's explore common redirect patterns and best practices.</p>
+                <p>Redirecting is the art of gently steering users where they need to be — to login when they're logged out, to the dashboard when they're already logged in, to an "access denied" page when they lack a role. Do it well and it feels invisible; do it poorly and you get the dreaded redirect loop where the browser bounces forever between two pages. Let's cover the common scenarios and the guardrails that keep them safe.</p>
+
+                <h3>The Modern Way: Loader-Based Redirects with <code>redirect()</code></h3>
+                <p>Before we look at component guards, meet the approach React Router v7 nudges you toward. When you build your routes with the <em>data router</em> (<code>createBrowserRouter</code>), each route can have a <code>loader</code> that runs <strong>before</strong> the component renders. If the loader decides the user shouldn't be here, it simply throws a <code>redirect()</code> — no component mounts, no flash of protected content, no render-then-bounce flicker.</p>
+
+                <p>The analogy: instead of letting the guest walk into the room and <em>then</em> tapping them on the shoulder, the loader checks the wristband out in the hallway. If it's missing, they never see the inside of the room at all.</p>
+
+                <pre><code class="language-typescript">// auth.ts — a tiny helper the loaders can call
+export async function requireUser(request: Request) {
+  const user = await getCurrentUser(); // however you resolve the session
+
+  if (!user) {
+    // Remember where they were going, then bounce to login.
+    const url = new URL(request.url);
+    const params = new URLSearchParams({ from: url.pathname });
+    throw redirect(`/login?${params.toString()}`);
+  }
+
+  return user; // available to the route via useLoaderData()
+}
+
+// routes.tsx
+import { createBrowserRouter, redirect } from 'react-router';
+
+export const router = createBrowserRouter([
+  { path: '/', element: &lt;Home /&gt; },
+  { path: '/login', element: &lt;Login /&gt; },
+  {
+    path: '/dashboard',
+    element: &lt;Dashboard /&gt;,
+    // The guard IS the loader — it runs before Dashboard renders.
+    loader: async ({ request }) =&gt; {
+      const user = await requireUser(request);
+      return { user };
+    },
+  },
+]);</code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 When to use which</h4>
+                    <p>Use <strong>loader redirects</strong> when you've adopted the data router (<code>createBrowserRouter</code> + <code>&lt;RouterProvider&gt;</code>) — they're faster and flicker-free because the redirect happens before render. Use the <strong>guard component</strong> pattern from Section 2 when your app renders <code>&lt;Routes&gt;</code> inside <code>&lt;BrowserRouter&gt;</code> and auth lives in React context. Both are valid in v7; just don't mix styles for the same route.</p>
+                </div>
 
                 <h3>Common Redirect Scenarios</h3>
                 <table>
@@ -708,7 +766,7 @@ export default function UserProfile() {
                 <p>Users who are already logged in shouldn't see the login page:</p>
 
                 <pre><code class="language-typescript">// components/PublicRoute.tsx
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 interface PublicRouteProps {
@@ -763,16 +821,16 @@ export function PublicRoute({
 
                 <pre><code class="language-typescript">// hooks/useAuthInterceptor.ts
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 export function useAuthInterceptor() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   
-  useEffect(() => {
+  useEffect(() =&gt; {
     // Intercept API responses
-    const handleUnauthorized = (event: CustomEvent) => {
+    const handleUnauthorized = (event: CustomEvent) =&gt; {
       if (event.detail.status === 401) {
         // Session expired
         logout();
@@ -788,7 +846,7 @@ export function useAuthInterceptor() {
     
     window.addEventListener('unauthorized' as any, handleUnauthorized);
     
-    return () => {
+    return () =&gt; {
       window.removeEventListener('unauthorized' as any, handleUnauthorized);
     };
   }, [navigate, logout]);
@@ -822,7 +880,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
                 <p>Redirect users based on multiple conditions:</p>
 
                 <pre><code class="language-typescript">// components/ConditionalRedirect.tsx
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 interface ConditionalRedirectProps {
@@ -875,7 +933,7 @@ export function ConditionalRedirect({ children }: ConditionalRedirectProps) {
                 <p>Handle unknown routes with a catch-all redirect:</p>
 
                 <pre><code class="language-typescript">// pages/NotFound.tsx
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 export default function NotFound() {
   return (
@@ -900,7 +958,9 @@ export default function NotFound() {
             <!-- Section 4: Lazy Loading Routes -->
             <section id="section4" aria-labelledby="section4-title">
                 <h2 id="section4-title">⚡ Lazy Loading Routes</h2>
-                <p>Lazy loading splits your application into smaller chunks that are loaded on-demand, significantly improving initial load time and performance.</p>
+                <p>Imagine a restaurant that cooked <em>every</em> dish on the menu the moment you sat down, just in case you ordered them. You'd wait forever and most of the food would go to waste. That's what shipping your entire app as one giant bundle feels like — the browser downloads the admin panel, the reports page, and the settings screen before the user has clicked anything.</p>
+
+                <p>Lazy loading fixes this by splitting your app into bite-sized chunks that load <strong>on demand</strong>. The home page loads instantly; the dashboard's code only downloads when someone actually navigates to it. The result is a dramatically smaller first download and a snappier initial paint — often the single biggest performance win you can make in a React app.</p>
 
                 <div class="mermaid">
                 flowchart LR
@@ -921,30 +981,30 @@ export default function NotFound() {
                 <h3>Why Lazy Load Routes?</h3>
                 <div class="card card-accent">
                     <h4>📊 Performance Benefits</h4>
-                    <ul style="color: white;">
+                    <ul>
                         <li><strong>Smaller Initial Bundle</strong> - Faster first page load</li>
                         <li><strong>Better Performance</strong> - Only load code when needed</li>
-                        <li><strong>Improved Caching</strong> - Chunks can be cached separately</li>
+                        <li><strong>Improved Caching</strong> - Chunks can be cached separately, so a change to one page doesn't bust the cache for all of them</li>
                         <li><strong>Bandwidth Savings</strong> - Users only download what they use</li>
-                        <li><strong>Progressive Loading</strong> - App becomes interactive faster</li>
+                        <li><strong>Progressive Loading</strong> - The app becomes interactive faster</li>
                     </ul>
                 </div>
 
                 <h3>Basic React.lazy() Usage</h3>
-                <p>Use <code>React.lazy()</code> to dynamically import components:</p>
+                <p>Use <code>lazy()</code> to turn a normal import into a <em>dynamic</em> one. Instead of pulling the component into the main bundle, you hand <code>lazy()</code> a function that imports it — and the bundler (Vite, webpack, etc.) automatically carves that import into its own chunk:</p>
 
                 <pre><code class="language-typescript">// Traditional import (not lazy)
 import Dashboard from './pages/Dashboard';
 
 // Lazy import
-const Dashboard = lazy(() => import('./pages/Dashboard'));</code></pre>
+const Dashboard = lazy(() =&gt; import('./pages/Dashboard'));</code></pre>
 
                 <h3>Setting Up Lazy Routes</h3>
                 <p>Here's how to implement lazy loading in your application:</p>
 
                 <pre><code class="language-typescript">// App.tsx
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -953,11 +1013,11 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 
 // Lazy-loaded components (loaded on demand)
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Profile = lazy(() => import('./pages/Profile'));
-const Settings = lazy(() => import('./pages/Settings'));
-const AdminPanel = lazy(() => import('./pages/AdminPanel'));
-const Reports = lazy(() => import('./pages/Reports'));
+const Dashboard = lazy(() =&gt; import('./pages/Dashboard'));
+const Profile = lazy(() =&gt; import('./pages/Profile'));
+const Settings = lazy(() =&gt; import('./pages/Settings'));
+const AdminPanel = lazy(() =&gt; import('./pages/AdminPanel'));
+const Reports = lazy(() =&gt; import('./pages/Reports'));
 
 // Loading fallback component
 function LoadingFallback() {
@@ -1078,21 +1138,21 @@ export function SkeletonLoading() {
 import { lazy, ComponentType } from 'react';
 
 export function lazyWithRetry&lt;T extends ComponentType&lt;any&gt;&gt;(
-  importFunc: () => Promise&lt;{ default: T }&gt;,
+  importFunc: () =&gt; Promise&lt;{ default: T }&gt;,
   retries = 3
 ) {
-  return lazy(() => {
-    return new Promise&lt;{ default: T }&gt;((resolve, reject) => {
+  return lazy(() =&gt; {
+    return new Promise&lt;{ default: T }&gt;((resolve, reject) =&gt; {
       // Track the number of attempts
       let attempts = 0;
       
-      const attemptImport = () => {
+      const attemptImport = () =&gt; {
         attempts++;
         
         importFunc()
           .then(resolve)
-          .catch((error) => {
-            if (attempts >= retries) {
+          .catch((error) =&gt; {
+            if (attempts &gt;= retries) {
               reject(error);
             } else {
               // Wait before retrying (exponential backoff)
@@ -1108,18 +1168,18 @@ export function lazyWithRetry&lt;T extends ComponentType&lt;any&gt;&gt;(
 }
 
 // Usage
-const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));</code></pre>
+const Dashboard = lazyWithRetry(() =&gt; import('./pages/Dashboard'));</code></pre>
 
                 <h3>Preloading Routes</h3>
                 <p>Preload routes that users are likely to visit next:</p>
 
                 <pre><code class="language-typescript">// Preload a route
-const DashboardImport = () => import('./pages/Dashboard');
+const DashboardImport = () =&gt; import('./pages/Dashboard');
 const Dashboard = lazy(DashboardImport);
 
 // In your component
 function Navigation() {
-  const handleMouseEnter = () => {
+  const handleMouseEnter = () =&gt; {
     // Preload dashboard when user hovers over link
     DashboardImport();
   };
@@ -1206,10 +1266,10 @@ function Navigation() {
 import Home from './pages/Home';
 
 // Lazy
-const Products = lazy(() => import('./pages/Products'));
+const Products = lazy(() =&gt; import('./pages/Products'));
 
 // With preload
-const ProductsImport = () => import('./pages/Products');
+const ProductsImport = () =&gt; import('./pages/Products');
 const Products = lazy(ProductsImport);</code></pre>
                     </details>
 
@@ -1217,20 +1277,20 @@ const Products = lazy(ProductsImport);</code></pre>
                         <summary>✅ Solution</summary>
                         <pre><code class="language-typescript">// App.tsx
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router';
 
 // Eager-loaded pages
 import Home from './pages/Home';
 import About from './pages/About';
 
 // Lazy-loaded pages with preload functions
-const ProductsImport = () => import('./pages/Products');
+const ProductsImport = () =&gt; import('./pages/Products');
 const Products = lazy(ProductsImport);
 
-const ContactImport = () => import('./pages/Contact');
+const ContactImport = () =&gt; import('./pages/Contact');
 const Contact = lazy(ContactImport);
 
-const DashboardImport = () => import('./pages/Dashboard');
+const DashboardImport = () =&gt; import('./pages/Dashboard');
 const Dashboard = lazy(DashboardImport);
 
 // Loading component
@@ -1256,19 +1316,19 @@ function Navigation() {
       &lt;Link to="/about"&gt;About&lt;/Link&gt;
       &lt;Link 
         to="/products"
-        onMouseEnter={() => ProductsImport()}
+        onMouseEnter={() =&gt; ProductsImport()}
       &gt;
         Products
       &lt;/Link&gt;
       &lt;Link 
         to="/contact"
-        onMouseEnter={() => ContactImport()}
+        onMouseEnter={() =&gt; ContactImport()}
       &gt;
         Contact
       &lt;/Link&gt;
       &lt;Link 
         to="/dashboard"
-        onMouseEnter={() => DashboardImport()}
+        onMouseEnter={() =&gt; DashboardImport()}
       &gt;
         Dashboard
       &lt;/Link&gt;
@@ -1305,15 +1365,15 @@ export default App;</code></pre>
             <!-- Section 5: React Suspense for Code Splitting -->
             <section id="section5" aria-labelledby="section5-title">
                 <h2 id="section5-title">⏳ React Suspense for Code Splitting</h2>
-                <p>React Suspense is a powerful feature that lets you declaratively specify loading states while waiting for code to load. It's essential for lazy loading and provides a clean way to handle asynchronous operations.</p>
+                <p>Here's the mental model: <code>&lt;Suspense&gt;</code> is a component that says, "if anything inside me isn't ready yet, show this fallback in the meantime — and swap in the real thing the moment it's ready." You wrap it around anything that might need to <em>wait</em>, and React handles the timing for you. No manual <code>isLoading</code> flags, no juggling booleans; you just declare "loading looks like this," and React does the choreography.</p>
 
                 <div class="card card-accent">
                     <h4>📖 What is Suspense?</h4>
-                    <p style="color: white;">Suspense is a React component that lets you "wait" for some code to load and declaratively specify a loading state while waiting. It's currently supported for:</p>
-                    <ul style="color: white;">
-                        <li>Lazy loading components with <code>React.lazy()</code></li>
-                        <li>Data fetching with frameworks like Relay or Next.js</li>
-                        <li>Loading any async resource (experimental)</li>
+                    <p>Suspense is a React component that lets you "wait" for something to be ready and declaratively specify a loading state while waiting. As of React 19 it's the standard way to handle:</p>
+                    <ul>
+                        <li>Lazy-loaded components with <code>React.lazy()</code> (our focus in this lesson)</li>
+                        <li>Reading a promise with the new <code>use()</code> hook</li>
+                        <li>Data fetching in Suspense-enabled frameworks and libraries (React Router's deferred loaders, Next.js, React Query, Relay, and more)</li>
                     </ul>
                 </div>
 
@@ -1322,7 +1382,7 @@ export default App;</code></pre>
 
                 <pre><code class="language-typescript">import { Suspense, lazy } from 'react';
 
-const HeavyComponent = lazy(() => import('./HeavyComponent'));
+const HeavyComponent = lazy(() =&gt; import('./HeavyComponent'));
 
 function App() {
   return (
@@ -1337,9 +1397,9 @@ function App() {
 
                 <pre><code class="language-typescript">import { Suspense, lazy } from 'react';
 
-const Sidebar = lazy(() => import('./Sidebar'));
-const MainContent = lazy(() => import('./MainContent'));
-const Comments = lazy(() => import('./Comments'));
+const Sidebar = lazy(() =&gt; import('./Sidebar'));
+const MainContent = lazy(() =&gt; import('./MainContent'));
+const Comments = lazy(() =&gt; import('./Comments'));
 
 function Page() {
   return (
@@ -1370,9 +1430,9 @@ function Page() {
                     A --> C[Suspense: Main Content]
                     A --> D[Suspense: Comments]
                     
-                    B --> E{Sidebar Loaded?}
-                    C --> F{Content Loaded?}
-                    D --> G{Comments Loaded?}
+                    B --> E{"Sidebar Loaded?"}
+                    C --> F{"Content Loaded?"}
+                    D --> G{"Comments Loaded?"}
                     
                     E -->|No| H[Show Sidebar Fallback]
                     E -->|Yes| I[Render Sidebar]
@@ -1394,9 +1454,9 @@ function Page() {
 
                 <pre><code class="language-typescript">import { Suspense, lazy } from 'react';
 
-const UserProfile = lazy(() => import('./UserProfile'));
-const UserPosts = lazy(() => import('./UserPosts'));
-const UserActivity = lazy(() => import('./UserActivity'));
+const UserProfile = lazy(() =&gt; import('./UserProfile'));
+const UserPosts = lazy(() =&gt; import('./UserPosts'));
+const UserActivity = lazy(() =&gt; import('./UserActivity'));
 
 function UserDashboard() {
   return (
@@ -1434,7 +1494,7 @@ export function SuspenseRoute({
 }
 
 // Usage
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Dashboard = lazy(() =&gt; import('./pages/Dashboard'));
 
 &lt;Route 
   path="/dashboard" 
@@ -1447,7 +1507,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
                 <pre><code class="language-typescript">import { Suspense, lazy } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Dashboard = lazy(() =&gt; import('./pages/Dashboard'));
 
 function App() {
   return (
@@ -1468,16 +1528,16 @@ function App() {
 
                 <pre><code class="language-typescript">import { Suspense, lazy, useTransition, useState } from 'react';
 
-const TabA = lazy(() => import('./TabA'));
-const TabB = lazy(() => import('./TabB'));
-const TabC = lazy(() => import('./TabC'));
+const TabA = lazy(() =&gt; import('./TabA'));
+const TabB = lazy(() =&gt; import('./TabB'));
+const TabC = lazy(() =&gt; import('./TabC'));
 
 function TabbedInterface() {
   const [activeTab, setActiveTab] = useState('a');
   const [isPending, startTransition] = useTransition();
   
-  const selectTab = (tab: string) => {
-    startTransition(() => {
+  const selectTab = (tab: string) =&gt; {
+    startTransition(() =&gt; {
       setActiveTab(tab);
     });
   };
@@ -1486,29 +1546,29 @@ function TabbedInterface() {
     &lt;div&gt;
       &lt;div className="tabs"&gt;
         &lt;button 
-          onClick={() => selectTab('a')}
+          onClick={() =&gt; selectTab('a')}
           disabled={isPending}
         &gt;
-          Tab A {isPending && activeTab === 'a' && '⏳'}
+          Tab A {isPending &amp;&amp; activeTab === 'a' &amp;&amp; '⏳'}
         &lt;/button&gt;
         &lt;button 
-          onClick={() => selectTab('b')}
+          onClick={() =&gt; selectTab('b')}
           disabled={isPending}
         &gt;
-          Tab B {isPending && activeTab === 'b' && '⏳'}
+          Tab B {isPending &amp;&amp; activeTab === 'b' &amp;&amp; '⏳'}
         &lt;/button&gt;
         &lt;button 
-          onClick={() => selectTab('c')}
+          onClick={() =&gt; selectTab('c')}
           disabled={isPending}
         &gt;
-          Tab C {isPending && activeTab === 'c' && '⏳'}
+          Tab C {isPending &amp;&amp; activeTab === 'c' &amp;&amp; '⏳'}
         &lt;/button&gt;
       &lt;/div&gt;
       
       &lt;Suspense fallback={&lt;div&gt;Loading tab...&lt;/div&gt;}&gt;
-        {activeTab === 'a' && &lt;TabA /&gt;}
-        {activeTab === 'b' && &lt;TabB /&gt;}
-        {activeTab === 'c' && &lt;TabC /&gt;}
+        {activeTab === 'a' &amp;&amp; &lt;TabA /&gt;}
+        {activeTab === 'b' &amp;&amp; &lt;TabB /&gt;}
+        {activeTab === 'c' &amp;&amp; &lt;TabC /&gt;}
       &lt;/Suspense&gt;
     &lt;/div&gt;
   );
@@ -1530,7 +1590,74 @@ function TabbedInterface() {
             <!-- Section 6: Loading States and User Feedback -->
             <section id="section6" aria-labelledby="section6-title">
                 <h2 id="section6-title">📊 Loading States and User Feedback</h2>
-                <p>Providing clear, informative loading states is crucial for good user experience. Let's explore various techniques for communicating loading status to users.</p>
+                <p>A loading state is a promise you make to the user: "I heard you, something's happening, hang tight." Skip it and your app feels broken — the user clicks, nothing visibly changes, and they click again (now you're double-submitting). Get it right and even a slow network feels intentional and calm. In this section we'll cover the toolbox of loading indicators, then wire up a <em>global</em> pending bar using React Router's data router so navigations always feel responsive.</p>
+
+                <h3>Global Pending UI with <code>useNavigation()</code></h3>
+                <p>When you use the data router, React Router tracks navigation state for you. The <code>useNavigation()</code> hook exposes it, so you can show a single top-level indicator whenever <em>any</em> route is transitioning — no per-page bookkeeping required. Put this in your root layout and every navigation gets a progress cue for free:</p>
+
+                <pre><code class="language-typescript">// RootLayout.tsx
+import { Outlet, useNavigation } from 'react-router';
+
+export function RootLayout() {
+  const navigation = useNavigation();
+  // 'idle' | 'loading' | 'submitting'
+  const isNavigating = navigation.state !== 'idle';
+
+  return (
+    &lt;div&gt;
+      {/* A slim top bar that only appears mid-navigation */}
+      {isNavigating &amp;&amp; (
+        &lt;div className="global-progress" role="status" aria-live="polite"&gt;
+          Loading…
+        &lt;/div&gt;
+      )}
+
+      {/* Child route renders here */}
+      &lt;Outlet /&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 Why this beats a per-page spinner</h4>
+                    <p>With a data-router loader, React Router keeps the <em>old</em> page on screen while the next page's loader runs, then swaps in one clean render. A global <code>useNavigation()</code> bar signals "working on it" during that gap without the jarring blank-screen flash you get when you unmount a page and show a full-screen spinner.</p>
+                </div>
+
+                <h3>Streaming Slow Data with Deferred Loaders</h3>
+                <p>Sometimes one part of a page is fast (the user's name) and another is slow (their analytics). Instead of making the whole page wait for the slow part, the data router lets you <strong>defer</strong> it: return the fast data immediately and hand the slow data off as a promise. You render the page right away, and <code>&lt;Suspense&gt;</code> + <code>&lt;Await&gt;</code> fill in the slow bit when it arrives:</p>
+
+                <pre><code class="language-typescript">// dashboard.tsx
+import { Suspense } from 'react';
+import { Await, useLoaderData } from 'react-router';
+
+// Loader returns fast data now, slow data as a promise (no await!)
+export async function loader() {
+  return {
+    user: await getUser(),        // fast — awaited
+    stats: getDashboardStats(),   // slow — a promise, deferred
+  };
+}
+
+export default function Dashboard() {
+  const { user, stats } = useLoaderData() as {
+    user: User;
+    stats: Promise&lt;Stats&gt;;
+  };
+
+  return (
+    &lt;div&gt;
+      &lt;h1&gt;Welcome back, {user.name}!&lt;/h1&gt;
+
+      &lt;Suspense fallback={&lt;p&gt;Crunching your numbers…&lt;/p&gt;}&gt;
+        &lt;Await resolve={stats}&gt;
+          {(resolved) =&gt; &lt;StatsPanel stats={resolved} /&gt;}
+        &lt;/Await&gt;
+      &lt;/Suspense&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+                <p>The user sees their dashboard shell instantly, with a friendly placeholder where the stats will land. That's a far better experience than staring at a blank spinner until the slowest query finishes. 🚀</p>
 
                 <h3>Types of Loading Indicators</h3>
                 <table>
@@ -1608,7 +1735,7 @@ export function LoadingSpinner({
         role="status"
         aria-label="Loading"
       &gt;&lt;/div&gt;
-      {message && (
+      {message &amp;&amp; (
         &lt;p className="mt-2 text-sm text-gray-600"&gt;{message}&lt;/p&gt;
       )}
     &lt;/div&gt;
@@ -1669,7 +1796,7 @@ function PostList() {
   
   return (
     &lt;div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"&gt;
-      {posts.map(post => (
+      {posts.map(post =&gt; (
         &lt;PostCard key={post.id} post={post} /&gt;
       ))}
     &lt;/div&gt;
@@ -1693,10 +1820,10 @@ export function ProgressBar({
 }: ProgressBarProps) {
   return (
     &lt;div className="w-full"&gt;
-      {message && (
+      {message &amp;&amp; (
         &lt;div className="flex justify-between mb-1"&gt;
           &lt;span className="text-sm font-medium"&gt;{message}&lt;/span&gt;
-          {showPercentage && (
+          {showPercentage &amp;&amp; (
             &lt;span className="text-sm font-medium"&gt;{progress}%&lt;/span&gt;
           )}
         &lt;/div&gt;
@@ -1773,7 +1900,7 @@ export function PageLoading({
 interface LoadingButtonProps {
   isLoading: boolean;
   children: React.ReactNode;
-  onClick?: () => void;
+  onClick?: () =&gt; void;
   disabled?: boolean;
   type?: 'button' | 'submit' | 'reset';
 }
@@ -1797,7 +1924,7 @@ export function LoadingButton({
         flex items-center justify-center
       `}
     &gt;
-      {isLoading && (
+      {isLoading &amp;&amp; (
         &lt;span className="mr-2"&gt;
           &lt;div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"&gt;&lt;/div&gt;
         &lt;/span&gt;
@@ -1811,7 +1938,7 @@ export function LoadingButton({
 function SaveForm() {
   const [isSaving, setIsSaving] = useState(false);
   
-  const handleSave = async () => {
+  const handleSave = async () =&gt; {
     setIsSaving(true);
     await saveData();
     setIsSaving(false);
@@ -1842,18 +1969,18 @@ function SaveForm() {
             <!-- Section 7: Error Boundaries with Routing -->
             <section id="section7" aria-labelledby="section7-title">
                 <h2 id="section7-title">🛑 Error Boundaries with Routing</h2>
-                <p>Error boundaries catch JavaScript errors anywhere in the component tree and display fallback UI instead of crashing the entire application. They're essential for handling route loading errors.</p>
+                <p>Without an error boundary, a single thrown error in one component takes down your <em>entire</em> React tree — the user gets a blank white screen and no idea what happened. An error boundary is like a circuit breaker in your house: when one appliance short-circuits, the breaker trips for that circuit only, and the rest of the lights stay on. It catches the error, shows a friendly fallback, and keeps the surrounding app alive.</p>
 
                 <div class="card card-accent">
                     <h4>📖 What Are Error Boundaries?</h4>
-                    <p style="color: white;">Error boundaries are React components that:</p>
-                    <ul style="color: white;">
-                        <li>Catch JavaScript errors in child components</li>
-                        <li>Log error information</li>
-                        <li>Display fallback UI instead of crashing</li>
-                        <li>Allow the rest of the app to continue working</li>
+                    <p>Error boundaries are React components that:</p>
+                    <ul>
+                        <li>Catch JavaScript errors thrown while rendering child components</li>
+                        <li>Log error information for later diagnosis</li>
+                        <li>Display fallback UI instead of crashing the whole app</li>
+                        <li>Let the rest of the app keep working normally</li>
                     </ul>
-                    <p style="color: white;"><strong>Note:</strong> Error boundaries must be class components in React (until React 19).</p>
+                    <p><strong>Note:</strong> React still has no built-in <em>hook</em> for error boundaries, even in React 19 — a boundary must be a <strong>class component</strong> (or you use the popular <code>react-error-boundary</code> library, which wraps a class for you). If you're on the data router, React Router also lets you attach an <code>errorElement</code>/<code>ErrorBoundary</code> per route, which catches loader and render errors for that branch.</p>
                 </div>
 
                 <h3>Creating an Error Boundary</h3>
@@ -1865,7 +1992,7 @@ import { Component, ReactNode } from 'react';
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
-  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) =&gt; void;
 }
 
 interface State {
@@ -1901,7 +2028,7 @@ export class ErrorBoundary extends Component&lt;Props, State&gt; {
     // logErrorToService(error, errorInfo);
   }
   
-  handleReset = () => {
+  handleReset = () =&gt; {
     this.setState({
       hasError: false,
       error: null
@@ -1921,7 +2048,7 @@ export class ErrorBoundary extends Component&lt;Props, State&gt; {
           &lt;h1&gt;⚠️ Something went wrong&lt;/h1&gt;
           &lt;p&gt;We're sorry, but something unexpected happened.&lt;/p&gt;
           
-          {this.state.error && (
+          {this.state.error &amp;&amp; (
             &lt;details className="error-details"&gt;
               &lt;summary&gt;Error details&lt;/summary&gt;
               &lt;pre&gt;{this.state.error.toString()}&lt;/pre&gt;
@@ -1944,11 +2071,11 @@ export class ErrorBoundary extends Component&lt;Props, State&gt; {
 
                 <pre><code class="language-typescript">// App.tsx
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Profile = lazy(() => import('./pages/Profile'));
+const Dashboard = lazy(() =&gt; import('./pages/Dashboard'));
+const Profile = lazy(() =&gt; import('./pages/Profile'));
 
 function App() {
   return (
@@ -1992,7 +2119,7 @@ function App() {
           element={
             &lt;ErrorBoundary 
               fallback={&lt;UserErrorPage /&gt;}
-              onError={(error) => logToAnalytics(error)}
+              onError={(error) =&gt; logToAnalytics(error)}
             &gt;
               &lt;Suspense fallback={&lt;Loading /&gt;}&gt;
                 &lt;Dashboard /&gt;
@@ -2019,22 +2146,22 @@ function App() {
                 <p>Create a user-friendly error page with recovery options:</p>
 
                 <pre><code class="language-typescript">// pages/ErrorPage.tsx
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 interface ErrorPageProps {
   error?: Error;
-  resetError?: () => void;
+  resetError?: () =&gt; void;
 }
 
 export function ErrorPage({ error, resetError }: ErrorPageProps) {
   const navigate = useNavigate();
   
-  const handleGoHome = () => {
+  const handleGoHome = () =&gt; {
     resetError?.();
     navigate('/');
   };
   
-  const handleReload = () => {
+  const handleReload = () =&gt; {
     resetError?.();
     window.location.reload();
   };
@@ -2051,7 +2178,7 @@ export function ErrorPage({ error, resetError }: ErrorPageProps) {
           your data is safe.
         &lt;/p&gt;
         
-        {error && process.env.NODE_ENV === 'development' && (
+        {error &amp;&amp; import.meta.env.DEV &amp;&amp; (
           &lt;details className="error-details"&gt;
             &lt;summary&gt;Technical Details&lt;/summary&gt;
             &lt;pre&gt;
@@ -2071,7 +2198,7 @@ export function ErrorPage({ error, resetError }: ErrorPageProps) {
             🔄 Reload Page
           &lt;/button&gt;
           
-          {resetError && (
+          {resetError &amp;&amp; (
             &lt;button onClick={resetError} className="btn-secondary"&gt;
               ↩️ Try Again
             &lt;/button&gt;
@@ -2096,20 +2223,20 @@ export function ErrorPage({ error, resetError }: ErrorPageProps) {
 import { lazy, ComponentType } from 'react';
 
 export function lazyWithErrorHandling&lt;T extends ComponentType&lt;any&gt;&gt;(
-  importFunc: () => Promise&lt;{ default: T }&gt;,
+  importFunc: () =&gt; Promise&lt;{ default: T }&gt;,
   componentName: string
 ) {
-  return lazy(() =>
-    importFunc().catch((error) => {
+  return lazy(() =&gt;
+    importFunc().catch((error) =&gt; {
       console.error(`Failed to load ${componentName}:`, error);
       
       // Return a fallback component
       return {
-        default: (() => (
+        default: (() =&gt; (
           &lt;div className="lazy-error"&gt;
             &lt;h2&gt;Failed to load {componentName}&lt;/h2&gt;
             &lt;p&gt;Please check your internet connection and try again.&lt;/p&gt;
-            &lt;button onClick={() => window.location.reload()}&gt;
+            &lt;button onClick={() =&gt; window.location.reload()}&gt;
               Reload Page
             &lt;/button&gt;
           &lt;/div&gt;
@@ -2121,7 +2248,7 @@ export function lazyWithErrorHandling&lt;T extends ComponentType&lt;any&gt;&gt;(
 
 // Usage
 const Dashboard = lazyWithErrorHandling(
-  () => import('./pages/Dashboard'),
+  () =&gt; import('./pages/Dashboard'),
   'Dashboard'
 );</code></pre>
 
@@ -2154,7 +2281,9 @@ const Dashboard = lazyWithErrorHandling(
             <!-- Section 8: Role-Based Access Control -->
             <section id="section8" aria-labelledby="section8-title">
                 <h2 id="section8-title">👥 Role-Based Access Control</h2>
-                <p>Role-Based Access Control (RBAC) restricts route access based on user roles or permissions. This is essential for applications with different user types (admin, moderator, user, etc.).</p>
+                <p>Authentication answers "<em>who</em> are you?" Authorization answers "<em>what are you allowed to do?</em>" — and Role-Based Access Control (RBAC) is the most common way to answer that second question. Think of a concert: a general-admission ticket gets you in the door (authenticated), but only a backstage wristband lets you into the green room (authorized). A regular user, a moderator, and an admin all logged in successfully, yet each should see a different set of doors.</p>
+
+                <p>RBAC layers a role check <em>on top of</em> the authentication check: first confirm the user is logged in, then confirm their role is on the allowed list for this route. Miss either check and they're redirected — to login if they're not authenticated, to an "access denied" page if they're logged in but under-privileged.</p>
 
                 <h3>Understanding RBAC</h3>
                 <div class="mermaid">
@@ -2174,7 +2303,7 @@ const Dashboard = lazyWithErrorHandling(
                 <p>Create a component that checks both authentication and roles:</p>
 
                 <pre><code class="language-typescript">// components/RoleProtectedRoute.tsx
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 interface RoleProtectedRouteProps {
@@ -2277,7 +2406,7 @@ function App() {
                 <p>Create a clear unauthorized access page:</p>
 
                 <pre><code class="language-typescript">// pages/UnauthorizedPage.tsx
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LocationState {
@@ -2291,15 +2420,15 @@ export function UnauthorizedPage() {
   
   const state = location.state as LocationState;
   
-  const handleGoBack = () => {
+  const handleGoBack = () =&gt; {
     navigate(-1);
   };
   
-  const handleGoHome = () => {
+  const handleGoHome = () =&gt; {
     navigate('/');
   };
   
-  const handleSwitchAccount = () => {
+  const handleSwitchAccount = () =&gt; {
     logout();
     navigate('/login');
   };
@@ -2315,18 +2444,18 @@ export function UnauthorizedPage() {
           You don't have permission to access this page.
         &lt;/p&gt;
         
-        {state?.requiredRoles && (
+        {state?.requiredRoles &amp;&amp; (
           &lt;div className="required-roles"&gt;
             &lt;p&gt;&lt;strong&gt;Required roles:&lt;/strong&gt;&lt;/p&gt;
             &lt;ul&gt;
-              {state.requiredRoles.map(role => (
+              {state.requiredRoles.map(role =&gt; (
                 &lt;li key={role}&gt;{role}&lt;/li&gt;
               ))}
             &lt;/ul&gt;
           &lt;/div&gt;
         )}
         
-        {user && (
+        {user &amp;&amp; (
           &lt;div className="current-role"&gt;
             &lt;p&gt;Your current role: &lt;strong&gt;{user.role}&lt;/strong&gt;&lt;/p&gt;
           &lt;/div&gt;
@@ -2391,8 +2520,8 @@ export function PermissionProtectedRoute({
   
   // Check permissions
   const hasPermission = requireAll
-    ? requiredPermissions.every(perm => user!.permissions.includes(perm))
-    : requiredPermissions.some(perm => user!.permissions.includes(perm));
+    ? requiredPermissions.every(perm =&gt; user!.permissions.includes(perm))
+    : requiredPermissions.some(perm =&gt; user!.permissions.includes(perm));
   
   if (!hasPermission) {
     return (
@@ -2423,37 +2552,69 @@ export function PermissionProtectedRoute({
                 <p>Show/hide navigation items based on user permissions:</p>
 
                 <pre><code class="language-typescript">// components/Navigation.tsx
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 export function Navigation() {
   const { user, isAuthenticated } = useAuth();
   
-  const hasRole = (roles: string[]) => {
-    return user && roles.includes(user.role);
+  const hasRole = (roles: string[]) =&gt; {
+    return user &amp;&amp; roles.includes(user.role);
   };
   
   return (
     &lt;nav&gt;
       &lt;Link to="/"&gt;Home&lt;/Link&gt;
       
-      {isAuthenticated && (
+      {isAuthenticated &amp;&amp; (
         &lt;&gt;
           &lt;Link to="/dashboard"&gt;Dashboard&lt;/Link&gt;
           &lt;Link to="/profile"&gt;Profile&lt;/Link&gt;
         &lt;/&gt;
       )}
       
-      {hasRole(['moderator', 'admin']) && (
+      {hasRole(['moderator', 'admin']) &amp;&amp; (
         &lt;Link to="/moderation"&gt;Moderation&lt;/Link&gt;
       )}
       
-      {hasRole(['admin']) && (
+      {hasRole(['admin']) &amp;&amp; (
         &lt;Link to="/admin"&gt;Admin Panel&lt;/Link&gt;
       )}
     &lt;/nav&gt;
   );
 }</code></pre>
+
+                <h3>See the Role Check in Action</h3>
+                <p>The interactive below runs the exact logic from <code>RoleProtectedRoute</code> for the route <code>/admin</code>, which requires <code>allowedRoles={['admin']}</code>. Click a visitor to see what the guard decides — render the page, bounce to login, or show "access denied":</p>
+
+                <!-- Interactive: RBAC decision demo (theme-aware, no canvas) -->
+                <div class="card ts-demo" aria-live="polite">
+                    <p class="ts-demo-sig"><code>&lt;RoleProtectedRoute allowedRoles={['admin']}&gt; &mdash; route: /admin</code></p>
+                    <div class="ts-demo-buttons">
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="Not authenticated → &lt;Navigate to='/login' state={{ from }} replace /&gt;. They'll be sent back to /admin after signing in.">Guest (not logged in)</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="Authenticated, but role 'user' is not in ['admin'] → &lt;Navigate to='/unauthorized' replace /&gt;.">Logged-in user (role: user)</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="Authenticated, but role 'moderator' is not in ['admin'] → redirected to /unauthorized.">Moderator (role: moderator)</button>
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="Authenticated AND role 'admin' is in ['admin'] → the &lt;AdminLayout /&gt; renders.">Admin (role: admin)</button>
+                    </div>
+                    <p class="ts-demo-result ts-demo-idle" id="ts-demo-rbac-result">👆 Pick a visitor to see how the guard responds.</p>
+                </div>
+
+                <script>
+                (function () {
+                    const wrap = document.getElementById('ts-demo-rbac-result').closest('.ts-demo');
+                    if (!wrap) return;
+                    const result = wrap.querySelector('#ts-demo-rbac-result');
+                    wrap.querySelectorAll('.ts-demo-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            const ok = btn.getAttribute('data-valid') === 'true';
+                            const msg = btn.getAttribute('data-msg');
+                            result.classList.remove('ts-demo-idle', 'ts-demo-ok', 'ts-demo-err');
+                            result.classList.add(ok ? 'ts-demo-ok' : 'ts-demo-err');
+                            result.textContent = (ok ? '✅ Access granted: ' : '🚫 Redirected: ') + msg;
+                        });
+                    });
+                })();
+                </script>
 
                 <div class="card card-warning">
                     <h4>⚠️ Security Warning</h4>
@@ -2501,15 +2662,16 @@ export function Navigation() {
 
                 <div class="card card-accent">
                     <h4>📚 Key Concepts Covered</h4>
-                    <ul style="color: white;">
+                    <ul>
                         <li><strong>Protected Routes</strong> - Securing routes with authentication</li>
                         <li><strong>Authentication Guards</strong> - Implementing auth context and redirect logic</li>
+                        <li><strong>Loader Redirects</strong> - Guarding routes before render with <code>redirect()</code> in the data router</li>
                         <li><strong>Redirect Patterns</strong> - Handling various redirect scenarios</li>
-                        <li><strong>Lazy Loading</strong> - Code splitting with React.lazy()</li>
-                        <li><strong>Suspense</strong> - Managing loading states declaratively</li>
-                        <li><strong>Loading UX</strong> - Creating spinners, skeletons, and progress indicators</li>
+                        <li><strong>Lazy Loading</strong> - Code splitting with <code>React.lazy()</code></li>
+                        <li><strong>Suspense</strong> - Managing loading states declaratively, including deferred data</li>
+                        <li><strong>Loading UX</strong> - Global pending UI with <code>useNavigation()</code>, plus spinners, skeletons, and progress bars</li>
                         <li><strong>Error Boundaries</strong> - Catching and handling route errors</li>
-                        <li><strong>Role-Based Access</strong> - Implementing RBAC for routes</li>
+                        <li><strong>Role-Based Access</strong> - Implementing RBAC and permission checks for routes</li>
                     </ul>
                 </div>
 
@@ -2579,7 +2741,7 @@ export function Navigation() {
 /&gt;
 
 // Lazy Loading Pattern
-const Dashboard = lazy(() => import('./Dashboard'));
+const Dashboard = lazy(() =&gt; import('./Dashboard'));
 
 &lt;Suspense fallback={&lt;Loading /&gt;}&gt;
   &lt;Dashboard /&gt;
@@ -2613,8 +2775,8 @@ const Dashboard = lazy(() => import('./Dashboard'));
                 <h3>Next Lesson Preview</h3>
                 <div class="card card-accent">
                     <h4>🔜 Coming Up: Lesson 6.4 - Search and Query Parameters</h4>
-                    <p style="color: white;">In the next lesson, you'll learn:</p>
-                    <ul style="color: white;">
+                    <p>In the next lesson, you'll learn:</p>
+                    <ul>
                         <li>Using the useSearchParams hook</li>
                         <li>Managing URL query strings</li>
                         <li>Building search and filter functionality</li>
@@ -2660,7 +2822,7 @@ const Dashboard = lazy(() => import('./Dashboard'));
                     <li><a href="https://react.dev/reference/react/lazy" target="_blank">React: lazy() Reference</a></li>
                     <li><a href="https://react.dev/reference/react/Suspense" target="_blank">React: Suspense Reference</a></li>
                     <li><a href="https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary" target="_blank">React: Error Boundaries</a></li>
-                    <li><a href="https://reactrouter.com/en/main/start/overview" target="_blank">React Router: Overview</a></li>
+                    <li><a href="https://reactrouter.com/start/data/custom" target="_blank" rel="noopener">React Router v7: Data Router &amp; Loaders</a></li>
                     <li><a href="https://web.dev/code-splitting-suspense/" target="_blank">Web.dev: Code Splitting with Suspense</a></li>
                 </ul>
 

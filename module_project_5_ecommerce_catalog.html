@@ -127,7 +127,17 @@
             <!-- Section 1: Project Setup -->
             <section id="section1" class="lesson-section">
                 <h2>🚀 Project Setup</h2>
-                <p>Let's set up the foundation for our e-commerce application. We'll create the project structure and install any necessary dependencies.</p>
+                <p>Let's set up the foundation for our e-commerce application. Before writing a single component, we lay out a folder structure that mirrors how the app <em>thinks</em>: types describe the data, a reducer owns the state transitions, a context shares that state, hooks hold reusable logic, and components render the UI. Getting these boundaries right up front is what keeps a growing app from turning into spaghetti - each piece has one job and one home.</p>
+
+                <div class="card card-info">
+                    <h4>🧰 Toolchain (2026)</h4>
+                    <ul>
+                        <li><strong>Node.js 20 LTS or newer</strong> (22 recommended) - Vite 5+ needs it.</li>
+                        <li><strong>Vite</strong> with the <code>react-ts</code> template - instant dev server and a fast production build.</li>
+                        <li><strong>React 19</strong> - the current default. You no longer need to <code>import React</code> just to use JSX (the modern transform handles it), and the new <strong>React Compiler</strong> can auto-memoize your components, which we'll come back to in the Performance section.</li>
+                        <li><strong>TypeScript 5.x</strong> - ships configured in the Vite template.</li>
+                    </ul>
+                </div>
 
                 <h3>Project Structure</h3>
                 <div class="code-block">
@@ -151,7 +161,8 @@
 │   │       ├── Header.tsx
 │   │       └── Layout.tsx
 │   ├── context/
-│   │   ├── CartContext.tsx
+│   │   └── CartContext.tsx
+│   ├── reducers/
 │   │   └── CartReducer.ts
 │   ├── types/
 │   │   └── index.ts
@@ -235,25 +246,27 @@ npm run dev</code></pre>
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/types/index.ts
 
+// The core product shape. Every component in the app agrees on this one
+// interface, so nailing it down here is what makes the whole project
+// type-safe end to end - a wrong id or a missing field is caught by the
+// compiler instead of by a confused user at checkout.
 export interface Product {
-    id: string;
+    id: number;
     name: string;
     description: string;
     price: number;
-    category: string;
+    category: ProductCategory;
     image: string;
-    stock: number;
+    inStock: boolean;
     rating: number;
-    reviews: number;
 }
 
-export type ProductCategory = 
-    | 'Electronics'
-    | 'Clothing'
-    | 'Books'
-    | 'Home & Garden'
-    | 'Sports'
-    | 'All';
+// The real categories a product can belong to. Using a union (rather than a
+// loose `string`) means a typo like 'electonics' becomes a compile error.
+export type ProductCategory = 'electronics' | 'accessories';
+
+// What the filter UI accepts: the real categories, plus "all" for "no filter".
+export type CategoryFilter = 'all' | ProductCategory;
 
 export interface PriceRange {
     min: number;
@@ -276,31 +289,35 @@ export interface CartState {
     total: number;
 }
 
-// Cart actions
+// Cart actions - a discriminated union. The literal `type` field is the
+// discriminant: inside each case of the reducer, TypeScript narrows `payload`
+// to exactly the right shape, so `action.payload` is fully typed for free.
 export type CartAction =
     | { type: 'ADD_TO_CART'; payload: Product }
-    | { type: 'REMOVE_FROM_CART'; payload: string } // product id
-    | { type: 'UPDATE_QUANTITY'; payload: { id: string; quantity: number } }
+    | { type: 'REMOVE_FROM_CART'; payload: number } // product id
+    | { type: 'UPDATE_QUANTITY'; payload: { id: number; quantity: number } }
     | { type: 'CLEAR_CART' }
     | { type: 'LOAD_CART'; payload: CartItem[] };
 
-// Cart context value
+// Cart context value - the public API our custom hook will expose to the app.
 export interface CartContextValue {
     state: CartState;
-    addToCart: (product: Product) => void;
-    removeFromCart: (productId: string) => void;
-    updateQuantity: (productId: string, quantity: number) => void;
-    clearCart: () => void;
+    addToCart: (product: Product) =&gt; void;
+    removeFromCart: (productId: number) =&gt; void;
+    updateQuantity: (productId: number, quantity: number) =&gt; void;
+    clearCart: () =&gt; void;
     itemCount: number;
+    isEmpty: boolean;
 }</code></pre>
                 </div>
 
                 <h3>Filter Types</h3>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
-                    <pre><code class="language-typescript">export interface FilterState {
+                    <pre><code class="language-typescript">// (still in src/types/index.ts - CategoryFilter and PriceRange are defined above)
+export interface FilterState {
     searchQuery: string;
-    category: ProductCategory;
+    category: CategoryFilter;
     priceRange: PriceRange;
     sortBy: 'name' | 'price-asc' | 'price-desc' | 'rating';
 }
@@ -309,150 +326,42 @@ export type ViewMode = 'grid' | 'list';</code></pre>
                 </div>
 
                 <h3>Mock Product Data</h3>
+                <p>Here is the shape in action. We show two products now so you can see how the <code>Product</code> type reads at a glance; we build out the full catalog in the <a href="#section5">Product Catalog</a> section, all in this same <code>src/data/products.ts</code> file.</p>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/data/products.ts
-import { Product } from '../types';
+import { Product, CategoryFilter } from '../types';
 
 export const products: Product[] = [
     {
-        id: '1',
-        name: 'Wireless Headphones',
-        description: 'Premium noise-cancelling wireless headphones with 30-hour battery life',
+        id: 1,
+        name: 'Wireless Headphones Pro',
+        description: 'Premium wireless headphones with active noise cancellation and 30-hour battery life.',
         price: 299.99,
-        category: 'Electronics',
-        image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400',
-        stock: 15,
-        rating: 4.5,
-        reviews: 234
+        category: 'electronics',
+        image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300',
+        inStock: true,
+        rating: 4.8
     },
     {
-        id: '2',
-        name: 'Smart Watch',
-        description: 'Fitness tracker with heart rate monitor and GPS',
-        price: 199.99,
-        category: 'Electronics',
-        image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400',
-        stock: 25,
-        rating: 4.3,
-        reviews: 156
-    },
-    {
-        id: '3',
-        name: 'Laptop Backpack',
-        description: 'Water-resistant backpack with laptop compartment',
+        id: 2,
+        name: 'USB-C Hub 7-in-1',
+        description: '7 ports including HDMI, USB 3.0, SD card reader, and power delivery.',
         price: 49.99,
-        category: 'Clothing',
-        image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400',
-        stock: 42,
-        rating: 4.7,
-        reviews: 89
-    },
-    {
-        id: '4',
-        name: 'JavaScript: The Definitive Guide',
-        description: 'Comprehensive guide to JavaScript programming',
-        price: 39.99,
-        category: 'Books',
-        image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400',
-        stock: 30,
-        rating: 4.8,
-        reviews: 445
-    },
-    {
-        id: '5',
-        name: 'Coffee Maker',
-        description: 'Programmable coffee maker with thermal carafe',
-        price: 79.99,
-        category: 'Home & Garden',
-        image: 'https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?w=400',
-        stock: 18,
-        rating: 4.4,
-        reviews: 201
-    },
-    {
-        id: '6',
-        name: 'Yoga Mat',
-        description: 'Non-slip yoga mat with carrying strap',
-        price: 29.99,
-        category: 'Sports',
-        image: 'https://images.unsplash.com/photo-1601925260368-ae2f83cf8b7f?w=400',
-        stock: 55,
-        rating: 4.6,
-        reviews: 312
-    },
-    {
-        id: '7',
-        name: 'Bluetooth Speaker',
-        description: 'Portable waterproof speaker with 20-hour battery',
-        price: 89.99,
-        category: 'Electronics',
-        image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=400',
-        stock: 33,
-        rating: 4.5,
-        reviews: 178
-    },
-    {
-        id: '8',
-        name: 'Running Shoes',
-        description: 'Lightweight running shoes with cushioned sole',
-        price: 119.99,
-        category: 'Sports',
-        image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400',
-        stock: 28,
-        rating: 4.7,
-        reviews: 267
-    },
-    {
-        id: '9',
-        name: 'LED Desk Lamp',
-        description: 'Adjustable LED lamp with USB charging port',
-        price: 34.99,
-        category: 'Home & Garden',
-        image: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400',
-        stock: 47,
-        rating: 4.3,
-        reviews: 134
-    },
-    {
-        id: '10',
-        name: 'Cooking for Beginners',
-        description: 'Essential cookbook with 100+ easy recipes',
-        price: 24.99,
-        category: 'Books',
-        image: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400',
-        stock: 61,
-        rating: 4.6,
-        reviews: 289
-    },
-    {
-        id: '11',
-        name: 'Wireless Mouse',
-        description: 'Ergonomic wireless mouse with precision tracking',
-        price: 39.99,
-        category: 'Electronics',
-        image: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400',
-        stock: 75,
-        rating: 4.4,
-        reviews: 423
-    },
-    {
-        id: '12',
-        name: 'Denim Jacket',
-        description: 'Classic denim jacket with modern fit',
-        price: 69.99,
-        category: 'Clothing',
-        image: 'https://images.unsplash.com/photo-1576995853123-5a10305d93c0?w=400',
-        stock: 22,
-        rating: 4.5,
-        reviews: 156
+        category: 'accessories',
+        image: 'https://images.unsplash.com/photo-1625948515291-69613efd103f?w=300',
+        inStock: true,
+        rating: 4.4
     }
+    // ...the rest of the catalog is added in the Product Catalog section.
 ];
 
-// Helper function to get unique categories
-export function getCategories(): ProductCategory[] {
-    const categories = [...new Set(products.map(p => p.category))] as ProductCategory[];
-    return ['All', ...categories];
+// Helper: the category options the filter UI offers ("all" first, then every
+// category that actually appears in the data). Because `category` is a typed
+// union, this list can never drift out of sync with the real products.
+export function getCategoryFilters(): CategoryFilter[] {
+    const unique = [...new Set(products.map(p =&gt; p.category))];
+    return ['all', ...unique];
 }</code></pre>
                 </div>
 
@@ -482,7 +391,38 @@ export function getCategories(): ProductCategory[] {
             <!-- Section 3: Cart State with useReducer -->
             <section id="section3" class="lesson-section">
                 <h2>🎯 Cart State with useReducer</h2>
-                <p>Now let's build the heart of our application - the cart reducer that manages all shopping cart operations.</p>
+                <p>Now let's build the heart of our application - the cart reducer that manages all shopping cart operations. A reducer is just a pure function: give it the current state and an action, and it returns the next state. Nothing else touches the cart. That single rule - <em>all changes flow through one function</em> - is what makes the cart predictable, testable, and easy to reason about as features pile up.</p>
+
+                <h3>Unidirectional Data Flow</h3>
+                <p>Every cart change follows the same one-way loop. A component <code>dispatch</code>es an action; the reducer computes a brand-new state; React re-renders the components that read it. The data only ever moves in one direction.</p>
+
+                <figure>
+                    <svg class="svg-auto-invert" id="svg-cart-dataflow" viewBox="0 0 560 180" width="100%" style="max-width: 560px;" aria-labelledby="dataflow-title dataflow-desc" role="img">
+                        <title id="dataflow-title">Unidirectional data flow with useReducer</title>
+                        <desc id="dataflow-desc">A component dispatches an action to the reducer, which returns new state, which re-renders the component.</desc>
+                        <defs>
+                            <marker id="arrow-dataflow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#764ba2"/>
+                            </marker>
+                        </defs>
+                        <rect x="20" y="60" width="140" height="60" rx="10" fill="#667eea" fill-opacity="0.15" stroke="#667eea" stroke-width="2"/>
+                        <text x="90" y="86" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#4a3f9f">Component</text>
+                        <text x="90" y="104" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#5a4faf">reads state, renders UI</text>
+                        <rect x="210" y="60" width="140" height="60" rx="10" fill="#764ba2" fill-opacity="0.15" stroke="#764ba2" stroke-width="2"/>
+                        <text x="280" y="86" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#5a4faf">cartReducer</text>
+                        <text x="280" y="104" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#5a4faf">(state, action) =&gt; state</text>
+                        <rect x="400" y="60" width="140" height="60" rx="10" fill="#48bb78" fill-opacity="0.18" stroke="#48bb78" stroke-width="2"/>
+                        <text x="470" y="86" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#2f855a">New State</text>
+                        <text x="470" y="104" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#2f855a">immutable snapshot</text>
+                        <line x1="160" y1="80" x2="206" y2="80" stroke="#764ba2" stroke-width="2.5" marker-end="url(#arrow-dataflow)"/>
+                        <text x="183" y="72" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#764ba2">dispatch</text>
+                        <line x1="350" y1="80" x2="396" y2="80" stroke="#764ba2" stroke-width="2.5" marker-end="url(#arrow-dataflow)"/>
+                        <text x="373" y="72" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#764ba2">returns</text>
+                        <path d="M 470 120 Q 470 160 280 160 Q 90 160 90 122" fill="none" stroke="#48bb78" stroke-width="2.5" stroke-dasharray="5,3" marker-end="url(#arrow-dataflow)"/>
+                        <text x="280" y="175" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#2f855a" font-style="italic">React re-renders with the new state</text>
+                    </svg>
+                    <figcaption>Figure: One-way data flow. Components never mutate the cart directly - they dispatch actions, and the reducer is the single place state changes.</figcaption>
+                </figure>
 
                 <h3>Why useReducer for Cart State?</h3>
                 <div class="card card-info">
@@ -499,12 +439,12 @@ export function getCategories(): ProductCategory[] {
                 <h3>Cart Reducer Implementation</h3>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
-                    <pre><code class="language-typescript">// src/context/CartReducer.ts
+                    <pre><code class="language-typescript">// src/reducers/CartReducer.ts
 import { CartState, CartAction, CartItem } from '../types';
 
 // Helper function to calculate cart total
 function calculateTotal(items: CartItem[]): number {
-    return items.reduce((total, item) => {
+    return items.reduce((total, item) =&gt; {
         return total + (item.product.price * item.quantity);
     }, 0);
 }
@@ -520,14 +460,14 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
     switch (action.type) {
         case 'ADD_TO_CART': {
             const existingItemIndex = state.items.findIndex(
-                item => item.product.id === action.payload.id
+                item =&gt; item.product.id === action.payload.id
             );
             
             let newItems: CartItem[];
             
-            if (existingItemIndex > -1) {
+            if (existingItemIndex &gt; -1) {
                 // Item already in cart - increase quantity
-                newItems = state.items.map((item, index) => 
+                newItems = state.items.map((item, index) =&gt; 
                     index === existingItemIndex
                         ? { ...item, quantity: item.quantity + 1 }
                         : item
@@ -548,7 +488,7 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
         
         case 'REMOVE_FROM_CART': {
             const newItems = state.items.filter(
-                item => item.product.id !== action.payload
+                item =&gt; item.product.id !== action.payload
             );
             
             return {
@@ -561,9 +501,9 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
             const { id, quantity } = action.payload;
             
             // Remove item if quantity is 0 or less
-            if (quantity <= 0) {
+            if (quantity &lt;= 0) {
                 const newItems = state.items.filter(
-                    item => item.product.id !== id
+                    item =&gt; item.product.id !== id
                 );
                 return {
                     items: newItems,
@@ -572,7 +512,7 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
             }
             
             // Update quantity
-            const newItems = state.items.map(item =>
+            const newItems = state.items.map(item =&gt;
                 item.product.id === id
                     ? { ...item, quantity }
                     : item
@@ -722,27 +662,17 @@ console.log('After removing:', state);
                 <h3>Creating the Context Structure</h3>
                 <p>Create <code>src/context/CartContext.tsx</code>:</p>
 
-                <pre><code class="language-typescript">import React, { createContext, useContext, useReducer, ReactNode, useCallback } from 'react';
-import { cartReducer, initialCartState, CartState, CartAction } from '../reducers/CartReducer';
-import { Product } from '../types';
+                <pre><code class="language-typescript">import { createContext, useContext, useReducer, ReactNode, useCallback } from 'react';
+import { cartReducer, initialCartState } from '../reducers/CartReducer';
+import { Product, CartContextValue } from '../types';
 
-// Define what our context will provide
-interface CartContextValue {
-    // State
-    state: CartState;
-    
-    // Actions (wrapped in helper functions)
-    addToCart: (product: Product) => void;
-    removeFromCart: (productId: number) => void;
-    updateQuantity: (productId: number, quantity: number) => void;
-    clearCart: () => void;
-    
-    // Computed values
-    itemCount: number;
-    isEmpty: boolean;
-}
+// CartContextValue (defined in src/types) describes exactly what this context
+// exposes: the state, the action helpers, and a couple of computed values.
 
-// Create the context with undefined default (will be provided by provider)
+// Create the context with an `undefined` default. That default is deliberate:
+// it lets our custom hook detect when a component tries to use the cart
+// without a provider above it, and throw a clear error instead of failing
+// silently with undefined state.
 const CartContext = createContext&lt;CartContextValue | undefined&gt;(undefined);
 
 // Provider Props
@@ -757,24 +687,24 @@ export function CartProvider({ children }: CartProviderProps) {
     
     // Helper functions that wrap dispatch
     // useCallback prevents recreating these on every render
-    const addToCart = useCallback((product: Product) => {
+    const addToCart = useCallback((product: Product) =&gt; {
         dispatch({ type: 'ADD_TO_CART', payload: product });
     }, []);
     
-    const removeFromCart = useCallback((productId: number) => {
+    const removeFromCart = useCallback((productId: number) =&gt; {
         dispatch({ type: 'REMOVE_FROM_CART', payload: productId });
     }, []);
     
-    const updateQuantity = useCallback((productId: number, quantity: number) => {
+    const updateQuantity = useCallback((productId: number, quantity: number) =&gt; {
         dispatch({ type: 'UPDATE_QUANTITY', payload: { id: productId, quantity } });
     }, []);
     
-    const clearCart = useCallback(() => {
+    const clearCart = useCallback(() =&gt; {
         dispatch({ type: 'CLEAR_CART' });
     }, []);
     
     // Computed values
-    const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
+    const itemCount = state.items.reduce((sum, item) =&gt; sum + item.quantity, 0);
     const isEmpty = state.items.length === 0;
     
     // Context value
@@ -808,9 +738,9 @@ export function useCartContext() {
 
                 <div class="card card-accent">
                     <h4>📖 Key Concepts</h4>
-                    <p style="color: white;"><strong>useCallback:</strong> Memoizes functions so they don't change on every render. Important when passing functions to child components or using them as dependencies.</p>
-                    <p style="color: white;"><strong>Computed Values:</strong> Derived from state but not stored in state. Calculated on-demand for efficiency.</p>
-                    <p style="color: white;"><strong>Custom Hook Pattern:</strong> Encapsulates context usage and provides better error messages.</p>
+                    <p><strong>useCallback:</strong> Memoizes functions so they don't change on every render. Important when passing functions to child components or using them as dependencies.</p>
+                    <p><strong>Computed Values:</strong> Derived from state but not stored in state. Calculated on-demand for efficiency.</p>
+                    <p><strong>Custom Hook Pattern:</strong> Encapsulates context usage and provides better error messages.</p>
                 </div>
 
                 <h3>Setting Up the Provider</h3>
@@ -901,7 +831,7 @@ function TestCart() {
     
     return (
         &lt;div&gt;
-            &lt;button onClick={() => addToCart(testProduct)}&gt;
+            &lt;button onClick={() =&gt; addToCart(testProduct)}&gt;
                 Add Test Product
             &lt;/button&gt;
             &lt;p&gt;Items in cart: {itemCount}&lt;/p&gt;
@@ -954,7 +884,7 @@ export default TestCart;</code></pre>
                 </div>
 
                 <h3>Creating Product Data</h3>
-                <p>First, let's create our product data. Create <code>src/data/products.ts</code>:</p>
+                <p>Back in the Data Models section we sketched <code>src/data/products.ts</code> with a couple of sample products. Here's the complete catalog - the same file, filled out. Every entry conforms to the <code>Product</code> type, so if you get a field name or a category wrong, the compiler tells you immediately:</p>
 
                 <pre><code class="language-typescript">import { Product } from '../types';
 
@@ -1043,13 +973,13 @@ export const products: Product[] = [
 
 // Helper function to get products by category
 export function getProductsByCategory(category: string): Product[] {
-    return products.filter(product => product.category === category);
+    return products.filter(product =&gt; product.category === category);
 }
 
 // Helper function to search products
 export function searchProducts(query: string): Product[] {
     const lowerQuery = query.toLowerCase();
-    return products.filter(product => 
+    return products.filter(product =&gt; 
         product.name.toLowerCase().includes(lowerQuery) ||
         product.description.toLowerCase().includes(lowerQuery)
     );
@@ -1076,10 +1006,10 @@ function ProductCard({ product }: ProductCardProps) {
     const { addToCart, state } = useCartContext();
     
     // Check if product is already in cart
-    const cartItem = state.items.find(item => item.product.id === product.id);
+    const cartItem = state.items.find(item =&gt; item.product.id === product.id);
     const quantityInCart = cartItem?.quantity || 0;
     
-    const handleAddToCart = () => {
+    const handleAddToCart = () =&gt; {
         addToCart(product);
     };
     
@@ -1094,12 +1024,12 @@ function ProductCard({ product }: ProductCardProps) {
                 /&gt;
                 
                 {/* Stock Badge */}
-                {!product.inStock && (
+                {!product.inStock &amp;&amp; (
                     &lt;span className="out-of-stock-badge"&gt;Out of Stock&lt;/span&gt;
                 )}
                 
                 {/* Quantity Badge */}
-                {quantityInCart > 0 && (
+                {quantityInCart &gt; 0 &amp;&amp; (
                     &lt;span className="quantity-badge"&gt;
                         {quantityInCart} in cart
                     &lt;/span&gt;
@@ -1139,9 +1069,9 @@ export default ProductCard;</code></pre>
 
                 <div class="card card-accent">
                     <h4>📖 Component Features</h4>
-                    <p style="color: white;"><strong>Contextual Information:</strong> Shows quantity in cart if product is already added</p>
-                    <p style="color: white;"><strong>Stock Status:</strong> Visual badge and disabled button for out-of-stock items</p>
-                    <p style="color: white;"><strong>User Feedback:</strong> Clear visual states for different conditions</p>
+                    <p><strong>Contextual Information:</strong> Shows quantity in cart if product is already added</p>
+                    <p><strong>Stock Status:</strong> Visual badge and disabled button for out-of-stock items</p>
+                    <p><strong>User Feedback:</strong> Clear visual states for different conditions</p>
                 </div>
 
                 <h3>ProductCard Styling</h3>
@@ -1301,18 +1231,18 @@ function ProductCatalog() {
     const [sortBy, setSortBy] = useState&lt;SortOption&gt;('name');
     
     // Filter and sort products using useMemo for performance
-    const displayedProducts = useMemo(() => {
+    const displayedProducts = useMemo(() =&gt; {
         let filtered = products;
         
         // Filter by category
         if (categoryFilter !== 'all') {
-            filtered = filtered.filter(p => p.category === categoryFilter);
+            filtered = filtered.filter(p =&gt; p.category === categoryFilter);
         }
         
         // Filter by search query
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(p => 
+            filtered = filtered.filter(p =&gt; 
                 p.name.toLowerCase().includes(query) ||
                 p.description.toLowerCase().includes(query)
             );
@@ -1322,16 +1252,16 @@ function ProductCatalog() {
         const sorted = [...filtered];
         switch (sortBy) {
             case 'name':
-                sorted.sort((a, b) => a.name.localeCompare(b.name));
+                sorted.sort((a, b) =&gt; a.name.localeCompare(b.name));
                 break;
             case 'price-low':
-                sorted.sort((a, b) => a.price - b.price);
+                sorted.sort((a, b) =&gt; a.price - b.price);
                 break;
             case 'price-high':
-                sorted.sort((a, b) => b.price - a.price);
+                sorted.sort((a, b) =&gt; b.price - a.price);
                 break;
             case 'rating':
-                sorted.sort((a, b) => b.rating - a.rating);
+                sorted.sort((a, b) =&gt; b.rating - a.rating);
                 break;
         }
         
@@ -1348,7 +1278,7 @@ function ProductCatalog() {
                         type="text"
                         placeholder="🔍 Search products..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) =&gt; setSearchQuery(e.target.value)}
                         className="search-input"
                     /&gt;
                 &lt;/div&gt;
@@ -1358,7 +1288,7 @@ function ProductCatalog() {
                     &lt;label&gt;Category:&lt;/label&gt;
                     &lt;select 
                         value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value as FilterCategory)}
+                        onChange={(e) =&gt; setCategoryFilter(e.target.value as FilterCategory)}
                         className="filter-select"
                     &gt;
                         &lt;option value="all"&gt;All Products&lt;/option&gt;
@@ -1372,7 +1302,7 @@ function ProductCatalog() {
                     &lt;label&gt;Sort by:&lt;/label&gt;
                     &lt;select 
                         value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as SortOption)}
+                        onChange={(e) =&gt; setSortBy(e.target.value as SortOption)}
                         className="filter-select"
                     &gt;
                         &lt;option value="name"&gt;Name&lt;/option&gt;
@@ -1389,9 +1319,9 @@ function ProductCatalog() {
             &lt;/div&gt;
             
             {/* Product Grid */}
-            {displayedProducts.length > 0 ? (
+            {displayedProducts.length &gt; 0 ? (
                 &lt;div className="product-grid"&gt;
-                    {displayedProducts.map(product => (
+                    {displayedProducts.map(product =&gt; (
                         &lt;ProductCard key={product.id} product={product} /&gt;
                     ))}
                 &lt;/div&gt;
@@ -1539,9 +1469,9 @@ export default ProductCatalog;</code></pre>
 const [priceRange, setPriceRange] = useState({ min: 0, max: 1000 });
 
 // Add to useMemo filtering
-if (priceRange.min > 0 || priceRange.max < 1000) {
-    filtered = filtered.filter(p => 
-        p.price >= priceRange.min && p.price <= priceRange.max
+if (priceRange.min &gt; 0 || priceRange.max &lt; 1000) {
+    filtered = filtered.filter(p =&gt; 
+        p.price &gt;= priceRange.min &amp;&amp; p.price &lt;= priceRange.max
     );
 }
 
@@ -1551,7 +1481,7 @@ if (priceRange.min > 0 || priceRange.max < 1000) {
     &lt;input
         type="number"
         value={priceRange.min}
-        onChange={(e) => setPriceRange(prev => ({ 
+        onChange={(e) =&gt; setPriceRange(prev =&gt; ({ 
             ...prev, 
             min: Number(e.target.value) 
         }))}
@@ -1562,7 +1492,7 @@ if (priceRange.min > 0 || priceRange.max < 1000) {
     &lt;input
         type="number"
         value={priceRange.max}
-        onChange={(e) => setPriceRange(prev => ({ 
+        onChange={(e) =&gt; setPriceRange(prev =&gt; ({ 
             ...prev, 
             max: Number(e.target.value) 
         }))}
@@ -1623,23 +1553,23 @@ function CartItem({ item }: CartItemProps) {
     
     const itemTotal = product.price * quantity;
     
-    const handleQuantityChange = (newQuantity: number) => {
-        if (newQuantity >= 1) {
+    const handleQuantityChange = (newQuantity: number) =&gt; {
+        if (newQuantity &gt;= 1) {
             updateQuantity(product.id, newQuantity);
         }
     };
     
-    const handleIncrement = () => {
+    const handleIncrement = () =&gt; {
         handleQuantityChange(quantity + 1);
     };
     
-    const handleDecrement = () => {
-        if (quantity > 1) {
+    const handleDecrement = () =&gt; {
+        if (quantity &gt; 1) {
             handleQuantityChange(quantity - 1);
         }
     };
     
-    const handleRemove = () => {
+    const handleRemove = () =&gt; {
         if (window.confirm(`Remove ${product.name} from cart?`)) {
             removeFromCart(product.id);
         }
@@ -1672,7 +1602,7 @@ function CartItem({ item }: CartItemProps) {
                     &lt;input
                         type="number"
                         value={quantity}
-                        onChange={(e) => handleQuantityChange(Number(e.target.value))}
+                        onChange={(e) =&gt; handleQuantityChange(Number(e.target.value))}
                         min="1"
                         className="quantity-input"
                         aria-label="Quantity"
@@ -1709,9 +1639,9 @@ export default CartItem;</code></pre>
 
                 <div class="card card-accent">
                     <h4>📖 UX Considerations</h4>
-                    <p style="color: white;"><strong>Confirmation Dialog:</strong> We ask for confirmation before removing items to prevent accidental deletions.</p>
-                    <p style="color: white;"><strong>Direct Input:</strong> Users can type a quantity directly or use increment/decrement buttons.</p>
-                    <p style="color: white;"><strong>Accessibility:</strong> All buttons have aria-labels for screen readers.</p>
+                    <p><strong>Confirmation Dialog:</strong> We ask for confirmation before removing items to prevent accidental deletions.</p>
+                    <p><strong>Direct Input:</strong> Users can type a quantity directly or use increment/decrement buttons.</p>
+                    <p><strong>Accessibility:</strong> All buttons have aria-labels for screen readers.</p>
                 </div>
 
                 <h3>CartItem Styling</h3>
@@ -1871,13 +1801,13 @@ function ShoppingCart() {
     const { state, isEmpty, itemCount, clearCart } = useCartContext();
     const [isOpen, setIsOpen] = useState(true);
     
-    const handleClearCart = () => {
+    const handleClearCart = () =&gt; {
         if (window.confirm('Are you sure you want to clear your cart?')) {
             clearCart();
         }
     };
     
-    const handleCheckout = () => {
+    const handleCheckout = () =&gt; {
         alert(`Checkout functionality coming soon!\nTotal: $${state.total.toFixed(2)}`);
     };
     
@@ -1887,10 +1817,10 @@ function ShoppingCart() {
             &lt;div className="cart-header"&gt;
                 &lt;h2&gt;
                     🛒 Shopping Cart 
-                    {!isEmpty && &lt;span className="cart-badge"&gt;{itemCount}&lt;/span&gt;}
+                    {!isEmpty &amp;&amp; &lt;span className="cart-badge"&gt;{itemCount}&lt;/span&gt;}
                 &lt;/h2&gt;
                 &lt;button 
-                    onClick={() => setIsOpen(!isOpen)}
+                    onClick={() =&gt; setIsOpen(!isOpen)}
                     className="toggle-cart-btn"
                     aria-label={isOpen ? 'Close cart' : 'Open cart'}
                 &gt;
@@ -1912,7 +1842,7 @@ function ShoppingCart() {
                     &lt;&gt;
                         {/* Cart Items */}
                         &lt;div className="cart-items"&gt;
-                            {state.items.map(item => (
+                            {state.items.map(item =&gt; (
                                 &lt;CartItem key={item.product.id} item={item} /&gt;
                             ))}
                         &lt;/div&gt;
@@ -2185,7 +2115,7 @@ function getInitialState(): CartState {
 const [state, dispatch] = useReducer(cartReducer, getInitialState());
 
 // Save to localStorage whenever state changes
-useEffect(() => {
+useEffect(() =&gt; {
     try {
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
@@ -2382,24 +2312,24 @@ export function useProductFilters(products: Product[]) {
     const updateFilter = &lt;K extends keyof FilterOptions&gt;(
         key: K,
         value: FilterOptions[K]
-    ) => {
-        setFilters(prev => ({ ...prev, [key]: value }));
+    ) =&gt; {
+        setFilters(prev =&gt; ({ ...prev, [key]: value }));
     };
     
     // Reset all filters
-    const resetFilters = () => {
+    const resetFilters = () =&gt; {
         setFilters(DEFAULT_FILTERS);
         setSortBy('name');
     };
     
     // Apply all filters and sorting
-    const filteredProducts = useMemo(() => {
+    const filteredProducts = useMemo(() =&gt; {
         let result = products;
         
         // Search filter
         if (filters.searchQuery.trim()) {
             const query = filters.searchQuery.toLowerCase();
-            result = result.filter(p => 
+            result = result.filter(p =&gt; 
                 p.name.toLowerCase().includes(query) ||
                 p.description.toLowerCase().includes(query) ||
                 p.category.toLowerCase().includes(query)
@@ -2408,39 +2338,39 @@ export function useProductFilters(products: Product[]) {
         
         // Category filter
         if (filters.category !== 'all') {
-            result = result.filter(p => p.category === filters.category);
+            result = result.filter(p =&gt; p.category === filters.category);
         }
         
         // Price range filter
-        result = result.filter(p => 
-            p.price >= filters.priceRange.min && 
-            p.price <= filters.priceRange.max
+        result = result.filter(p =&gt; 
+            p.price &gt;= filters.priceRange.min &amp;&amp; 
+            p.price &lt;= filters.priceRange.max
         );
         
         // Rating filter
-        if (filters.minRating > 0) {
-            result = result.filter(p => p.rating >= filters.minRating);
+        if (filters.minRating &gt; 0) {
+            result = result.filter(p =&gt; p.rating &gt;= filters.minRating);
         }
         
         // Stock filter
         if (!filters.showOutOfStock) {
-            result = result.filter(p => p.inStock);
+            result = result.filter(p =&gt; p.inStock);
         }
         
         // Sort
         const sorted = [...result];
         switch (sortBy) {
             case 'name':
-                sorted.sort((a, b) => a.name.localeCompare(b.name));
+                sorted.sort((a, b) =&gt; a.name.localeCompare(b.name));
                 break;
             case 'price-low':
-                sorted.sort((a, b) => a.price - b.price);
+                sorted.sort((a, b) =&gt; a.price - b.price);
                 break;
             case 'price-high':
-                sorted.sort((a, b) => b.price - a.price);
+                sorted.sort((a, b) =&gt; b.price - a.price);
                 break;
             case 'rating':
-                sorted.sort((a, b) => b.rating - a.rating);
+                sorted.sort((a, b) =&gt; b.rating - a.rating);
                 break;
         }
         
@@ -2448,12 +2378,12 @@ export function useProductFilters(products: Product[]) {
     }, [products, filters, sortBy]);
     
     // Active filter count (for UI badge)
-    const activeFilterCount = useMemo(() => {
+    const activeFilterCount = useMemo(() =&gt; {
         let count = 0;
         if (filters.searchQuery.trim()) count++;
         if (filters.category !== 'all') count++;
-        if (filters.priceRange.min > 0 || filters.priceRange.max < 1000) count++;
-        if (filters.minRating > 0) count++;
+        if (filters.priceRange.min &gt; 0 || filters.priceRange.max &lt; 1000) count++;
+        if (filters.minRating &gt; 0) count++;
         if (!filters.showOutOfStock) count++;
         return count;
     }, [filters]);
@@ -2471,10 +2401,10 @@ export function useProductFilters(products: Product[]) {
 
                 <div class="card card-accent">
                     <h4>📖 Custom Hook Benefits</h4>
-                    <p style="color: white;"><strong>Encapsulation:</strong> All filter logic is in one place, making it reusable and testable</p>
-                    <p style="color: white;"><strong>Type Safety:</strong> Generic updateFilter function ensures type-safe updates</p>
-                    <p style="color: white;"><strong>Performance:</strong> useMemo prevents unnecessary recalculations</p>
-                    <p style="color: white;"><strong>DX:</strong> Simple API makes it easy to use in components</p>
+                    <p><strong>Encapsulation:</strong> All filter logic is in one place, making it reusable and testable</p>
+                    <p><strong>Type Safety:</strong> Generic updateFilter function ensures type-safe updates</p>
+                    <p><strong>Performance:</strong> useMemo prevents unnecessary recalculations</p>
+                    <p><strong>DX:</strong> Simple API makes it easy to use in components</p>
                 </div>
 
                 <h3>Enhanced FilterBar Component</h3>
@@ -2489,10 +2419,10 @@ interface FilterBarProps {
     onFilterChange: &lt;K extends keyof FilterOptions&gt;(
         key: K,
         value: FilterOptions[K]
-    ) => void;
+    ) =&gt; void;
     sortBy: SortOption;
-    onSortChange: (sort: SortOption) => void;
-    onReset: () => void;
+    onSortChange: (sort: SortOption) =&gt; void;
+    onReset: () =&gt; void;
     activeFilterCount: number;
     totalProducts: number;
     filteredCount: number;
@@ -2518,7 +2448,7 @@ function FilterBar({
                     type="text"
                     placeholder="Search products..."
                     value={filters.searchQuery}
-                    onChange={(e) => onFilterChange('searchQuery', e.target.value)}
+                    onChange={(e) =&gt; onFilterChange('searchQuery', e.target.value)}
                     className="search-input"
                 /&gt;
             &lt;/div&gt;
@@ -2529,7 +2459,7 @@ function FilterBar({
                 &lt;select
                     id="category"
                     value={filters.category}
-                    onChange={(e) => onFilterChange('category', e.target.value as any)}
+                    onChange={(e) =&gt; onFilterChange('category', e.target.value as any)}
                     className="filter-select"
                 &gt;
                     &lt;option value="all"&gt;All Categories&lt;/option&gt;
@@ -2546,7 +2476,7 @@ function FilterBar({
                         type="number"
                         placeholder="Min"
                         value={filters.priceRange.min}
-                        onChange={(e) => onFilterChange('priceRange', {
+                        onChange={(e) =&gt; onFilterChange('priceRange', {
                             ...filters.priceRange,
                             min: Number(e.target.value)
                         })}
@@ -2558,7 +2488,7 @@ function FilterBar({
                         type="number"
                         placeholder="Max"
                         value={filters.priceRange.max}
-                        onChange={(e) => onFilterChange('priceRange', {
+                        onChange={(e) =&gt; onFilterChange('priceRange', {
                             ...filters.priceRange,
                             max: Number(e.target.value)
                         })}
@@ -2574,7 +2504,7 @@ function FilterBar({
                 &lt;select
                     id="rating"
                     value={filters.minRating}
-                    onChange={(e) => onFilterChange('minRating', Number(e.target.value))}
+                    onChange={(e) =&gt; onFilterChange('minRating', Number(e.target.value))}
                     className="filter-select"
                 &gt;
                     &lt;option value="0"&gt;Any Rating&lt;/option&gt;
@@ -2589,7 +2519,7 @@ function FilterBar({
                     &lt;input
                         type="checkbox"
                         checked={filters.showOutOfStock}
-                        onChange={(e) => onFilterChange('showOutOfStock', e.target.checked)}
+                        onChange={(e) =&gt; onFilterChange('showOutOfStock', e.target.checked)}
                     /&gt;
                     &lt;span&gt;Show out of stock&lt;/span&gt;
                 &lt;/label&gt;
@@ -2601,7 +2531,7 @@ function FilterBar({
                 &lt;select
                     id="sort"
                     value={sortBy}
-                    onChange={(e) => onSortChange(e.target.value as SortOption)}
+                    onChange={(e) =&gt; onSortChange(e.target.value as SortOption)}
                     className="filter-select"
                 &gt;
                     &lt;option value="name"&gt;Name&lt;/option&gt;
@@ -2615,13 +2545,13 @@ function FilterBar({
             &lt;div className="filter-section results-section"&gt;
                 &lt;div className="results-info"&gt;
                     Showing {filteredCount} of {totalProducts} products
-                    {activeFilterCount > 0 && (
+                    {activeFilterCount &gt; 0 &amp;&amp; (
                         &lt;span className="active-filters-badge"&gt;
                             {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''}
                         &lt;/span&gt;
                     )}
                 &lt;/div&gt;
-                {activeFilterCount > 0 && (
+                {activeFilterCount &gt; 0 &amp;&amp; (
                     &lt;button onClick={onReset} className="reset-btn"&gt;
                         🔄 Reset Filters
                     &lt;/button&gt;
@@ -2793,7 +2723,7 @@ function highlightText(text: string, query: string): JSX.Element {
     const parts = text.split(new RegExp(`(${query})`, 'gi'));
     return (
         &lt;&gt;
-            {parts.map((part, index) => 
+            {parts.map((part, index) =&gt; 
                 part.toLowerCase() === query.toLowerCase() ? (
                     &lt;mark key={index} style={{ 
                         background: '#fef3c7', 
@@ -2851,9 +2781,9 @@ function ProductCatalog() {
                 filteredCount={filteredProducts.length}
             /&gt;
             
-            {filteredProducts.length > 0 ? (
+            {filteredProducts.length &gt; 0 ? (
                 &lt;div className="product-grid"&gt;
-                    {filteredProducts.map(product => (
+                    {filteredProducts.map(product =&gt; (
                         &lt;ProductCard 
                             key={product.id} 
                             product={product}
@@ -2894,7 +2824,13 @@ export default ProductCatalog;</code></pre>
             <!-- Section 8: Performance Optimization -->
             <section id="section8" class="lesson-section">
                 <h2>⚡ Step 9: Performance Optimization</h2>
-                <p>Now that our e-commerce app is feature-complete, let's optimize its performance using React's built-in tools and best practices.</p>
+                <p>Now that our e-commerce app is feature-complete, let's optimize its performance using React's built-in tools and best practices. The goal is simple: do less work per render, and skip renders that wouldn't change anything on screen.</p>
+
+                <div class="card card-info">
+                    <h4>🆕 React 19 and the React Compiler</h4>
+                    <p>Before you reach for <code>useMemo</code>, <code>useCallback</code>, and <code>React.memo</code> by hand, know that <strong>React 19 ships the React Compiler</strong>. When enabled, it analyzes your components at build time and inserts memoization <em>for you</em>, so a lot of the manual wrapping below becomes unnecessary.</p>
+                    <p style="margin: 0;">We still teach the manual techniques here because (1) understanding <em>what</em> the compiler automates makes you a better React developer, and (2) you'll meet plenty of codebases that don't have it turned on yet. Think of the manual memoization as the concept, and the compiler as the autopilot.</p>
+                </div>
 
                 <h3>Performance Optimization Strategy</h3>
                 <div class="mermaid">
@@ -2948,9 +2884,9 @@ export default memo(ProductCardComponent);</code></pre>
 
                 <div class="card card-accent">
                     <h4>📖 React.memo Explained</h4>
-                    <p style="color: white;"><strong>Purpose:</strong> Prevents re-renders when props haven't changed</p>
-                    <p style="color: white;"><strong>When to Use:</strong> Components that render often with the same props</p>
-                    <p style="color: white;"><strong>Shallow Comparison:</strong> By default, compares props using shallow equality</p>
+                    <p><strong>Purpose:</strong> Prevents re-renders when props haven't changed</p>
+                    <p><strong>When to Use:</strong> Components that render often with the same props</p>
+                    <p><strong>Shallow Comparison:</strong> By default, compares props using shallow equality</p>
                 </div>
 
                 <h3>2. Creating a Debounced Search Hook</h3>
@@ -2965,14 +2901,14 @@ export default memo(ProductCardComponent);</code></pre>
 export function useDebounce&lt;T&gt;(value: T, delay: number = 300): T {
     const [debouncedValue, setDebouncedValue] = useState&lt;T&gt;(value);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         // Set up a timer to update the debounced value after delay
-        const timer = setTimeout(() => {
+        const timer = setTimeout(() =&gt; {
             setDebouncedValue(value);
         }, delay);
         
         // Clean up the timer if value changes before delay expires
-        return () => {
+        return () =&gt; {
             clearTimeout(timer);
         };
     }, [value, delay]);
@@ -2998,13 +2934,13 @@ export function useProductFilters(products: Product[]) {
     const debouncedSearchQuery = useDebounce(filters.searchQuery, 300);
     
     // Apply all filters and sorting
-    const filteredProducts = useMemo(() => {
+    const filteredProducts = useMemo(() =&gt; {
         let result = products;
         
         // Use debounced search query instead of immediate value
         if (debouncedSearchQuery.trim()) {
             const query = debouncedSearchQuery.toLowerCase();
-            result = result.filter(p => 
+            result = result.filter(p =&gt; 
                 p.name.toLowerCase().includes(query) ||
                 p.description.toLowerCase().includes(query) ||
                 p.category.toLowerCase().includes(query)
@@ -3035,35 +2971,35 @@ export function CartProvider({ children }: CartProviderProps) {
     const [state, dispatch] = useReducer(cartReducer, initialCartState);
     
     // Memoize all action functions
-    const addToCart = useCallback((product: Product) => {
+    const addToCart = useCallback((product: Product) =&gt; {
         dispatch({ type: 'ADD_TO_CART', payload: product });
     }, []); // Empty deps - function never changes
     
-    const removeFromCart = useCallback((productId: number) => {
+    const removeFromCart = useCallback((productId: number) =&gt; {
         dispatch({ type: 'REMOVE_FROM_CART', payload: productId });
     }, []);
     
-    const updateQuantity = useCallback((productId: number, quantity: number) => {
+    const updateQuantity = useCallback((productId: number, quantity: number) =&gt; {
         dispatch({ type: 'UPDATE_QUANTITY', payload: { id: productId, quantity } });
     }, []);
     
-    const clearCart = useCallback(() => {
+    const clearCart = useCallback(() =&gt; {
         dispatch({ type: 'CLEAR_CART' });
     }, []);
     
     // Memoize computed values
     const itemCount = useMemo(
-        () => state.items.reduce((sum, item) => sum + item.quantity, 0),
+        () =&gt; state.items.reduce((sum, item) =&gt; sum + item.quantity, 0),
         [state.items]
     );
     
     const isEmpty = useMemo(
-        () => state.items.length === 0,
+        () =&gt; state.items.length === 0,
         [state.items]
     );
     
     // Memoize the entire context value to prevent unnecessary re-renders
-    const value = useMemo(() => ({
+    const value = useMemo(() =&gt; ({
         state,
         addToCart,
         removeFromCart,
@@ -3092,7 +3028,7 @@ function VirtualizedProductGrid({ products }: { products: Product[] }) {
     const columnCount = 3;
     const rowCount = Math.ceil(products.length / columnCount);
     
-    const Cell = ({ columnIndex, rowIndex, style }: any) => {
+    const Cell = ({ columnIndex, rowIndex, style }: any) =&gt; {
         const index = rowIndex * columnCount + columnIndex;
         const product = products[index];
         
@@ -3137,7 +3073,7 @@ function VirtualizedProductGrid({ products }: { products: Product[] }) {
 export function useRenderCount(componentName: string) {
     const renderCount = useRef(0);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         renderCount.current += 1;
         console.log(`${componentName} rendered ${renderCount.current} times`);
     });
@@ -3355,7 +3291,7 @@ function LoadingSpinner({ size = 'medium', message }: LoadingSpinnerProps) {
             &lt;div className={`loading-spinner ${size}`}&gt;
                 &lt;div className="spinner"&gt;&lt;/div&gt;
             &lt;/div&gt;
-            {message && &lt;p className="loading-message"&gt;{message}&lt;/p&gt;}
+            {message &amp;&amp; &lt;p className="loading-message"&gt;{message}&lt;/p&gt;}
         &lt;/div&gt;
     );
 }
@@ -3416,13 +3352,13 @@ interface ToastProps {
     message: string;
     type?: 'success' | 'error' | 'info';
     duration?: number;
-    onClose: () => void;
+    onClose: () =&gt; void;
 }
 
 function Toast({ message, type = 'info', duration = 3000, onClose }: ToastProps) {
-    useEffect(() => {
+    useEffect(() =&gt; {
         const timer = setTimeout(onClose, duration);
-        return () => clearTimeout(timer);
+        return () =&gt; clearTimeout(timer);
     }, [duration, onClose]);
     
     const icons = {
@@ -3595,7 +3531,7 @@ export default Toast;</code></pre>
                         <summary>✅ Solution Structure</summary>
                         <pre><code class="language-typescript">// Create ToastContext
 const ToastContext = createContext&lt;{
-    showToast: (message: string, type: 'success' | 'error') => void;
+    showToast: (message: string, type: 'success' | 'error') =&gt; void;
 }&gt;(null!);
 
 // In addToCart function:
@@ -3669,7 +3605,7 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 expect.extend(matchers);
 
 // Cleanup after each test
-afterEach(() => {
+afterEach(() =&gt; {
     cleanup();
 });</code></pre>
 
@@ -3692,9 +3628,9 @@ const mockProduct: Product = {
     rating: 4.5
 };
 
-describe('cartReducer', () => {
-    describe('ADD_TO_CART', () => {
-        it('should add a new product to empty cart', () => {
+describe('cartReducer', () =&gt; {
+    describe('ADD_TO_CART', () =&gt; {
+        it('should add a new product to empty cart', () =&gt; {
             const action = { type: 'ADD_TO_CART' as const, payload: mockProduct };
             const result = cartReducer(initialCartState, action);
             
@@ -3704,7 +3640,7 @@ describe('cartReducer', () => {
             expect(result.total).toBe(99.99);
         });
         
-        it('should increment quantity if product already exists', () => {
+        it('should increment quantity if product already exists', () =&gt; {
             const existingState = {
                 items: [{ product: mockProduct, quantity: 1 }],
                 total: 99.99
@@ -3719,8 +3655,8 @@ describe('cartReducer', () => {
         });
     });
     
-    describe('REMOVE_FROM_CART', () => {
-        it('should remove product from cart', () => {
+    describe('REMOVE_FROM_CART', () =&gt; {
+        it('should remove product from cart', () =&gt; {
             const existingState = {
                 items: [{ product: mockProduct, quantity: 2 }],
                 total: 199.98
@@ -3733,7 +3669,7 @@ describe('cartReducer', () => {
             expect(result.total).toBe(0);
         });
         
-        it('should handle removing non-existent product', () => {
+        it('should handle removing non-existent product', () =&gt; {
             const action = { type: 'REMOVE_FROM_CART' as const, payload: 999 };
             const result = cartReducer(initialCartState, action);
             
@@ -3741,8 +3677,8 @@ describe('cartReducer', () => {
         });
     });
     
-    describe('UPDATE_QUANTITY', () => {
-        it('should update product quantity', () => {
+    describe('UPDATE_QUANTITY', () =&gt; {
+        it('should update product quantity', () =&gt; {
             const existingState = {
                 items: [{ product: mockProduct, quantity: 1 }],
                 total: 99.99
@@ -3758,7 +3694,7 @@ describe('cartReducer', () => {
             expect(result.total).toBe(499.95);
         });
         
-        it('should remove item if quantity is 0 or less', () => {
+        it('should remove item if quantity is 0 or less', () =&gt; {
             const existingState = {
                 items: [{ product: mockProduct, quantity: 1 }],
                 total: 99.99
@@ -3775,8 +3711,8 @@ describe('cartReducer', () => {
         });
     });
     
-    describe('CLEAR_CART', () => {
-        it('should clear all items from cart', () => {
+    describe('CLEAR_CART', () =&gt; {
+        it('should clear all items from cart', () =&gt; {
             const existingState = {
                 items: [
                     { product: mockProduct, quantity: 2 },
@@ -3795,9 +3731,9 @@ describe('cartReducer', () => {
 
                 <div class="card card-accent">
                     <h4>📖 Testing Best Practices</h4>
-                    <p style="color: white;"><strong>Arrange-Act-Assert:</strong> Set up state, perform action, verify result</p>
-                    <p style="color: white;"><strong>Test Edge Cases:</strong> Empty states, boundary conditions, invalid inputs</p>
-                    <p style="color: white;"><strong>Descriptive Names:</strong> Test names should explain what they verify</p>
+                    <p><strong>Arrange-Act-Assert:</strong> Set up state, perform action, verify result</p>
+                    <p><strong>Test Edge Cases:</strong> Empty states, boundary conditions, invalid inputs</p>
+                    <p><strong>Descriptive Names:</strong> Test names should explain what they verify</p>
                 </div>
 
                 <h3>Testing Components with Context</h3>
@@ -3829,8 +3765,8 @@ const mockProduct: Product = {
     rating: 4.8
 };
 
-describe('ProductCard', () => {
-    it('should render product information', () => {
+describe('ProductCard', () =&gt; {
+    it('should render product information', () =&gt; {
         renderWithProviders(&lt;ProductCard product={mockProduct} /&gt;);
         
         expect(screen.getByText('Wireless Headphones')).toBeInTheDocument();
@@ -3839,14 +3775,14 @@ describe('ProductCard', () => {
         expect(screen.getByText('4.8')).toBeInTheDocument();
     });
     
-    it('should show add to cart button for in-stock items', () => {
+    it('should show add to cart button for in-stock items', () =&gt; {
         renderWithProviders(&lt;ProductCard product={mockProduct} /&gt;);
         
         const button = screen.getByRole('button', { name: /add to cart/i });
         expect(button).toBeEnabled();
     });
     
-    it('should disable add to cart button for out-of-stock items', () => {
+    it('should disable add to cart button for out-of-stock items', () =&gt; {
         const outOfStockProduct = { ...mockProduct, inStock: false };
         renderWithProviders(&lt;ProductCard product={outOfStockProduct} /&gt;);
         
@@ -3854,7 +3790,7 @@ describe('ProductCard', () => {
         expect(button).toBeDisabled();
     });
     
-    it('should add product to cart when button is clicked', () => {
+    it('should add product to cart when button is clicked', () =&gt; {
         renderWithProviders(&lt;ProductCard product={mockProduct} /&gt;);
         
         const button = screen.getByRole('button', { name: /add to cart/i });
@@ -3864,7 +3800,7 @@ describe('ProductCard', () => {
         expect(screen.getByText('1 in cart')).toBeInTheDocument();
     });
     
-    it('should show quantity badge when product is in cart', () => {
+    it('should show quantity badge when product is in cart', () =&gt; {
         renderWithProviders(
             &lt;&gt;
                 &lt;ProductCard product={mockProduct} /&gt;
@@ -3922,17 +3858,17 @@ const mockProducts: Product[] = [
     }
 ];
 
-describe('useProductFilters', () => {
-    it('should return all products initially', () => {
-        const { result } = renderHook(() => useProductFilters(mockProducts));
+describe('useProductFilters', () =&gt; {
+    it('should return all products initially', () =&gt; {
+        const { result } = renderHook(() =&gt; useProductFilters(mockProducts));
         
         expect(result.current.filteredProducts).toHaveLength(3);
     });
     
-    it('should filter by search query', () => {
-        const { result } = renderHook(() => useProductFilters(mockProducts));
+    it('should filter by search query', () =&gt; {
+        const { result } = renderHook(() =&gt; useProductFilters(mockProducts));
         
-        act(() => {
+        act(() =&gt; {
             result.current.updateFilter('searchQuery', 'laptop');
         });
         
@@ -3940,10 +3876,10 @@ describe('useProductFilters', () => {
         expect(result.current.filteredProducts[0].name).toBe('Laptop');
     });
     
-    it('should filter by category', () => {
-        const { result } = renderHook(() => useProductFilters(mockProducts));
+    it('should filter by category', () =&gt; {
+        const { result } = renderHook(() =&gt; useProductFilters(mockProducts));
         
-        act(() => {
+        act(() =&gt; {
             result.current.updateFilter('category', 'accessories');
         });
         
@@ -3951,10 +3887,10 @@ describe('useProductFilters', () => {
         expect(result.current.filteredProducts[0].category).toBe('accessories');
     });
     
-    it('should filter by price range', () => {
-        const { result } = renderHook(() => useProductFilters(mockProducts));
+    it('should filter by price range', () =&gt; {
+        const { result } = renderHook(() =&gt; useProductFilters(mockProducts));
         
-        act(() => {
+        act(() =&gt; {
             result.current.updateFilter('priceRange', { min: 100, max: 500 });
         });
         
@@ -3962,38 +3898,38 @@ describe('useProductFilters', () => {
         expect(result.current.filteredProducts[0].name).toBe('Keyboard');
     });
     
-    it('should filter out of stock items', () => {
-        const { result } = renderHook(() => useProductFilters(mockProducts));
+    it('should filter out of stock items', () =&gt; {
+        const { result } = renderHook(() =&gt; useProductFilters(mockProducts));
         
-        act(() => {
+        act(() =&gt; {
             result.current.updateFilter('showOutOfStock', false);
         });
         
         expect(result.current.filteredProducts).toHaveLength(2);
-        expect(result.current.filteredProducts.every(p => p.inStock)).toBe(true);
+        expect(result.current.filteredProducts.every(p =&gt; p.inStock)).toBe(true);
     });
     
-    it('should sort products by price', () => {
-        const { result } = renderHook(() => useProductFilters(mockProducts));
+    it('should sort products by price', () =&gt; {
+        const { result } = renderHook(() =&gt; useProductFilters(mockProducts));
         
-        act(() => {
+        act(() =&gt; {
             result.current.setSortBy('price-low');
         });
         
-        const prices = result.current.filteredProducts.map(p => p.price);
+        const prices = result.current.filteredProducts.map(p =&gt; p.price);
         expect(prices).toEqual([49.99, 149.99, 999.99]);
     });
     
-    it('should reset filters', () => {
-        const { result } = renderHook(() => useProductFilters(mockProducts));
+    it('should reset filters', () =&gt; {
+        const { result } = renderHook(() =&gt; useProductFilters(mockProducts));
         
-        act(() => {
+        act(() =&gt; {
             result.current.updateFilter('searchQuery', 'laptop');
             result.current.updateFilter('category', 'electronics');
             result.current.setSortBy('price-high');
         });
         
-        act(() => {
+        act(() =&gt; {
             result.current.resetFilters();
         });
         
@@ -4003,12 +3939,12 @@ describe('useProductFilters', () => {
         expect(result.current.filteredProducts).toHaveLength(3);
     });
     
-    it('should calculate active filter count', () => {
-        const { result } = renderHook(() => useProductFilters(mockProducts));
+    it('should calculate active filter count', () =&gt; {
+        const { result } = renderHook(() =&gt; useProductFilters(mockProducts));
         
         expect(result.current.activeFilterCount).toBe(0);
         
-        act(() => {
+        act(() =&gt; {
             result.current.updateFilter('searchQuery', 'laptop');
             result.current.updateFilter('category', 'electronics');
         });
@@ -4032,8 +3968,8 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../App';
 
-describe('Shopping Flow Integration', () => {
-    it('should complete a full shopping workflow', async () => {
+describe('Shopping Flow Integration', () =&gt; {
+    it('should complete a full shopping workflow', async () =&gt; {
         const user = userEvent.setup();
         render(&lt;App /&gt;);
         
@@ -4046,7 +3982,7 @@ describe('Shopping Flow Integration', () => {
         await user.type(searchInput, 'headphones');
         
         // Wait for debounce and check filtered results
-        await new Promise(resolve => setTimeout(resolve, 400));
+        await new Promise(resolve =&gt; setTimeout(resolve, 400));
         const productCards = screen.getAllByRole('article');
         expect(productCards.length).toBeGreaterThan(0);
         
@@ -4086,7 +4022,7 @@ describe('Shopping Flow Integration', () => {
         // expect(screen.getByText(/your cart is empty/i)).toBeInTheDocument();
     });
     
-    it('should handle filtering and sorting together', async () => {
+    it('should handle filtering and sorting together', async () =&gt; {
         const user = userEvent.setup();
         render(&lt;App /&gt;);
         
@@ -4103,12 +4039,12 @@ describe('Shopping Flow Integration', () => {
         expect(productCards.length).toBeGreaterThan(0);
         
         // Get all prices and verify they're in ascending order
-        const prices = Array.from(productCards).map(card => {
+        const prices = Array.from(productCards).map(card =&gt; {
             const priceText = within(card).getByText(/\$\d+/).textContent;
             return parseFloat(priceText?.replace('$', '') || '0');
         });
         
-        for (let i = 1; i < prices.length; i++) {
+        for (let i = 1; i &lt; prices.length; i++) {
             expect(prices[i]).toBeGreaterThanOrEqual(prices[i - 1]);
         }
     });
@@ -4149,7 +4085,7 @@ describe('Shopping Flow Integration', () => {
                     
                     <details>
                         <summary>✅ Solution</summary>
-                        <pre><code class="language-typescript">it('should increment quantity when + button is clicked', async () => {
+                        <pre><code class="language-typescript">it('should increment quantity when + button is clicked', async () =&gt; {
     const user = userEvent.setup();
     const mockItem = {
         product: mockProduct,
@@ -4212,10 +4148,10 @@ import { Product } from '../types';
 
 interface WishlistContextValue {
     wishlist: Product[];
-    addToWishlist: (product: Product) => void;
-    removeFromWishlist: (productId: number) => void;
-    isInWishlist: (productId: number) => boolean;
-    clearWishlist: () => void;
+    addToWishlist: (product: Product) =&gt; void;
+    removeFromWishlist: (productId: number) =&gt; void;
+    isInWishlist: (productId: number) =&gt; boolean;
+    clearWishlist: () =&gt; void;
 }
 
 const WishlistContext = createContext&lt;WishlistContextValue | undefined&gt;(undefined);
@@ -4223,24 +4159,24 @@ const WishlistContext = createContext&lt;WishlistContextValue | undefined&gt;(un
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
     const [wishlist, setWishlist] = useState&lt;Product[]&gt;([]);
     
-    const addToWishlist = useCallback((product: Product) => {
-        setWishlist(prev => {
-            if (prev.find(p => p.id === product.id)) {
+    const addToWishlist = useCallback((product: Product) =&gt; {
+        setWishlist(prev =&gt; {
+            if (prev.find(p =&gt; p.id === product.id)) {
                 return prev; // Already in wishlist
             }
             return [...prev, product];
         });
     }, []);
     
-    const removeFromWishlist = useCallback((productId: number) => {
-        setWishlist(prev => prev.filter(p => p.id !== productId));
+    const removeFromWishlist = useCallback((productId: number) =&gt; {
+        setWishlist(prev =&gt; prev.filter(p =&gt; p.id !== productId));
     }, []);
     
-    const isInWishlist = useCallback((productId: number) => {
-        return wishlist.some(p => p.id === productId);
+    const isInWishlist = useCallback((productId: number) =&gt; {
+        return wishlist.some(p =&gt; p.id === productId);
     }, [wishlist]);
     
-    const clearWishlist = useCallback(() => {
+    const clearWishlist = useCallback(() =&gt; {
         setWishlist([]);
     }, []);
     
@@ -4269,7 +4205,7 @@ export function useWishlist() {
 const { addToWishlist, isInWishlist } = useWishlist();
 const inWishlist = isInWishlist(product.id);
 
-&lt;button onClick={() => addToWishlist(product)}&gt;
+&lt;button onClick={() =&gt; addToWishlist(product)}&gt;
     {inWishlist ? '❤️' : '🤍'} Wishlist
 &lt;/button&gt;</code></pre>
 
@@ -4283,8 +4219,8 @@ import './ProductComparison.css';
 
 interface ProductComparisonProps {
     products: Product[];
-    onRemove: (id: number) => void;
-    onClose: () => void;
+    onRemove: (id: number) =&gt; void;
+    onClose: () =&gt; void;
 }
 
 function ProductComparison({ products, onRemove, onClose }: ProductComparisonProps) {
@@ -4298,10 +4234,10 @@ function ProductComparison({ products, onRemove, onClose }: ProductComparisonPro
             &lt;/div&gt;
             
             &lt;div className="comparison-grid"&gt;
-                {products.map(product => (
+                {products.map(product =&gt; (
                     &lt;div key={product.id} className="comparison-item"&gt;
                         &lt;button 
-                            onClick={() => onRemove(product.id)}
+                            onClick={() =&gt; onRemove(product.id)}
                             className="remove-comparison"
                         &gt;
                             ×
@@ -4347,20 +4283,20 @@ import './ProductQuickView.css';
 
 interface ProductQuickViewProps {
     product: Product;
-    onClose: () => void;
+    onClose: () =&gt; void;
 }
 
 function ProductQuickView({ product, onClose }: ProductQuickViewProps) {
     const { addToCart } = useCartContext();
     
-    const handleAddToCart = () => {
+    const handleAddToCart = () =&gt; {
         addToCart(product);
         onClose();
     };
     
     return (
         &lt;div className="modal-overlay" onClick={onClose}&gt;
-            &lt;div className="quick-view-modal" onClick={e => e.stopPropagation()}&gt;
+            &lt;div className="quick-view-modal" onClick={e =&gt; e.stopPropagation()}&gt;
                 &lt;button className="modal-close" onClick={onClose}&gt;×&lt;/button&gt;
                 
                 &lt;div className="quick-view-content"&gt;
@@ -4417,7 +4353,7 @@ export function useRecentlyViewed() {
     const [recentlyViewed, setRecentlyViewed] = useState&lt;Product[]&gt;([]);
     
     // Load from localStorage on mount
-    useEffect(() => {
+    useEffect(() =&gt; {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
             try {
@@ -4428,10 +4364,10 @@ export function useRecentlyViewed() {
         }
     }, []);
     
-    const addToRecentlyViewed = (product: Product) => {
-        setRecentlyViewed(prev => {
+    const addToRecentlyViewed = (product: Product) =&gt; {
+        setRecentlyViewed(prev =&gt; {
             // Remove if already exists
-            const filtered = prev.filter(p => p.id !== product.id);
+            const filtered = prev.filter(p =&gt; p.id !== product.id);
             // Add to beginning
             const updated = [product, ...filtered].slice(0, MAX_ITEMS);
             // Save to localStorage
@@ -4440,7 +4376,7 @@ export function useRecentlyViewed() {
         });
     };
     
-    const clearRecentlyViewed = () => {
+    const clearRecentlyViewed = () =&gt; {
         setRecentlyViewed([]);
         localStorage.removeItem(STORAGE_KEY);
     };
@@ -4474,9 +4410,9 @@ export function useDiscountCode() {
     const [appliedCode, setAppliedCode] = useState&lt;DiscountCode | null&gt;(null);
     const [error, setError] = useState&lt;string&gt;('');
     
-    const applyCode = useCallback((code: string, cartTotal: number) => {
+    const applyCode = useCallback((code: string, cartTotal: number) =&gt; {
         const discountCode = VALID_CODES.find(
-            c => c.code.toLowerCase() === code.toLowerCase()
+            c =&gt; c.code.toLowerCase() === code.toLowerCase()
         );
         
         if (!discountCode) {
@@ -4484,7 +4420,7 @@ export function useDiscountCode() {
             return false;
         }
         
-        if (discountCode.minPurchase && cartTotal < discountCode.minPurchase) {
+        if (discountCode.minPurchase &amp;&amp; cartTotal &lt; discountCode.minPurchase) {
             setError(`Minimum purchase of $${discountCode.minPurchase} required`);
             return false;
         }
@@ -4494,12 +4430,12 @@ export function useDiscountCode() {
         return true;
     }, []);
     
-    const removeCode = useCallback(() => {
+    const removeCode = useCallback(() =&gt; {
         setAppliedCode(null);
         setError('');
     }, []);
     
-    const calculateDiscount = useCallback((cartTotal: number) => {
+    const calculateDiscount = useCallback((cartTotal: number) =&gt; {
         if (!appliedCode) return 0;
         return (cartTotal * appliedCode.discount) / 100;
     }, [appliedCode]);
@@ -4585,8 +4521,8 @@ npm run type-check</code></pre>
                 <h3>What You've Learned</h3>
                 <div class="card card-accent">
                     <h4>🎓 Module 5 Mastery</h4>
-                    <p style="color: white;">You've successfully implemented all advanced hooks and patterns:</p>
-                    <ul style="color: white;">
+                    <p>You've successfully implemented all advanced hooks and patterns:</p>
+                    <ul>
                         <li><strong>useReducer:</strong> Complex state management for cart operations</li>
                         <li><strong>useContext:</strong> Global state sharing without prop drilling</li>
                         <li><strong>useRef:</strong> DOM access and mutable value storage</li>
@@ -4620,47 +4556,49 @@ npm run type-check</code></pre>
                 </div>
 
                 <h3>Key Features Implemented</h3>
-                <table style="width: 100%; border-collapse: collapse; margin: 2rem 0;">
-                    <thead>
-                        <tr style="background: var(--gray-100);">
-                            <th style="padding: 1rem; text-align: left; border: 1px solid var(--gray-300);">Feature</th>
-                            <th style="padding: 1rem; text-align: left; border: 1px solid var(--gray-300);">Technology</th>
-                            <th style="padding: 1rem; text-align: left; border: 1px solid var(--gray-300);">Benefit</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Shopping Cart</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">useReducer + Context</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Predictable state updates</td>
-                        </tr>
-                        <tr style="background: var(--gray-50);">
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Product Filtering</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">useMemo + Custom Hook</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Optimized performance</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Search</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">useDebounce Hook</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Reduced computations</td>
-                        </tr>
-                        <tr style="background: var(--gray-50);">
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Cart Persistence</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">localStorage + useEffect</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">User convenience</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Type Safety</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">TypeScript</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Fewer runtime errors</td>
-                        </tr>
-                        <tr style="background: var(--gray-50);">
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Testing</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Vitest + Testing Library</td>
-                            <td style="padding: 1rem; border: 1px solid var(--gray-300);">Confidence in changes</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Feature</th>
+                                <th>Technology</th>
+                                <th>Benefit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Shopping Cart</td>
+                                <td>useReducer + Context</td>
+                                <td>Predictable state updates</td>
+                            </tr>
+                            <tr>
+                                <td>Product Filtering</td>
+                                <td>useMemo + Custom Hook</td>
+                                <td>Optimized performance</td>
+                            </tr>
+                            <tr>
+                                <td>Search</td>
+                                <td>useDebounce Hook</td>
+                                <td>Reduced computations</td>
+                            </tr>
+                            <tr>
+                                <td>Cart Persistence</td>
+                                <td>localStorage + useEffect</td>
+                                <td>User convenience</td>
+                            </tr>
+                            <tr>
+                                <td>Type Safety</td>
+                                <td>TypeScript</td>
+                                <td>Fewer runtime errors</td>
+                            </tr>
+                            <tr>
+                                <td>Testing</td>
+                                <td>Vitest + Testing Library</td>
+                                <td>Confidence in changes</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h3>Best Practices Applied</h3>
                 <div class="card card-success">
@@ -4712,8 +4650,8 @@ npm run type-check</code></pre>
 
                 <div class="card card-accent">
                     <h4>💡 Key Takeaways</h4>
-                    <p style="color: white;">Remember these core concepts:</p>
-                    <ul style="color: white;">
+                    <p>Remember these core concepts:</p>
+                    <ul>
                         <li><strong>useReducer shines</strong> when state transitions follow predictable patterns</li>
                         <li><strong>Context + Reducer</strong> is a powerful alternative to Redux for medium apps</li>
                         <li><strong>Memoization</strong> (useMemo, useCallback) prevents performance issues</li>
@@ -4758,10 +4696,10 @@ npm run type-check</code></pre>
 
                 <p>These patterns and techniques apply to any React application you'll build in the future. You're well-equipped to tackle real-world projects!</p>
 
-                <div class="card card-accent" style="text-align: center; padding: 2rem;">
-                    <h2 style="color: white; margin: 0 0 1rem 0;">🎉 Congratulations!</h2>
-                    <p style="color: white; font-size: 1.25rem; margin: 0;">You've completed Module 5!</p>
-                    <p style="color: white; margin: 1rem 0 0 0;">You're now a master of advanced React hooks and patterns.</p>
+                <div class="card card-accent" style="text-align: center;">
+                    <h2 style="margin: 0 0 1rem 0;">🎉 Congratulations!</h2>
+                    <p style="font-size: 1.25rem; margin: 0;">You've completed Module 5!</p>
+                    <p style="margin: 1rem 0 0 0;">You're now a master of advanced React hooks and patterns.</p>
                 </div>
             </section>
 

@@ -99,7 +99,9 @@
                         <li><a href="#section6" class="toc-link">Cache Invalidation and Refetching</a></li>
                         <li><a href="#section7" class="toc-link">Optimistic Updates</a></li>
                         <li><a href="#section8" class="toc-link">Best Practices</a></li>
-                        <li><a href="#section9" class="toc-link">Summary</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-On Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Knowledge Check Quiz</a></li>
+                        <li><a href="#summary" class="toc-link">Summary</a></li>
                     </ol>
                 </nav>
             </details>
@@ -108,13 +110,13 @@
             <section id="section1" class="lesson-section">
                 <h2>🤔 Understanding Server State vs Client State</h2>
                 
-                <p>React Query solves a fundamental problem: managing server state is fundamentally different from managing client state, yet we often treat them the same way.</p>
+                <p>Here's a problem almost every React developer runs into: you fetch some data from an API, drop it in <code>useState</code>, and everything seems fine — until you realize you now have to babysit that data. Is it still fresh? Did another component already fetch it? What happens when the user switches tabs and comes back? React Query (now TanStack Query) exists because <strong>managing server state is a fundamentally different problem from managing client state</strong>, yet for years we reached for the same <code>useState</code>/<code>useEffect</code> hammer for both. Once you see the distinction, you can't unsee it — and your data-fetching code gets dramatically simpler.</p>
 
                 <h3>What is Server State?</h3>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Server state</strong> is data that lives on a remote server and is fetched over the network. It's data you don't own - it can change without your knowledge, be updated by other users, and requires synchronization between the server and your UI. <strong>React Query</strong> (now TanStack Query) is a powerful data fetching library that manages server state automatically with caching, background updates, and optimistic updates.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Server state</strong> is data that lives on a remote server and is fetched over the network. It is data you <em>don't own</em>: it can change without your knowledge, be updated by other users, and it needs continuous synchronization between the server and your UI. Think of it like a shared Google Doc — you're looking at a snapshot, but the real document lives elsewhere and other people are editing it. <strong>TanStack Query</strong> (still widely called React Query) is a library that manages this borrowed data for you, handling caching, background refresh, deduplication, and optimistic updates automatically.</p>
                 </div>
 
                 <h3>Server State vs Client State</h3>
@@ -164,17 +166,17 @@ function UserList() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState&lt;string | null&gt;(null);
   
-  useEffect(() => {
+  useEffect(() =&gt; {
     setIsLoading(true);
     setError(null);
     
     fetch('/api/users')
-      .then(res => res.json())
-      .then(data => {
+      .then(res =&gt; res.json())
+      .then(data =&gt; {
         setUsers(data);
         setIsLoading(false);
       })
-      .catch(err => {
+      .catch(err =&gt; {
         setError(err.message);
         setIsLoading(false);
       });
@@ -185,7 +187,7 @@ function UserList() {
   
   return (
     &lt;ul&gt;
-      {users.map(user => (
+      {users.map(user =&gt; (
         &lt;li key={user.id}&gt;{user.name}&lt;/li&gt;
       ))}
     &lt;/ul&gt;
@@ -215,7 +217,7 @@ import { useQuery } from '@tanstack/react-query';
 function UserList() {
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['users'],
-    queryFn: () => fetch('/api/users').then(res => res.json())
+    queryFn: () =&gt; fetch('/api/users').then(res =&gt; res.json())
   });
   
   if (isLoading) return &lt;div&gt;Loading...&lt;/div&gt;;
@@ -223,7 +225,7 @@ function UserList() {
   
   return (
     &lt;ul&gt;
-      {users.map(user => (
+      {users.map(user =&gt; (
         &lt;li key={user.id}&gt;{user.name}&lt;/li&gt;
       ))}
     &lt;/ul&gt;
@@ -250,17 +252,17 @@ function UserList() {
 
                 <div class="mermaid">
 graph TB
-    A[Need Data?] --> B{Where's it from?}
-    B -->|Server/API| C[Use React Query]
-    B -->|Local/Browser| D[Use useState/Context/Zustand]
-    
-    C --> E[Automatic caching]
-    C --> F[Background updates]
-    C --> G[Loading states]
-    
-    D --> H[Direct state control]
-    D --> I[No network overhead]
-    
+    A["Need data?"] --> B{"Where's it from?"}
+    B -->|"Server/API"| C["Use TanStack Query"]
+    B -->|"Local/Browser"| D["Use useState/Context/Zustand"]
+
+    C --> E["Automatic caching"]
+    C --> F["Background updates"]
+    C --> G["Loading states"]
+
+    D --> H["Direct state control"]
+    D --> I["No network overhead"]
+
     style C fill:#c8e6c9
     style D fill:#e3f2fd
     style A fill:#f0f0f0
@@ -315,8 +317,8 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      cacheTime: 1000 * 60 * 10, // 10 minutes
+      staleTime: 1000 * 60 * 5,  // 5 minutes
+      gcTime: 1000 * 60 * 10,    // 10 minutes (v5 renamed cacheTime -&gt; gcTime)
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       retry: 1,
@@ -326,10 +328,15 @@ export const queryClient = new QueryClient({
 
 // Explanation:
 // - staleTime: How long until data is considered stale
-// - cacheTime: How long to keep unused data in cache
-// - refetchOnWindowFocus: Refetch when user returns to window
-// - refetchOnReconnect: Refetch when internet reconnects
-// - retry: Number of retry attempts on failure</code></pre>
+// - gcTime:    How long to keep UNUSED data in cache before garbage collection
+// - refetchOnWindowFocus: Refetch when user returns to the window
+// - refetchOnReconnect:   Refetch when the internet reconnects
+// - retry:     Number of retry attempts on failure</code></pre>
+
+                <div class="card card-warning">
+                    <h4>⚠️ v5 Rename: cacheTime → gcTime</h4>
+                    <p>If you're following an older tutorial, watch out: TanStack Query v5 renamed <code>cacheTime</code> to <code>gcTime</code> (short for "garbage collection time"). The old name no longer works. The behavior is identical — it just describes the option more accurately, since it controls when <em>inactive</em> data is evicted from the cache, not how long data stays "cached and usable" in general.</p>
+                </div>
 
                 <h3>Wrapping Your App</h3>
 
@@ -515,7 +522,7 @@ function UserList() {
   
   return (
     &lt;ul&gt;
-      {data?.map(user => (
+      {data?.map(user =&gt; (
         &lt;li key={user.id}&gt;
           {user.name} - {user.email}
         &lt;/li&gt;
@@ -551,7 +558,7 @@ function UserList() {
   
   return (
     &lt;div&gt;
-      {isFetching && &lt;div&gt;Updating...&lt;/div&gt;}
+      {isFetching &amp;&amp; &lt;div&gt;Updating...&lt;/div&gt;}
       {/* Render data */}
     &lt;/div&gt;
   );
@@ -581,7 +588,7 @@ import { getUser } from '../api/users';
 function UserProfile({ userId }: { userId: string }) {
   const { data: user, isLoading, error } = useQuery({
     queryKey: ['user', userId], // Include params in key!
-    queryFn: () => getUser(userId),
+    queryFn: () =&gt; getUser(userId),
     enabled: !!userId, // Only run if userId exists
   });
   
@@ -608,8 +615,8 @@ function UserProfile({ userId }: { userId: string }) {
                     </ul>
                     <pre><code class="language-typescript">const { data: user } = useQuery({
   queryKey: ['user', userId],
-  queryFn: () => getUser(userId),
-  enabled: !!userId && hasPermission
+  queryFn: () =&gt; getUser(userId),
+  enabled: !!userId &amp;&amp; hasPermission
 });</code></pre>
                 </div>
 
@@ -635,49 +642,103 @@ const { data, error } = useQuery({
                 <pre><code class="language-typescript">const { data } = useQuery({
   queryKey: ['users'],
   queryFn: getUsers,
-  
+
   // Caching
-  staleTime: 1000 * 60 * 5,        // 5 minutes until stale
-  cacheTime: 1000 * 60 * 10,       // 10 minutes in cache (deprecated in v5, use gcTime)
-  gcTime: 1000 * 60 * 10,          // Garbage collection time (v5+)
-  
+  staleTime: 1000 * 60 * 5,           // 5 minutes until stale
+  gcTime: 1000 * 60 * 10,             // Keep unused data 10 min (was cacheTime in v4)
+
   // Refetching
-  refetchOnMount: true,             // Refetch on component mount if stale
-  refetchOnWindowFocus: true,       // Refetch when window regains focus
-  refetchOnReconnect: true,         // Refetch when internet reconnects
-  refetchInterval: false,           // Refetch every X ms (or false to disable)
-  refetchIntervalInBackground: false, // Refetch even when window not focused
-  
+  refetchOnMount: true,               // Refetch on mount if data is stale
+  refetchOnWindowFocus: true,         // Refetch when window regains focus
+  refetchOnReconnect: true,           // Refetch when internet reconnects
+  refetchInterval: false,             // Poll every X ms (or false to disable)
+  refetchIntervalInBackground: false, // Poll even when window not focused
+
   // Retry
-  retry: 3,                         // Retry failed requests 3 times
-  retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-  
+  retry: 3,                           // Retry failed requests 3 times
+  retryDelay: (attemptIndex) =&gt; Math.min(1000 * 2 ** attemptIndex, 30000),
+
   // Other
-  enabled: true,                    // Enable/disable query
-  placeholderData: [],              // Show while loading (doesn't go to cache)
-  initialData: [],                  // Initial data (goes to cache)
-  
-  // Callbacks
-  onSuccess: (data) => {
-    console.log('Query succeeded:', data);
-  },
-  onError: (error) => {
-    console.error('Query failed:', error);
-  },
-  onSettled: (data, error) => {
-    console.log('Query completed');
-  }
+  enabled: true,                      // Enable/disable the query
+  placeholderData: [],                // Show while loading (NOT written to cache)
+  initialData: [],                    // Seed data (IS written to cache),
+  select: (data) =&gt; data,             // Transform/derive data before it reaches the component
 });</code></pre>
+
+                <div class="card card-danger">
+                    <h4>❌ Gone in v5: the per-query onSuccess / onError / onSettled callbacks</h4>
+                    <p>Older tutorials pass <code>onSuccess</code>, <code>onError</code>, and <code>onSettled</code> directly to <code>useQuery</code>. <strong>TanStack Query v5 removed these callbacks from queries</strong> (they still exist on <code>useMutation</code>). The reason: with caching and background refetching, those callbacks fired inconsistently across the many components sharing a query, which caused subtle bugs. If you need a side effect when data arrives, run it in a normal <code>useEffect</code> keyed on the data, or set a global <code>onError</code> on the <code>QueryClient</code>'s <code>QueryCache</code> instead.</p>
+                </div>
+
+                <h3>Reshaping Data with <code>select</code></h3>
+
+                <p>Often a component only needs a slice of the response, or wants it transformed. The <code>select</code> option lets you derive exactly what the component needs — and React Query is smart enough to only re-render when the <em>selected</em> value changes, not the whole payload.</p>
+
+                <pre><code class="language-typescript">// Only re-renders when the COUNT changes, not on every user edit
+function UserCount() {
+  const { data: count } = useQuery({
+    queryKey: ['users'],
+    queryFn: getUsers,
+    select: (users) =&gt; users.length, // derive a number from User[]
+  });
+
+  return &lt;p&gt;{count} users online&lt;/p&gt;;
+}
+
+// Sort or map without touching the cached data
+const { data: names } = useQuery({
+  queryKey: ['users'],
+  queryFn: getUsers,
+  select: (users) =&gt; users.map(u =&gt; u.name).sort(),
+});</code></pre>
+
+                <h3>Suspense-Powered Queries with <code>useSuspenseQuery</code></h3>
+
+                <p>React 19 pairs beautifully with Suspense for data fetching. TanStack Query v5 ships a first-class <code>useSuspenseQuery</code> hook. Instead of checking <code>isLoading</code> yourself, you let a parent <code>&lt;Suspense&gt;</code> boundary show the fallback and an <code>&lt;ErrorBoundary&gt;</code> catch failures. The big win for TypeScript: because the hook <em>suspends</em> until data exists, <code>data</code> is never <code>undefined</code> — no more optional chaining everywhere.</p>
+
+                <pre><code class="language-typescript">import { useSuspenseQuery } from '@tanstack/react-query';
+import { Suspense } from 'react';
+
+function UserList() {
+  // No isLoading / error branches here — Suspense handles them.
+  const { data } = useSuspenseQuery({
+    queryKey: ['users'],
+    queryFn: getUsers,
+  });
+
+  // 'data' is User[], NOT User[] | undefined 🎉
+  return (
+    &lt;ul&gt;
+      {data.map(user =&gt; (
+        &lt;li key={user.id}&gt;{user.name}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  );
+}
+
+function Page() {
+  return (
+    &lt;Suspense fallback={&lt;div&gt;Loading users…&lt;/div&gt;}&gt;
+      &lt;UserList /&gt;
+    &lt;/Suspense&gt;
+  );
+}</code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 When to reach for <code>useSuspenseQuery</code></h4>
+                    <p>Use it when the component genuinely can't render without the data and you want clean, branch-free code. Stick with regular <code>useQuery</code> when you want to render a partial UI while data streams in, or when the query is conditional (Suspense queries can't be disabled with <code>enabled: false</code>).</p>
+                </div>
 
                 <div class="card card-success">
                     <h4>✅ Query Best Practices</h4>
                     <ul>
-                        <li>Always include all dependencies in <code>queryKey</code></li>
+                        <li>Always include every dependency of the request in the <code>queryKey</code></li>
                         <li>Keep query functions pure and predictable</li>
-                        <li>Use <code>enabled</code> for conditional fetching</li>
-                        <li>Set appropriate <code>staleTime</code> based on data volatility</li>
+                        <li>Use <code>enabled</code> for conditional and dependent fetching</li>
+                        <li>Set an appropriate <code>staleTime</code> based on how volatile the data is</li>
+                        <li>Use <code>select</code> to derive data and minimize re-renders</li>
                         <li>Extract query logic into custom hooks for reusability</li>
-                        <li>Let TypeScript infer types from your API functions</li>
+                        <li>Let TypeScript infer types from your API functions — avoid manual generics</li>
                     </ul>
                 </div>
             </section>
@@ -691,8 +752,8 @@ const { data, error } = useQuery({
                 <h3>How Query Keys Work</h3>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Query Keys</h4>
-                    <p style="color: white;">Query keys uniquely identify queries in the cache. They can be strings or arrays, and React Query compares them deeply. If two queries have the same key, they share the same cached data.</p>
+                    <h4>📖 Query Keys</h4>
+                    <p>A query key is the <strong>address</strong> of a piece of data in the cache. Keys are arrays, and React Query compares them <em>deeply and order-independently for objects</em>. Two queries with the same key share the exact same cache entry — fetch <code>['users']</code> from three components and only one network request goes out. Change any value in the key and React Query treats it as a brand-new query with its own cache slot.</p>
                 </div>
 
                 <pre><code class="language-typescript">// Simple string key
@@ -704,13 +765,13 @@ useQuery({
 // Array with parameters
 useQuery({
   queryKey: ['user', userId],
-  queryFn: () => getUser(userId)
+  queryFn: () =&gt; getUser(userId)
 });
 
 // Complex keys with multiple parameters
 useQuery({
   queryKey: ['users', { status: 'active', page: 1 }],
-  queryFn: () => getUsers({ status: 'active', page: 1 })
+  queryFn: () =&gt; getUsers({ status: 'active', page: 1 })
 });
 
 // Keys are compared deeply
@@ -747,22 +808,22 @@ export const queryKeys = {
   // Users
   users: {
     all: ['users'] as const,
-    lists: () => [...queryKeys.users.all, 'list'] as const,
-    list: (filters: string) => 
+    lists: () =&gt; [...queryKeys.users.all, 'list'] as const,
+    list: (filters: string) =&gt; 
       [...queryKeys.users.lists(), { filters }] as const,
-    details: () => [...queryKeys.users.all, 'detail'] as const,
-    detail: (id: string) => 
+    details: () =&gt; [...queryKeys.users.all, 'detail'] as const,
+    detail: (id: string) =&gt; 
       [...queryKeys.users.details(), id] as const,
   },
   
   // Posts
   posts: {
     all: ['posts'] as const,
-    lists: () => [...queryKeys.posts.all, 'list'] as const,
-    list: (filters: string) => 
+    lists: () =&gt; [...queryKeys.posts.all, 'list'] as const,
+    list: (filters: string) =&gt; 
       [...queryKeys.posts.lists(), { filters }] as const,
-    details: () => [...queryKeys.posts.all, 'detail'] as const,
-    detail: (id: string) => 
+    details: () =&gt; [...queryKeys.posts.all, 'detail'] as const,
+    detail: (id: string) =&gt; 
       [...queryKeys.posts.details(), id] as const,
   },
 };
@@ -770,12 +831,12 @@ export const queryKeys = {
 // Usage
 useQuery({
   queryKey: queryKeys.users.detail(userId),
-  queryFn: () => getUser(userId)
+  queryFn: () =&gt; getUser(userId)
 });
 
 useQuery({
   queryKey: queryKeys.posts.list('published'),
-  queryFn: () => getPosts({ status: 'published' })
+  queryFn: () =&gt; getPosts({ status: 'published' })
 });</code></pre>
 
                 <div class="card card-success">
@@ -793,17 +854,17 @@ useQuery({
 
                 <div class="mermaid">
 graph TB
-    A[Component 1 requests 'users'] --> B{In cache?}
-    B -->|No| C[Fetch from server]
-    B -->|Yes - Fresh| D[Return cached data]
-    B -->|Yes - Stale| E[Return cached + refetch]
-    
-    C --> F[Store in cache]
+    A["Component 1 requests 'users'"] --> B{"In cache?"}
+    B -->|"No"| C["Fetch from server"]
+    B -->|"Yes — fresh"| D["Return cached data"]
+    B -->|"Yes — stale"| E["Return cached, refetch in background"]
+
+    C --> F["Store in cache"]
     E --> F
-    F --> G[Update components]
-    
-    H[Component 2 requests 'users'] --> B
-    
+    F --> G["Update components"]
+
+    H["Component 2 requests 'users'"] --> B
+
     style D fill:#c8e6c9
     style E fill:#fff3cd
     style C fill:#e3f2fd
@@ -824,6 +885,22 @@ graph TB
 //       - On mount, return stale data + refetch in background
 // t=10m: Data removed from cache (garbage collected)
 //       - On mount, show loading + fetch fresh data</code></pre>
+
+                <p>That two-timer model is the single most important idea in React Query's cache. It's worth picturing the whole lifecycle of one cache entry from birth to garbage collection:</p>
+
+                <div class="mermaid">
+stateDiagram-v2
+    [*] --> Fresh: "queryFn resolves"
+    Fresh --> Stale: "staleTime elapses"
+    Stale --> Fetching: "mount / focus / invalidate"
+    Fetching --> Fresh: "new data resolves"
+    Stale --> Inactive: "no components using it"
+    Fresh --> Inactive: "no components using it"
+    Inactive --> Fetching: "reused before gcTime"
+    Inactive --> [*]: "gcTime elapses (garbage collected)"
+</div>
+
+                <p>Notice that <strong>fresh vs. stale</strong> controls <em>refetching</em>, while <strong>active vs. inactive</strong> (plus <code>gcTime</code>) controls <em>memory</em>. The two are independent: data can be stale but still cached for ages, or fresh yet about to be garbage-collected the moment the last component using it unmounts.</p>
 
                 <table>
                     <thead>
@@ -863,15 +940,17 @@ graph TB
                         <li><strong>Infinity:</strong> Static data (won't refetch until invalidated)</li>
                     </ul>
                 </div>
+            </section>
+
             <!-- Section 5: Mutations -->
-            <section id="section5">
+            <section id="section5" class="lesson-section">
                 <h2>🔧 Mutations: Updating Data</h2>
                 
                 <p>While queries are for reading data, <strong>mutations</strong> are for creating, updating, or deleting data. React Query's <code>useMutation</code> hook provides a powerful abstraction for modifying server state with automatic cache updates and optimistic UI patterns.</p>
 
                 <div class="card card-accent">
                     <h4>📖 Definition</h4>
-                    <p style="color: white;"><strong>Mutation:</strong> A side effect that changes data on the server (POST, PUT, PATCH, DELETE requests). Mutations trigger cache invalidation and refetching to keep data synchronized.</p>
+                    <p><strong>Mutation:</strong> A side effect that changes data on the server (POST, PUT, PATCH, DELETE requests). Where a query is a question ("what are the users?"), a mutation is a command ("create this user"). Mutations don't run automatically — you fire them explicitly with <code>mutate()</code> — and afterward you tell React Query which cached queries to invalidate so the UI resynchronizes with the server.</p>
                 </div>
 
                 <h3>Basic Mutation Example</h3>
@@ -891,7 +970,7 @@ interface User {
 }
 
 // API function
-const createUser = async (userData: CreateUserData): Promise&lt;User&gt; => {
+const createUser = async (userData: CreateUserData): Promise&lt;User&gt; =&gt; {
   const response = await fetch('/api/users', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -911,17 +990,17 @@ function CreateUserForm() {
   
   const mutation = useMutation({
     mutationFn: createUser,
-    onSuccess: (data) => {
+    onSuccess: (data) =&gt; {
       // Invalidate and refetch users list
       queryClient.invalidateQueries({ queryKey: ['users'] });
       console.log('User created:', data);
     },
-    onError: (error) => {
+    onError: (error) =&gt; {
       console.error('Error creating user:', error);
     }
   });
 
-  const handleSubmit = (e: React.FormEvent&lt;HTMLFormElement&gt;) => {
+  const handleSubmit = (e: React.FormEvent&lt;HTMLFormElement&gt;) =&gt; {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
@@ -943,13 +1022,13 @@ function CreateUserForm() {
         {mutation.isPending ? 'Creating...' : 'Create User'}
       &lt;/button&gt;
       
-      {mutation.isError && (
+      {mutation.isError &amp;&amp; (
         &lt;div className="error"&gt;
           Error: {mutation.error.message}
         &lt;/div&gt;
       )}
       
-      {mutation.isSuccess && (
+      {mutation.isSuccess &amp;&amp; (
         &lt;div className="success"&gt;
           User created successfully!
         &lt;/div&gt;
@@ -996,8 +1075,8 @@ mutation.mutate(userData);
 
 // Or use async version with Promise
 mutation.mutateAsync(userData)
-  .then(data => console.log('Success:', data))
-  .catch(error => console.error('Error:', error));</code></pre>
+  .then(data =&gt; console.log('Success:', data))
+  .catch(error =&gt; console.error('Error:', error));</code></pre>
 
                 <h3>Update and Delete Mutations</h3>
 
@@ -1005,7 +1084,7 @@ mutation.mutateAsync(userData)
 const updateUser = async ({ id, data }: { 
   id: string; 
   data: Partial&lt;User&gt; 
-}): Promise&lt;User&gt; => {
+}): Promise&lt;User&gt; =&gt; {
   const response = await fetch(`/api/users/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -1016,7 +1095,7 @@ const updateUser = async ({ id, data }: {
 
 const updateMutation = useMutation({
   mutationFn: updateUser,
-  onSuccess: (data, variables) => {
+  onSuccess: (data, variables) =&gt; {
     // Invalidate specific user and list
     queryClient.invalidateQueries({ queryKey: ['users'] });
     queryClient.invalidateQueries({ queryKey: ['users', variables.id] });
@@ -1024,7 +1103,7 @@ const updateMutation = useMutation({
 });
 
 // Delete mutation
-const deleteUser = async (userId: string): Promise&lt;void&gt; => {
+const deleteUser = async (userId: string): Promise&lt;void&gt; =&gt; {
   await fetch(`/api/users/${userId}`, {
     method: 'DELETE'
   });
@@ -1032,23 +1111,23 @@ const deleteUser = async (userId: string): Promise&lt;void&gt; => {
 
 const deleteMutation = useMutation({
   mutationFn: deleteUser,
-  onSuccess: (_, deletedId) => {
+  onSuccess: (_, deletedId) =&gt; {
     // Remove from cache
-    queryClient.setQueryData&lt;User[]&gt;(['users'], (old) => 
-      old?.filter(user => user.id !== deletedId)
+    queryClient.setQueryData&lt;User[]&gt;(['users'], (old) =&gt; 
+      old?.filter(user =&gt; user.id !== deletedId)
     );
   }
 });
 
 // Usage
-&lt;button onClick={() => updateMutation.mutate({ 
+&lt;button onClick={() =&gt; updateMutation.mutate({ 
   id: user.id, 
   data: { name: 'New Name' } 
 })}&gt;
   Update
 &lt;/button&gt;
 
-&lt;button onClick={() => deleteMutation.mutate(user.id)}&gt;
+&lt;button onClick={() =&gt; deleteMutation.mutate(user.id)}&gt;
   Delete
 &lt;/button&gt;</code></pre>
 
@@ -1069,23 +1148,23 @@ const deleteMutation = useMutation({
                 <pre><code class="language-typescript">// Access mutation variables in callbacks
 const mutation = useMutation({
   mutationFn: createUser,
-  onMutate: async (variables) => {
+  onMutate: async (variables) =&gt; {
     // Called before mutation function
     console.log('About to create:', variables);
     
     // Can return context for rollback
     return { timestamp: Date.now() };
   },
-  onSuccess: (data, variables, context) => {
+  onSuccess: (data, variables, context) =&gt; {
     console.log('Created:', data);
     console.log('With input:', variables);
     console.log('Context:', context);
   },
-  onError: (error, variables, context) => {
+  onError: (error, variables, context) =&gt; {
     console.error('Failed to create:', variables);
     console.log('Rollback context:', context);
   },
-  onSettled: (data, error, variables, context) => {
+  onSettled: (data, error, variables, context) =&gt; {
     // Called whether success or error
     console.log('Mutation finished');
   }
@@ -1100,7 +1179,7 @@ const mutation = useMutation({
             </section>
 
             <!-- Section 6: Cache Invalidation and Refetching -->
-            <section id="section6">
+            <section id="section6" class="lesson-section">
                 <h2>🔄 Cache Invalidation and Refetching</h2>
                 
                 <p>One of React Query's superpowers is intelligent cache management. Understanding when and how to invalidate queries ensures your UI always displays the most current data without unnecessary network requests.</p>
@@ -1125,8 +1204,8 @@ function MyComponent() {
 
   // 3. Invalidate with predicate function
   queryClient.invalidateQueries({
-    predicate: (query) => {
-      return query.queryKey[0] === 'users' && 
+    predicate: (query) =&gt; {
+      return query.queryKey[0] === 'users' &amp;&amp; 
              query.state.data !== undefined;
     }
   });
@@ -1167,7 +1246,7 @@ graph TB
                 <pre><code class="language-typescript">function UserProfile({ userId }: { userId: string }) {
   const { data, refetch, isRefetching } = useQuery({
     queryKey: ['users', userId],
-    queryFn: () => getUser(userId)
+    queryFn: () =&gt; getUser(userId)
   });
 
   return (
@@ -1175,7 +1254,7 @@ graph TB
       &lt;h2&gt;{data?.name}&lt;/h2&gt;
       
       &lt;button 
-        onClick={() => refetch()}
+        onClick={() =&gt; refetch()}
         disabled={isRefetching}
       &gt;
         {isRefetching ? 'Refreshing...' : 'Refresh'}
@@ -1208,7 +1287,7 @@ queryClient.setQueryData&lt;User&gt;(['users', '123'], {
 });
 
 // 2. Update data with function (merge)
-queryClient.setQueryData&lt;User&gt;(['users', '123'], (oldData) => {
+queryClient.setQueryData&lt;User&gt;(['users', '123'], (oldData) =&gt; {
   if (!oldData) return oldData;
   return { ...oldData, name: 'Updated Name' };
 });
@@ -1216,9 +1295,9 @@ queryClient.setQueryData&lt;User&gt;(['users', '123'], (oldData) => {
 // 3. Update list after creating item
 const createMutation = useMutation({
   mutationFn: createUser,
-  onSuccess: (newUser) => {
+  onSuccess: (newUser) =&gt; {
     // Add new user to cached list
-    queryClient.setQueryData&lt;User[]&gt;(['users'], (old) => {
+    queryClient.setQueryData&lt;User[]&gt;(['users'], (old) =&gt; {
       return old ? [...old, newUser] : [newUser];
     });
   }
@@ -1227,10 +1306,10 @@ const createMutation = useMutation({
 // 4. Update list after deleting item
 const deleteMutation = useMutation({
   mutationFn: deleteUser,
-  onSuccess: (_, deletedId) => {
+  onSuccess: (_, deletedId) =&gt; {
     // Remove user from cached list
-    queryClient.setQueryData&lt;User[]&gt;(['users'], (old) => {
-      return old?.filter(user => user.id !== deletedId);
+    queryClient.setQueryData&lt;User[]&gt;(['users'], (old) =&gt; {
+      return old?.filter(user =&gt; user.id !== deletedId);
     });
   }
 });</code></pre>
@@ -1277,7 +1356,7 @@ queryClient.removeQueries({ queryKey: ['users'] });
 queryClient.clear();
 
 // Example: Clear user data on logout
-const logout = () => {
+const logout = () =&gt; {
   // Clear all user-related queries
   queryClient.removeQueries({ queryKey: ['users'] });
   queryClient.removeQueries({ queryKey: ['profile'] });
@@ -1305,14 +1384,14 @@ queryClient.invalidateQueries({ queryKey: ['users', userId] });</code></pre>
             </section>
 
             <!-- Section 7: Optimistic Updates -->
-            <section id="section7">
+            <section id="section7" class="lesson-section">
                 <h2>⚡ Optimistic Updates</h2>
                 
                 <p><strong>Optimistic updates</strong> make your app feel instant by updating the UI immediately, before waiting for the server response. If the server request fails, React Query automatically rolls back to the previous state.</p>
 
                 <div class="card card-accent">
                     <h4>📖 Definition</h4>
-                    <p style="color: white;"><strong>Optimistic Update:</strong> Updating the UI immediately based on the expected result of an operation, before receiving server confirmation. Provides instant feedback and makes apps feel faster.</p>
+                    <p><strong>Optimistic Update:</strong> Updating the UI immediately based on the <em>expected</em> result of an operation, before the server confirms it. You're betting the request will succeed — and since it almost always does, the app feels instant. If the bet loses, React Query rolls the cache back to the snapshot you saved. Think of a "like" button that fills in the instant you tap it, long before the network round-trip finishes.</p>
                 </div>
 
                 <div class="mermaid">
@@ -1345,7 +1424,7 @@ sequenceDiagram
   completed: boolean;
 }
 
-const toggleTodo = async (id: string): Promise&lt;Todo&gt; => {
+const toggleTodo = async (id: string): Promise&lt;Todo&gt; =&gt; {
   const response = await fetch(`/api/todos/${id}/toggle`, {
     method: 'PATCH'
   });
@@ -1359,7 +1438,7 @@ function TodoList() {
     mutationFn: toggleTodo,
     
     // Before mutation starts
-    onMutate: async (todoId) => {
+    onMutate: async (todoId) =&gt; {
       // Cancel outgoing refetches (so they don't overwrite optimistic update)
       await queryClient.cancelQueries({ queryKey: ['todos'] });
 
@@ -1367,8 +1446,8 @@ function TodoList() {
       const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
 
       // Optimistically update the cache
-      queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) => {
-        return old?.map(todo =>
+      queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) =&gt; {
+        return old?.map(todo =&gt;
           todo.id === todoId
             ? { ...todo, completed: !todo.completed }
             : todo
@@ -1380,25 +1459,25 @@ function TodoList() {
     },
     
     // On error, rollback
-    onError: (error, variables, context) => {
+    onError: (error, variables, context) =&gt; {
       queryClient.setQueryData(['todos'], context?.previousTodos);
       alert('Failed to update todo. Please try again.');
     },
     
     // Always refetch after error or success
-    onSettled: () => {
+    onSettled: () =&gt; {
       queryClient.invalidateQueries({ queryKey: ['todos'] });
     }
   });
 
   return (
     &lt;ul&gt;
-      {todos?.map(todo => (
+      {todos?.map(todo =&gt; (
         &lt;li key={todo.id}&gt;
           &lt;input
             type="checkbox"
             checked={todo.completed}
-            onChange={() => toggleMutation.mutate(todo.id)}
+            onChange={() =&gt; toggleMutation.mutate(todo.id)}
           /&gt;
           {todo.title}
         &lt;/li&gt;
@@ -1409,7 +1488,7 @@ function TodoList() {
 
                 <h3>Optimistic Create</h3>
 
-                <pre><code class="language-typescript">const createTodo = async (newTodo: { title: string }): Promise&lt;Todo&gt; => {
+                <pre><code class="language-typescript">const createTodo = async (newTodo: { title: string }): Promise&lt;Todo&gt; =&gt; {
   const response = await fetch('/api/todos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1421,7 +1500,7 @@ function TodoList() {
 const createMutation = useMutation({
   mutationFn: createTodo,
   
-  onMutate: async (newTodo) => {
+  onMutate: async (newTodo) =&gt; {
     await queryClient.cancelQueries({ queryKey: ['todos'] });
     
     const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
@@ -1434,60 +1513,60 @@ const createMutation = useMutation({
     };
     
     // Add optimistic todo to cache
-    queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) => {
+    queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) =&gt; {
       return old ? [...old, optimisticTodo] : [optimisticTodo];
     });
     
     return { previousTodos, optimisticTodo };
   },
   
-  onSuccess: (newTodo, variables, context) => {
+  onSuccess: (newTodo, variables, context) =&gt; {
     // Replace temp todo with real one from server
-    queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) => {
-      return old?.map(todo => 
+    queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) =&gt; {
+      return old?.map(todo =&gt; 
         todo.id === context.optimisticTodo.id ? newTodo : todo
       );
     });
   },
   
-  onError: (error, variables, context) => {
+  onError: (error, variables, context) =&gt; {
     queryClient.setQueryData(['todos'], context?.previousTodos);
   },
   
-  onSettled: () => {
+  onSettled: () =&gt; {
     queryClient.invalidateQueries({ queryKey: ['todos'] });
   }
 });</code></pre>
 
                 <h3>Optimistic Delete</h3>
 
-                <pre><code class="language-typescript">const deleteTodo = async (id: string): Promise&lt;void&gt; => {
+                <pre><code class="language-typescript">const deleteTodo = async (id: string): Promise&lt;void&gt; =&gt; {
   await fetch(`/api/todos/${id}`, { method: 'DELETE' });
 };
 
 const deleteMutation = useMutation({
   mutationFn: deleteTodo,
   
-  onMutate: async (todoId) => {
+  onMutate: async (todoId) =&gt; {
     await queryClient.cancelQueries({ queryKey: ['todos'] });
     
     const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
     
     // Remove todo optimistically
-    queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) => {
-      return old?.filter(todo => todo.id !== todoId);
+    queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old) =&gt; {
+      return old?.filter(todo =&gt; todo.id !== todoId);
     });
     
     return { previousTodos };
   },
   
-  onError: (error, variables, context) => {
+  onError: (error, variables, context) =&gt; {
     // Restore deleted todo on error
     queryClient.setQueryData(['todos'], context?.previousTodos);
     alert('Failed to delete todo');
   },
   
-  onSettled: () => {
+  onSettled: () =&gt; {
     queryClient.invalidateQueries({ queryKey: ['todos'] });
   }
 });</code></pre>
@@ -1519,7 +1598,7 @@ const toggleLike = async ({
 }: { 
   postId: string; 
   userId: string 
-}): Promise&lt;Post&gt; => {
+}): Promise&lt;Post&gt; =&gt; {
   const response = await fetch(`/api/posts/${postId}/like`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1535,12 +1614,12 @@ function LikeButton({ post, userId }: { post: Post; userId: string }) {
   const likeMutation = useMutation({
     mutationFn: toggleLike,
     
-    onMutate: async ({ postId, userId }) => {
+    onMutate: async ({ postId, userId }) =&gt; {
       await queryClient.cancelQueries({ queryKey: ['posts', postId] });
       
       const previousPost = queryClient.getQueryData&lt;Post&gt;(['posts', postId]);
       
-      queryClient.setQueryData&lt;Post&gt;(['posts', postId], (old) => {
+      queryClient.setQueryData&lt;Post&gt;(['posts', postId], (old) =&gt; {
         if (!old) return old;
         
         const isCurrentlyLiked = old.likedBy.includes(userId);
@@ -1549,7 +1628,7 @@ function LikeButton({ post, userId }: { post: Post; userId: string }) {
           ...old,
           likes: isCurrentlyLiked ? old.likes - 1 : old.likes + 1,
           likedBy: isCurrentlyLiked
-            ? old.likedBy.filter(id => id !== userId)
+            ? old.likedBy.filter(id =&gt; id !== userId)
             : [...old.likedBy, userId]
         };
       });
@@ -1557,20 +1636,20 @@ function LikeButton({ post, userId }: { post: Post; userId: string }) {
       return { previousPost };
     },
     
-    onError: (error, variables, context) => {
+    onError: (error, variables, context) =&gt; {
       if (context?.previousPost) {
         queryClient.setQueryData(['posts', variables.postId], context.previousPost);
       }
     },
     
-    onSettled: (data, error, variables) => {
+    onSettled: (data, error, variables) =&gt; {
       queryClient.invalidateQueries({ queryKey: ['posts', variables.postId] });
     }
   });
 
   return (
     &lt;button
-      onClick={() => likeMutation.mutate({ postId: post.id, userId })}
+      onClick={() =&gt; likeMutation.mutate({ postId: post.id, userId })}
       disabled={likeMutation.isPending}
       style={{
         color: isLiked ? 'red' : 'gray',
@@ -1596,7 +1675,7 @@ function LikeButton({ post, userId }: { post: Post; userId: string }) {
             </section>
 
             <!-- Section 8: Best Practices -->
-            <section id="section8">
+            <section id="section8" class="lesson-section">
                 <h2>🎯 Best Practices and Patterns</h2>
                 
                 <p>After mastering the basics of React Query, following these best practices will help you build maintainable, performant applications that leverage React Query's full power.</p>
@@ -1611,19 +1690,19 @@ export interface User {
 }
 
 export const usersApi = {
-  getAll: async (): Promise&lt;User[]&gt; => {
+  getAll: async (): Promise&lt;User[]&gt; =&gt; {
     const response = await fetch('/api/users');
     if (!response.ok) throw new Error('Failed to fetch users');
     return response.json();
   },
   
-  getById: async (id: string): Promise&lt;User&gt; => {
+  getById: async (id: string): Promise&lt;User&gt; =&gt; {
     const response = await fetch(`/api/users/${id}`);
     if (!response.ok) throw new Error('Failed to fetch user');
     return response.json();
   },
   
-  create: async (data: Omit&lt;User, 'id'&gt;): Promise&lt;User&gt; => {
+  create: async (data: Omit&lt;User, 'id'&gt;): Promise&lt;User&gt; =&gt; {
     const response = await fetch('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1633,7 +1712,7 @@ export const usersApi = {
     return response.json();
   },
   
-  update: async ({ id, data }: { id: string; data: Partial&lt;User&gt; }): Promise&lt;User&gt; => {
+  update: async ({ id, data }: { id: string; data: Partial&lt;User&gt; }): Promise&lt;User&gt; =&gt; {
     const response = await fetch(`/api/users/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -1643,7 +1722,7 @@ export const usersApi = {
     return response.json();
   },
   
-  delete: async (id: string): Promise&lt;void&gt; => {
+  delete: async (id: string): Promise&lt;void&gt; =&gt; {
     const response = await fetch(`/api/users/${id}`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Failed to delete user');
   }
@@ -1658,10 +1737,10 @@ import { usersApi, User } from '../api/users';
 // Query keys factory
 export const userKeys = {
   all: ['users'] as const,
-  lists: () => [...userKeys.all, 'list'] as const,
-  list: (filters: string) => [...userKeys.lists(), { filters }] as const,
-  details: () => [...userKeys.all, 'detail'] as const,
-  detail: (id: string) => [...userKeys.details(), id] as const,
+  lists: () =&gt; [...userKeys.all, 'list'] as const,
+  list: (filters: string) =&gt; [...userKeys.lists(), { filters }] as const,
+  details: () =&gt; [...userKeys.all, 'detail'] as const,
+  detail: (id: string) =&gt; [...userKeys.details(), id] as const,
 };
 
 // Get all users
@@ -1677,7 +1756,7 @@ export function useUsers() {
 export function useUser(id: string) {
   return useQuery({
     queryKey: userKeys.detail(id),
-    queryFn: () => usersApi.getById(id),
+    queryFn: () =&gt; usersApi.getById(id),
     staleTime: 1000 * 60 * 5,
   });
 }
@@ -1688,9 +1767,9 @@ export function useCreateUser() {
   
   return useMutation({
     mutationFn: usersApi.create,
-    onSuccess: (newUser) => {
+    onSuccess: (newUser) =&gt; {
       // Optimistically add to list
-      queryClient.setQueryData&lt;User[]&gt;(userKeys.lists(), (old) => {
+      queryClient.setQueryData&lt;User[]&gt;(userKeys.lists(), (old) =&gt; {
         return old ? [...old, newUser] : [newUser];
       });
       // Invalidate to refetch from server
@@ -1705,7 +1784,7 @@ export function useUpdateUser() {
   
   return useMutation({
     mutationFn: usersApi.update,
-    onSuccess: (updatedUser) => {
+    onSuccess: (updatedUser) =&gt; {
       // Update specific user cache
       queryClient.setQueryData(
         userKeys.detail(updatedUser.id),
@@ -1723,10 +1802,10 @@ export function useDeleteUser() {
   
   return useMutation({
     mutationFn: usersApi.delete,
-    onSuccess: (_, deletedId) => {
+    onSuccess: (_, deletedId) =&gt; {
       // Remove from list cache
-      queryClient.setQueryData&lt;User[]&gt;(userKeys.lists(), (old) => {
-        return old?.filter(user => user.id !== deletedId);
+      queryClient.setQueryData&lt;User[]&gt;(userKeys.lists(), (old) =&gt; {
+        return old?.filter(user =&gt; user.id !== deletedId);
       });
       // Remove detail cache
       queryClient.removeQueries({ queryKey: userKeys.detail(deletedId) });
@@ -1749,12 +1828,12 @@ const queryClient = new QueryClient({
       refetchOnWindowFocus: false,     // Don't refetch on tab focus
       refetchOnReconnect: true,        // Refetch on network reconnect
       retry: 1,                        // Retry failed requests once
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      retryDelay: (attemptIndex) =&gt; Math.min(1000 * 2 ** attemptIndex, 30000),
     },
     mutations: {
       // Global defaults for ALL mutations
       retry: 0,                        // Don't retry mutations
-      onError: (error) => {
+      onError: (error) =&gt; {
         console.error('Mutation error:', error);
         // Show global error toast
       },
@@ -1790,7 +1869,7 @@ async function fetchApi&lt;T&gt;(url: string, options?: RequestInit): Promise&lt
   const response = await fetch(url, options);
   
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    const errorData = await response.json().catch(() =&gt; ({}));
     throw new ApiError(
       errorData.message || 'Request failed',
       response.status,
@@ -1805,7 +1884,7 @@ async function fetchApi&lt;T&gt;(url: string, options?: RequestInit): Promise&lt
 function UserProfile({ userId }: { userId: string }) {
   const { data, error, isError } = useQuery({
     queryKey: ['users', userId],
-    queryFn: () => fetchApi&lt;User&gt;(`/api/users/${userId}`)
+    queryFn: () =&gt; fetchApi&lt;User&gt;(`/api/users/${userId}`)
   });
 
   if (isError) {
@@ -1832,20 +1911,20 @@ function UserList() {
   const { data: users } = useUsers();
 
   // Prefetch user details on hover
-  const prefetchUser = (userId: string) => {
+  const prefetchUser = (userId: string) =&gt; {
     queryClient.prefetchQuery({
       queryKey: userKeys.detail(userId),
-      queryFn: () => usersApi.getById(userId),
+      queryFn: () =&gt; usersApi.getById(userId),
       staleTime: 1000 * 60 * 5,
     });
   };
 
   return (
     &lt;ul&gt;
-      {users?.map(user => (
+      {users?.map(user =&gt; (
         &lt;li
           key={user.id}
-          onMouseEnter={() => prefetchUser(user.id)}
+          onMouseEnter={() =&gt; prefetchUser(user.id)}
         &gt;
           &lt;Link to={`/users/${user.id}`}&gt;{user.name}&lt;/Link&gt;
         &lt;/li&gt;
@@ -1859,11 +1938,11 @@ function UserDetailPage() {
   const { userId } = useParams();
   const queryClient = useQueryClient();
   
-  useEffect(() => {
+  useEffect(() =&gt; {
     // Prefetch related data
     queryClient.prefetchQuery({
       queryKey: ['posts', userId],
-      queryFn: () => getPostsByUser(userId!)
+      queryFn: () =&gt; getPostsByUser(userId!)
     });
   }, [userId, queryClient]);
   
@@ -1895,13 +1974,13 @@ function UserPosts({ userId }: { userId: string }) {
   // First query
   const { data: user } = useQuery({
     queryKey: ['users', userId],
-    queryFn: () => getUser(userId)
+    queryFn: () =&gt; getUser(userId)
   });
 
   // Second query depends on first
   const { data: posts } = useQuery({
     queryKey: ['posts', user?.id],
-    queryFn: () => getPosts(user!.id),
+    queryFn: () =&gt; getPosts(user!.id),
     enabled: !!user, // Only run when user exists
   });
 
@@ -1917,17 +1996,17 @@ function Dashboard() {
     queries: [
       {
         queryKey: ['posts', user?.id],
-        queryFn: () => getPosts(user!.id),
+        queryFn: () =&gt; getPosts(user!.id),
         enabled: !!user,
       },
       {
         queryKey: ['comments', user?.id],
-        queryFn: () => getComments(user!.id),
+        queryFn: () =&gt; getComments(user!.id),
         enabled: !!user,
       },
       {
         queryKey: ['likes', user?.id],
-        queryFn: () => getLikes(user!.id),
+        queryFn: () =&gt; getLikes(user!.id),
         enabled: !!user,
       },
     ],
@@ -1935,7 +2014,7 @@ function Dashboard() {
 
   const [postsQuery, commentsQuery, likesQuery] = queries;
 
-  if (queries.some(q => q.isLoading)) {
+  if (queries.some(q =&gt; q.isLoading)) {
     return &lt;div&gt;Loading...&lt;/div&gt;;
   }
 
@@ -1984,12 +2063,12 @@ export interface Post {
 
 // api/posts.ts
 export const postsApi = {
-  getAll: async (): Promise&lt;Post[]&gt; => { /* ... */ },
-  getById: async (id: string): Promise&lt;Post&gt; => { /* ... */ },
-  create: async (data: Omit&lt;Post, 'id' | 'createdAt'&gt;): Promise&lt;Post&gt; => { /* ... */ },
-  update: async (id: string, data: Partial&lt;Post&gt;): Promise&lt;Post&gt; => { /* ... */ },
-  delete: async (id: string): Promise&lt;void&gt; => { /* ... */ },
-  like: async (id: string): Promise&lt;Post&gt; => { /* ... */ }
+  getAll: async (): Promise&lt;Post[]&gt; =&gt; { /* ... */ },
+  getById: async (id: string): Promise&lt;Post&gt; =&gt; { /* ... */ },
+  create: async (data: Omit&lt;Post, 'id' | 'createdAt'&gt;): Promise&lt;Post&gt; =&gt; { /* ... */ },
+  update: async (id: string, data: Partial&lt;Post&gt;): Promise&lt;Post&gt; =&gt; { /* ... */ },
+  delete: async (id: string): Promise&lt;void&gt; =&gt; { /* ... */ },
+  like: async (id: string): Promise&lt;Post&gt; =&gt; { /* ... */ }
 };</code></pre>
                     </details>
 
@@ -1998,9 +2077,9 @@ export const postsApi = {
                         <pre><code class="language-typescript">// hooks/usePosts.ts
 export const postKeys = {
   all: ['posts'] as const,
-  lists: () => [...postKeys.all, 'list'] as const,
-  details: () => [...postKeys.all, 'detail'] as const,
-  detail: (id: string) => [...postKeys.details(), id] as const,
+  lists: () =&gt; [...postKeys.all, 'list'] as const,
+  details: () =&gt; [...postKeys.all, 'detail'] as const,
+  detail: (id: string) =&gt; [...postKeys.details(), id] as const,
 };
 
 export function usePosts() {
@@ -2014,7 +2093,7 @@ export function useCreatePost() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: postsApi.create,
-    onSuccess: () => {
+    onSuccess: () =&gt; {
       queryClient.invalidateQueries({ queryKey: postKeys.lists() });
     }
   });
@@ -2047,17 +2126,17 @@ export function useCreatePost() {
                     <details>
                         <summary>💡 Hint: Optimistic Cart Update</summary>
                         <pre><code class="language-typescript">const addToCartMutation = useMutation({
-  mutationFn: (productId: string) => addToCart(productId),
+  mutationFn: (productId: string) =&gt; addToCart(productId),
   
-  onMutate: async (productId) => {
+  onMutate: async (productId) =&gt; {
     await queryClient.cancelQueries({ queryKey: ['cart'] });
     
     const previousCart = queryClient.getQueryData&lt;CartItem[]&gt;(['cart']);
     
-    queryClient.setQueryData&lt;CartItem[]&gt;(['cart'], (old) => {
-      const existing = old?.find(item => item.productId === productId);
+    queryClient.setQueryData&lt;CartItem[]&gt;(['cart'], (old) =&gt; {
+      const existing = old?.find(item =&gt; item.productId === productId);
       if (existing) {
-        return old?.map(item =>
+        return old?.map(item =&gt;
           item.productId === productId
             ? { ...item, quantity: item.quantity + 1 }
             : item
@@ -2069,11 +2148,11 @@ export function useCreatePost() {
     return { previousCart };
   },
   
-  onError: (err, variables, context) => {
+  onError: (err, variables, context) =&gt; {
     queryClient.setQueryData(['cart'], context?.previousCart);
   },
   
-  onSettled: () => {
+  onSettled: () =&gt; {
     queryClient.invalidateQueries({ queryKey: ['cart'] });
   }
 });</code></pre>
@@ -2108,7 +2187,7 @@ interface PostsResponse {
   nextCursor: string | null;
 }
 
-const fetchPosts = async ({ pageParam }: { pageParam: string | undefined }): Promise&lt;PostsResponse&gt; => {
+const fetchPosts = async ({ pageParam }: { pageParam: string | undefined }): Promise&lt;PostsResponse&gt; =&gt; {
   const url = pageParam 
     ? `/api/posts?cursor=${pageParam}`
     : '/api/posts';
@@ -2127,21 +2206,21 @@ function InfinitePostList() {
     queryKey: ['posts', 'infinite'],
     queryFn: fetchPosts,
     initialPageParam: undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) =&gt; lastPage.nextCursor,
   });
 
   return (
     &lt;div&gt;
-      {data?.pages.map((page, i) => (
+      {data?.pages.map((page, i) =&gt; (
         &lt;div key={i}&gt;
-          {page.posts.map(post => (
+          {page.posts.map(post =&gt; (
             &lt;div key={post.id}&gt;{post.title}&lt;/div&gt;
           ))}
         &lt;/div&gt;
       ))}
       
-      {hasNextPage && (
-        &lt;button onClick={() => fetchNextPage()}&gt;
+      {hasNextPage &amp;&amp; (
+        &lt;button onClick={() =&gt; fetchNextPage()}&gt;
           {isFetchingNextPage ? 'Loading...' : 'Load More'}
         &lt;/button&gt;
       )}
@@ -2303,8 +2382,8 @@ function InfinitePostList() {
                 </div>
 
                 <div class="card card-accent">
-                    <h3 style="color: white;">🎯 Key Takeaways</h3>
-                    <ol style="color: white;">
+                    <h3>🎯 Key Takeaways</h3>
+                    <ol>
                         <li><strong>React Query is for server state:</strong> Use it for data from APIs, not UI state</li>
                         <li><strong>Queries auto-cache and refetch:</strong> No manual cache management needed</li>
                         <li><strong>Mutations update server state:</strong> Always invalidate affected queries</li>

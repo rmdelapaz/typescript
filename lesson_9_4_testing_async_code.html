@@ -62,7 +62,7 @@
                 <p class="lead">Master the art of testing asynchronous operations in React applications. Learn to test data fetching, API calls, loading states, error handling, race conditions, and advanced async patterns with confidence.</p>
                 
                 <!-- Learning objectives -->
-                <div class="card">
+                <div class="card card-info">
                     <h2>🎯 Learning Objectives</h2>
                     <p>By the end of this lesson, you will be able to:</p>
                     <ul>
@@ -107,25 +107,25 @@
             <section id="introduction" class="lesson-section">
                 <h2>📖 Understanding Async Testing</h2>
                 
-                <p>Asynchronous code is everywhere in modern React applications—data fetching, API calls, animations, timers, and more. Testing async code is challenging because you need to wait for operations to complete before asserting on results.</p>
+                <p>Asynchronous code is everywhere in modern React applications — data fetching, API calls, animations, timers, and more. Testing it is uniquely tricky because the thing you want to assert on doesn't exist <em>yet</em>. Picture ordering a coffee: you don't check for your latte the instant you hand over your card — you wait for the barista to call your name. Test the async version too eagerly and you'll "check the counter" while the machine is still brewing, see nothing, and wrongly conclude the order failed. The whole craft of async testing is learning to wait for the right signal instead of guessing.</p>
 
                 <div class="card card-accent">
                     <h4>📖 What is Async Testing?</h4>
-                    <p style="color: white;"><strong>Async testing</strong> involves testing code that doesn't execute immediately. This includes network requests, setTimeout/setInterval, Promises, async/await, and any operation where results aren't available synchronously.</p>
+                    <p><strong>Async testing</strong> means testing code whose result isn't available on the same tick it was requested. That covers network requests, <code>setTimeout</code>/<code>setInterval</code>, Promises, <code>async</code>/<code>await</code>, and anything that resolves later. The key skill is telling the test to <em>pause</em> until the UI reflects the finished operation — then assert.</p>
                 </div>
 
                 <h3>The Challenge with Async Code</h3>
-                <p>Consider this component that fetches user data:</p>
+                <p>Consider this component that fetches user data. It starts in a loading state, then swaps in the real data once the network resolves:</p>
 
                 <pre><code class="language-typescript">
 function UserProfile({ userId }: { userId: string }) {
   const [user, setUser] = React.useState&lt;User | null&gt;(null);
   const [loading, setLoading] = React.useState(true);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     fetch(`/api/users/${userId}`)
-      .then(res => res.json())
-      .then(data => {
+      .then(res =&gt; res.json())
+      .then(data =&gt; {
         setUser(data);
         setLoading(false);
       });
@@ -136,11 +136,11 @@ function UserProfile({ userId }: { userId: string }) {
 }
                 </code></pre>
 
-                <p>If we test this synchronously, we'll only see the loading state:</p>
+                <p>Here's the trap. If we test this synchronously — asserting the moment after <code>render</code> — we're inspecting the component during that very first "Loading..." tick, before React has even kicked off the fetch, let alone received a response:</p>
 
                 <pre><code class="language-typescript">
 // ❌ This test fails - doesn't wait for async operation
-test('displays user name', () => {
+test('displays user name', () =&gt; {
   render(&lt;UserProfile userId="123" /&gt;);
   
   // This fails - user data hasn't loaded yet!
@@ -154,7 +154,7 @@ test('displays user name', () => {
                     A[Render Component] --> B[Initial State: Loading]
                     B --> C[Async Operation Starts]
                     C --> D[Wait for Operation]
-                    D --> E{Success?}
+                    D --> E{"Success?"}
                     E -->|Yes| F[Update State: Data]
                     E -->|No| G[Update State: Error]
                     F --> H[Component Rerenders]
@@ -216,7 +216,7 @@ test('displays user name', () => {
             <section id="basic-async" class="lesson-section">
                 <h2>🌐 Testing Basic Data Fetching</h2>
                 
-                <p>Let's start with the fundamentals of testing components that fetch data.</p>
+                <p>Let's start with the fundamentals of testing components that fetch data. Throughout this lesson we assume a modern 2026 stack: <strong>Vitest</strong> as the runner, <strong>React Testing Library</strong> for rendering and queries, <strong>user-event v14</strong> for interactions, and <strong>MSW v2</strong> for mocking the network. Every code sample here uses those current APIs.</p>
 
                 <h3>Simple Data Fetching Component</h3>
                 <pre><code class="language-typescript">
@@ -231,17 +231,17 @@ export function PostList() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState&lt;string | null&gt;(null);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     fetch('/api/posts')
-      .then(res => {
+      .then(res =&gt; {
         if (!res.ok) throw new Error('Failed to fetch');
         return res.json();
       })
-      .then(data => {
+      .then(data =&gt; {
         setPosts(data);
         setLoading(false);
       })
-      .catch(err => {
+      .catch(err =&gt; {
         setError(err.message);
         setLoading(false);
       });
@@ -253,7 +253,7 @@ export function PostList() {
   
   return (
     &lt;ul&gt;
-      {posts.map(post => (
+      {posts.map(post =&gt; (
         &lt;li key={post.id}&gt;
           &lt;h3&gt;{post.title}&lt;/h3&gt;
           &lt;p&gt;{post.body}&lt;/p&gt;
@@ -268,52 +268,71 @@ export function PostList() {
                 <pre><code class="language-typescript">
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { PostList } from './PostList';
 
-// Set up MSW server
+// Set up an MSW v2 server. Note the shape: http.get(path, resolver),
+// and the resolver returns an HttpResponse instead of calling res(ctx.*).
 const server = setupServer(
-  rest.get('/api/posts', (req, res, ctx) => {
-    return res(
-      ctx.json([
-        { id: '1', title: 'First Post', body: 'Content 1' },
-        { id: '2', title: 'Second Post', body: 'Content 2' }
-      ])
-    );
+  http.get('/api/posts', () =&gt; {
+    return HttpResponse.json([
+      { id: '1', title: 'First Post', body: 'Content 1' },
+      { id: '2', title: 'Second Post', body: 'Content 2' }
+    ]);
   })
 );
 
-beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+beforeAll(() =&gt; server.listen());
+afterEach(() =&gt; server.resetHandlers());
+afterAll(() =&gt; server.close());
 
-describe('PostList', () => {
-  it('displays posts after loading', async () => {
+describe('PostList', () =&gt; {
+  it('displays posts after loading', async () =&gt; {
     render(&lt;PostList /&gt;);
-    
-    // Initially shows loading
+
+    // Initially shows loading (this assertion is synchronous and safe —
+    // the loading UI is present on the very first render).
     expect(screen.getByText('Loading posts...')).toBeInTheDocument();
-    
-    // Wait for posts to appear
+
+    // findByText RETURNS A PROMISE and retries until the element appears
+    // (default up to 1000ms). Awaiting it is what makes the test wait.
     expect(await screen.findByText('First Post')).toBeInTheDocument();
+
+    // By now the fetch has resolved, so a synchronous getByText is fine.
     expect(screen.getByText('Second Post')).toBeInTheDocument();
-    
+
     // Loading should be gone
     expect(screen.queryByText('Loading posts...')).not.toBeInTheDocument();
   });
 });
                 </code></pre>
 
+                <p>Trace what actually happens when that test runs. The request never leaves your machine — MSW intercepts it and answers from your handler — but from the component's point of view it's an ordinary <code>fetch</code>:</p>
+
+                <div class="mermaid">
+                    sequenceDiagram
+                    participant T as Test
+                    participant C as Component
+                    participant M as MSW handler
+                    T-&gt;&gt;C: render PostList
+                    C-&gt;&gt;M: fetch /api/posts
+                    Note over T: await findByText retries ~50ms
+                    M--&gt;&gt;C: HttpResponse.json
+                    C-&gt;&gt;C: setState then rerender
+                    C--&gt;&gt;T: First Post now in DOM
+                    Note over T: findBy resolves then assert
+                </div>
+
                 <h3>Testing with waitFor</h3>
                 <pre><code class="language-typescript">
 import { waitFor } from '@testing-library/react';
 
-test('displays posts using waitFor', async () => {
+test('displays posts using waitFor', async () =&gt; {
   render(&lt;PostList /&gt;);
   
   // Wait for loading to finish and posts to appear
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.queryByText('Loading posts...')).not.toBeInTheDocument();
     expect(screen.getByText('First Post')).toBeInTheDocument();
   });
@@ -322,38 +341,36 @@ test('displays posts using waitFor', async () => {
 
                 <h3>Testing Empty State</h3>
                 <pre><code class="language-typescript">
-test('displays empty state when no posts', async () => {
-  // Override handler to return empty array
+test('displays empty state when no posts', async () =&gt; {
+  // Override the default handler for THIS test only
   server.use(
-    rest.get('/api/posts', (req, res, ctx) => {
-      return res(ctx.json([]));
+    http.get('/api/posts', () =&gt; {
+      return HttpResponse.json([]);
     })
   );
-  
+
   render(&lt;PostList /&gt;);
-  
+
   expect(await screen.findByText('No posts found')).toBeInTheDocument();
 });
                 </code></pre>
 
                 <h3>Testing with Different Data</h3>
                 <pre><code class="language-typescript">
-test('displays correct number of posts', async () => {
+test('displays correct number of posts', async () =&gt; {
   server.use(
-    rest.get('/api/posts', (req, res, ctx) => {
-      return res(
-        ctx.json([
-          { id: '1', title: 'Post 1', body: 'Body 1' },
-          { id: '2', title: 'Post 2', body: 'Body 2' },
-          { id: '3', title: 'Post 3', body: 'Body 3' }
-        ])
-      );
+    http.get('/api/posts', () =&gt; {
+      return HttpResponse.json([
+        { id: '1', title: 'Post 1', body: 'Body 1' },
+        { id: '2', title: 'Post 2', body: 'Body 2' },
+        { id: '3', title: 'Post 3', body: 'Body 3' }
+      ]);
     })
   );
-  
+
   render(&lt;PostList /&gt;);
-  
-  await waitFor(() => {
+
+  await waitFor(() =&gt; {
     const posts = screen.getAllByRole('listitem');
     expect(posts).toHaveLength(3);
   });
@@ -382,7 +399,21 @@ test('displays correct number of posts', async () => {
             <section id="msw-setup" class="lesson-section">
                 <h2>🎭 Mock Service Worker Deep Dive</h2>
                 
-                <p>Mock Service Worker (MSW) is the gold standard for mocking APIs in tests. It intercepts network requests at the network level, making tests more realistic.</p>
+                <p>Mock Service Worker (MSW) is the gold standard for mocking APIs in tests. Instead of replacing <code>fetch</code> with a stub, it intercepts requests at the network boundary — the same layer a real server would answer from. Your component runs its <em>actual</em> data-fetching code; MSW just supplies the response. Think of it as a stunt double that's indistinguishable from the real actor: the scene plays out normally, but nobody gets hurt (and no real API gets called).</p>
+
+                <div class="card card-warning">
+                    <h4>⚠️ MSW v1 → v2: what changed</h4>
+                    <p>If you're following older tutorials, you'll see the v1 API everywhere. MSW v2 (the current release) reworked it around the web-standard <code>Request</code>/<code>Response</code>. Here's the translation you'll use constantly:</p>
+                    <ul>
+                        <li><code>rest.get(...)</code> → <code>http.get(...)</code> (import <code>{ http, HttpResponse }</code>)</li>
+                        <li><code>(req, res, ctx) =&gt; res(ctx.json(data))</code> → <code>() =&gt; HttpResponse.json(data)</code></li>
+                        <li><code>ctx.status(201)</code> → second arg: <code>HttpResponse.json(data, { status: 201 })</code></li>
+                        <li><code>req.params</code> → the resolver's <code>{ params }</code> argument</li>
+                        <li><code>req.url.searchParams</code> → <code>new URL(request.url).searchParams</code></li>
+                        <li><code>await req.json()</code> → <code>await request.json()</code></li>
+                        <li><code>res.networkError()</code> → <code>HttpResponse.error()</code>; <code>ctx.delay(ms)</code> → <code>await delay(ms)</code></li>
+                    </ul>
+                </div>
 
                 <h3>Why MSW Over fetch Mocking?</h3>
                 <table>
@@ -415,71 +446,63 @@ test('displays correct number of posts', async () => {
                 <h3>Complete MSW Setup</h3>
                 <pre><code class="language-typescript">
 // src/mocks/handlers.ts
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 
 export const handlers = [
-  // GET request with dynamic params
-  rest.get('/api/users/:id', (req, res, ctx) => {
-    const { id } = req.params;
-    
-    return res(
-      ctx.status(200),
-      ctx.json({
-        id,
-        name: `User ${id}`,
-        email: `user${id}@example.com`
-      })
-    );
+  // GET with a dynamic path segment — path params arrive in { params }
+  http.get('/api/users/:id', ({ params }) =&gt; {
+    const { id } = params;
+
+    return HttpResponse.json({
+      id,
+      name: `User ${id}`,
+      email: `user${id}@example.com`
+    });
   }),
-  
-  // POST request with request body
-  rest.post('/api/users', async (req, res, ctx) => {
-    const body = await req.json();
-    
-    return res(
-      ctx.status(201),
-      ctx.json({
-        id: Math.random().toString(),
+
+  // POST — read the body off the standard Request object
+  http.post('/api/users', async ({ request }) =&gt; {
+    const body = (await request.json()) as Record&lt;string, unknown&gt;;
+
+    // Second arg to HttpResponse.json() sets status/headers
+    return HttpResponse.json(
+      {
+        id: crypto.randomUUID(),
         ...body,
         createdAt: new Date().toISOString()
-      })
+      },
+      { status: 201 }
     );
   }),
-  
-  // PUT request
-  rest.put('/api/users/:id', async (req, res, ctx) => {
-    const { id } = req.params;
-    const body = await req.json();
-    
-    return res(
-      ctx.status(200),
-      ctx.json({
-        id,
-        ...body,
-        updatedAt: new Date().toISOString()
-      })
-    );
+
+  // PUT — you can destructure both params and request together
+  http.put('/api/users/:id', async ({ params, request }) =&gt; {
+    const { id } = params;
+    const body = (await request.json()) as Record&lt;string, unknown&gt;;
+
+    return HttpResponse.json({
+      id,
+      ...body,
+      updatedAt: new Date().toISOString()
+    });
   }),
-  
-  // DELETE request
-  rest.delete('/api/users/:id', (req, res, ctx) => {
-    return res(
-      ctx.status(204)
-    );
+
+  // DELETE — a 204 carries no body, so build the response directly
+  http.delete('/api/users/:id', () =&gt; {
+    return new HttpResponse(null, { status: 204 });
   }),
-  
-  // Query parameters
-  rest.get('/api/search', (req, res, ctx) => {
-    const query = req.url.searchParams.get('q');
-    const page = req.url.searchParams.get('page') || '1';
-    
-    return res(
-      ctx.json({
-        query,
-        page: parseInt(page),
-        results: [`Result for ${query}`]
-      })
-    );
+
+  // Query params live on the intercepted Request's URL
+  http.get('/api/search', ({ request }) =&gt; {
+    const url = new URL(request.url);
+    const query = url.searchParams.get('q');
+    const page = url.searchParams.get('page') ?? '1';
+
+    return HttpResponse.json({
+      query,
+      page: Number(page),
+      results: [`Result for ${query}`]
+    });
   })
 ];
 
@@ -489,121 +512,116 @@ import { handlers } from './handlers';
 
 export const server = setupServer(...handlers);
 
-// src/test/setup.ts
+// src/test/setup.ts (registered via vitest.config's setupFiles)
 import { beforeAll, afterEach, afterAll } from 'vitest';
 import { server } from '../mocks/server';
 
-// Start server before all tests
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+// Start intercepting before any test runs. 'error' surfaces any request
+// you forgot to mock, instead of letting it hit the real network.
+beforeAll(() =&gt; server.listen({ onUnhandledRequest: 'error' }));
 
-// Reset handlers after each test
-afterEach(() => server.resetHandlers());
+// Reset per-test overrides so tests stay isolated
+afterEach(() =&gt; server.resetHandlers());
 
-// Clean up after all tests
-afterAll(() => server.close());
+// Stop intercepting once the suite is done
+afterAll(() =&gt; server.close());
                 </code></pre>
 
                 <h3>Simulating Different Response Times</h3>
                 <pre><code class="language-typescript">
-test('handles slow API responses', async () => {
+import { http, HttpResponse, delay } from 'msw';
+
+test('handles slow API responses', async () =&gt; {
   server.use(
-    rest.get('/api/posts', async (req, res, ctx) => {
-      // Delay response by 2 seconds
-      await ctx.delay(2000);
-      
-      return res(
-        ctx.json([{ id: '1', title: 'Post' }])
-      );
+    http.get('/api/posts', async () =&gt; {
+      // delay() is a standalone helper in MSW v2 (no more ctx.delay)
+      await delay(2000);
+
+      return HttpResponse.json([{ id: '1', title: 'Post' }]);
     })
   );
-  
+
   render(&lt;PostList /&gt;);
-  
+
   // Should show loading for a while
   expect(screen.getByText('Loading posts...')).toBeInTheDocument();
-  
-  // Eventually loads
+
+  // findBy's third arg lets us extend the retry window past the 1s default
   expect(await screen.findByText('Post', {}, { timeout: 3000 })).toBeInTheDocument();
 });
                 </code></pre>
 
                 <h3>Simulating Network Errors</h3>
                 <pre><code class="language-typescript">
-test('handles network errors', async () => {
+test('handles network errors', async () =&gt; {
   server.use(
-    rest.get('/api/posts', (req, res, ctx) => {
-      return res.networkError('Failed to connect');
+    http.get('/api/posts', () =&gt; {
+      // Simulates a connection failure (DNS error, offline, etc.)
+      return HttpResponse.error();
     })
   );
-  
+
   render(&lt;PostList /&gt;);
-  
+
   expect(await screen.findByText(/error/i)).toBeInTheDocument();
 });
                 </code></pre>
 
                 <h3>Testing Different Status Codes</h3>
                 <pre><code class="language-typescript">
-test('handles 404 not found', async () => {
+test('handles 404 not found', async () =&gt; {
   server.use(
-    rest.get('/api/posts', (req, res, ctx) => {
-      return res(
-        ctx.status(404),
-        ctx.json({ message: 'Not found' })
-      );
+    http.get('/api/posts', () =&gt; {
+      return HttpResponse.json({ message: 'Not found' }, { status: 404 });
     })
   );
-  
+
   render(&lt;PostList /&gt;);
-  
+
   expect(await screen.findByText('Error: Failed to fetch')).toBeInTheDocument();
 });
 
-test('handles 500 server error', async () => {
+test('handles 500 server error', async () =&gt; {
   server.use(
-    rest.get('/api/posts', (req, res, ctx) => {
-      return res(
-        ctx.status(500),
-        ctx.json({ message: 'Internal server error' })
-      );
+    http.get('/api/posts', () =&gt; {
+      return HttpResponse.json({ message: 'Internal server error' }, { status: 500 });
     })
   );
-  
+
   render(&lt;PostList /&gt;);
-  
+
   expect(await screen.findByText(/error/i)).toBeInTheDocument();
 });
                 </code></pre>
 
                 <h3>Per-Test Handler Overrides</h3>
                 <pre><code class="language-typescript">
-describe('PostList with different scenarios', () => {
-  it('shows success state', async () => {
-    // Uses default handler
+describe('PostList with different scenarios', () =&gt; {
+  it('shows success state', async () =&gt; {
+    // Uses the default handler registered in setup
     render(&lt;PostList /&gt;);
     expect(await screen.findByText('First Post')).toBeInTheDocument();
   });
-  
-  it('shows error state', async () => {
-    // Override for this test only
+
+  it('shows error state', async () =&gt; {
+    // server.use() adds a one-off override; afterEach resetHandlers clears it
     server.use(
-      rest.get('/api/posts', (req, res, ctx) => {
-        return res(ctx.status(500));
+      http.get('/api/posts', () =&gt; {
+        return new HttpResponse(null, { status: 500 });
       })
     );
-    
+
     render(&lt;PostList /&gt;);
     expect(await screen.findByText(/error/i)).toBeInTheDocument();
   });
-  
-  it('shows empty state', async () => {
-    // Override for this test only
+
+  it('shows empty state', async () =&gt; {
     server.use(
-      rest.get('/api/posts', (req, res, ctx) => {
-        return res(ctx.json([]));
+      http.get('/api/posts', () =&gt; {
+        return HttpResponse.json([]);
       })
     );
-    
+
     render(&lt;PostList /&gt;);
     expect(await screen.findByText('No posts found')).toBeInTheDocument();
   });
@@ -618,7 +636,7 @@ describe('PostList with different scenarios', () => {
                         <li><strong>Reset handlers after each test:</strong> Prevents test pollution</li>
                         <li><strong>Handle all HTTP methods:</strong> GET, POST, PUT, DELETE, PATCH</li>
                         <li><strong>Test various response scenarios:</strong> Success, errors, timeouts</li>
-                        <li><strong>Use ctx.delay() sparingly:</strong> Don't slow down your test suite unnecessarily</li>
+                        <li><strong>Use delay() sparingly:</strong> A short delay proves the loading state renders; long ones just slow your suite</li>
                     </ul>
                 </div>
             </section>
@@ -635,11 +653,11 @@ function DataComponent() {
   const [data, setData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     setLoading(true);
     fetch('/api/data')
-      .then(res => res.json())
-      .then(data => {
+      .then(res =&gt; res.json())
+      .then(data =&gt; {
         setData(data);
         setLoading(false);
       });
@@ -647,22 +665,20 @@ function DataComponent() {
   
   return (
     &lt;div&gt;
-      {loading && &lt;div data-testid="spinner"&gt;Loading...&lt;/div&gt;}
-      {!loading && data && &lt;div&gt;{data.value}&lt;/div&gt;}
+      {loading &amp;&amp; &lt;div data-testid="spinner"&gt;Loading...&lt;/div&gt;}
+      {!loading &amp;&amp; data &amp;&amp; &lt;div&gt;{data.value}&lt;/div&gt;}
     &lt;/div&gt;
   );
 }
 
-test('shows loading spinner then data', async () => {
+test('shows loading spinner then data', async () =&gt; {
   server.use(
-    rest.get('/api/data', (req, res, ctx) => {
-      return res(
-        ctx.delay(100), // Simulate network delay
-        ctx.json({ value: 'Loaded!' })
-      );
+    http.get('/api/data', async () =&gt; {
+      await delay(100); // Simulate network latency
+      return HttpResponse.json({ value: 'Loaded!' });
     })
   );
-  
+
   render(&lt;DataComponent /&gt;);
   
   // Should show loading initially
@@ -670,7 +686,7 @@ test('shows loading spinner then data', async () => {
   expect(screen.getByText('Loading...')).toBeInTheDocument();
   
   // Wait for data to load
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
   });
   
@@ -683,12 +699,12 @@ test('shows loading spinner then data', async () => {
 function MultiStepLoader() {
   const [step, setStep] = React.useState&lt;'idle' | 'fetching' | 'processing' | 'done'&gt;('idle');
   
-  const handleLoad = async () => {
+  const handleLoad = async () =&gt; {
     setStep('fetching');
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve =&gt; setTimeout(resolve, 100));
     
     setStep('processing');
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve =&gt; setTimeout(resolve, 100));
     
     setStep('done');
   };
@@ -696,14 +712,14 @@ function MultiStepLoader() {
   return (
     &lt;div&gt;
       &lt;button onClick={handleLoad}&gt;Load Data&lt;/button&gt;
-      {step === 'fetching' && &lt;div&gt;Fetching data...&lt;/div&gt;}
-      {step === 'processing' && &lt;div&gt;Processing data...&lt;/div&gt;}
-      {step === 'done' && &lt;div&gt;Complete!&lt;/div&gt;}
+      {step === 'fetching' &amp;&amp; &lt;div&gt;Fetching data...&lt;/div&gt;}
+      {step === 'processing' &amp;&amp; &lt;div&gt;Processing data...&lt;/div&gt;}
+      {step === 'done' &amp;&amp; &lt;div&gt;Complete!&lt;/div&gt;}
     &lt;/div&gt;
   );
 }
 
-test('shows correct loading message at each step', async () => {
+test('shows correct loading message at each step', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;MultiStepLoader /&gt;);
   
@@ -713,12 +729,12 @@ test('shows correct loading message at each step', async () => {
   expect(screen.getByText('Fetching data...')).toBeInTheDocument();
   
   // Step 2: Processing
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByText('Processing data...')).toBeInTheDocument();
   });
   
   // Step 3: Complete
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByText('Complete!')).toBeInTheDocument();
   });
 });
@@ -730,10 +746,10 @@ function UserCard({ userId }: { userId: string }) {
   const [user, setUser] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     fetch(`/api/users/${userId}`)
-      .then(res => res.json())
-      .then(data => {
+      .then(res =&gt; res.json())
+      .then(data =&gt; {
         setUser(data);
         setLoading(false);
       });
@@ -758,20 +774,18 @@ function UserCard({ userId }: { userId: string }) {
   );
 }
 
-test('shows skeleton screen while loading', async () => {
+test('shows skeleton screen while loading', async () =&gt; {
   server.use(
-    rest.get('/api/users/:id', (req, res, ctx) => {
-      return res(
-        ctx.delay(100),
-        ctx.json({
-          name: 'John Doe',
-          email: 'john@example.com',
-          avatar: '/avatar.jpg'
-        })
-      );
+    http.get('/api/users/:id', async () =&gt; {
+      await delay(100);
+      return HttpResponse.json({
+        name: 'John Doe',
+        email: 'john@example.com',
+        avatar: '/avatar.jpg'
+      });
     })
   );
-  
+
   render(&lt;UserCard userId="123" /&gt;);
   
   // Skeleton should be visible
@@ -780,7 +794,7 @@ test('shows skeleton screen while loading', async () => {
   expect(skeleton.querySelector('.skeleton-avatar')).toBeInTheDocument();
   
   // Wait for actual content
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.queryByTestId('skeleton')).not.toBeInTheDocument();
   });
   
@@ -794,13 +808,13 @@ function FileUploadProgress() {
   const [progress, setProgress] = React.useState(0);
   const [status, setStatus] = React.useState&lt;'idle' | 'uploading' | 'complete'&gt;('idle');
   
-  const handleUpload = () => {
+  const handleUpload = () =&gt; {
     setStatus('uploading');
     
     // Simulate progress
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
+    const interval = setInterval(() =&gt; {
+      setProgress(prev =&gt; {
+        if (prev &gt;= 100) {
           clearInterval(interval);
           setStatus('complete');
           return 100;
@@ -815,42 +829,39 @@ function FileUploadProgress() {
       &lt;button onClick={handleUpload} disabled={status === 'uploading'}&gt;
         Upload
       &lt;/button&gt;
-      {status === 'uploading' && (
+      {status === 'uploading' &amp;&amp; (
         &lt;div&gt;
           &lt;div&gt;Uploading... {progress}%&lt;/div&gt;
           &lt;progress value={progress} max={100} /&gt;
         &lt;/div&gt;
       )}
-      {status === 'complete' && &lt;div&gt;Upload complete!&lt;/div&gt;}
+      {status === 'complete' &amp;&amp; &lt;div&gt;Upload complete!&lt;/div&gt;}
     &lt;/div&gt;
   );
 }
 
-test('shows upload progress', async () => {
+test('shows upload progress', async () =&gt; {
   vi.useFakeTimers();
-  const user = userEvent.setup({ delay: null }); // Disable userEvent's built-in delay
-  
+  // With fake timers, tell user-event to drive them so its own waits resolve
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
   render(&lt;FileUploadProgress /&gt;);
-  
+
   await user.click(screen.getByRole('button', { name: 'Upload' }));
-  
+
   // Should start uploading
   expect(screen.getByText('Uploading... 0%')).toBeInTheDocument();
-  
-  // Advance time and check progress
-  act(() => {
-    vi.advanceTimersByTime(500);
-  });
-  
+
+  // advanceTimersByTimeAsync flushes the state updates each interval triggers,
+  // so React re-renders inside act() automatically — no manual act() needed
+  // and no "not wrapped in act(...)" warning.
+  await vi.advanceTimersByTimeAsync(500);
   expect(screen.getByText('Uploading... 50%')).toBeInTheDocument();
-  
+
   // Complete upload
-  act(() => {
-    vi.advanceTimersByTime(500);
-  });
-  
+  await vi.advanceTimersByTimeAsync(500);
   expect(screen.getByText('Upload complete!')).toBeInTheDocument();
-  
+
   vi.useRealTimers();
 });
                 </code></pre>
@@ -881,7 +892,7 @@ function RobustDataFetcher() {
   const [error, setError] = React.useState&lt;string | null&gt;(null);
   const [loading, setLoading] = React.useState(false);
   
-  const fetchData = async () => {
+  const fetchData = async () =&gt; {
     setLoading(true);
     setError(null);
     
@@ -907,65 +918,59 @@ function RobustDataFetcher() {
         Fetch Data
       &lt;/button&gt;
       
-      {loading && &lt;div&gt;Loading...&lt;/div&gt;}
-      {error && &lt;div role="alert"&gt;Error: {error}&lt;/div&gt;}
-      {data && &lt;div&gt;Data: {JSON.stringify(data)}&lt;/div&gt;}
+      {loading &amp;&amp; &lt;div&gt;Loading...&lt;/div&gt;}
+      {error &amp;&amp; &lt;div role="alert"&gt;Error: {error}&lt;/div&gt;}
+      {data &amp;&amp; &lt;div&gt;Data: {JSON.stringify(data)}&lt;/div&gt;}
     &lt;/div&gt;
   );
 }
 
-test('handles network error', async () => {
+test('handles network error', async () =&gt; {
   const user = userEvent.setup();
   
   server.use(
-    rest.get('/api/data', (req, res, ctx) => {
-      return res.networkError('Failed to connect');
+    http.get('/api/data', () =&gt; {
+      return HttpResponse.error();
     })
   );
-  
+
   render(&lt;RobustDataFetcher /&gt;);
-  
+
   await user.click(screen.getByRole('button', { name: 'Fetch Data' }));
-  
+
   expect(await screen.findByRole('alert')).toHaveTextContent(/error/i);
   expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
 });
 
-test('handles 404 error', async () => {
+test('handles 404 error', async () =&gt; {
   const user = userEvent.setup();
   
   server.use(
-    rest.get('/api/data', (req, res, ctx) => {
-      return res(
-        ctx.status(404),
-        ctx.text('Not Found')
-      );
+    http.get('/api/data', () =&gt; {
+      return HttpResponse.text('Not Found', { status: 404 });
     })
   );
-  
+
   render(&lt;RobustDataFetcher /&gt;);
-  
+
   await user.click(screen.getByRole('button', { name: 'Fetch Data' }));
-  
+
   expect(await screen.findByRole('alert')).toHaveTextContent(/HTTP 404/i);
 });
 
-test('handles 500 error', async () => {
+test('handles 500 error', async () =&gt; {
   const user = userEvent.setup();
   
   server.use(
-    rest.get('/api/data', (req, res, ctx) => {
-      return res(
-        ctx.status(500),
-        ctx.json({ message: 'Internal Server Error' })
-      );
+    http.get('/api/data', () =&gt; {
+      return HttpResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     })
   );
-  
+
   render(&lt;RobustDataFetcher /&gt;);
-  
+
   await user.click(screen.getByRole('button', { name: 'Fetch Data' }));
-  
+
   expect(await screen.findByRole('alert')).toHaveTextContent(/HTTP 500/i);
 });
                 </code></pre>
@@ -978,7 +983,7 @@ function DataFetcherWithRetry() {
   const [retryCount, setRetryCount] = React.useState(0);
   const maxRetries = 3;
   
-  const fetchData = async () => {
+  const fetchData = async () =&gt; {
     try {
       const response = await fetch('/api/data');
       if (!response.ok) throw new Error('Failed');
@@ -987,8 +992,8 @@ function DataFetcherWithRetry() {
       setData(json);
       setRetryCount(0);
     } catch (err) {
-      if (retryCount < maxRetries) {
-        setRetryCount(prev => prev + 1);
+      if (retryCount &lt; maxRetries) {
+        setRetryCount(prev =&gt; prev + 1);
         setTimeout(fetchData, 1000);
       } else {
         setError('Failed after 3 retries');
@@ -996,7 +1001,7 @@ function DataFetcherWithRetry() {
     }
   };
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     fetchData();
   }, []);
   
@@ -1005,64 +1010,54 @@ function DataFetcherWithRetry() {
   return &lt;div&gt;Data: {data.value}&lt;/div&gt;;
 }
 
-test('retries on failure and eventually succeeds', async () => {
+test('retries on failure and eventually succeeds', async () =&gt; {
   let attempts = 0;
   
   server.use(
-    rest.get('/api/data', (req, res, ctx) => {
+    http.get('/api/data', () =&gt; {
       attempts++;
-      
-      if (attempts < 3) {
-        return res(ctx.status(500));
+
+      if (attempts &lt; 3) {
+        return new HttpResponse(null, { status: 500 });
       }
-      
-      return res(ctx.json({ value: 'Success!' }));
+
+      return HttpResponse.json({ value: 'Success!' });
     })
   );
-  
+
   vi.useFakeTimers();
   render(&lt;DataFetcherWithRetry /&gt;);
-  
+
   // First attempt fails
   expect(screen.getByText('Loading... (Attempt 1)')).toBeInTheDocument();
-  
-  // Wait for retry
-  act(() => {
-    vi.advanceTimersByTime(1000);
-  });
-  
-  await waitFor(() => {
-    expect(screen.getByText('Loading... (Attempt 2)')).toBeInTheDocument();
-  });
-  
-  // Second retry
-  act(() => {
-    vi.advanceTimersByTime(1000);
-  });
-  
-  // Eventually succeeds
-  expect(await screen.findByText('Data: Success!')).toBeInTheDocument();
-  
+
+  // Advance past the 1s retry timer; the async variant also flushes the
+  // fetch promises MSW resolves, so React updates without an act() warning
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(screen.getByText('Loading... (Attempt 2)')).toBeInTheDocument();
+
+  // Second retry succeeds
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(screen.getByText('Data: Success!')).toBeInTheDocument();
+
   vi.useRealTimers();
 });
 
-test('gives up after max retries', async () => {
+test('gives up after max retries', async () =&gt; {
   server.use(
-    rest.get('/api/data', (req, res, ctx) => {
-      return res(ctx.status(500));
+    http.get('/api/data', () =&gt; {
+      return new HttpResponse(null, { status: 500 });
     })
   );
-  
+
   vi.useFakeTimers();
   render(&lt;DataFetcherWithRetry /&gt;);
-  
-  // Fast-forward through all retries
-  act(() => {
-    vi.advanceTimersByTime(4000);
-  });
-  
-  expect(await screen.findByText('Error: Failed after 3 retries')).toBeInTheDocument();
-  
+
+  // Fast-forward through all three retry windows at once
+  await vi.advanceTimersByTimeAsync(4000);
+
+  expect(screen.getByText('Error: Failed after 3 retries')).toBeInTheDocument();
+
   vi.useRealTimers();
 });
                 </code></pre>
@@ -1073,7 +1068,7 @@ function ErrorRecoveryComponent() {
   const [data, setData] = React.useState(null);
   const [error, setError] = React.useState(null);
   
-  const fetchData = async () => {
+  const fetchData = async () =&gt; {
     setError(null);
     try {
       const response = await fetch('/api/data');
@@ -1085,7 +1080,7 @@ function ErrorRecoveryComponent() {
     }
   };
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     fetchData();
   }, []);
   
@@ -1102,25 +1097,25 @@ function ErrorRecoveryComponent() {
   return &lt;div&gt;Data: {data.value}&lt;/div&gt;;
 }
 
-test('allows user to retry after error', async () => {
+test('allows user to retry after error', async () =&gt; {
   const user = userEvent.setup();
   
   // First request fails
   server.use(
-    rest.get('/api/data', (req, res, ctx) => {
-      return res(ctx.status(500));
+    http.get('/api/data', () =&gt; {
+      return new HttpResponse(null, { status: 500 });
     })
   );
-  
+
   render(&lt;ErrorRecoveryComponent /&gt;);
-  
+
   // Wait for error
   expect(await screen.findByText(/error/i)).toBeInTheDocument();
-  
-  // Fix the API
+
+  // Fix the API — the newest server.use() handler wins on the next request
   server.use(
-    rest.get('/api/data', (req, res, ctx) => {
-      return res(ctx.json({ value: 'Success!' }));
+    http.get('/api/data', () =&gt; {
+      return HttpResponse.json({ value: 'Success!' });
     })
   );
   
@@ -1156,7 +1151,7 @@ function SearchComponent() {
   const [query, setQuery] = React.useState('');
   const [results, setResults] = React.useState&lt;string[]&gt;([]);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     if (!query) {
       setResults([]);
       return;
@@ -1165,14 +1160,14 @@ function SearchComponent() {
     let cancelled = false;
     
     fetch(`/api/search?q=${query}`)
-      .then(res => res.json())
-      .then(data => {
+      .then(res =&gt; res.json())
+      .then(data =&gt; {
         if (!cancelled) {
           setResults(data.results);
         }
       });
     
-    return () => {
+    return () =&gt; {
       cancelled = true;
     };
   }, [query]);
@@ -1182,11 +1177,11 @@ function SearchComponent() {
       &lt;input
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) =&gt; setQuery(e.target.value)}
         placeholder="Search..."
       /&gt;
       &lt;ul&gt;
-        {results.map((result, i) => (
+        {results.map((result, i) =&gt; (
           &lt;li key={i}&gt;{result}&lt;/li&gt;
         ))}
       &lt;/ul&gt;
@@ -1194,27 +1189,25 @@ function SearchComponent() {
   );
 }
 
-test('handles rapid search queries correctly', async () => {
+test('handles rapid search queries correctly', async () =&gt; {
   const user = userEvent.setup();
   
   server.use(
-    rest.get('/api/search', async (req, res, ctx) => {
-      const query = req.url.searchParams.get('q');
-      
-      // Simulate different response times
-      const delay = query === 'first' ? 200 : 50;
-      await ctx.delay(delay);
-      
-      return res(
-        ctx.json({
-          results: [`Result for ${query}`]
-        })
-      );
+    http.get('/api/search', async ({ request }) =&gt; {
+      const query = new URL(request.url).searchParams.get('q');
+
+      // Simulate different response times so the slow one resolves LAST
+      const responseDelay = query === 'first' ? 200 : 50;
+      await delay(responseDelay);
+
+      return HttpResponse.json({
+        results: [`Result for ${query}`]
+      });
     })
   );
-  
+
   render(&lt;SearchComponent /&gt;);
-  
+
   const input = screen.getByPlaceholderText('Search...');
   
   // Type "first" - slow response
@@ -1225,7 +1218,7 @@ test('handles rapid search queries correctly', async () => {
   await user.type(input, 'second');
   
   // Should show results for "second", not "first"
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByText('Result for second')).toBeInTheDocument();
   });
   
@@ -1240,7 +1233,7 @@ function DataFetcherWithAbort() {
   const [loading, setLoading] = React.useState(false);
   const abortControllerRef = React.useRef&lt;AbortController | null&gt;(null);
   
-  const fetchData = async (id: string) => {
+  const fetchData = async (id: string) =&gt; {
     // Cancel previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -1267,30 +1260,30 @@ function DataFetcherWithAbort() {
   
   return (
     &lt;div&gt;
-      &lt;button onClick={() => fetchData('1')}&gt;Fetch 1&lt;/button&gt;
-      &lt;button onClick={() => fetchData('2')}&gt;Fetch 2&lt;/button&gt;
-      {loading && &lt;div&gt;Loading...&lt;/div&gt;}
-      {data && &lt;div&gt;Data: {data.id}&lt;/div&gt;}
+      &lt;button onClick={() =&gt; fetchData('1')}&gt;Fetch 1&lt;/button&gt;
+      &lt;button onClick={() =&gt; fetchData('2')}&gt;Fetch 2&lt;/button&gt;
+      {loading &amp;&amp; &lt;div&gt;Loading...&lt;/div&gt;}
+      {data &amp;&amp; &lt;div&gt;Data: {data.id}&lt;/div&gt;}
     &lt;/div&gt;
   );
 }
 
-test('cancels previous request when new one starts', async () => {
+test('cancels previous request when new one starts', async () =&gt; {
   const user = userEvent.setup();
   
   let request1Completed = false;
   let request2Completed = false;
   
   server.use(
-    rest.get('/api/data/1', async (req, res, ctx) => {
-      await ctx.delay(200);
+    http.get('/api/data/1', async () =&gt; {
+      await delay(200);
       request1Completed = true;
-      return res(ctx.json({ id: '1' }));
+      return HttpResponse.json({ id: '1' });
     }),
-    rest.get('/api/data/2', async (req, res, ctx) => {
-      await ctx.delay(50);
+    http.get('/api/data/2', async () =&gt; {
+      await delay(50);
       request2Completed = true;
-      return res(ctx.json({ id: '2' }));
+      return HttpResponse.json({ id: '2' });
     })
   );
   
@@ -1304,7 +1297,7 @@ test('cancels previous request when new one starts', async () => {
   await user.click(screen.getByRole('button', { name: 'Fetch 2' }));
   
   // Wait for second request to complete
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByText('Data: 2')).toBeInTheDocument();
   });
   
@@ -1324,20 +1317,20 @@ function UserWithPosts({ userId }: { userId: string }) {
   const [posts, setPosts] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     setLoading(true);
     
     // Fetch user first
     fetch(`/api/users/${userId}`)
-      .then(res => res.json())
-      .then(userData => {
+      .then(res =&gt; res.json())
+      .then(userData =&gt; {
         setUser(userData);
         
         // Then fetch their posts
         return fetch(`/api/users/${userId}/posts`);
       })
-      .then(res => res.json())
-      .then(postsData => {
+      .then(res =&gt; res.json())
+      .then(postsData =&gt; {
         setPosts(postsData);
         setLoading(false);
       });
@@ -1349,7 +1342,7 @@ function UserWithPosts({ userId }: { userId: string }) {
     &lt;div&gt;
       &lt;h2&gt;{user.name}&lt;/h2&gt;
       &lt;ul&gt;
-        {posts.map(post => (
+        {posts.map(post =&gt; (
           &lt;li key={post.id}&gt;{post.title}&lt;/li&gt;
         ))}
       &lt;/ul&gt;
@@ -1357,31 +1350,29 @@ function UserWithPosts({ userId }: { userId: string }) {
   );
 }
 
-test('fetches user then posts in sequence', async () => {
+test('fetches user then posts in sequence', async () =&gt; {
   const userFetchOrder: string[] = [];
   
   server.use(
-    rest.get('/api/users/:id', async (req, res, ctx) => {
+    http.get('/api/users/:id', async () =&gt; {
       userFetchOrder.push('user');
-      await ctx.delay(50);
-      return res(ctx.json({ name: 'John Doe' }));
+      await delay(50);
+      return HttpResponse.json({ name: 'John Doe' });
     }),
-    rest.get('/api/users/:id/posts', async (req, res, ctx) => {
+    http.get('/api/users/:id/posts', async () =&gt; {
       userFetchOrder.push('posts');
-      await ctx.delay(50);
-      return res(
-        ctx.json([
-          { id: '1', title: 'First Post' },
-          { id: '2', title: 'Second Post' }
-        ])
-      );
+      await delay(50);
+      return HttpResponse.json([
+        { id: '1', title: 'First Post' },
+        { id: '2', title: 'Second Post' }
+      ]);
     })
   );
   
   render(&lt;UserWithPosts userId="123" /&gt;);
   
   // Wait for both requests to complete
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByText('John Doe')).toBeInTheDocument();
   });
   
@@ -1424,7 +1415,7 @@ interface User {
 function UserProfile({ userId }: { userId: string }) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['user', userId],
-    queryFn: () => fetch(`/api/users/${userId}`).then(res => res.json())
+    queryFn: () =&gt; fetch(`/api/users/${userId}`).then(res =&gt; res.json())
   });
   
   if (isLoading) return &lt;div&gt;Loading...&lt;/div&gt;;
@@ -1449,8 +1440,8 @@ function createTestQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        retry: false, // Don't retry failed queries in tests
-        cacheTime: 0, // Don't cache between tests
+        retry: false, // Failed queries retry 3x by default — off for fast, deterministic tests
+        gcTime: 0,    // TanStack Query v5 renamed cacheTime -&gt; gcTime; 0 = no cross-test caching
       },
     },
   });
@@ -1469,21 +1460,19 @@ function renderWithQueryClient(ui: React.ReactElement) {
 
                 <h3>Testing React Query Success State</h3>
                 <pre><code class="language-typescript">
-test('displays user data from React Query', async () => {
+test('displays user data from React Query', async () =&gt; {
   server.use(
-    rest.get('/api/users/123', (req, res, ctx) => {
-      return res(
-        ctx.json({
-          id: '123',
-          name: 'John Doe',
-          email: 'john@example.com'
-        })
-      );
+    http.get('/api/users/123', () =&gt; {
+      return HttpResponse.json({
+        id: '123',
+        name: 'John Doe',
+        email: 'john@example.com'
+      });
     })
   );
-  
+
   renderWithQueryClient(&lt;UserProfile userId="123" /&gt;);
-  
+
   // Shows loading initially
   expect(screen.getByText('Loading...')).toBeInTheDocument();
   
@@ -1495,15 +1484,15 @@ test('displays user data from React Query', async () => {
 
                 <h3>Testing React Query Error State</h3>
                 <pre><code class="language-typescript">
-test('handles React Query errors', async () => {
+test('handles React Query errors', async () =&gt; {
   server.use(
-    rest.get('/api/users/123', (req, res, ctx) => {
-      return res(ctx.status(500));
+    http.get('/api/users/123', () =&gt; {
+      return new HttpResponse(null, { status: 500 });
     })
   );
-  
+
   renderWithQueryClient(&lt;UserProfile userId="123" /&gt;);
-  
+
   expect(await screen.findByText('Error loading user')).toBeInTheDocument();
 });
                 </code></pre>
@@ -1517,18 +1506,18 @@ function CreateUserForm() {
   const [name, setName] = React.useState('');
   
   const mutation = useMutation({
-    mutationFn: (newUser: { name: string }) => 
+    mutationFn: (newUser: { name: string }) =&gt; 
       fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUser)
-      }).then(res => res.json()),
-    onSuccess: () => {
+      }).then(res =&gt; res.json()),
+    onSuccess: () =&gt; {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     }
   });
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     mutation.mutate({ name });
   };
@@ -1537,33 +1526,31 @@ function CreateUserForm() {
     &lt;form onSubmit={handleSubmit}&gt;
       &lt;input
         value={name}
-        onChange={e => setName(e.target.value)}
+        onChange={e =&gt; setName(e.target.value)}
         placeholder="User name"
       /&gt;
       &lt;button type="submit" disabled={mutation.isPending}&gt;
         {mutation.isPending ? 'Creating...' : 'Create User'}
       &lt;/button&gt;
-      {mutation.isError && &lt;div&gt;Error creating user&lt;/div&gt;}
-      {mutation.isSuccess && &lt;div&gt;User created!&lt;/div&gt;}
+      {mutation.isError &amp;&amp; &lt;div&gt;Error creating user&lt;/div&gt;}
+      {mutation.isSuccess &amp;&amp; &lt;div&gt;User created!&lt;/div&gt;}
     &lt;/form&gt;
   );
 }
 
-test('creates user with mutation', async () => {
+test('creates user with mutation', async () =&gt; {
   const user = userEvent.setup();
   
   server.use(
-    rest.post('/api/users', async (req, res, ctx) => {
-      const body = await req.json();
-      return res(
-        ctx.json({
-          id: '123',
-          ...body
-        })
-      );
+    http.post('/api/users', async ({ request }) =&gt; {
+      const body = (await request.json()) as Record&lt;string, unknown&gt;;
+      return HttpResponse.json({
+        id: '123',
+        ...body
+      });
     })
   );
-  
+
   renderWithQueryClient(&lt;CreateUserForm /&gt;);
   
   const input = screen.getByPlaceholderText('User name');
@@ -1582,19 +1569,17 @@ test('creates user with mutation', async () => {
 
                 <h3>Testing Query Invalidation</h3>
                 <pre><code class="language-typescript">
-test('invalidates queries after mutation', async () => {
+test('invalidates queries after mutation', async () =&gt; {
   const user = userEvent.setup();
   let queryCount = 0;
   
   server.use(
-    rest.get('/api/users', (req, res, ctx) => {
+    http.get('/api/users', () =&gt; {
       queryCount++;
-      return res(
-        ctx.json([{ id: '1', name: `User ${queryCount}` }])
-      );
+      return HttpResponse.json([{ id: '1', name: `User ${queryCount}` }]);
     }),
-    rest.post('/api/users', async (req, res, ctx) => {
-      return res(ctx.json({ id: '2', name: 'New User' }));
+    http.post('/api/users', () =&gt; {
+      return HttpResponse.json({ id: '2', name: 'New User' });
     })
   );
   
@@ -1614,7 +1599,7 @@ test('invalidates queries after mutation', async () => {
   await user.click(screen.getByText('Create User'));
   
   // Query should be invalidated and refetched
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(queryCount).toBe(2);
   });
 });
@@ -1622,7 +1607,7 @@ test('invalidates queries after mutation', async () => {
 
                 <h3>Testing with Prefilled Cache</h3>
                 <pre><code class="language-typescript">
-test('uses cached data', async () => {
+test('uses cached data', async () =&gt; {
   const testQueryClient = createTestQueryClient();
   
   // Prefill cache
@@ -1648,7 +1633,7 @@ test('uses cached data', async () => {
                     <h4>✅ React Query Testing Tips</h4>
                     <ul>
                         <li><strong>Disable retries:</strong> Set <code>retry: false</code> in test config</li>
-                        <li><strong>Clear cache:</strong> Use <code>cacheTime: 0</code> to prevent test pollution</li>
+                        <li><strong>Clear cache:</strong> Use <code>gcTime: 0</code> (the v5 name for <code>cacheTime</code>) to prevent test pollution</li>
                         <li><strong>Create fresh clients:</strong> New QueryClient for each test</li>
                         <li><strong>Test invalidation:</strong> Verify cache is refreshed after mutations</li>
                         <li><strong>Use MSW for API:</strong> Mock at network level, not Query functions</li>
@@ -1671,59 +1656,57 @@ function InfinitePostList() {
   const [hasMore, setHasMore] = React.useState(true);
   const [loading, setLoading] = React.useState(false);
   
-  const loadMore = React.useCallback(async () => {
+  const loadMore = React.useCallback(async () =&gt; {
     if (loading || !hasMore) return;
     
     setLoading(true);
     const response = await fetch(`/api/posts?page=${page}`);
     const data = await response.json();
     
-    setPosts(prev => [...prev, ...data.posts]);
+    setPosts(prev =&gt; [...prev, ...data.posts]);
     setHasMore(data.hasMore);
-    setPage(prev => prev + 1);
+    setPage(prev =&gt; prev + 1);
     setLoading(false);
   }, [page, loading, hasMore]);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     loadMore();
   }, []);
   
   return (
     &lt;div&gt;
-      {posts.map(post => (
+      {posts.map(post =&gt; (
         &lt;article key={post.id}&gt;{post.title}&lt;/article&gt;
       ))}
-      {hasMore && (
+      {hasMore &amp;&amp; (
         &lt;button onClick={loadMore} disabled={loading}&gt;
           {loading ? 'Loading...' : 'Load More'}
         &lt;/button&gt;
       )}
-      {!hasMore && &lt;p&gt;No more posts&lt;/p&gt;}
+      {!hasMore &amp;&amp; &lt;p&gt;No more posts&lt;/p&gt;}
     &lt;/div&gt;
   );
 }
 
-test('loads more posts on button click', async () => {
+test('loads more posts on button click', async () =&gt; {
   const user = userEvent.setup();
   let requestCount = 0;
   
   server.use(
-    rest.get('/api/posts', (req, res, ctx) => {
-      const page = req.url.searchParams.get('page') || '1';
+    http.get('/api/posts', ({ request }) =&gt; {
+      const page = new URL(request.url).searchParams.get('page') ?? '1';
       requestCount++;
-      
-      return res(
-        ctx.json({
-          posts: [
-            { id: `${page}-1`, title: `Post ${page}-1` },
-            { id: `${page}-2`, title: `Post ${page}-2` }
-          ],
-          hasMore: parseInt(page) < 3
-        })
-      );
+
+      return HttpResponse.json({
+        posts: [
+          { id: `${page}-1`, title: `Post ${page}-1` },
+          { id: `${page}-2`, title: `Post ${page}-2` }
+        ],
+        hasMore: Number(page) &lt; 3
+      });
     })
   );
-  
+
   render(&lt;InfinitePostList /&gt;);
   
   // First page loads automatically
@@ -1761,9 +1744,9 @@ function PaginatedList() {
   const [page, setPage] = React.useState(1);
   const [data, setData] = React.useState&lt;any&gt;(null);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     fetch(`/api/posts?page=${page}`)
-      .then(res => res.json())
+      .then(res =&gt; res.json())
       .then(setData);
   }, [page]);
   
@@ -1771,18 +1754,18 @@ function PaginatedList() {
   
   return (
     &lt;div&gt;
-      {data.posts.map((post: Post) => (
+      {data.posts.map((post: Post) =&gt; (
         &lt;div key={post.id}&gt;{post.title}&lt;/div&gt;
       ))}
       &lt;button
-        onClick={() => setPage(p => p - 1)}
+        onClick={() =&gt; setPage(p =&gt; p - 1)}
         disabled={page === 1}
       &gt;
         Previous
       &lt;/button&gt;
       &lt;span&gt;Page {page} of {data.totalPages}&lt;/span&gt;
       &lt;button
-        onClick={() => setPage(p => p + 1)}
+        onClick={() =&gt; setPage(p =&gt; p + 1)}
         disabled={page === data.totalPages}
       &gt;
         Next
@@ -1791,24 +1774,22 @@ function PaginatedList() {
   );
 }
 
-test('navigates through pages', async () => {
+test('navigates through pages', async () =&gt; {
   const user = userEvent.setup();
   
   server.use(
-    rest.get('/api/posts', (req, res, ctx) => {
-      const page = parseInt(req.url.searchParams.get('page') || '1');
-      
-      return res(
-        ctx.json({
-          posts: [
-            { id: `${page}-1`, title: `Page ${page} Post 1` }
-          ],
-          totalPages: 3
-        })
-      );
+    http.get('/api/posts', ({ request }) =&gt; {
+      const page = Number(new URL(request.url).searchParams.get('page') ?? '1');
+
+      return HttpResponse.json({
+        posts: [
+          { id: `${page}-1`, title: `Page ${page} Post 1` }
+        ],
+        totalPages: 3
+      });
     })
   );
-  
+
   render(&lt;PaginatedList /&gt;);
   
   // First page
@@ -1846,7 +1827,7 @@ function SearchComponent() {
   const [searching, setSearching] = React.useState(false);
   
   const searchApi = React.useMemo(
-    () => debounce(async (searchQuery: string) => {
+    () =&gt; debounce(async (searchQuery: string) =&gt; {
       if (!searchQuery) {
         setResults([]);
         return;
@@ -1861,7 +1842,7 @@ function SearchComponent() {
     []
   );
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     searchApi(query);
   }, [query, searchApi]);
   
@@ -1869,12 +1850,12 @@ function SearchComponent() {
     &lt;div&gt;
       &lt;input
         value={query}
-        onChange={e => setQuery(e.target.value)}
+        onChange={e =&gt; setQuery(e.target.value)}
         placeholder="Search..."
       /&gt;
-      {searching && &lt;div&gt;Searching...&lt;/div&gt;}
+      {searching &amp;&amp; &lt;div&gt;Searching...&lt;/div&gt;}
       &lt;ul&gt;
-        {results.map((result, i) => (
+        {results.map((result, i) =&gt; (
           &lt;li key={i}&gt;{result}&lt;/li&gt;
         ))}
       &lt;/ul&gt;
@@ -1882,27 +1863,25 @@ function SearchComponent() {
   );
 }
 
-test('debounces search requests', async () => {
+test('debounces search requests', async () =&gt; {
   const user = userEvent.setup();
   let requestCount = 0;
   
   server.use(
-    rest.get('/api/search', (req, res, ctx) => {
+    http.get('/api/search', ({ request }) =&gt; {
       requestCount++;
-      const query = req.url.searchParams.get('q');
-      
-      return res(
-        ctx.json({
-          results: [`Result for ${query}`]
-        })
-      );
+      const query = new URL(request.url).searchParams.get('q');
+
+      return HttpResponse.json({
+        results: [`Result for ${query}`]
+      });
     })
   );
-  
+
   render(&lt;SearchComponent /&gt;);
-  
+
   const input = screen.getByPlaceholderText('Search...');
-  
+
   // Type quickly - should only trigger one request after debounce
   await user.type(input, 'react');
   
@@ -1913,23 +1892,21 @@ test('debounces search requests', async () => {
   expect(requestCount).toBe(1);
 });
 
-test('cancels previous search when typing continues', async () => {
+test('cancels previous search when typing continues', async () =&gt; {
   const user = userEvent.setup();
   const searches: string[] = [];
   
   server.use(
-    rest.get('/api/search', async (req, res, ctx) => {
-      const query = req.url.searchParams.get('q');
+    http.get('/api/search', async ({ request }) =&gt; {
+      const query = new URL(request.url).searchParams.get('q');
       searches.push(query || '');
-      
+
       // Simulate slow search
-      await ctx.delay(100);
-      
-      return res(
-        ctx.json({
-          results: [`Result for ${query}`]
-        })
-      );
+      await delay(100);
+
+      return HttpResponse.json({
+        results: [`Result for ${query}`]
+      });
     })
   );
   
@@ -1939,7 +1916,7 @@ test('cancels previous search when typing continues', async () => {
   
   // Type "re", wait, then type "act"
   await user.type(input, 're');
-  await new Promise(resolve => setTimeout(resolve, 350));
+  await new Promise(resolve =&gt; setTimeout(resolve, 350));
   await user.type(input, 'act');
   
   // Should show final results
@@ -1955,47 +1932,46 @@ test('cancels previous search when typing continues', async () => {
 function LiveCounter() {
   const [count, setCount] = React.useState(0);
   
-  React.useEffect(() => {
-    const interval = setInterval(() => {
+  React.useEffect(() =&gt; {
+    const interval = setInterval(() =&gt; {
       fetch('/api/counter')
-        .then(res => res.json())
-        .then(data => setCount(data.count));
+        .then(res =&gt; res.json())
+        .then(data =&gt; setCount(data.count));
     }, 1000);
     
-    return () => clearInterval(interval);
+    return () =&gt; clearInterval(interval);
   }, []);
   
   return &lt;div&gt;Count: {count}&lt;/div&gt;;
 }
 
-test('polls for updates', async () => {
+test('polls for updates', async () =&gt; {
   vi.useFakeTimers();
   let currentCount = 0;
-  
+
   server.use(
-    rest.get('/api/counter', (req, res, ctx) => {
+    http.get('/api/counter', () =&gt; {
       currentCount++;
-      return res(ctx.json({ count: currentCount }));
+      return HttpResponse.json({ count: currentCount });
     })
   );
-  
+
   render(&lt;LiveCounter /&gt;);
-  
+
   // Initial render
   expect(screen.getByText('Count: 0')).toBeInTheDocument();
-  
-  // First poll (1 second later)
-  vi.advanceTimersByTime(1000);
-  expect(await screen.findByText('Count: 1')).toBeInTheDocument();
-  
-  // Second poll
-  vi.advanceTimersByTime(1000);
-  expect(await screen.findByText('Count: 2')).toBeInTheDocument();
-  
-  // Third poll
-  vi.advanceTimersByTime(1000);
-  expect(await screen.findByText('Count: 3')).toBeInTheDocument();
-  
+
+  // Each async advance fires the interval AND flushes the fetch it triggers,
+  // so the DOM is up to date by the time we assert (no findBy needed).
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(screen.getByText('Count: 1')).toBeInTheDocument();
+
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(screen.getByText('Count: 2')).toBeInTheDocument();
+
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(screen.getByText('Count: 3')).toBeInTheDocument();
+
   vi.useRealTimers();
 });
                 </code></pre>
@@ -2005,10 +1981,10 @@ test('polls for updates', async () => {
 function TodoList() {
   const [todos, setTodos] = React.useState&lt;Todo[]&gt;([]);
   
-  const toggleTodo = async (id: string) => {
+  const toggleTodo = async (id: string) =&gt; {
     // Optimistic update
-    setTodos(prev => 
-      prev.map(todo => 
+    setTodos(prev =&gt; 
+      prev.map(todo =&gt; 
         todo.id === id 
           ? { ...todo, completed: !todo.completed }
           : todo
@@ -2019,8 +1995,8 @@ function TodoList() {
       await fetch(`/api/todos/${id}/toggle`, { method: 'POST' });
     } catch (error) {
       // Rollback on error
-      setTodos(prev => 
-        prev.map(todo => 
+      setTodos(prev =&gt; 
+        prev.map(todo =&gt; 
           todo.id === id 
             ? { ...todo, completed: !todo.completed }
             : todo
@@ -2031,12 +2007,12 @@ function TodoList() {
   
   return (
     &lt;ul&gt;
-      {todos.map(todo => (
+      {todos.map(todo =&gt; (
         &lt;li key={todo.id}&gt;
           &lt;input
             type="checkbox"
             checked={todo.completed}
-            onChange={() => toggleTodo(todo.id)}
+            onChange={() =&gt; toggleTodo(todo.id)}
           /&gt;
           {todo.title}
         &lt;/li&gt;
@@ -2045,17 +2021,17 @@ function TodoList() {
   );
 }
 
-test('updates UI optimistically', async () => {
+test('updates UI optimistically', async () =&gt; {
   const user = userEvent.setup();
   
   server.use(
-    rest.post('/api/todos/:id/toggle', async (req, res, ctx) => {
+    http.post('/api/todos/:id/toggle', async () =&gt; {
       // Simulate slow network
-      await ctx.delay(500);
-      return res(ctx.status(200));
+      await delay(500);
+      return new HttpResponse(null, { status: 200 });
     })
   );
-  
+
   // Start with initial todos
   render(&lt;TodoList /&gt;);
   // ... set up initial state
@@ -2072,34 +2048,34 @@ test('updates UI optimistically', async () => {
   expect(checkbox).toBeChecked();
   
   // Wait for API call to complete
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     // Still checked after API confirms
     expect(checkbox).toBeChecked();
   });
 });
 
-test('rolls back on error', async () => {
+test('rolls back on error', async () =&gt; {
   const user = userEvent.setup();
   
   server.use(
-    rest.post('/api/todos/:id/toggle', (req, res, ctx) => {
-      return res(ctx.status(500));
+    http.post('/api/todos/:id/toggle', () =&gt; {
+      return new HttpResponse(null, { status: 500 });
     })
   );
-  
+
   render(&lt;TodoList /&gt;);
   // ... set up initial state
-  
+
   const checkbox = screen.getByRole('checkbox');
-  
+
   // Click checkbox
   await user.click(checkbox);
-  
+
   // Immediately checked
   expect(checkbox).toBeChecked();
   
   // Should roll back after error
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(checkbox).not.toBeChecked();
   });
 });
@@ -2137,31 +2113,31 @@ function UserProfileLoader({ userId }: { userId: string }) {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState&lt;string | null&gt;(null);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     let cancelled = false;
     
     setLoading(true);
     setError(null);
     
     fetch(`/api/users/${userId}/profile`)
-      .then(res => {
+      .then(res =&gt; {
         if (!res.ok) throw new Error('Failed to load profile');
         return res.json();
       })
-      .then(data => {
+      .then(data =&gt; {
         if (!cancelled) {
           setProfile(data);
           setLoading(false);
         }
       })
-      .catch(err => {
+      .catch(err =&gt; {
         if (!cancelled) {
           setError(err.message);
           setLoading(false);
         }
       });
     
-    return () => {
+    return () =&gt; {
       cancelled = true;
     };
   }, [userId]);
@@ -2197,73 +2173,69 @@ function UserProfileLoader({ userId }: { userId: string }) {
                     <details>
                         <summary>✅ Solution</summary>
                         <pre><code class="language-typescript">
-describe('UserProfileLoader', () => {
-  it('displays profile after loading', async () => {
+describe('UserProfileLoader', () =&gt; {
+  it('displays profile after loading', async () =&gt; {
     server.use(
-      rest.get('/api/users/123/profile', (req, res, ctx) => {
-        return res(
-          ctx.json({
-            name: 'Jane Doe',
-            bio: 'Software Developer',
-            followers: 1500
-          })
-        );
+      http.get('/api/users/123/profile', () =&gt; {
+        return HttpResponse.json({
+          name: 'Jane Doe',
+          bio: 'Software Developer',
+          followers: 1500
+        });
       })
     );
-    
+
     render(&lt;UserProfileLoader userId="123" /&gt;);
-    
+
     expect(screen.getByText('Loading profile...')).toBeInTheDocument();
-    
+
     expect(await screen.findByText('Jane Doe')).toBeInTheDocument();
     expect(screen.getByText('Software Developer')).toBeInTheDocument();
     expect(screen.getByText('Followers: 1500')).toBeInTheDocument();
   });
-  
-  it('handles errors', async () => {
+
+  it('handles errors', async () =&gt; {
     server.use(
-      rest.get('/api/users/123/profile', (req, res, ctx) => {
-        return res(ctx.status(500));
+      http.get('/api/users/123/profile', () =&gt; {
+        return new HttpResponse(null, { status: 500 });
       })
     );
-    
+
     render(&lt;UserProfileLoader userId="123" /&gt;);
-    
+
     expect(
       await screen.findByText('Error: Failed to load profile')
     ).toBeInTheDocument();
   });
-  
-  it('refetches when userId changes', async () => {
+
+  it('refetches when userId changes', async () =&gt; {
     server.use(
-      rest.get('/api/users/:id/profile', (req, res, ctx) => {
-        const { id } = req.params;
-        return res(
-          ctx.json({
-            name: `User ${id}`,
-            bio: `Bio ${id}`,
-            followers: 100
-          })
-        );
+      http.get('/api/users/:id/profile', ({ params }) =&gt; {
+        const { id } = params;
+        return HttpResponse.json({
+          name: `User ${id}`,
+          bio: `Bio ${id}`,
+          followers: 100
+        });
       })
     );
-    
+
     const { rerender } = render(&lt;UserProfileLoader userId="123" /&gt;);
-    
+
     expect(await screen.findByText('User 123')).toBeInTheDocument();
-    
+
     rerender(&lt;UserProfileLoader userId="456" /&gt;);
-    
+
     expect(await screen.findByText('User 456')).toBeInTheDocument();
   });
-  
-  it('cancels requests on unmount', async () => {
+
+  it('cancels requests on unmount', async () =&gt; {
     const consoleError = vi.spyOn(console, 'error');
-    
+
     server.use(
-      rest.get('/api/users/123/profile', async (req, res, ctx) => {
-        await ctx.delay(100);
-        return res(ctx.json({ name: 'Test' }));
+      http.get('/api/users/123/profile', async () =&gt; {
+        await delay(100);
+        return HttpResponse.json({ name: 'Test' });
       })
     );
     
@@ -2273,7 +2245,7 @@ describe('UserProfileLoader', () => {
     unmount();
     
     // Wait for request to complete
-    await new Promise(resolve => setTimeout(resolve, 150));
+    await new Promise(resolve =&gt; setTimeout(resolve, 150));
     
     // Should not have errors from state updates after unmount
     expect(consoleError).not.toHaveBeenCalled();
@@ -2298,7 +2270,7 @@ function AutoSaveEditor({ documentId }: { documentId: string }) {
   const [lastSaved, setLastSaved] = React.useState&lt;Date | null&gt;(null);
   
   const saveDocument = React.useMemo(
-    () => debounce(async (text: string) => {
+    () =&gt; debounce(async (text: string) =&gt; {
       setSaving(true);
       await fetch(`/api/documents/${documentId}`, {
         method: 'PUT',
@@ -2310,7 +2282,7 @@ function AutoSaveEditor({ documentId }: { documentId: string }) {
     [documentId]
   );
   
-  const handleChange = (e: React.ChangeEvent&lt;HTMLTextAreaElement&gt;) => {
+  const handleChange = (e: React.ChangeEvent&lt;HTMLTextAreaElement&gt;) =&gt; {
     const newContent = e.target.value;
     setContent(newContent);
     saveDocument(newContent);
@@ -2319,8 +2291,8 @@ function AutoSaveEditor({ documentId }: { documentId: string }) {
   return (
     &lt;div&gt;
       &lt;textarea value={content} onChange={handleChange} /&gt;
-      {saving && &lt;span&gt;Saving...&lt;/span&gt;}
-      {lastSaved && &lt;span&gt;Saved at {lastSaved.toLocaleTimeString()}&lt;/span&gt;}
+      {saving &amp;&amp; &lt;span&gt;Saving...&lt;/span&gt;}
+      {lastSaved &amp;&amp; &lt;span&gt;Saved at {lastSaved.toLocaleTimeString()}&lt;/span&gt;}
     &lt;/div&gt;
   );
 }
@@ -2343,107 +2315,102 @@ function AutoSaveEditor({ documentId }: { documentId: string }) {
                     <details>
                         <summary>✅ Solution</summary>
                         <pre><code class="language-typescript">
-describe('AutoSaveEditor', () => {
-  beforeEach(() => {
+describe('AutoSaveEditor', () =&gt; {
+  beforeEach(() =&gt; {
     vi.useFakeTimers();
   });
   
-  afterEach(() => {
+  afterEach(() =&gt; {
     vi.useRealTimers();
   });
   
-  it('saves after 500ms of inactivity', async () => {
-    const user = userEvent.setup({ delay: null });
+  it('saves after 500ms of inactivity', async () =&gt; {
+    // With fake timers, hand user-event the advance fn so its keystroke
+    // waits resolve against the same fake clock
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     let saveCount = 0;
-    
+
     server.use(
-      rest.put('/api/documents/doc1', (req, res, ctx) => {
+      http.put('/api/documents/doc1', () =&gt; {
         saveCount++;
-        return res(ctx.status(200));
+        return new HttpResponse(null, { status: 200 });
       })
     );
-    
+
     render(&lt;AutoSaveEditor documentId="doc1" /&gt;);
-    
+
     const textarea = screen.getByRole('textbox');
     await user.type(textarea, 'Hello');
-    
-    // Should not save immediately
+
+    // Should not save immediately — the debounce hasn't elapsed
     expect(saveCount).toBe(0);
-    
-    // Advance time
-    vi.advanceTimersByTime(500);
-    
-    // Should have saved once
-    await waitFor(() => {
-      expect(saveCount).toBe(1);
-    });
+
+    // Cross the 500ms debounce; the async advance flushes the PUT too
+    await vi.advanceTimersByTimeAsync(500);
+    expect(saveCount).toBe(1);
   });
-  
-  it('debounces multiple changes', async () => {
-    const user = userEvent.setup({ delay: null });
+
+  it('debounces multiple changes', async () =&gt; {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     let saveCount = 0;
-    
+
     server.use(
-      rest.put('/api/documents/doc1', (req, res, ctx) => {
+      http.put('/api/documents/doc1', () =&gt; {
         saveCount++;
-        return res(ctx.status(200));
+        return new HttpResponse(null, { status: 200 });
       })
     );
-    
+
     render(&lt;AutoSaveEditor documentId="doc1" /&gt;);
-    
+
     const textarea = screen.getByRole('textbox');
-    
-    // Type multiple times
+
+    // Type multiple times, never pausing long enough to trigger a save
     await user.type(textarea, 'H');
-    vi.advanceTimersByTime(100);
+    await vi.advanceTimersByTimeAsync(100);
     await user.type(textarea, 'e');
-    vi.advanceTimersByTime(100);
+    await vi.advanceTimersByTimeAsync(100);
     await user.type(textarea, 'l');
-    vi.advanceTimersByTime(100);
+    await vi.advanceTimersByTimeAsync(100);
     await user.type(textarea, 'l');
-    vi.advanceTimersByTime(100);
+    await vi.advanceTimersByTimeAsync(100);
     await user.type(textarea, 'o');
-    
-    // Only 100ms passed, shouldn't save yet
+
+    // Only 100ms since the last keystroke — shouldn't save yet
     expect(saveCount).toBe(0);
-    
-    // Wait full 500ms from last change
-    vi.advanceTimersByTime(500);
-    
-    // Should have saved only once
-    await waitFor(() => {
-      expect(saveCount).toBe(1);
-    });
+
+    // Wait the full 500ms from the last change
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Should have saved only once, for the final value
+    expect(saveCount).toBe(1);
   });
-  
-  it('shows saving indicator', async () => {
-    const user = userEvent.setup({ delay: null });
-    
+
+  it('shows saving indicator', async () =&gt; {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
     server.use(
-      rest.put('/api/documents/doc1', async (req, res, ctx) => {
-        await ctx.delay(100);
-        return res(ctx.status(200));
+      http.put('/api/documents/doc1', async () =&gt; {
+        await delay(100);
+        return new HttpResponse(null, { status: 200 });
       })
     );
-    
+
     render(&lt;AutoSaveEditor documentId="doc1" /&gt;);
-    
+
     const textarea = screen.getByRole('textbox');
     await user.type(textarea, 'Test');
-    
-    vi.advanceTimersByTime(500);
-    
-    // Should show saving indicator
-    expect(await screen.findByText('Saving...')).toBeInTheDocument();
-    
-    // Wait for save to complete
-    vi.advanceTimersByTime(100);
-    
-    await waitFor(() => {
-      expect(screen.queryByText('Saving...')).not.toBeInTheDocument();
-    });
+
+    // Fire the debounced save; the PUT is still in flight (100ms delay)
+    await vi.advanceTimersByTimeAsync(500);
+
+    // Should show the saving indicator while the request is pending
+    expect(screen.getByText('Saving...')).toBeInTheDocument();
+
+    // Let the request finish
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(screen.queryByText('Saving...')).not.toBeInTheDocument();
   });
 });
                         </code></pre>
@@ -2487,7 +2454,7 @@ describe('AutoSaveEditor', () => {
                 <div class="card card-success">
                     <h4>✅ Do This</h4>
                     <pre><code class="language-typescript">
-test('loads data', async () => {
+test('loads data', async () =&gt; {
   render(&lt;Component /&gt;);
   expect(await screen.findByText('Loaded')).toBeInTheDocument();
 });
@@ -2497,7 +2464,7 @@ test('loads data', async () => {
                 <div class="card card-warning">
                     <h4>❌ Don't Do This</h4>
                     <pre><code class="language-typescript">
-test('loads data', () => {
+test('loads data', () =&gt; {
   render(&lt;Component /&gt;);
   // This will fail - doesn't wait!
   expect(screen.getByText('Loaded')).toBeInTheDocument();
@@ -2511,8 +2478,8 @@ test('loads data', () => {
                     <pre><code class="language-typescript">
 // Set up MSW handlers
 server.use(
-  rest.get('/api/data', (req, res, ctx) => {
-    return res(ctx.json({ data: 'test' }));
+  http.get('/api/data', () =&gt; {
+    return HttpResponse.json({ data: 'test' });
   })
 );
                     </code></pre>
@@ -2523,7 +2490,7 @@ server.use(
                     <pre><code class="language-typescript">
 // Mocking fetch directly is brittle
 global.fetch = vi.fn().mockResolvedValue({
-  json: async () => ({ data: 'test' })
+  json: async () =&gt; ({ data: 'test' })
 });
                     </code></pre>
                 </div>
@@ -2538,35 +2505,35 @@ global.fetch = vi.fn().mockResolvedValue({
                 </ul>
 
                 <pre><code class="language-typescript">
-describe('DataComponent', () => {
-  it('shows loading state', () => {
+describe('DataComponent', () =&gt; {
+  it('shows loading state', () =&gt; {
     render(&lt;DataComponent /&gt;);
     expect(screen.getByText('Loading...')).toBeInTheDocument();
   });
   
-  it('shows success state', async () => {
+  it('shows success state', async () =&gt; {
     render(&lt;DataComponent /&gt;);
     expect(await screen.findByText('Data loaded')).toBeInTheDocument();
   });
   
-  it('shows error state', async () => {
+  it('shows error state', async () =&gt; {
     server.use(
-      rest.get('/api/data', (req, res, ctx) => {
-        return res(ctx.status(500));
+      http.get('/api/data', () =&gt; {
+        return new HttpResponse(null, { status: 500 });
       })
     );
-    
+
     render(&lt;DataComponent /&gt;);
     expect(await screen.findByText('Error')).toBeInTheDocument();
   });
-  
-  it('shows empty state', async () => {
+
+  it('shows empty state', async () =&gt; {
     server.use(
-      rest.get('/api/data', (req, res, ctx) => {
-        return res(ctx.json([]));
+      http.get('/api/data', () =&gt; {
+        return HttpResponse.json([]);
       })
     );
-    
+
     render(&lt;DataComponent /&gt;);
     expect(await screen.findByText('No data')).toBeInTheDocument();
   });
@@ -2582,7 +2549,7 @@ expect(
 
 // Or for waitFor
 await waitFor(
-  () => {
+  () =&gt; {
     expect(screen.getByText('Loaded')).toBeInTheDocument();
   },
   { timeout: 5000 }
@@ -2591,11 +2558,11 @@ await waitFor(
 
                 <h3>5. Clean Up After Tests</h3>
                 <pre><code class="language-typescript">
-beforeEach(() => {
+beforeEach(() =&gt; {
   vi.useFakeTimers();
 });
 
-afterEach(() => {
+afterEach(() =&gt; {
   vi.useRealTimers();
   server.resetHandlers();
   cleanup(); // Clean up rendered components
@@ -2604,19 +2571,19 @@ afterEach(() => {
 
                 <h3>6. Test Request Parameters</h3>
                 <pre><code class="language-typescript">
-test('sends correct request parameters', async () => {
+test('sends correct request parameters', async () =&gt; {
   let receivedBody: any;
   
   server.use(
-    rest.post('/api/users', async (req, res, ctx) => {
-      receivedBody = await req.json();
-      return res(ctx.json({ id: '123' }));
+    http.post('/api/users', async ({ request }) =&gt; {
+      receivedBody = await request.json();
+      return HttpResponse.json({ id: '123' });
     })
   );
-  
+
   // ... trigger request
-  
-  await waitFor(() => {
+
+  await waitFor(() =&gt; {
     expect(receivedBody).toEqual({
       name: 'John',
       email: 'john@example.com'
@@ -2627,21 +2594,21 @@ test('sends correct request parameters', async () => {
 
                 <h3>7. Handle Race Conditions</h3>
                 <pre><code class="language-typescript">
-test('cancels previous requests', async () => {
+test('cancels previous requests', async () =&gt; {
   const user = userEvent.setup();
   let requestCount = 0;
   
   server.use(
-    rest.get('/api/search', async (req, res, ctx) => {
+    http.get('/api/search', async ({ request }) =&gt; {
       requestCount++;
-      const query = req.url.searchParams.get('q');
-      await ctx.delay(100);
-      return res(ctx.json({ query }));
+      const query = new URL(request.url).searchParams.get('q');
+      await delay(100);
+      return HttpResponse.json({ query });
     })
   );
-  
+
   render(&lt;SearchComponent /&gt;);
-  
+
   const input = screen.getByRole('textbox');
   
   // Type different searches rapidly
@@ -2665,24 +2632,24 @@ function createWrapper() {
     defaultOptions: {
       queries: {
         retry: false,
-        cacheTime: 0,
+        gcTime: 0,
       },
     },
   });
-  
-  return ({ children }: { children: React.ReactNode }) => (
+
+  return ({ children }: { children: React.ReactNode }) =&gt; (
     &lt;QueryClientProvider client={queryClient}&gt;
       {children}
     &lt;/QueryClientProvider&gt;
   );
 }
 
-test('with React Query', async () => {
-  const { result } = renderHook(() => useUserQuery('123'), {
+test('with React Query', async () =&gt; {
+  const { result } = renderHook(() =&gt; useUserQuery('123'), {
     wrapper: createWrapper()
   });
   
-  await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  await waitFor(() =&gt; expect(result.current.isSuccess).toBe(true));
   expect(result.current.data.name).toBe('John');
 });
                 </code></pre>
@@ -2702,26 +2669,32 @@ test('with React Query', async () => {
                     <p><strong>Solution:</strong> Always wait for all state updates</p>
                     <pre><code class="language-typescript">
 // Wait for all updates
-await waitFor(() => {
+await waitFor(() =&gt; {
   expect(screen.queryByText('Loading')).not.toBeInTheDocument();
 });
 
 // Or use findBy which waits automatically
 await screen.findByText('Loaded');
+
+// With FAKE timers, prefer the async advance — it flushes the
+// state updates each timer fires, so React re-renders inside act()
+// for you (no manual act() wrapper, no warning):
+await vi.advanceTimersByTimeAsync(1000);
                     </code></pre>
+                    <p>This is why every fake-timer test in this lesson uses <code>vi.advanceTimersByTimeAsync()</code> rather than wrapping a synchronous <code>vi.advanceTimersByTime()</code> in <code>act()</code> — it's the current, warning-free idiom.</p>
                 </div>
 
                 <h3>10. Test Error Boundaries</h3>
                 <pre><code class="language-typescript">
-test('error boundary catches async errors', async () => {
-  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+test('error boundary catches async errors', async () =&gt; {
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() =&gt; {});
   
   server.use(
-    rest.get('/api/data', (req, res, ctx) => {
-      return res(ctx.status(500));
+    http.get('/api/data', () =&gt; {
+      return new HttpResponse(null, { status: 500 });
     })
   );
-  
+
   render(
     &lt;ErrorBoundary fallback={&lt;div&gt;Something went wrong&lt;/div&gt;}&gt;
       &lt;DataComponent /&gt;
@@ -2736,9 +2709,9 @@ test('error boundary catches async errors', async () => {
 
                 <div class="card card-accent">
                     <h4>📋 Async Testing Checklist</h4>
-                    <ul style="color: white;">
-                        <li>✅ Mark test functions as <code style="color: white;">async</code></li>
-                        <li>✅ Use <code style="color: white;">await</code> with findBy or waitFor</li>
+                    <ul>
+                        <li>✅ Mark test functions as <code>async</code></li>
+                        <li>✅ Use <code>await</code> with findBy or waitFor</li>
                         <li>✅ Mock APIs with MSW, not fetch directly</li>
                         <li>✅ Test loading, success, error, and empty states</li>
                         <li>✅ Set appropriate timeouts for slow operations</li>
@@ -2813,7 +2786,7 @@ test('error boundary catches async errors', async () => {
                     graph TB
                     A[Write Component with Async Logic] --> B[Set Up MSW Handlers]
                     B --> C[Write Test Cases]
-                    C --> D{Test Type?}
+                    C --> D{"Test Type?"}
                     D -->|Success| E[Mock Successful Response]
                     D -->|Error| F[Mock Error Response]
                     D -->|Loading| G[Test Initial State]

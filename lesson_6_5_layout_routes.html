@@ -96,7 +96,8 @@
                         <li><a href="#section5" class="toc-link">Multi-Layout Applications</a></li>
                         <li><a href="#section6" class="toc-link">Dynamic Breadcrumbs</a></li>
                         <li><a href="#section7" class="toc-link">Advanced Layout Patterns</a></li>
-                        <li><a href="#section8" class="toc-link">Summary and Module Project</a></li>
+                        <li><a href="#section8" class="toc-link">Best Practices</a></li>
+                        <li><a href="#section9" class="toc-link">Summary and Module Project</a></li>
                     </ol>
                 </nav>
             </details>
@@ -104,7 +105,16 @@
             <!-- Section 1: Understanding Layout Routes -->
             <section id="section1" aria-labelledby="section1-title">
                 <h2 id="section1-title">🏛️ Understanding Layout Routes</h2>
-                <p>Layout routes provide a way to share common UI elements (navigation, headers, footers, sidebars) across multiple pages while keeping the content unique for each route.</p>
+                <p>Think about a picture frame in an art gallery. The frame — the wall, the lighting, the little placard rail underneath — stays exactly the same all day. Only the <em>painting</em> inside it changes as the curator swaps pieces in and out. A <strong>layout route</strong> is that frame: your navigation bar, header, sidebar, and footer stay mounted and stable, while React Router slots a different page into the middle every time the URL changes. 🖼️</p>
+
+                <p>This matters because in a real application the "frame" is the majority of your UI. Rebuilding it on every page is wasteful to write, easy to get subtly inconsistent, and jarring for users when it flickers or resets on navigation. Layout routes let you declare the frame <em>once</em> and let every child route borrow it.</p>
+
+                <div class="card card-info">
+                    <h4>🧭 Version note: React Router v7</h4>
+                    <p>This lesson targets <strong>React Router v7</strong> (2026) with <strong>React 19</strong> and <strong>TypeScript 5.x</strong>. In v7 the package to import from is simply <code>react-router</code> — the old <code>react-router-dom</code> still works as a compatibility re-export, but the modern, recommended import is:</p>
+                    <pre><code class="language-typescript">import { Routes, Route, Outlet, NavLink } from 'react-router';</code></pre>
+                    <p>Everything in this lesson uses function components and the current hook-based API. If you are on an older v6 project, the concepts are identical — only the import path changed.</p>
+                </div>
 
                 <h3>The Problem: Duplicated UI Code</h3>
                 <p>Without layout routes, you'd repeat the same navigation and structure in every component:</p>
@@ -165,7 +175,7 @@ function AboutPage() {
 
                 <div class="card card-accent">
                     <h4>📖 Layout Route Benefits</h4>
-                    <ul style="color: white;">
+                    <ul>
                         <li><strong>DRY Principle</strong> - Don't repeat shared UI code</li>
                         <li><strong>Consistent UX</strong> - Navigation stays in place during transitions</li>
                         <li><strong>Easier Maintenance</strong> - Update header once, affects all pages</li>
@@ -178,7 +188,7 @@ function AboutPage() {
                 <h3>How Layout Routes Work</h3>
                 <div class="mermaid">
                 flowchart TD
-                    A[User Navigates to /about] --> B[React Router]
+                    A["User Navigates to /about"] --> B[React Router]
                     B --> C[Finds Layout Route]
                     C --> D[Renders MainLayout]
                     D --> E[MainLayout renders Header]
@@ -226,7 +236,7 @@ function AboutPage() {
                 </table>
 
                 <h3>Basic Layout Route Structure</h3>
-                <pre><code class="language-typescript">import { Routes, Route, Outlet } from 'react-router-dom';
+                <pre><code class="language-typescript">import { Routes, Route, Outlet } from 'react-router';
 
 // Layout component
 function MainLayout() {
@@ -266,17 +276,54 @@ function App() {
                         <li><strong>Persistence</strong> - Layout doesn't unmount when switching between children</li>
                     </ul>
                 </div>
+
+                <h3>Pathless Routes: Grouping Without a URL Segment</h3>
+                <p>Notice that a layout route has an <code>element</code> but <em>no</em> <code>path</code>. A <code>&lt;Route&gt;</code> without a path is called a <strong>pathless route</strong>, and it is one of the most quietly powerful tools in React Router. It adds a level to the route tree without adding a segment to the URL.</p>
+                <p>A layout is the obvious use, but pathless routes are just as handy for grouping routes that share behavior but <em>no</em> visible chrome — for example, wrapping a batch of pages in a single authentication guard or error boundary:</p>
+                <pre><code class="language-typescript">import { Routes, Route, Outlet } from 'react-router';
+
+&lt;Routes&gt;
+  {/* Pathless group: a shared guard, but no shared UI and no URL segment */}
+  &lt;Route element={&lt;RequireAuth&gt;&lt;Outlet /&gt;&lt;/RequireAuth&gt;}&gt;
+    &lt;Route path="/dashboard" element={&lt;Dashboard /&gt;} /&gt;
+    &lt;Route path="/settings" element={&lt;Settings /&gt;} /&gt;
+  &lt;/Route&gt;
+&lt;/Routes&gt;
+{/* /dashboard and /settings are both protected — no "/group" appears in the URL */}</code></pre>
+                <p>So there are really two jobs a pathless route can do: give a set of children a <em>shared layout</em> (with visible chrome and an <code>&lt;Outlet /&gt;</code>), or simply <em>group</em> them under shared logic. Same mechanism, two payoffs.</p>
             </section>
 
             <!-- Section 2: The Outlet Component -->
             <section id="section2" aria-labelledby="section2-title">
                 <h2 id="section2-title">🔌 The Outlet Component</h2>
-                <p>The <code>&lt;Outlet /&gt;</code> component is the magic that makes layout routes work. It acts as a placeholder where child routes will be rendered.</p>
+                <p>The <code>&lt;Outlet /&gt;</code> component is the piece that makes the whole "frame" idea work. It marks the exact spot in your layout where the active child route should appear — the empty space inside the picture frame where today's painting hangs.</p>
+
+                <p>Here is the mental model that makes it click: your layout renders once and stays on screen. Inside it, <code>&lt;Outlet /&gt;</code> is a live window. As the URL changes, React Router looks at which child route matches and renders that component <em>into the window</em>. The header above it and footer below it never re-render — only the contents of the window swap out.</p>
+
+                <figure>
+                    <svg class="svg-auto-invert" viewBox="0 0 460 260" width="100%" style="max-width: 460px;" role="img" aria-labelledby="outlet-fig-title outlet-fig-desc">
+                        <title id="outlet-fig-title">Persistent layout chrome with a swapping Outlet</title>
+                        <desc id="outlet-fig-desc">A header, sidebar, and footer stay fixed while the central Outlet region swaps between the Home, About, and Contact pages as the URL changes.</desc>
+                        <rect x="20" y="20" width="420" height="220" rx="10" fill="none" stroke="#667eea" stroke-width="2"/>
+                        <rect x="20" y="20" width="420" height="40" rx="10" fill="#667eea" fill-opacity="0.25"/>
+                        <text x="230" y="45" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#4a3f9f">Header + Nav (persists)</text>
+                        <rect x="20" y="60" width="110" height="150" fill="#764ba2" fill-opacity="0.18"/>
+                        <text x="75" y="140" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#5a4faf">Sidebar</text>
+                        <text x="75" y="156" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#5a4faf">(persists)</text>
+                        <rect x="145" y="72" width="280" height="126" rx="8" fill="#48bb78" fill-opacity="0.18" stroke="#48bb78" stroke-width="2" stroke-dasharray="6,4"/>
+                        <text x="285" y="120" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#2f855a">&lt;Outlet /&gt;</text>
+                        <text x="285" y="142" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#2f855a">Home → About → Contact</text>
+                        <text x="285" y="158" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#2f855a">(swaps with the URL)</text>
+                        <rect x="20" y="210" width="420" height="30" rx="10" fill="#667eea" fill-opacity="0.25"/>
+                        <text x="230" y="230" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#4a3f9f">Footer (persists)</text>
+                    </svg>
+                    <figcaption>Figure 1: The header, sidebar, and footer are rendered once by the layout. Only the dashed <code>&lt;Outlet /&gt;</code> region re-renders as you navigate.</figcaption>
+                </figure>
 
                 <h3>How Outlet Works</h3>
-                <p>Think of Outlet like a slot machine - it shows whatever child route matches the current URL:</p>
+                <p>In code, you drop <code>&lt;Outlet /&gt;</code> wherever the page-specific content belongs and let the router fill it in:</p>
 
-                <pre><code class="language-typescript">import { Outlet } from 'react-router-dom';
+                <pre><code class="language-typescript">import { Outlet } from 'react-router';
 
 function Layout() {
   return (
@@ -298,10 +345,11 @@ function Layout() {
 // When URL is "/"      → Outlet renders HomePage
 // When URL is "/about" → Outlet renders AboutPage</code></pre>
 
-                <h3>Outlet Context</h3>
-                <p>You can pass data from the layout to child routes using Outlet context:</p>
+                <h3>Passing Data Down with Outlet Context</h3>
+                <p>Because the layout wraps every child, it is the natural place to hold state that all pages share — the logged-in user, the current theme, a "collapse the sidebar" toggle. Rather than reaching for a full React Context provider for something this local, React Router gives you a lightweight shortcut: pass a value to <code>&lt;Outlet context={...} /&gt;</code>, and any child reads it back with the typed hook <code>useOutletContext&lt;T&gt;()</code>.</p>
+                <p>Think of it as handing a note through the picture frame to whatever painting is hanging there right now:</p>
 
-                <pre><code class="language-typescript">import { Outlet, useOutletContext } from 'react-router-dom';
+                <pre><code class="language-typescript">import { Outlet, useOutletContext } from 'react-router';
 
 // Layout passes context to children
 interface LayoutContextType {
@@ -320,7 +368,7 @@ function Layout() {
   return (
     &lt;div className={`layout-${theme}`}&gt;
       &lt;header&gt;
-        &lt;button onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}&gt;
+        &lt;button onClick={() =&gt; setTheme(t =&gt; t === 'light' ? 'dark' : 'light')}&gt;
           Toggle Theme
         &lt;/button&gt;
       &lt;/header&gt;
@@ -344,38 +392,60 @@ function ProfilePage() {
   );
 }</code></pre>
 
-                <h3>Multiple Outlets (Advanced)</h3>
-                <p>You can have named outlets for complex layouts:</p>
+                <div class="card card-info">
+                    <h4>💡 A cleaner pattern: export a typed hook</h4>
+                    <p>Writing <code>useOutletContext&lt;LayoutContextType&gt;()</code> in every child is repetitive and easy to get wrong. The idiomatic move is to define the context type <em>and</em> a typed accessor next to the layout, then have children import that:</p>
+                    <pre><code class="language-typescript">// layouts/MainLayout.tsx
+import { Outlet, useOutletContext } from 'react-router';
 
-                <pre><code class="language-typescript">// Advanced: Named outlets (uncommon pattern)
+export interface LayoutContext {
+  user: { name: string; email: string };
+  theme: 'light' | 'dark';
+}
+
+// Re-usable, fully typed accessor — no generic needed at call sites
+export function useLayoutContext() {
+  return useOutletContext&lt;LayoutContext&gt;();
+}
+
+// A child route stays clean:
+// const { user, theme } = useLayoutContext();</code></pre>
+                </div>
+
+                <h3>One Outlet Per Layout (No "Named" Outlets)</h3>
+                <p>A common misconception — often carried over from other frameworks — is that <code>&lt;Outlet /&gt;</code> accepts a <code>name</code> prop so you can render several different child slots. <strong>It does not.</strong> React Router's <code>Outlet</code> renders exactly one thing: the matched child route. Its only prop is <code>context</code>.</p>
+
+                <p>So how do you build a layout with, say, a sidebar <em>and</em> a main panel that both change per route? You compose components. Give the child route a single component that itself lays out the two regions, or nest another layout route:</p>
+
+                <pre><code class="language-typescript">// ✅ One Outlet — the child decides how to fill it
 function ComplexLayout() {
   return (
     &lt;div className="complex-layout"&gt;
-      &lt;aside&gt;
-        &lt;Outlet name="sidebar" /&gt;
-      &lt;/aside&gt;
-      
+      &lt;header&gt;App chrome that always stays&lt;/header&gt;
       &lt;main&gt;
-        &lt;Outlet /&gt; {/* Default outlet */}
+        &lt;Outlet /&gt; {/* the single, unnamed outlet */}
       &lt;/main&gt;
-      
-      &lt;aside&gt;
-        &lt;Outlet name="rightPanel" /&gt;
-      &lt;/aside&gt;
     &lt;/div&gt;
   );
 }
 
-// Note: Named outlets are rarely needed
-// Usually better to use separate layout components</code></pre>
+// The matched page renders BOTH panels itself:
+function ProjectWorkspace() {
+  return (
+    &lt;div className="workspace"&gt;
+      &lt;aside className="workspace-sidebar"&gt;{/* filters */}&lt;/aside&gt;
+      &lt;section className="workspace-main"&gt;{/* content */}&lt;/section&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
 
                 <div class="card card-warning">
                     <h4>⚠️ Common Outlet Mistakes</h4>
                     <ul>
-                        <li><strong>Forgetting Outlet</strong> - Layout needs &lt;Outlet /&gt; or children won't render</li>
-                        <li><strong>Multiple default Outlets</strong> - Only one unnamed &lt;Outlet /&gt; per layout</li>
-                        <li><strong>Outlet in wrong place</strong> - Should be where you want child content</li>
-                        <li><strong>Not wrapping Routes</strong> - Parent route must wrap child routes</li>
+                        <li><strong>Forgetting the Outlet</strong> - A layout with no <code>&lt;Outlet /&gt;</code> renders its chrome but never shows any child page. Silent and confusing!</li>
+                        <li><strong>Reaching for a "named" Outlet</strong> - There is no <code>name</code> prop. Compose components or nest a layout route instead.</li>
+                        <li><strong>Outlet in the wrong place</strong> - It renders exactly where you put it, so place it where the page content belongs.</li>
+                        <li><strong>Not nesting the routes</strong> - The child <code>&lt;Route&gt;</code>s must sit <em>inside</em> the parent layout <code>&lt;Route&gt;</code>, or they won't use the layout.</li>
                     </ul>
                 </div>
 
@@ -416,13 +486,14 @@ function ComplexLayout() {
             <!-- Section 3: Creating Shared Layouts -->
             <section id="section3" aria-labelledby="section3-title">
                 <h2 id="section3-title">🎨 Creating Shared Layouts</h2>
-                <p>Let's build practical, reusable layouts for real-world applications.</p>
+                <p>Theory is comfortable; real apps are messier. Most products don't have <em>one</em> frame — they have a few. A marketing homepage wants a big navbar and a fat footer. A login screen wants a calm, centered card with almost no chrome. A dashboard wants a sticky sidebar. Each of these is just a layout component with its own <code>&lt;Outlet /&gt;</code>, and in this section we'll build three of the most common ones you'll reach for again and again.</p>
+                <p>A useful habit: keep each layout in its own file under a <code>layouts/</code> folder and export it as a named function component. That way your route configuration reads like a table of contents for the whole app.</p>
 
                 <h3>Basic Main Layout</h3>
                 <p>A simple layout with header, navigation, and footer:</p>
 
                 <pre><code class="language-typescript">// layouts/MainLayout.tsx
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link } from 'react-router';
 import './MainLayout.css';
 
 export function MainLayout() {
@@ -460,7 +531,7 @@ export function MainLayout() {
                 <p>A layout with a persistent sidebar for dashboard pages:</p>
 
                 <pre><code class="language-typescript">// layouts/DashboardLayout.tsx
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router';
 
 export function DashboardLayout() {
   return (
@@ -506,7 +577,7 @@ export function DashboardLayout() {
                 <p>A minimal layout for login/register pages:</p>
 
                 <pre><code class="language-typescript">// layouts/AuthLayout.tsx
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link } from 'react-router';
 
 export function AuthLayout() {
   return (
@@ -538,7 +609,7 @@ export function AuthLayout() {
 
                 <h3>Using Layouts in Routes</h3>
                 <pre><code class="language-typescript">// App.tsx
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router';
 import { MainLayout } from './layouts/MainLayout';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -613,7 +684,7 @@ function App() {
                     <details>
                         <summary>✅ Solution</summary>
                         <pre><code class="language-typescript">// layouts/MainLayout.tsx
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router';
 
 export function MainLayout() {
   return (
@@ -654,7 +725,7 @@ export function Contact() {
 }
 
 // App.tsx
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router';
 import { MainLayout } from './layouts/MainLayout';
 import { Home } from './pages/Home';
 import { About } from './pages/About';
@@ -678,7 +749,8 @@ function App() {
             <!-- Section 4: Nested Route Structures -->
             <section id="section4" aria-labelledby="section4-title">
                 <h2 id="section4-title">🪆 Nested Route Structures</h2>
-                <p>Nested routes allow you to create layouts within layouts, perfect for complex applications with multiple levels of navigation.</p>
+                <p>The picture frame can hold another frame. That is the whole idea behind nested routes — like a set of matryoshka dolls, each layout can wrap another layout, which wraps the actual page. The URL <code>/dashboard/settings/security</code> reads left to right as exactly that nesting: the app shell holds the dashboard shell, which holds the settings shell, which finally holds the Security page.</p>
+                <p>Why bother? Because each level owns the navigation that belongs to <em>it</em>. The dashboard sidebar shouldn't know about individual settings tabs, and the settings tabs shouldn't have to redraw the dashboard sidebar. Nesting lets each layer render its own chrome and drop an <code>&lt;Outlet /&gt;</code> for the layer beneath it — and because parent layouts stay mounted, switching a settings tab never disturbs the dashboard around it.</p>
 
                 <div class="mermaid">
                 flowchart TD
@@ -725,7 +797,7 @@ function App() {
                 <p>Let's create a three-level nested structure:</p>
 
                 <pre><code class="language-typescript">// layouts/MainLayout.tsx
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router';
 
 export function MainLayout() {
   return (
@@ -818,8 +890,9 @@ function App() {
   );
 }</code></pre>
 
-                <h3>Index Routes</h3>
-                <p>Index routes render when the parent route matches exactly:</p>
+                <h3>Index Routes: The Default Painting</h3>
+                <p>Here's a subtle trap. When someone visits <code>/dashboard</code>, the <code>DashboardLayout</code> renders — sidebar and all — but its <code>&lt;Outlet /&gt;</code> has nothing to show, because no child route matches <code>/dashboard</code> exactly. The result is an eerily empty content area. Users see the frame with no painting in it.</p>
+                <p>An <strong>index route</strong> fixes this. It's the child that renders when the parent path matches <em>exactly</em> — the default painting that hangs in the frame until the visitor picks another. You write it with the <code>index</code> attribute instead of a <code>path</code>:</p>
 
                 <pre><code class="language-typescript">// Without index route:
 // /dashboard          → Shows DashboardLayout but nothing in Outlet
@@ -848,7 +921,7 @@ function App() {
                 <h3>Relative Routing in Nested Routes</h3>
                 <pre><code class="language-typescript">// Inside a nested component at /dashboard/settings/profile
 
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 
 function ProfileSettings() {
   const navigate = useNavigate();
@@ -1097,7 +1170,7 @@ export function AdminLayout() {
 
                 <h3>Route Configuration for Multiple Layouts</h3>
                 <pre><code class="language-typescript">// App.tsx
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router';
 import { PublicLayout } from './layouts/PublicLayout';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
@@ -1208,7 +1281,7 @@ export function PageHeader({
       {breadcrumbs}
       &lt;div className="page-header-content"&gt;
         &lt;h1&gt;{title}&lt;/h1&gt;
-        {actions && &lt;div className="page-actions"&gt;{actions}&lt;/div&gt;}
+        {actions &amp;&amp; &lt;div className="page-actions"&gt;{actions}&lt;/div&gt;}
       &lt;/div&gt;
     &lt;/header&gt;
   );
@@ -1241,7 +1314,7 @@ function ProjectsPage() {
                 flowchart LR
                     A[Home] --> B[Dashboard]
                     B --> C[Projects]
-                    C --> D[Project: ABC]
+                    C --> D["Project: ABC"]
                     D --> E[Settings]
                     
                     style A fill:#667eea,color:#fff
@@ -1250,13 +1323,13 @@ function ProjectsPage() {
 
                 <h3>Basic Breadcrumb Component</h3>
                 <pre><code class="language-typescript">// components/Breadcrumbs.tsx
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router';
 
 export function Breadcrumbs() {
   const location = useLocation();
   
   // Split path into segments
-  const pathnames = location.pathname.split('/').filter(x => x);
+  const pathnames = location.pathname.split('/').filter(x =&gt; x);
   
   return (
     &lt;nav aria-label="Breadcrumb" className="breadcrumbs"&gt;
@@ -1267,14 +1340,14 @@ export function Breadcrumbs() {
         &lt;/li&gt;
         
         {/* Dynamic segments */}
-        {pathnames.map((segment, index) => {
+        {pathnames.map((segment, index) =&gt; {
           const path = `/${pathnames.slice(0, index + 1).join('/')}`;
           const isLast = index === pathnames.length - 1;
           
           // Format segment name
           const label = segment
             .replace(/-/g, ' ')
-            .replace(/\b\w/g, char => char.toUpperCase());
+            .replace(/\b\w/g, char =&gt; char.toUpperCase());
           
           return (
             &lt;li key={path}&gt;
@@ -1321,16 +1394,16 @@ export const breadcrumbLabels: Record&lt;string, string&gt; = {
 };
 
 // components/SmartBreadcrumbs.tsx
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router';
 import { breadcrumbLabels } from '../config/breadcrumbLabels';
 
 export function SmartBreadcrumbs() {
   const location = useLocation();
   const params = useParams();
   
-  const pathnames = location.pathname.split('/').filter(x => x);
+  const pathnames = location.pathname.split('/').filter(x =&gt; x);
   
-  const getBreadcrumbLabel = (path: string, segment: string): string => {
+  const getBreadcrumbLabel = (path: string, segment: string): string =&gt; {
     // Check if we have a custom label
     if (breadcrumbLabels[path]) {
       return breadcrumbLabels[path];
@@ -1338,7 +1411,7 @@ export function SmartBreadcrumbs() {
     
     // Check if segment is a parameter (like :projectId)
     // Try to replace with actual value
-    const paramKey = Object.keys(params).find(key => 
+    const paramKey = Object.keys(params).find(key =&gt; 
       params[key] === segment
     );
     
@@ -1349,7 +1422,7 @@ export function SmartBreadcrumbs() {
     // Default: format the segment
     return segment
       .replace(/-/g, ' ')
-      .replace(/\b\w/g, char => char.toUpperCase());
+      .replace(/\b\w/g, char =&gt; char.toUpperCase());
   };
   
   return (
@@ -1359,7 +1432,7 @@ export function SmartBreadcrumbs() {
           &lt;Link to="/"&gt;🏠 Home&lt;/Link&gt;
         &lt;/li&gt;
         
-        {pathnames.map((segment, index) => {
+        {pathnames.map((segment, index) =&gt; {
           const path = `/${pathnames.slice(0, index + 1).join('/')}`;
           const isLast = index === pathnames.length - 1;
           const label = getBreadcrumbLabel(path, segment);
@@ -1384,7 +1457,7 @@ export function SmartBreadcrumbs() {
                 <p>Fetch actual names for dynamic routes:</p>
 
                 <pre><code class="language-typescript">// components/DataBreadcrumbs.tsx
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router';
 import { useState, useEffect } from 'react';
 
 interface BreadcrumbItem {
@@ -1398,9 +1471,9 @@ export function DataBreadcrumbs() {
   const params = useParams();
   const [breadcrumbs, setBreadcrumbs] = useState&lt;BreadcrumbItem[]&gt;([]);
   
-  useEffect(() => {
-    const buildBreadcrumbs = async () => {
-      const pathnames = location.pathname.split('/').filter(x => x);
+  useEffect(() =&gt; {
+    const buildBreadcrumbs = async () =&gt; {
+      const pathnames = location.pathname.split('/').filter(x =&gt; x);
       const items: BreadcrumbItem[] = [];
       
       for (let i = 0; i &lt; pathnames.length; i++) {
@@ -1432,7 +1505,7 @@ export function DataBreadcrumbs() {
         else {
           label = segment
             .replace(/-/g, ' ')
-            .replace(/\b\w/g, char => char.toUpperCase());
+            .replace(/\b\w/g, char =&gt; char.toUpperCase());
         }
         
         items.push({
@@ -1455,7 +1528,7 @@ export function DataBreadcrumbs() {
           &lt;Link to="/"&gt;Home&lt;/Link&gt;
         &lt;/li&gt;
         
-        {breadcrumbs.map(crumb => (
+        {breadcrumbs.map(crumb =&gt; (
           &lt;li key={crumb.path}&gt;
             &lt;span className="separator"&gt; / &lt;/span&gt;
             {crumb.isLast ? (
@@ -1530,13 +1603,13 @@ export function DataBreadcrumbs() {
             <!-- Section 7: Advanced Layout Patterns -->
             <section id="section7" aria-labelledby="section7-title">
                 <h2 id="section7-title">🎯 Advanced Layout Patterns</h2>
-                <p>Explore sophisticated layout patterns for complex applications.</p>
+                <p>Once the fundamentals click, layouts become a place to solve genuinely interesting UX problems: remembering whether a user collapsed the sidebar, showing a loading bar while the next page's data streams in, or popping a modal over the current page without losing your place. These aren't different <em>concepts</em> — they're the same <code>&lt;Outlet /&gt;</code> and pathless-route ideas, applied with a little more ambition. Treat this section as a pattern library to borrow from, not a checklist to memorize.</p>
 
                 <h3>Conditional Layouts Based on Route</h3>
                 <p>Automatically select layouts based on route patterns:</p>
 
                 <pre><code class="language-typescript">// hooks/useLayoutForRoute.ts
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 
 export function useLayoutForRoute() {
   const location = useLocation();
@@ -1574,16 +1647,16 @@ function App() {
 
                 <pre><code class="language-typescript">// layouts/DashboardLayoutWithState.tsx
 import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 
 export function DashboardLayoutWithState() {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =&gt; {
     // Load from localStorage
     return localStorage.getItem('sidebarCollapsed') === 'true';
   });
   
   // Save to localStorage when changed
-  useEffect(() => {
+  useEffect(() =&gt; {
     localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
   
@@ -1591,13 +1664,13 @@ export function DashboardLayoutWithState() {
     &lt;div className={`dashboard ${sidebarCollapsed ? 'collapsed' : ''}`}&gt;
       &lt;aside className="sidebar"&gt;
         &lt;button
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onClick={() =&gt; setSidebarCollapsed(!sidebarCollapsed)}
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         &gt;
           {sidebarCollapsed ? '→' : '←'}
         &lt;/button&gt;
         
-        {!sidebarCollapsed && (
+        {!sidebarCollapsed &amp;&amp; (
           &lt;nav&gt;
             {/* Navigation items */}
           &lt;/nav&gt;
@@ -1612,10 +1685,10 @@ export function DashboardLayoutWithState() {
 }</code></pre>
 
                 <h3>Layout with Loading State</h3>
-                <p>Show loading indicators during route transitions:</p>
+                <p>Show loading indicators during route transitions. Note that <code>useNavigation</code> reports transition state only when your app uses a <strong>data router</strong> (<code>createBrowserRouter</code> + <code>&lt;RouterProvider&gt;</code>) — it's part of React Router's data APIs, not the plain <code>&lt;Routes&gt;</code> element tree:</p>
 
                 <pre><code class="language-typescript">// layouts/LayoutWithLoading.tsx
-import { Outlet, useNavigation } from 'react-router-dom';
+import { Outlet, useNavigation } from 'react-router';
 
 export function LayoutWithLoading() {
   const navigation = useNavigation();
@@ -1625,7 +1698,7 @@ export function LayoutWithLoading() {
     &lt;div className="layout"&gt;
       &lt;header&gt;
         {/* Navigation */}
-        {isLoading && (
+        {isLoading &amp;&amp; (
           &lt;div className="loading-bar"&gt;
             &lt;div className="loading-progress"&gt;&lt;/div&gt;
           &lt;/div&gt;
@@ -1644,17 +1717,17 @@ export function LayoutWithLoading() {
 
                 <pre><code class="language-typescript">// layouts/SplitPanelLayout.tsx
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router';
 
 export function SplitPanelLayout() {
   const [leftWidth, setLeftWidth] = useState(300);
   const [isDragging, setIsDragging] = useState(false);
   
-  const handleMouseDown = () => setIsDragging(true);
+  const handleMouseDown = () =&gt; setIsDragging(true);
   
-  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseUp = () =&gt; setIsDragging(false);
   
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e: React.MouseEvent) =&gt; {
     if (isDragging) {
       setLeftWidth(e.clientX);
     }
@@ -1705,7 +1778,7 @@ function App() {
       &lt;/Routes&gt;
       
       {/* Modal routes */}
-      {background && (
+      {background &amp;&amp; (
         &lt;Routes&gt;
           &lt;Route path="/projects/:id/edit" element={&lt;EditProjectModal /&gt;} /&gt;
           &lt;Route path="/projects/new" element={&lt;NewProjectModal /&gt;} /&gt;
@@ -1731,9 +1804,9 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface LayoutContextType {
   pageTitle: string;
-  setPageTitle: (title: string) => void;
+  setPageTitle: (title: string) =&gt; void;
   pageActions: ReactNode;
-  setPageActions: (actions: ReactNode) => void;
+  setPageActions: (actions: ReactNode) =&gt; void;
 }
 
 const LayoutContext = createContext&lt;LayoutContextType | undefined&gt;(undefined);
@@ -1780,13 +1853,13 @@ function AppLayout() {
 function ProjectsPage() {
   const { setPageTitle, setPageActions } = useLayout();
   
-  useEffect(() => {
+  useEffect(() =&gt; {
     setPageTitle('Projects');
     setPageActions(
       &lt;button&gt;New Project&lt;/button&gt;
     );
     
-    return () => {
+    return () =&gt; {
       setPageTitle('');
       setPageActions(null);
     };
@@ -1901,8 +1974,8 @@ DashboardLayout (protected)
 
                 <div class="card card-accent">
                     <h4>🎯 Layout Architecture Checklist</h4>
-                    <p style="color: white;">Before deploying your layout system, verify:</p>
-                    <ul style="color: white;">
+                    <p>Before deploying your layout system, verify:</p>
+                    <ul>
                         <li>✅ Layouts are responsive and mobile-friendly</li>
                         <li>✅ Navigation is consistent and intuitive</li>
                         <li>✅ Loading states are implemented everywhere</li>
@@ -2005,16 +2078,16 @@ DashboardLayout (protected)
                 <p>This project will bring together everything you've learned in Module 6 and create a production-ready application structure you can use as a foundation for your own projects!</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">💡 Layout Design Philosophy</h4>
-                    <p style="color: white;"><em>"A great layout is invisible. It should provide structure and consistency without getting in the way of the content. Users should be able to focus on their tasks while the layout quietly handles navigation, context, and visual hierarchy."</em></p>
-                    <p style="color: white; margin-top: 1rem;">As you build your applications, always ask: Does this layout help or hinder the user? Keep layouts simple, intuitive, and focused on enabling your users to accomplish their goals efficiently.</p>
+                    <h4>💡 Layout Design Philosophy</h4>
+                    <p><em>"A great layout is invisible. It should provide structure and consistency without getting in the way of the content. Users should be able to focus on their tasks while the layout quietly handles navigation, context, and visual hierarchy."</em></p>
+                    <p style="margin-top: 1rem;">As you build your applications, always ask: Does this layout help or hinder the user? Keep layouts simple, intuitive, and focused on enabling your users to accomplish their goals efficiently.</p>
                 </div>
 
                 <!-- Encouragement Card -->
                 <div class="card card-accent" style="text-align: center; padding: 2rem; margin-top: 2rem;">
-                    <h3 style="color: white;">🎉 Congratulations!</h3>
-                    <p style="color: white; font-size: 1.1rem;">You've mastered layout routes and nested routing patterns! You now have the skills to create sophisticated, multi-layout applications with professional navigation structures.</p>
-                    <p style="color: white; margin-top: 1rem;">Ready to build something amazing? Let's move on to the Module 6 Project!</p>
+                    <h3>🎉 Congratulations!</h3>
+                    <p style="font-size: 1.1rem;">You've mastered layout routes and nested routing patterns! You now have the skills to create sophisticated, multi-layout applications with professional navigation structures.</p>
+                    <p style="margin-top: 1rem;">Ready to build something amazing? Let's move on to the Module 6 Project!</p>
                 </div>
             </section>
 

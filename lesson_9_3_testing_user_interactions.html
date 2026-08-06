@@ -59,10 +59,10 @@
             <!-- Lesson Header -->
             <header>
                 <h1>🎮 Lesson 9.3: Testing User Interactions</h1>
-                <p class="lead">Take your testing skills to the next level by mastering complex user interaction testing. Learn to test forms with validation, custom hooks, keyboard navigation, drag-and-drop, and complete user workflows in React applications.</p>
-                
+                <p class="lead">A great test is a tiny actor: it walks up to your component, clicks the buttons a real person would click, types what a real person would type, and then checks that the app responded the way a real person would expect. In this lesson you'll learn to script that actor for the hard cases — forms with live validation, custom hooks, keyboard navigation, file uploads, and complete multi-step workflows — using <code>@testing-library/user-event</code> v14 and Vitest.</p>
+
                 <!-- Learning objectives -->
-                <div class="card">
+                <div class="card card-info">
                     <h2>🎯 Learning Objectives</h2>
                     <p>By the end of this lesson, you will be able to:</p>
                     <ul>
@@ -107,7 +107,9 @@
             <section id="introduction" class="lesson-section">
                 <h2>📖 Introduction to Advanced Testing</h2>
                 
-                <p>In the previous lessons, you learned the fundamentals of testing React components. Now it's time to level up and tackle more complex, real-world testing scenarios that you'll encounter in production applications.</p>
+                <p>In the previous lessons, you learned the fundamentals of testing React components — render something, find an element, assert it's there. Those are the scales and chords. This lesson is where you start playing songs. Real production apps aren't static: users type, tab, drag, upload, submit, hit Escape, and change their minds halfway through. Your tests need to do all of that too.</p>
+
+                <p>The single most important upgrade in this lesson is a mindset one: <strong>test the way a human uses the app, not the way the code is wired.</strong> A user never calls <code>setState</code> or reads a component's internal variables — they see the screen and act on it. So will our tests. That's exactly what <code>@testing-library/user-event</code> gives us: a library that simulates the full sequence of real browser events a person triggers, rather than firing one synthetic event in isolation.</p>
 
                 <p>Real applications involve:</p>
                 <ul>
@@ -120,7 +122,16 @@
 
                 <div class="card card-accent">
                     <h4>📖 What Makes Interactions "Advanced"?</h4>
-                    <p style="color: white;"><strong>Advanced interactions</strong> involve multiple steps, state changes, side effects, and dependencies. They require sophisticated testing techniques including mocking, custom render functions, and careful attention to async behavior and user flows.</p>
+                    <p><strong>Advanced interactions</strong> involve multiple steps, state changes, side effects, and dependencies. Clicking a single button is easy; testing "user fills three fields, sees a validation error, fixes it, uploads a photo, and submits" is a story with many beats. These require sophisticated techniques — mocking, custom render helpers, and careful attention to <em>async</em> behavior — because almost every real interaction now involves waiting for something.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h4>⚠️ The One Rule That Prevents Most Test Bugs</h4>
+                    <p>In user-event <strong>v14</strong>, every interaction is <strong>asynchronous</strong>. You must <code>setup()</code> the user once, then <code>await</code> every action:</p>
+                    <pre><code class="language-typescript">const user = userEvent.setup();   // once, at the top of the test
+await user.click(button);          // ✅ always await
+await user.type(input, 'hello');   // ✅ always await</code></pre>
+                    <p>Forget the <code>await</code> and your assertions run <em>before</em> the click's effects have flushed — the test fails with a confusing "element not found," even though the app works. The old synchronous <code>userEvent.click(...)</code> (no <code>setup</code>, no <code>await</code>) is gone. When you see it in an old tutorial, mentally rewrite it.</p>
                 </div>
 
                 <h3>The Testing Mindset for Complex Interactions</h3>
@@ -141,7 +152,33 @@
                     style I fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
                 </div>
 
-                <p>Your tests should mirror this flow—each step building on the previous one, just like a user would experience it.</p>
+                <p>Your tests should mirror this flow — each step building on the previous one, just like a user would experience it.</p>
+
+                <p>At the smallest scale, every interaction test is the same three-beat loop repeated: you <strong>act</strong> (an awaited user-event), React <strong>re-renders</strong> in response, and you <strong>assert</strong> on what's now on screen. Keep this picture in your head and complex tests stop feeling complex — they're just this loop, over and over:</p>
+
+                <figure>
+                    <svg class="svg-auto-invert" viewBox="0 0 640 150" width="100%" style="max-width: 640px;" role="img" aria-labelledby="loop-title loop-desc">
+                        <title id="loop-title">The user-event testing loop</title>
+                        <desc id="loop-desc">A repeating cycle: an awaited user action causes React to re-render, which you then assert against, before the next action.</desc>
+                        <rect x="14" y="50" width="150" height="50" rx="10" fill="#667eea" fill-opacity="0.18" stroke="#667eea" stroke-width="2"/>
+                        <text x="89" y="72" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#4a3f9f">1 · Act</text>
+                        <text x="89" y="90" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#5a4faf">await user.click(…)</text>
+                        <rect x="245" y="50" width="150" height="50" rx="10" fill="#764ba2" fill-opacity="0.18" stroke="#764ba2" stroke-width="2"/>
+                        <text x="320" y="72" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#5a3f82">2 · Re-render</text>
+                        <text x="320" y="90" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#6a4f92">React updates the DOM</text>
+                        <rect x="476" y="50" width="150" height="50" rx="10" fill="#4CAF50" fill-opacity="0.18" stroke="#4CAF50" stroke-width="2"/>
+                        <text x="551" y="72" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#2f7d33">3 · Assert</text>
+                        <text x="551" y="90" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#3f8d43">expect(screen…)</text>
+                        <defs>
+                            <marker id="loop-arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#999"/></marker>
+                        </defs>
+                        <line x1="166" y1="75" x2="242" y2="75" stroke="#999" stroke-width="2" marker-end="url(#loop-arrow)"/>
+                        <line x1="397" y1="75" x2="473" y2="75" stroke="#999" stroke-width="2" marker-end="url(#loop-arrow)"/>
+                        <path d="M 551 105 Q 551 135 320 135 Q 89 135 89 105" fill="none" stroke="#999" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#loop-arrow)"/>
+                        <text x="320" y="128" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#888" font-style="italic">…then the next interaction</text>
+                    </svg>
+                    <figcaption>Figure 1: Every interaction test is this loop. The <code>await</code> in step 1 is what guarantees step 2 finishes before step 3 runs.</figcaption>
+                </figure>
 
                 <div class="card card-info">
                     <h4>💡 Key Principles for Advanced Testing</h4>
@@ -183,7 +220,7 @@
 
                 <pre><code class="language-typescript">
 interface RegistrationFormProps {
-  onSubmit: (data: FormData) => Promise&lt;void&gt;;
+  onSubmit: (data: FormData) =&gt; Promise&lt;void&gt;;
 }
 
 interface FormData {
@@ -203,7 +240,7 @@ export function RegistrationForm({ onSubmit }: RegistrationFormProps) {
   const [touched, setTouched] = React.useState&lt;Partial&lt;Record&lt;keyof FormData, boolean&gt;&gt;&gt;({});
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   
-  const validateField = (name: keyof FormData, value: string) => {
+  const validateField = (name: keyof FormData, value: string) =&gt; {
     switch (name) {
       case 'email':
         if (!value) return 'Email is required';
@@ -214,7 +251,7 @@ export function RegistrationForm({ onSubmit }: RegistrationFormProps) {
       
       case 'password':
         if (!value) return 'Password is required';
-        if (value.length < 8) return 'Password must be at least 8 characters';
+        if (value.length &lt; 8) return 'Password must be at least 8 characters';
         if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(value)) {
           return 'Password must contain uppercase, lowercase, and number';
         }
@@ -230,31 +267,31 @@ export function RegistrationForm({ onSubmit }: RegistrationFormProps) {
     }
   };
   
-  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev =&gt; ({ ...prev, [name]: value }));
     
     // Validate on change if field has been touched
     if (touched[name as keyof FormData]) {
       const error = validateField(name as keyof FormData, value);
-      setErrors(prev => ({ ...prev, [name]: error }));
+      setErrors(prev =&gt; ({ ...prev, [name]: error }));
     }
   };
   
-  const handleBlur = (e: React.FocusEvent&lt;HTMLInputElement&gt;) => {
+  const handleBlur = (e: React.FocusEvent&lt;HTMLInputElement&gt;) =&gt; {
     const { name, value } = e.target;
-    setTouched(prev => ({ ...prev, [name]: true }));
+    setTouched(prev =&gt; ({ ...prev, [name]: true }));
     
     const error = validateField(name as keyof FormData, value);
-    setErrors(prev => ({ ...prev, [name]: error }));
+    setErrors(prev =&gt; ({ ...prev, [name]: error }));
   };
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) =&gt; {
     e.preventDefault();
     
     // Validate all fields
     const newErrors: Partial&lt;FormData&gt; = {};
-    Object.keys(formData).forEach(key => {
+    Object.keys(formData).forEach(key =&gt; {
       const error = validateField(key as keyof FormData, formData[key as keyof FormData]);
       if (error) newErrors[key as keyof FormData] = error;
     });
@@ -285,7 +322,7 @@ export function RegistrationForm({ onSubmit }: RegistrationFormProps) {
           aria-invalid={!!errors.email}
           aria-describedby={errors.email ? 'email-error' : undefined}
         /&gt;
-        {errors.email && (
+        {errors.email &amp;&amp; (
           &lt;span id="email-error" role="alert"&gt;{errors.email}&lt;/span&gt;
         )}
       &lt;/div&gt;
@@ -302,7 +339,7 @@ export function RegistrationForm({ onSubmit }: RegistrationFormProps) {
           aria-invalid={!!errors.password}
           aria-describedby={errors.password ? 'password-error' : undefined}
         /&gt;
-        {errors.password && (
+        {errors.password &amp;&amp; (
           &lt;span id="password-error" role="alert"&gt;{errors.password}&lt;/span&gt;
         )}
       &lt;/div&gt;
@@ -319,7 +356,7 @@ export function RegistrationForm({ onSubmit }: RegistrationFormProps) {
           aria-invalid={!!errors.confirmPassword}
           aria-describedby={errors.confirmPassword ? 'confirm-error' : undefined}
         /&gt;
-        {errors.confirmPassword && (
+        {errors.confirmPassword &amp;&amp; (
           &lt;span id="confirm-error" role="alert"&gt;{errors.confirmPassword}&lt;/span&gt;
         )}
       &lt;/div&gt;
@@ -339,8 +376,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { RegistrationForm } from './RegistrationForm';
 
-describe('RegistrationForm', () => {
-  it('shows validation errors on blur', async () => {
+describe('RegistrationForm', () =&gt; {
+  it('shows validation errors on blur', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn();
     
@@ -356,7 +393,7 @@ describe('RegistrationForm', () => {
     expect(screen.getByText('Email is required')).toBeInTheDocument();
   });
   
-  it('shows format error for invalid email', async () => {
+  it('shows format error for invalid email', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn();
     
@@ -371,7 +408,7 @@ describe('RegistrationForm', () => {
     expect(screen.getByText('Invalid email format')).toBeInTheDocument();
   });
   
-  it('validates password strength', async () => {
+  it('validates password strength', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn();
     
@@ -391,7 +428,7 @@ describe('RegistrationForm', () => {
     expect(screen.getByText(/must contain uppercase/i)).toBeInTheDocument();
   });
   
-  it('validates password confirmation matches', async () => {
+  it('validates password confirmation matches', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn();
     
@@ -407,7 +444,7 @@ describe('RegistrationForm', () => {
     expect(screen.getByText('Passwords do not match')).toBeInTheDocument();
   });
   
-  it('submits form with valid data', async () => {
+  it('submits form with valid data', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn().mockResolvedValue(undefined);
     
@@ -422,7 +459,7 @@ describe('RegistrationForm', () => {
     await user.click(screen.getByRole('button', { name: 'Create Account' }));
     
     // Should call onSubmit with correct data
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(mockOnSubmit).toHaveBeenCalledWith({
         email: 'user@example.com',
         password: 'Password123',
@@ -431,12 +468,12 @@ describe('RegistrationForm', () => {
     });
   });
   
-  it('shows loading state during submission', async () => {
+  it('shows loading state during submission', async () =&gt; {
     const user = userEvent.setup();
     
     // Mock that takes time to resolve
-    const mockOnSubmit = vi.fn(() => 
-      new Promise(resolve => setTimeout(resolve, 100))
+    const mockOnSubmit = vi.fn(() =&gt; 
+      new Promise(resolve =&gt; setTimeout(resolve, 100))
     );
     
     render(&lt;RegistrationForm onSubmit={mockOnSubmit} /&gt;);
@@ -451,12 +488,12 @@ describe('RegistrationForm', () => {
     expect(screen.getByRole('button', { name: 'Creating account...' })).toBeDisabled();
     
     // Wait for completion
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByRole('button', { name: 'Create Account' })).not.toBeDisabled();
     });
   });
   
-  it('prevents submission with validation errors', async () => {
+  it('prevents submission with validation errors', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn();
     
@@ -473,7 +510,7 @@ describe('RegistrationForm', () => {
     expect(mockOnSubmit).not.toHaveBeenCalled();
   });
   
-  it('clears errors when user fixes input', async () => {
+  it('clears errors when user fixes input', async () =&gt; {
     const user = userEvent.setup();
     const mockOnSubmit = vi.fn();
     
@@ -490,7 +527,7 @@ describe('RegistrationForm', () => {
     await user.type(emailInput, 'user@example.com');
     
     // Error should clear as user types (after first blur)
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.queryByText('Email is required')).not.toBeInTheDocument();
     });
   });
@@ -509,6 +546,39 @@ describe('RegistrationForm', () => {
                     </ul>
                 </div>
 
+                <h3>Quick Self-Check: Is This Interaction Written Correctly?</h3>
+                <p>The most common mistake in interaction tests is getting the user-event v14 mechanics wrong. Click each line below to see whether it's idiomatic modern usage — and why.</p>
+
+                <!-- Interactive: user-event v14 usage check (theme-aware, no canvas) -->
+                <div class="card ts-demo" aria-live="polite">
+                    <p class="ts-demo-sig"><code>const user = userEvent.setup(); // assume this ran at the top of the test</code></p>
+                    <div class="ts-demo-buttons">
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="setup() once, then await the action. This is the textbook v14 pattern.">await user.click(button)</button>
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="Typing is asynchronous in v14 — awaited, so React finishes re-rendering before the next line.">await user.type(input, 'hello')</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="The old synchronous API. v14 removed it — you must call userEvent.setup() and await the returned method.">userEvent.click(button)</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="It runs, but fireEvent fires a single change event and skips focus, keydown, and keyup. Prefer user.type for realistic input.">fireEvent.change(input, { target: { value: 'hi' } })</button>
+                    </div>
+                    <p class="ts-demo-result ts-demo-idle" id="ue-demo-result">👆 Click an example above to see whether it's correct v14 usage.</p>
+                </div>
+
+                <script>
+                (function () {
+                    var demo = document.getElementById('ue-demo-result');
+                    if (!demo) return;
+                    var wrap = demo.closest('.ts-demo');
+                    wrap.querySelectorAll('.ts-demo-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            var result = btn.closest('.ts-demo').querySelector('#ue-demo-result');
+                            var ok = btn.getAttribute('data-valid') === 'true';
+                            var msg = btn.getAttribute('data-msg');
+                            result.classList.remove('ts-demo-idle', 'ts-demo-ok', 'ts-demo-err');
+                            result.classList.add(ok ? 'ts-demo-ok' : 'ts-demo-err');
+                            result.textContent = (ok ? '✅ Correct v14 usage: ' : '❌ Avoid this: ') + msg;
+                        });
+                    });
+                })();
+                </script>
+
                 <h3>Testing Dynamic Form Fields</h3>
                 <p>Forms that add/remove fields dynamically need special testing:</p>
 
@@ -516,15 +586,15 @@ describe('RegistrationForm', () => {
 function DynamicSkillsForm() {
   const [skills, setSkills] = React.useState&lt;string[]&gt;(['']);
   
-  const addSkill = () => {
+  const addSkill = () =&gt; {
     setSkills([...skills, '']);
   };
   
-  const removeSkill = (index: number) => {
-    setSkills(skills.filter((_, i) => i !== index));
+  const removeSkill = (index: number) =&gt; {
+    setSkills(skills.filter((_, i) =&gt; i !== index));
   };
   
-  const updateSkill = (index: number, value: string) => {
+  const updateSkill = (index: number, value: string) =&gt; {
     const newSkills = [...skills];
     newSkills[index] = value;
     setSkills(newSkills);
@@ -533,18 +603,18 @@ function DynamicSkillsForm() {
   return (
     &lt;div&gt;
       &lt;h2&gt;Skills&lt;/h2&gt;
-      {skills.map((skill, index) => (
+      {skills.map((skill, index) =&gt; (
         &lt;div key={index}&gt;
           &lt;input
             type="text"
             value={skill}
-            onChange={(e) => updateSkill(index, e.target.value)}
+            onChange={(e) =&gt; updateSkill(index, e.target.value)}
             aria-label={`Skill ${index + 1}`}
           /&gt;
-          {skills.length > 1 && (
+          {skills.length &gt; 1 &amp;&amp; (
             &lt;button 
               type="button"
-              onClick={() => removeSkill(index)}
+              onClick={() =&gt; removeSkill(index)}
               aria-label={`Remove skill ${index + 1}`}
             &gt;
               Remove
@@ -557,7 +627,7 @@ function DynamicSkillsForm() {
   );
 }
 
-test('adds and removes dynamic fields', async () => {
+test('adds and removes dynamic fields', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;DynamicSkillsForm /&gt;);
   
@@ -597,6 +667,7 @@ test('adds and removes dynamic fields', async () => {
                         <li>Test minimum and maximum field constraints</li>
                     </ul>
                 </div>
+            </section>
 
             <!-- Section 3: Testing Custom Hooks -->
             <section id="custom-hooks" class="lesson-section">
@@ -615,20 +686,20 @@ export function useFormState&lt;T extends Record&lt;string, any&gt;&gt;(initialV
   const [values, setValues] = useState&lt;T&gt;(initialValues);
   const [touched, setTouched] = useState&lt;Record&lt;string, boolean&gt;&gt;({});
   
-  const handleChange = (name: keyof T, value: any) => {
-    setValues(prev => ({ ...prev, [name]: value }));
+  const handleChange = (name: keyof T, value: any) =&gt; {
+    setValues(prev =&gt; ({ ...prev, [name]: value }));
   };
   
-  const handleBlur = (name: keyof T) => {
-    setTouched(prev => ({ ...prev, [name]: true }));
+  const handleBlur = (name: keyof T) =&gt; {
+    setTouched(prev =&gt; ({ ...prev, [name]: true }));
   };
   
-  const reset = () => {
+  const reset = () =&gt; {
     setValues(initialValues);
     setTouched({});
   };
   
-  const isTouched = (name: keyof T) => touched[name] || false;
+  const isTouched = (name: keyof T) =&gt; touched[name] || false;
   
   return {
     values,
@@ -647,21 +718,21 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { useFormState } from './useFormState';
 
-describe('useFormState', () => {
-  it('initializes with default values', () => {
+describe('useFormState', () =&gt; {
+  it('initializes with default values', () =&gt; {
     const initialValues = { name: '', email: '' };
-    const { result } = renderHook(() => useFormState(initialValues));
+    const { result } = renderHook(() =&gt; useFormState(initialValues));
     
     expect(result.current.values).toEqual(initialValues);
     expect(result.current.touched).toEqual({});
   });
   
-  it('updates values when handleChange is called', () => {
-    const { result } = renderHook(() => 
+  it('updates values when handleChange is called', () =&gt; {
+    const { result } = renderHook(() =&gt; 
       useFormState({ name: '', email: '' })
     );
     
-    act(() => {
+    act(() =&gt; {
       result.current.handleChange('name', 'John');
     });
     
@@ -669,14 +740,14 @@ describe('useFormState', () => {
     expect(result.current.values.email).toBe('');
   });
   
-  it('tracks touched fields', () => {
-    const { result } = renderHook(() => 
+  it('tracks touched fields', () =&gt; {
+    const { result } = renderHook(() =&gt; 
       useFormState({ name: '', email: '' })
     );
     
     expect(result.current.isTouched('name')).toBe(false);
     
-    act(() => {
+    act(() =&gt; {
       result.current.handleBlur('name');
     });
     
@@ -684,12 +755,12 @@ describe('useFormState', () => {
     expect(result.current.isTouched('email')).toBe(false);
   });
   
-  it('resets to initial values', () => {
+  it('resets to initial values', () =&gt; {
     const initialValues = { name: '', email: '' };
-    const { result } = renderHook(() => useFormState(initialValues));
+    const { result } = renderHook(() =&gt; useFormState(initialValues));
     
     // Make changes
-    act(() => {
+    act(() =&gt; {
       result.current.handleChange('name', 'John');
       result.current.handleBlur('name');
     });
@@ -698,7 +769,7 @@ describe('useFormState', () => {
     expect(result.current.isTouched('name')).toBe(true);
     
     // Reset
-    act(() => {
+    act(() =&gt; {
       result.current.reset();
     });
     
@@ -710,7 +781,7 @@ describe('useFormState', () => {
 
                 <div class="card card-accent">
                     <h4>📖 Understanding renderHook</h4>
-                    <p style="color: white;"><strong>renderHook()</strong> creates a test component that calls your hook and provides access to its return value through <code>result.current</code>. Use <code>act()</code> to wrap state updates just like in component tests.</p>
+                    <p><strong><code>renderHook()</code></strong> spins up an invisible throwaway component whose only job is to call your hook and hand you back its return value through <code>result.current</code>. Think of it as a test harness: there's no UI to click, so instead of user-events you call the hook's functions directly — and because those functions update state, you wrap each call in <code>act()</code> so React can flush the update before you read <code>result.current</code> again.</p>
                 </div>
 
                 <h3>Testing Hooks with Dependencies</h3>
@@ -723,12 +794,12 @@ import { useState, useEffect } from 'react';
 export function useDebounce&lt;T&gt;(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState&lt;T&gt;(value);
   
-  useEffect(() => {
-    const timer = setTimeout(() => {
+  useEffect(() =&gt; {
+    const timer = setTimeout(() =&gt; {
       setDebouncedValue(value);
     }, delay);
     
-    return () => {
+    return () =&gt; {
       clearTimeout(timer);
     };
   }, [value, delay]);
@@ -737,15 +808,15 @@ export function useDebounce&lt;T&gt;(value: T, delay: number): T {
 }
 
 // useDebounce.test.ts
-describe('useDebounce', () => {
-  it('returns initial value immediately', () => {
-    const { result } = renderHook(() => useDebounce('initial', 500));
+describe('useDebounce', () =&gt; {
+  it('returns initial value immediately', () =&gt; {
+    const { result } = renderHook(() =&gt; useDebounce('initial', 500));
     expect(result.current).toBe('initial');
   });
   
-  it('debounces value changes', async () => {
+  it('debounces value changes', async () =&gt; {
     const { result, rerender } = renderHook(
-      ({ value, delay }) => useDebounce(value, delay),
+      ({ value, delay }) =&gt; useDebounce(value, delay),
       { initialProps: { value: 'first', delay: 500 } }
     );
     
@@ -758,14 +829,14 @@ describe('useDebounce', () => {
     expect(result.current).toBe('first');
     
     // Wait for debounce
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(result.current).toBe('second');
     }, { timeout: 600 });
   });
   
-  it('cancels previous timeout on rapid changes', async () => {
+  it('cancels previous timeout on rapid changes', async () =&gt; {
     const { result, rerender } = renderHook(
-      ({ value }) => useDebounce(value, 500),
+      ({ value }) =&gt; useDebounce(value, 500),
       { initialProps: { value: 'first' } }
     );
     
@@ -775,7 +846,7 @@ describe('useDebounce', () => {
     rerender({ value: 'fourth' });
     
     // Wait for debounce - should skip intermediate values
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(result.current).toBe('fourth');
     }, { timeout: 600 });
   });
@@ -803,30 +874,30 @@ import { renderHook } from '@testing-library/react';
 import { AuthProvider } from './AuthContext';
 import { useAuth } from './useAuth';
 
-describe('useAuth', () => {
-  it('throws error when used outside provider', () => {
+describe('useAuth', () =&gt; {
+  it('throws error when used outside provider', () =&gt; {
     // Suppress console.error for this test
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const spy = vi.spyOn(console, 'error').mockImplementation(() =&gt; {});
     
-    expect(() => {
-      renderHook(() => useAuth());
+    expect(() =&gt; {
+      renderHook(() =&gt; useAuth());
     }).toThrow('useAuth must be used within AuthProvider');
     
     spy.mockRestore();
   });
   
-  it('returns auth context when inside provider', () => {
+  it('returns auth context when inside provider', () =&gt; {
     const mockUser = { id: '1', name: 'John' };
     const mockLogin = vi.fn();
     const mockLogout = vi.fn();
     
-    const wrapper = ({ children }: { children: React.ReactNode }) => (
+    const wrapper = ({ children }: { children: React.ReactNode }) =&gt; (
       &lt;AuthProvider value={{ user: mockUser, login: mockLogin, logout: mockLogout }}&gt;
         {children}
       &lt;/AuthProvider&gt;
     );
     
-    const { result } = renderHook(() => useAuth(), { wrapper });
+    const { result } = renderHook(() =&gt; useAuth(), { wrapper });
     
     expect(result.current.user).toEqual(mockUser);
     expect(result.current.login).toBe(mockLogin);
@@ -853,25 +924,25 @@ export function useFetch&lt;T&gt;(url: string): FetchState&lt;T&gt; {
     error: null
   });
   
-  useEffect(() => {
+  useEffect(() =&gt; {
     let cancelled = false;
     
     setState({ data: null, loading: true, error: null });
     
     fetch(url)
-      .then(res => res.json())
-      .then(data => {
+      .then(res =&gt; res.json())
+      .then(data =&gt; {
         if (!cancelled) {
           setState({ data, loading: false, error: null });
         }
       })
-      .catch(error => {
+      .catch(error =&gt; {
         if (!cancelled) {
           setState({ data: null, loading: false, error });
         }
       });
     
-    return () => {
+    return () =&gt; {
       cancelled = true;
     };
   }, [url]);
@@ -880,21 +951,21 @@ export function useFetch&lt;T&gt;(url: string): FetchState&lt;T&gt; {
 }
 
 // useFetch.test.ts
-describe('useFetch', () => {
-  it('fetches data successfully', async () => {
+describe('useFetch', () =&gt; {
+  it('fetches data successfully', async () =&gt; {
     const mockData = { id: 1, name: 'Test' };
     global.fetch = vi.fn().mockResolvedValue({
-      json: async () => mockData
+      json: async () =&gt; mockData
     });
     
-    const { result } = renderHook(() => useFetch('/api/test'));
+    const { result } = renderHook(() =&gt; useFetch('/api/test'));
     
     // Initially loading
     expect(result.current.loading).toBe(true);
     expect(result.current.data).toBe(null);
     
     // Wait for data
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(result.current.loading).toBe(false);
     });
     
@@ -902,13 +973,13 @@ describe('useFetch', () => {
     expect(result.current.error).toBe(null);
   });
   
-  it('handles fetch errors', async () => {
+  it('handles fetch errors', async () =&gt; {
     const mockError = new Error('Network error');
     global.fetch = vi.fn().mockRejectedValue(mockError);
     
-    const { result } = renderHook(() => useFetch('/api/test'));
+    const { result } = renderHook(() =&gt; useFetch('/api/test'));
     
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(result.current.loading).toBe(false);
     });
     
@@ -916,18 +987,18 @@ describe('useFetch', () => {
     expect(result.current.error).toEqual(mockError);
   });
   
-  it('refetches when URL changes', async () => {
+  it('refetches when URL changes', async () =&gt; {
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ json: async () => ({ id: 1 }) })
-      .mockResolvedValueOnce({ json: async () => ({ id: 2 }) });
+      .mockResolvedValueOnce({ json: async () =&gt; ({ id: 1 }) })
+      .mockResolvedValueOnce({ json: async () =&gt; ({ id: 2 }) });
     
     const { result, rerender } = renderHook(
-      ({ url }) => useFetch(url),
+      ({ url }) =&gt; useFetch(url),
       { initialProps: { url: '/api/1' } }
     );
     
     // Wait for first fetch
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(result.current.data).toEqual({ id: 1 });
     });
     
@@ -935,7 +1006,7 @@ describe('useFetch', () => {
     rerender({ url: '/api/2' });
     
     // Should refetch
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(result.current.data).toEqual({ id: 2 });
     });
     
@@ -960,8 +1031,10 @@ describe('useFetch', () => {
             <!-- Section 4: Keyboard and Accessibility Testing -->
             <section id="keyboard-interactions" class="lesson-section">
                 <h2>⌨️ Keyboard and Accessibility Testing</h2>
-                
-                <p>Keyboard navigation is crucial for accessibility. Let's ensure your components work for keyboard users.</p>
+
+                <p>Not everyone uses a mouse. People with motor disabilities, power users, and anyone relying on a screen reader navigate entirely by keyboard — Tab to move, Enter or Space to activate, Arrow keys inside menus, Escape to back out. If your component only works when clicked, you've quietly locked those users out. The good news: user-event speaks keyboard fluently, so these journeys are just as testable as clicks.</p>
+
+                <p>The two workhorses here are <code>user.tab()</code> (move focus to the next focusable element, or backwards with <code>{ shift: true }</code>) and <code>user.keyboard('{Escape}')</code> (press specific keys, with special keys wrapped in braces). Pair them with the <code>toHaveFocus()</code> matcher and you can assert exactly where the keyboard cursor lands after each step.</p>
 
                 <h3>Tab Navigation</h3>
                 <pre><code class="language-typescript">
@@ -969,7 +1042,7 @@ function NavigationMenu() {
   const [activeIndex, setActiveIndex] = React.useState(0);
   const items = ['Home', 'About', 'Services', 'Contact'];
   
-  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) =&gt; {
     switch (e.key) {
       case 'ArrowRight':
         e.preventDefault();
@@ -993,13 +1066,13 @@ function NavigationMenu() {
   return (
     &lt;nav role="navigation" aria-label="Main navigation"&gt;
       &lt;ul role="menubar"&gt;
-        {items.map((item, index) => (
+        {items.map((item, index) =&gt; (
           &lt;li key={item} role="none"&gt;
             &lt;button
               role="menuitem"
               tabIndex={activeIndex === index ? 0 : -1}
-              onKeyDown={(e) => handleKeyDown(e, index)}
-              onFocus={() => setActiveIndex(index)}
+              onKeyDown={(e) =&gt; handleKeyDown(e, index)}
+              onFocus={() =&gt; setActiveIndex(index)}
               aria-current={activeIndex === index ? 'page' : undefined}
             &gt;
               {item}
@@ -1011,7 +1084,7 @@ function NavigationMenu() {
   );
 }
 
-test('navigates with arrow keys', async () => {
+test('navigates with arrow keys', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;NavigationMenu /&gt;);
   
@@ -1045,7 +1118,7 @@ test('navigates with arrow keys', async () => {
 function Modal({ isOpen, onClose, children }: ModalProps) {
   const modalRef = React.useRef&lt;HTMLDivElement&gt;(null);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     if (!isOpen) return;
     
     const focusableElements = modalRef.current?.querySelectorAll(
@@ -1057,7 +1130,7 @@ function Modal({ isOpen, onClose, children }: ModalProps) {
     const firstElement = focusableElements[0] as HTMLElement;
     const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
     
-    const handleTab = (e: KeyboardEvent) => {
+    const handleTab = (e: KeyboardEvent) =&gt; {
       if (e.key !== 'Tab') return;
       
       if (e.shiftKey) {
@@ -1076,7 +1149,7 @@ function Modal({ isOpen, onClose, children }: ModalProps) {
     document.addEventListener('keydown', handleTab);
     firstElement.focus();
     
-    return () => {
+    return () =&gt; {
       document.removeEventListener('keydown', handleTab);
     };
   }, [isOpen]);
@@ -1092,7 +1165,7 @@ function Modal({ isOpen, onClose, children }: ModalProps) {
   );
 }
 
-test('traps focus within modal', async () => {
+test('traps focus within modal', async () =&gt; {
   const user = userEvent.setup();
   const handleClose = vi.fn();
   
@@ -1134,7 +1207,7 @@ test('traps focus within modal', async () => {
 
                 <h3>Testing Escape Key to Close</h3>
                 <pre><code class="language-typescript">
-test('closes modal on Escape key', async () => {
+test('closes modal on Escape key', async () =&gt; {
   const user = userEvent.setup();
   const handleClose = vi.fn();
   
@@ -1162,12 +1235,12 @@ function Accordion() {
   
   return (
     &lt;div&gt;
-      {sections.map(section => (
+      {sections.map(section =&gt; (
         &lt;div key={section.id}&gt;
           &lt;button
             aria-expanded={expanded === section.id}
             aria-controls={`panel-${section.id}`}
-            onClick={() => setExpanded(
+            onClick={() =&gt; setExpanded(
               expanded === section.id ? null : section.id
             )}
           &gt;
@@ -1187,7 +1260,7 @@ function Accordion() {
   );
 }
 
-test('has correct ARIA attributes', async () => {
+test('has correct ARIA attributes', async () =&gt; {
   const user = userEvent.setup();
   render(&lt;Accordion /&gt;);
   
@@ -1222,13 +1295,18 @@ test('has correct ARIA attributes', async () => {
             <!-- Section 5: Testing File Uploads -->
             <section id="file-uploads" class="lesson-section">
                 <h2>📁 Testing File Uploads</h2>
-                
-                <p>File uploads involve browser APIs and require special handling in tests.</p>
+
+                <p>File uploads feel intimidating to test because there's no real file system in a test — jsdom runs in Node, not a browser with a file picker. The trick is that you don't need a real file: you fabricate one in memory with the <code>File</code> constructor, then hand it to <code>user.upload()</code>, which sets it on the <code>&lt;input type="file"&gt;</code> and fires the change event for you. From the component's point of view, a user just picked a file.</p>
+
+                <pre><code class="language-typescript">// A fake file is just three arguments: contents, name, and options
+const file = new File(['hello world'], 'notes.txt', { type: 'text/plain' });</code></pre>
+
+                <p>With that one line you can drive every branch of your upload logic — size limits, type filters, previews — without ever touching a disk.</p>
 
                 <h3>Basic File Upload Component</h3>
                 <pre><code class="language-typescript">
 interface FileUploadProps {
-  onFileSelect: (file: File) => void;
+  onFileSelect: (file: File) =&gt; void;
   accept?: string;
   maxSize?: number; // in bytes
 }
@@ -1236,7 +1314,7 @@ interface FileUploadProps {
 export function FileUpload({ onFileSelect, accept, maxSize }: FileUploadProps) {
   const [error, setError] = React.useState&lt;string | null&gt;(null);
   
-  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
     const file = e.target.files?.[0];
     
     if (!file) return;
@@ -1244,17 +1322,17 @@ export function FileUpload({ onFileSelect, accept, maxSize }: FileUploadProps) {
     setError(null);
     
     // Validate file size
-    if (maxSize && file.size > maxSize) {
+    if (maxSize &amp;&amp; file.size &gt; maxSize) {
       setError(`File size must be less than ${maxSize / 1024 / 1024}MB`);
       return;
     }
     
     // Validate file type
     if (accept) {
-      const acceptedTypes = accept.split(',').map(t => t.trim());
+      const acceptedTypes = accept.split(',').map(t =&gt; t.trim());
       const fileExtension = '.' + file.name.split('.').pop();
       
-      if (!acceptedTypes.includes(fileExtension) && !acceptedTypes.includes(file.type)) {
+      if (!acceptedTypes.includes(fileExtension) &amp;&amp; !acceptedTypes.includes(file.type)) {
         setError(`File type must be: ${accept}`);
         return;
       }
@@ -1272,7 +1350,7 @@ export function FileUpload({ onFileSelect, accept, maxSize }: FileUploadProps) {
         onChange={handleChange}
         accept={accept}
       /&gt;
-      {error && &lt;div role="alert"&gt;{error}&lt;/div&gt;}
+      {error &amp;&amp; &lt;div role="alert"&gt;{error}&lt;/div&gt;}
     &lt;/div&gt;
   );
 }
@@ -1285,8 +1363,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import { FileUpload } from './FileUpload';
 
-describe('FileUpload', () => {
-  it('uploads a valid file', async () => {
+describe('FileUpload', () =&gt; {
+  it('uploads a valid file', async () =&gt; {
     const user = userEvent.setup();
     const handleFileSelect = vi.fn();
     
@@ -1303,7 +1381,7 @@ describe('FileUpload', () => {
     expect(handleFileSelect).toHaveBeenCalledWith(file);
   });
   
-  it('validates file size', async () => {
+  it('validates file size', async () =&gt; {
     const user = userEvent.setup();
     const handleFileSelect = vi.fn();
     const maxSize = 1024; // 1KB
@@ -1321,7 +1399,7 @@ describe('FileUpload', () => {
     expect(handleFileSelect).not.toHaveBeenCalled();
   });
   
-  it('validates file type', async () => {
+  it('validates file type', async () =&gt; {
     const user = userEvent.setup();
     const handleFileSelect = vi.fn();
     
@@ -1341,7 +1419,7 @@ describe('FileUpload', () => {
     expect(handleFileSelect).not.toHaveBeenCalled();
   });
   
-  it('handles multiple file types', async () => {
+  it('handles multiple file types', async () =&gt; {
     const user = userEvent.setup();
     const handleFileSelect = vi.fn();
     
@@ -1365,16 +1443,16 @@ describe('FileUpload', () => {
 
                 <h3>Testing File Upload with Preview</h3>
                 <pre><code class="language-typescript">
-function ImageUploadWithPreview({ onUpload }: { onUpload: (file: File) => void }) {
+function ImageUploadWithPreview({ onUpload }: { onUpload: (file: File) =&gt; void }) {
   const [preview, setPreview] = React.useState&lt;string | null&gt;(null);
   
-  const handleFileChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleFileChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
     const file = e.target.files?.[0];
     if (!file) return;
     
     // Create preview
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = () =&gt; {
       setPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
@@ -1390,7 +1468,7 @@ function ImageUploadWithPreview({ onUpload }: { onUpload: (file: File) => void }
         accept="image/*"
         aria-label="Upload image"
       /&gt;
-      {preview && (
+      {preview &amp;&amp; (
         &lt;img 
           src={preview} 
           alt="Upload preview" 
@@ -1401,7 +1479,7 @@ function ImageUploadWithPreview({ onUpload }: { onUpload: (file: File) => void }
   );
 }
 
-test('shows image preview after upload', async () => {
+test('shows image preview after upload', async () =&gt; {
   const user = userEvent.setup();
   const handleUpload = vi.fn();
   
@@ -1416,7 +1494,7 @@ test('shows image preview after upload', async () => {
     result: 'data:image/png;base64,mockImageData'
   };
   
-  global.FileReader = vi.fn(() => mockFileReader) as any;
+  global.FileReader = vi.fn(() =&gt; mockFileReader) as any;
   
   await user.upload(screen.getByLabelText('Upload image'), file);
   
@@ -1424,7 +1502,7 @@ test('shows image preview after upload', async () => {
   mockFileReader.onloadend?.();
   
   // Preview should appear
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByAltText('Upload preview')).toBeInTheDocument();
   });
 });
@@ -1432,19 +1510,19 @@ test('shows image preview after upload', async () => {
 
                 <h3>Testing Drag and Drop</h3>
                 <pre><code class="language-typescript">
-function DragDropUpload({ onDrop }: { onDrop: (files: File[]) => void }) {
+function DragDropUpload({ onDrop }: { onDrop: (files: File[]) =&gt; void }) {
   const [isDragging, setIsDragging] = React.useState(false);
   
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent) =&gt; {
     e.preventDefault();
     setIsDragging(true);
   };
   
-  const handleDragLeave = () => {
+  const handleDragLeave = () =&gt; {
     setIsDragging(false);
   };
   
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) =&gt; {
     e.preventDefault();
     setIsDragging(false);
     
@@ -1468,30 +1546,26 @@ function DragDropUpload({ onDrop }: { onDrop: (files: File[]) => void }) {
   );
 }
 
-test('handles file drop', async () => {
+// Note: drag-and-drop is the ONE case where we still reach for fireEvent —
+// user-event does not simulate the DataTransfer of a drag gesture. Import it
+// alongside the others: import { fireEvent } from '@testing-library/react';
+test('handles file drop', () =&gt; {
   const handleDrop = vi.fn();
-  
+
   render(&lt;DragDropUpload onDrop={handleDrop} /&gt;);
-  
+
   const dropZone = screen.getByTestId('drop-zone');
-  
-  // Create mock files
+
   const file1 = new File(['content1'], 'file1.txt', { type: 'text/plain' });
   const file2 = new File(['content2'], 'file2.txt', { type: 'text/plain' });
-  
-  // Create a drop event
-  const dropEvent = new Event('drop', { bubbles: true }) as any;
-  dropEvent.dataTransfer = {
-    files: [file1, file2]
-  };
-  
-  // Trigger drop
-  fireEvent.drop(dropZone, dropEvent);
-  
+
+  // Pass the DataTransfer payload as the event init — no need to build an Event
+  fireEvent.drop(dropZone, { dataTransfer: { files: [file1, file2] } });
+
   expect(handleDrop).toHaveBeenCalledWith([file1, file2]);
 });
 
-test('shows dragging state', () => {
+test('shows dragging state', () =&gt; {
   const handleDrop = vi.fn();
   
   render(&lt;DragDropUpload onDrop={handleDrop} /&gt;);
@@ -1535,7 +1609,7 @@ test('shows dragging state', () => {
 
                 <pre><code class="language-typescript">
 // ❌ Repetitive - wrapping providers in every test
-test('renders themed button', () => {
+test('renders themed button', () =&gt; {
   render(
     &lt;ThemeProvider&gt;
       &lt;AuthProvider&gt;
@@ -1621,14 +1695,14 @@ import { render, screen } from './test-utils'; // Import from test-utils
 import userEvent from '@testing-library/user-event';
 import { MyComponent } from './MyComponent';
 
-test('renders with dark theme', () => {
+test('renders with dark theme', () =&gt; {
   // ✅ Clean and simple!
   render(&lt;MyComponent /&gt;, { theme: 'dark' });
   
   expect(screen.getByTestId('theme-indicator')).toHaveTextContent('dark');
 });
 
-test('shows user name when authenticated', () => {
+test('shows user name when authenticated', () =&gt; {
   render(&lt;MyComponent /&gt;, {
     initialAuth: {
       isAuthenticated: true,
@@ -1639,7 +1713,7 @@ test('shows user name when authenticated', () => {
   expect(screen.getByText('Welcome, Alice')).toBeInTheDocument();
 });
 
-test('renders at specific route', () => {
+test('renders at specific route', () =&gt; {
   render(&lt;MyComponent /&gt;, { route: '/dashboard' });
   
   expect(screen.getByText('Dashboard')).toBeInTheDocument();
@@ -1660,7 +1734,7 @@ export function renderWithRouter(
   window.history.pushState({}, 'Test page', route);
   
   return render(ui, {
-    wrapper: ({ children }) => &lt;BrowserRouter&gt;{children}&lt;/BrowserRouter&gt;
+    wrapper: ({ children }) =&gt; &lt;BrowserRouter&gt;{children}&lt;/BrowserRouter&gt;
   });
 }
 
@@ -1670,7 +1744,7 @@ export function renderWithTheme(
   { theme = 'light' }: { theme?: 'light' | 'dark' } = {}
 ) {
   return render(ui, {
-    wrapper: ({ children }) => (
+    wrapper: ({ children }) =&gt; (
       &lt;ThemeProvider initialTheme={theme}&gt;{children}&lt;/ThemeProvider&gt;
     )
   });
@@ -1711,45 +1785,39 @@ export function renderWithForm(
                 <p>Mocking external dependencies makes tests faster, more reliable, and easier to control. Let's explore different mocking strategies.</p>
 
                 <h3>Mocking API Calls with MSW</h3>
-                <p>Mock Service Worker (MSW) intercepts network requests at the network level:</p>
+                <p>Mock Service Worker (MSW) is the gold standard for API mocking because it intercepts requests at the <em>network</em> level, not by replacing <code>fetch</code>. Your component calls <code>fetch('/api/...')</code> exactly as it does in production — MSW quietly catches the request and hands back a canned response. Because your app code is never modified, the test exercises the real request path.</p>
+
+                <div class="card card-info">
+                    <h4>💡 MSW v2 syntax (the current API)</h4>
+                    <p>MSW 2.x changed its API and is the standard today. The old <code>rest.get((req, res, ctx) =&gt; res(ctx.json(...)))</code> style you'll still see in older blog posts is gone. Modern handlers use <code>http.*</code>, receive a single <code>{ request, params }</code> argument, and return a standard <code>HttpResponse</code>:</p>
+                </div>
 
                 <pre><code class="language-typescript">
 // mocks/handlers.ts
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 
 export const handlers = [
-  // GET request
-  rest.get('/api/users/:id', (req, res, ctx) => {
-    const { id } = req.params;
-    
-    return res(
-      ctx.status(200),
-      ctx.json({
-        id,
-        name: 'John Doe',
-        email: 'john@example.com'
-      })
-    );
+  // GET request — params come from the destructured argument
+  http.get('/api/users/:id', ({ params }) =&gt; {
+    const { id } = params;
+    return HttpResponse.json({
+      id,
+      name: 'John Doe',
+      email: 'john@example.com'
+    });
   }),
-  
-  // POST request
-  rest.post('/api/users', async (req, res, ctx) => {
-    const body = await req.json();
-    
-    return res(
-      ctx.status(201),
-      ctx.json({
-        id: '123',
-        ...body
-      })
-    );
+
+  // POST request — read the body off the standard Request
+  http.post('/api/users', async ({ request }) =&gt; {
+    const body = await request.json();
+    return HttpResponse.json({ id: '123', ...body }, { status: 201 });
   }),
-  
-  // Error response
-  rest.get('/api/error', (req, res, ctx) => {
-    return res(
-      ctx.status(500),
-      ctx.json({ message: 'Internal server error' })
+
+  // Error response — status goes in the second argument
+  http.get('/api/error', () =&gt; {
+    return HttpResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
     );
   })
 ];
@@ -1764,55 +1832,52 @@ export const server = setupServer(...handlers);
 import { beforeAll, afterEach, afterAll } from 'vitest';
 import { server } from '../mocks/server';
 
-beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
+beforeAll(() =&gt; server.listen());
+afterEach(() =&gt; server.resetHandlers()); // undo per-test overrides
+afterAll(() =&gt; server.close());
                 </code></pre>
 
                 <h3>Using MSW in Tests</h3>
                 <pre><code class="language-typescript">
 import { render, screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { server } from '../mocks/server';
-import { rest } from 'msw';
 import { UserProfile } from './UserProfile';
 
-test('displays user data from API', async () => {
+test('displays user data from API', async () =&gt; {
   render(&lt;UserProfile userId="1" /&gt;);
-  
-  // MSW automatically handles the request
-  await waitFor(() => {
+
+  // MSW automatically handles the request using the default handler
+  await waitFor(() =&gt; {
     expect(screen.getByText('John Doe')).toBeInTheDocument();
   });
 });
 
-test('handles API errors', async () => {
-  // Override handler for this test
+test('handles API errors', async () =&gt; {
+  // Override the default handler for THIS test only (reset in afterEach)
   server.use(
-    rest.get('/api/users/:id', (req, res, ctx) => {
-      return res(
-        ctx.status(404),
-        ctx.json({ message: 'User not found' })
-      );
+    http.get('/api/users/:id', () =&gt; {
+      return HttpResponse.json({ message: 'User not found' }, { status: 404 });
     })
   );
-  
+
   render(&lt;UserProfile userId="999" /&gt;);
-  
-  await waitFor(() => {
+
+  await waitFor(() =&gt; {
     expect(screen.getByText('User not found')).toBeInTheDocument();
   });
 });
 
-test('handles network errors', async () => {
+test('handles network errors', async () =&gt; {
   server.use(
-    rest.get('/api/users/:id', (req, res, ctx) => {
-      return res.networkError('Failed to connect');
+    http.get('/api/users/:id', () =&gt; {
+      return HttpResponse.error(); // simulate a connection failure
     })
   );
-  
+
   render(&lt;UserProfile userId="1" /&gt;);
-  
-  await waitFor(() => {
+
+  await waitFor(() =&gt; {
     expect(screen.getByText(/network error/i)).toBeInTheDocument();
   });
 });
@@ -1821,22 +1886,22 @@ test('handles network errors', async () => {
                 <h3>Mocking Modules with Vitest</h3>
                 <pre><code class="language-typescript">
 // Mocking an entire module
-vi.mock('./api', () => ({
+vi.mock('./api', () =&gt; ({
   fetchUser: vi.fn(),
   createUser: vi.fn()
 }));
 
 import { fetchUser, createUser } from './api';
 
-test('fetches user data', async () => {
+test('fetches user data', async () =&gt; {
   const mockUser = { id: '1', name: 'Alice' };
-  
-  // Mock implementation
-  (fetchUser as any).mockResolvedValue(mockUser);
-  
+
+  // vi.mocked() gives type-safe access to the mock (no 'as any' cast)
+  vi.mocked(fetchUser).mockResolvedValue(mockUser);
+
   render(&lt;UserProfile userId="1" /&gt;);
   
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByText('Alice')).toBeInTheDocument();
   });
   
@@ -1846,13 +1911,13 @@ test('fetches user data', async () => {
 
                 <h3>Mocking localStorage</h3>
                 <pre><code class="language-typescript">
-describe('LocalStorageComponent', () => {
-  beforeEach(() => {
+describe('LocalStorageComponent', () =&gt; {
+  beforeEach(() =&gt; {
     // Clear localStorage before each test
     localStorage.clear();
   });
   
-  it('saves data to localStorage', async () => {
+  it('saves data to localStorage', async () =&gt; {
     const user = userEvent.setup();
     render(&lt;SettingsForm /&gt;);
     
@@ -1862,7 +1927,7 @@ describe('LocalStorageComponent', () => {
     expect(localStorage.getItem('username')).toBe('testuser');
   });
   
-  it('loads data from localStorage', () => {
+  it('loads data from localStorage', () =&gt; {
     localStorage.setItem('username', 'existing-user');
     
     render(&lt;SettingsForm /&gt;);
@@ -1886,7 +1951,7 @@ global.localStorage = localStorageMock as any;
                 <pre><code class="language-typescript">
 import { vi } from 'vitest';
 
-test('auto-hides notification after delay', async () => {
+test('auto-hides notification after delay', async () =&gt; {
   vi.useFakeTimers();
   
   render(&lt;Notification message="Success!" autoHideDuration={3000} /&gt;);
@@ -1898,14 +1963,14 @@ test('auto-hides notification after delay', async () => {
   vi.advanceTimersByTime(3000);
   
   // Notification should be hidden
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.queryByText('Success!')).not.toBeInTheDocument();
   });
   
   vi.useRealTimers();
 });
 
-test('clears timer on unmount', () => {
+test('clears timer on unmount', () =&gt; {
   vi.useFakeTimers();
   const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
   
@@ -1921,30 +1986,34 @@ test('clears timer on unmount', () => {
 
                 <h3>Mocking Date and Time</h3>
                 <pre><code class="language-typescript">
-test('displays current date', () => {
-  // Mock Date
-  const mockDate = new Date('2024-01-15T12:00:00Z');
-  vi.setSystemTime(mockDate);
-  
+test('displays current date', () =&gt; {
+  // setSystemTime requires fake timers to be enabled first
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
+
   render(&lt;DateDisplay /&gt;);
-  
+
   expect(screen.getByText('January 15, 2024')).toBeInTheDocument();
-  
-  vi.useRealTimers();
+
+  vi.useRealTimers(); // always restore, or later tests inherit the frozen clock
 });
                 </code></pre>
 
                 <h3>Mocking window.location</h3>
                 <pre><code class="language-typescript">
-test('redirects to login page', () => {
+test('redirects to login page', async () =&gt; {
+  const user = userEvent.setup();
   const mockReload = vi.fn();
-  delete (window as any).location;
-  window.location = { ...window.location, reload: mockReload };
-  
+  // jsdom won't let you reassign location.reload directly, so replace the object
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { ...window.location, reload: mockReload }
+  });
+
   render(&lt;LogoutButton /&gt;);
-  
-  fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
-  
+
+  await user.click(screen.getByRole('button', { name: 'Logout' }));
+
   expect(mockReload).toHaveBeenCalled();
 });
                 </code></pre>
@@ -1965,25 +2034,37 @@ test('redirects to login page', () => {
             <!-- Section 8: Testing Complete Workflows -->
             <section id="workflows" class="lesson-section">
                 <h2>🔄 Testing Complete Workflows</h2>
-                
-                <p>Real users complete multi-step workflows. Let's test entire user journeys from start to finish.</p>
+
+                <p>Individual interaction tests are like checking that each door in a house opens. A workflow test walks the whole route — front door, hallway, up the stairs, into the bedroom — and confirms you can actually get where you're going. These are your highest-value tests: one workflow test can catch a broken step that a dozen isolated tests would sail right past, because the bug only appears when the steps run <em>in sequence</em> and carry state forward.</p>
+
+                <p>The structure is always the same rhythm you learned at the start — act, re-render, assert — just repeated once per step, with a <code>waitFor</code> or <code>findBy</code> at each transition so you never assert against a step that hasn't rendered yet:</p>
+
+                <div class="mermaid">
+                    graph LR
+                        A["Step 1: Personal info"] --> B["Step 2: Account details"]
+                        B --> C["Step 3: Profile picture"]
+                        C --> D["Step 4: Review"]
+                        D --> E["POST /api/register"]
+                        E --> F["Success message"]
+
+                        style A fill:#667eea,stroke:#333,stroke-width:2px,color:#fff
+                        style E fill:#764ba2,stroke:#333,stroke-width:2px,color:#fff
+                        style F fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
+                </div>
 
                 <h3>Multi-Step Registration Workflow</h3>
                 <pre><code class="language-typescript">
-test('complete registration workflow', async () => {
+test('complete registration workflow', async () =&gt; {
   const user = userEvent.setup();
   
-  // Mock API calls
+  // Mock API calls (MSW v2)
   server.use(
-    rest.post('/api/register', async (req, res, ctx) => {
-      const body = await req.json();
-      return res(ctx.status(201), ctx.json({ 
-        id: '123', 
-        ...body 
-      }));
+    http.post('/api/register', async ({ request }) =&gt; {
+      const body = await request.json();
+      return HttpResponse.json({ id: '123', ...body }, { status: 201 });
     })
   );
-  
+
   render(&lt;RegistrationWizard /&gt;);
   
   // Step 1: Personal Information
@@ -1996,7 +2077,7 @@ test('complete registration workflow', async () => {
   await user.click(screen.getByRole('button', { name: 'Next' }));
   
   // Step 2: Account Details
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByRole('heading', { name: 'Account Details' })).toBeInTheDocument();
   });
   
@@ -2007,7 +2088,7 @@ test('complete registration workflow', async () => {
   await user.click(screen.getByRole('button', { name: 'Next' }));
   
   // Step 3: Profile Picture
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByRole('heading', { name: 'Profile Picture' })).toBeInTheDocument();
   });
   
@@ -2017,7 +2098,7 @@ test('complete registration workflow', async () => {
   await user.click(screen.getByRole('button', { name: 'Next' }));
   
   // Step 4: Review
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument();
   });
   
@@ -2029,7 +2110,7 @@ test('complete registration workflow', async () => {
   await user.click(screen.getByRole('button', { name: 'Submit' }));
   
   // Success message
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByText(/registration successful/i)).toBeInTheDocument();
   });
 });
@@ -2037,7 +2118,7 @@ test('complete registration workflow', async () => {
 
                 <h3>E-commerce Checkout Flow</h3>
                 <pre><code class="language-typescript">
-test('complete checkout process', async () => {
+test('complete checkout process', async () =&gt; {
   const user = userEvent.setup();
   
   render(&lt;App /&gt;, { 
@@ -2060,7 +2141,7 @@ test('complete checkout process', async () => {
   // 3. View cart
   await user.click(screen.getByRole('link', { name: /cart/i }));
   
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByRole('heading', { name: 'Shopping Cart' })).toBeInTheDocument();
   });
   
@@ -2074,7 +2155,7 @@ test('complete checkout process', async () => {
   // 5. Proceed to checkout
   await user.click(screen.getByRole('button', { name: 'Checkout' }));
   
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByRole('heading', { name: 'Checkout' })).toBeInTheDocument();
   });
   
@@ -2093,7 +2174,7 @@ test('complete checkout process', async () => {
   await user.click(screen.getByRole('button', { name: 'Place Order' }));
   
   // 9. Confirmation
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByText(/order confirmed/i)).toBeInTheDocument();
   }, { timeout: 3000 });
   
@@ -2103,7 +2184,7 @@ test('complete checkout process', async () => {
 
                 <h3>Testing Navigation Between Pages</h3>
                 <pre><code class="language-typescript">
-test('navigates through application', async () => {
+test('navigates through application', async () =&gt; {
   const user = userEvent.setup();
   
   render(&lt;App /&gt;, { route: '/' });
@@ -2126,7 +2207,7 @@ test('navigates through application', async () => {
   await user.click(screen.getByRole('button', { name: 'Send' }));
   
   // Success and redirect
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
   });
   expect(screen.getByText(/message sent successfully/i)).toBeInTheDocument();
@@ -2135,29 +2216,29 @@ test('navigates through application', async () => {
 
                 <h3>Testing Error Recovery Flows</h3>
                 <pre><code class="language-typescript">
-test('handles and recovers from errors', async () => {
+test('handles and recovers from errors', async () =&gt; {
   const user = userEvent.setup();
   
   // Start with failing API
   server.use(
-    rest.post('/api/submit', (req, res, ctx) => {
-      return res(ctx.status(500), ctx.json({ message: 'Server error' }));
+    http.post('/api/submit', () =&gt; {
+      return HttpResponse.json({ message: 'Server error' }, { status: 500 });
     })
   );
-  
+
   render(&lt;SubmitForm /&gt;);
-  
+
   // Fill form
   await user.type(screen.getByLabelText('Name'), 'John');
   await user.click(screen.getByRole('button', { name: 'Submit' }));
-  
+
   // Error appears
   expect(await screen.findByText(/server error/i)).toBeInTheDocument();
-  
-  // Fix API
+
+  // Fix API — a later server.use() takes precedence over the earlier one
   server.use(
-    rest.post('/api/submit', (req, res, ctx) => {
-      return res(ctx.status(200), ctx.json({ success: true }));
+    http.post('/api/submit', () =&gt; {
+      return HttpResponse.json({ success: true });
     })
   );
   
@@ -2256,12 +2337,12 @@ test('handles and recovers from errors', async () => {
                 <h4>1. Test Complete User Flows</h4>
                 <pre><code class="language-typescript">
 // ✅ Good - tests the complete user experience
-test('user can complete checkout', async () => {
+test('user can complete checkout', async () =&gt; {
   // Add to cart → View cart → Enter shipping → Payment → Confirm
 });
 
 // ❌ Incomplete - only tests one step
-test('user can add to cart', async () => {
+test('user can add to cart', async () =&gt; {
   // Just tests adding, not the full journey
 });
                 </code></pre>
@@ -2269,17 +2350,17 @@ test('user can add to cart', async () => {
                 <h4>2. Keep Tests Independent</h4>
                 <pre><code class="language-typescript">
 // ✅ Good - each test sets up its own data
-test('displays cart items', () => {
+test('displays cart items', () =&gt; {
   const items = [{ id: '1', name: 'Product' }];
   render(&lt;Cart items={items} /&gt;);
 });
 
 // ❌ Bad - depends on global state
 let globalItems = [];
-test('adds to cart', () => {
+test('adds to cart', () =&gt; {
   globalItems.push({ id: '1' });
 });
-test('displays cart', () => {
+test('displays cart', () =&gt; {
   render(&lt;Cart items={globalItems} /&gt;); // Depends on previous test
 });
                 </code></pre>
@@ -2299,12 +2380,12 @@ render(
                 <h4>4. Test Error States</h4>
                 <pre><code class="language-typescript">
 // ✅ Good - tests both success and failure
-test('handles successful submission', async () => { /* ... */ });
-test('handles submission errors', async () => { /* ... */ });
-test('handles network errors', async () => { /* ... */ });
+test('handles successful submission', async () =&gt; { /* ... */ });
+test('handles submission errors', async () =&gt; { /* ... */ });
+test('handles network errors', async () =&gt; { /* ... */ });
 
 // ❌ Incomplete - only tests happy path
-test('submits form', async () => { /* ... */ });
+test('submits form', async () =&gt; { /* ... */ });
                 </code></pre>
 
                 <h3>❌ Don'ts</h3>
@@ -2330,14 +2411,14 @@ screen.getByRole('button', { name: 'Submit' });
                 <h4>3. Don't Make Tests Too Long</h4>
                 <pre><code class="language-typescript">
 // ❌ Bad - testing too many things
-test('app works', async () => {
+test('app works', async () =&gt; {
   // 500 lines testing every feature
 });
 
 // ✅ Good - focused tests
-test('user can register', async () => { /* ... */ });
-test('user can login', async () => { /* ... */ });
-test('user can update profile', async () => { /* ... */ });
+test('user can register', async () =&gt; { /* ... */ });
+test('user can login', async () =&gt; { /* ... */ });
+test('user can update profile', async () =&gt; { /* ... */ });
                 </code></pre>
 
                 <h3>💡 Pro Tips</h3>
@@ -2345,14 +2426,14 @@ test('user can update profile', async () => { /* ... */ });
                 <h4>1. Create Test Data Factories</h4>
                 <pre><code class="language-typescript">
 // test-factories.ts
-export const createMockUser = (overrides = {}) => ({
+export const createMockUser = (overrides = {}) =&gt; ({
   id: '1',
   name: 'Test User',
   email: 'test@example.com',
   ...overrides
 });
 
-export const createMockProduct = (overrides = {}) => ({
+export const createMockProduct = (overrides = {}) =&gt; ({
   id: '1',
   name: 'Test Product',
   price: 9.99,
@@ -2366,7 +2447,7 @@ const product = createMockProduct({ price: 19.99 });
 
                 <h4>2. Use Testing Library Debug Tools</h4>
                 <pre><code class="language-typescript">
-test('debugging', () => {
+test('debugging', () =&gt; {
   render(&lt;MyComponent /&gt;);
   
   screen.debug(); // See entire DOM
@@ -2376,15 +2457,15 @@ test('debugging', () => {
 
                 <h4>3. Group Related Tests</h4>
                 <pre><code class="language-typescript">
-describe('RegistrationForm', () => {
-  describe('validation', () => {
-    test('validates email format', async () => { /* ... */ });
-    test('validates password strength', async () => { /* ... */ });
+describe('RegistrationForm', () =&gt; {
+  describe('validation', () =&gt; {
+    test('validates email format', async () =&gt; { /* ... */ });
+    test('validates password strength', async () =&gt; { /* ... */ });
   });
   
-  describe('submission', () => {
-    test('submits valid data', async () => { /* ... */ });
-    test('handles submission errors', async () => { /* ... */ });
+  describe('submission', () =&gt; {
+    test('submits valid data', async () =&gt; { /* ... */ });
+    test('handles submission errors', async () =&gt; { /* ... */ });
   });
 });
                 </code></pre>
@@ -2449,9 +2530,9 @@ describe('RegistrationForm', () => {
 
                 <!-- Encouragement Card -->
                 <div class="card card-accent" style="text-align: center; padding: 2rem;">
-                    <h3 style="color: white;">🎉 Congratulations!</h3>
-                    <p style="color: white;">You've mastered advanced user interaction testing! You can now test complex forms, custom hooks, keyboard navigation, file uploads, and complete user workflows. These skills will help you build rock-solid React applications that users can rely on.</p>
-                    <p style="color: white; margin-top: 1rem;">Keep practicing, and remember: every interaction you test makes your application better!</p>
+                    <h3>🎉 Congratulations!</h3>
+                    <p>You've mastered advanced user interaction testing! You can now test complex forms, custom hooks, keyboard navigation, file uploads, and complete user workflows. These skills will help you build rock-solid React applications that users can rely on.</p>
+                    <p style="margin-top: 1rem;">Keep practicing, and remember: every interaction you test makes your application better!</p>
                 </div>
             </section>
 

@@ -62,7 +62,7 @@
                 <p class="lead">So far, your React components have been pure functions—they take props and state, and they render JSX. But real applications need to do more than just render. They need to fetch data from APIs, subscribe to events, update the document title, set timers, and interact with the browser. These are called "side effects," and React's useEffect hook is how you handle them. Think of useEffect as your component's way of saying "after you render, do this extra thing." Let's master this essential hook! 🚀</p>
                 
                 <!-- Learning objectives -->
-                <div class="card">
+                <div class="card card-info">
                     <h2>🎯 Learning Objectives</h2>
                     <p>By the end of this lesson, you will be able to:</p>
                     <ul>
@@ -108,11 +108,13 @@
             <!-- Section 1: What Are Side Effects? -->
             <section id="section1" class="lesson-section">
                 <h2>🎭 What Are Side Effects?</h2>
-                <p>Before we dive into useEffect, we need to understand what side effects are and why they need special handling in React.</p>
+                <p>Before we reach for <code>useEffect</code>, we need to understand what a "side effect" actually is—and why React insists on handling them separately from rendering.</p>
+
+                <p>Here's a helpful analogy. Think of a React component as a <em>recipe</em>. When React "renders," it reads your recipe and describes the finished dish (the JSX)—but it doesn't touch the kitchen. A side effect is the moment you actually <em>do</em> something in the real world: turn on the oven, ring the timer, phone the supplier for more flour. Rendering should be pure description; side effects are the real-world actions that happen <em>after</em> the description is ready. 🍳</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Side Effect:</strong> Any operation that affects something outside the scope of the function being executed. In React, this means anything beyond calculating and returning JSX.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Side Effect:</strong> Any operation that reaches outside the component's own render calculation—touching something in the "outside world." In React terms, that's anything beyond taking props and state and returning JSX. Fetching from an API, starting a timer, subscribing to an event, writing to <code>localStorage</code>, or setting <code>document.title</code> are all side effects.</p>
                 </div>
 
                 <h3>Pure Functions vs Side Effects</h3>
@@ -124,7 +126,7 @@ function add(a: number, b: number): number {
 }
 
 // ✅ PURE React Component
-const Greeting: React.FC&lt;{ name: string }&gt; = ({ name }) => {
+const Greeting: React.FC&lt;{ name: string }&gt; = ({ name }) =&gt; {
     return &lt;h1&gt;Hello, {name}!&lt;/h1&gt;; // Only renders JSX
 };
 
@@ -135,7 +137,7 @@ function addAndLog(a: number, b: number): number {
 }
 
 // ❌ IMPURE React Component (DON'T DO THIS)
-const BadComponent: React.FC = () => {
+const BadComponent: React.FC = () =&gt; {
     document.title = 'My App'; // Side effect in render!
     fetch('/api/data'); // Side effect in render!
     return &lt;h1&gt;Hello&lt;/h1&gt;;
@@ -197,12 +199,12 @@ const BadComponent: React.FC = () => {
                 <div class="card card-warning">
                     <h4>⚠️ The Problem with Side Effects During Render</h4>
                     <pre><code class="language-typescript">// ❌ BAD: Side effect during render
-const BadTimer: React.FC = () => {
+const BadTimer: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     
     // Problem: This runs on EVERY render!
-    setInterval(() => {
-        setCount(prev => prev + 1);
+    setInterval(() =&gt; {
+        setCount(prev =&gt; prev + 1);
     }, 1000);
     // Result: Hundreds of timers created, app crashes!
     
@@ -210,12 +212,12 @@ const BadTimer: React.FC = () => {
 };
 
 // ❌ BAD: Fetch during render
-const BadFetch: React.FC = () => {
+const BadFetch: React.FC = () =&gt; {
     const [data, setData] = useState(null);
     
     // Problem: Fetches on every render, infinite loop!
     fetch('/api/data')
-        .then(res => res.json())
+        .then(res =&gt; res.json())
         .then(setData); // Setting state triggers re-render!
     
     return &lt;div&gt;{data}&lt;/div&gt;;
@@ -240,68 +242,57 @@ graph TD
                     </div>
                 </div>
 
-                <!-- Interactive: Pure vs Impure Demo -->
+                <!-- Interactive: Pure vs Impure Demo (theme-aware ts-demo) -->
                 <h3>🎮 Interactive: Pure vs Impure Functions</h3>
-                <div class="card">
-                    <p>Click the buttons to see the difference between pure and impure functions:</p>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0;">
-                        <div style="padding: 1rem; background: #e8f5e9; border-radius: 8px; border: 2px solid #4caf50;">
-                            <h4 style="margin: 0 0 0.5rem 0; color: #2e7d32;">✅ Pure Function</h4>
-                            <pre style="background: #1e1e1e; color: #d4d4d4; padding: 0.5rem; border-radius: 4px; font-size: 0.8rem; margin: 0.5rem 0;"><code>function add(a, b) {
-  return a + b;
-}</code></pre>
-                            <button id="pure-btn" style="padding: 0.5rem 1rem; cursor: pointer; background: #4caf50; color: white; border: none; border-radius: 4px;">Call add(2, 3)</button>
-                            <div id="pure-result" style="margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px; min-height: 1.5rem;"></div>
-                            <p style="font-size: 0.85rem; color: #2e7d32; margin: 0.5rem 0 0 0;">Same input → Same output, no side effects</p>
-                        </div>
-                        <div style="padding: 1rem; background: #ffebee; border-radius: 8px; border: 2px solid #f44336;">
-                            <h4 style="margin: 0 0 0.5rem 0; color: #c62828;">❌ Impure Function</h4>
-                            <pre style="background: #1e1e1e; color: #d4d4d4; padding: 0.5rem; border-radius: 4px; font-size: 0.8rem; margin: 0.5rem 0;"><code>let callCount = 0;
-function addAndLog(a, b) {
-  callCount++;
-  console.log('Called!');
-  return a + b;
-}</code></pre>
-                            <button id="impure-btn" style="padding: 0.5rem 1rem; cursor: pointer; background: #f44336; color: white; border: none; border-radius: 4px;">Call addAndLog(2, 3)</button>
-                            <div id="impure-result" style="margin-top: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px; min-height: 1.5rem;"></div>
-                            <p style="font-size: 0.85rem; color: #c62828; margin: 0.5rem 0 0 0;">Modifies external state, logs to console</p>
-                        </div>
+                <p>Click each call below. A <strong>pure</strong> function is safe to run during render—same input, same output, no ripples in the outside world. An <strong>impure</strong> function reaches out and changes something, so it belongs in an effect, not in render.</p>
+
+                <div class="card ts-demo" aria-live="polite">
+                    <p class="ts-demo-sig"><code>add(a, b) // pure  ·  addAndLog(a, b) // impure (logs + mutates a counter)</code></p>
+                    <div class="ts-demo-buttons">
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="add(2, 3) returns 5 and touches nothing outside itself. Call it a thousand times and the world is unchanged. Safe to run during render.">add(2, 3)</button>
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="Same input always gives the same output: add(2, 3) is 5 every single time, with zero side effects.">add(2, 3) again</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="addAndLog(2, 3) returns 5 too — but it also logs to the console and increments a shared counter. Those are side effects, so this must NOT run during render.">addAndLog(2, 3)</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="document.title = 'Hi' reaches into the browser and mutates the page. Classic side effect — wrap it in useEffect.">document.title = 'Hi'</button>
                     </div>
-                    <div id="side-effects-log" style="padding: 0.75rem; background: #263238; border-radius: 4px; color: #aed581; font-family: monospace; font-size: 0.85rem; max-height: 100px; overflow-y: auto;">Console: Ready...</div>
+                    <p class="ts-demo-result ts-demo-idle" id="ts-demo-purity-result">👆 Click an example to see whether it is pure (render-safe) or a side effect.</p>
                 </div>
                 <script>
-                (function() {
-                    let callCount = 0;
-                    const pureResult = document.getElementById('pure-result');
-                    const impureResult = document.getElementById('impure-result');
-                    const logDiv = document.getElementById('side-effects-log');
-                    
-                    document.getElementById('pure-btn').addEventListener('click', () => {
-                        const result = 2 + 3;
-                        pureResult.innerHTML = `<strong>Result:</strong> ${result}`;
-                    });
-                    
-                    document.getElementById('impure-btn').addEventListener('click', () => {
-                        callCount++;
-                        const result = 2 + 3;
-                        impureResult.innerHTML = `<strong>Result:</strong> ${result}<br><span style="color:#f44336;">callCount is now: ${callCount}</span>`;
-                        logDiv.innerHTML += `<br>> Called! (call #${callCount})`;
-                        logDiv.scrollTop = logDiv.scrollHeight;
+                (function () {
+                    const wrap = document.getElementById('ts-demo-purity-result').closest('.ts-demo');
+                    const result = wrap.querySelector('#ts-demo-purity-result');
+                    wrap.querySelectorAll('.ts-demo-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            const ok = btn.getAttribute('data-valid') === 'true';
+                            result.classList.remove('ts-demo-idle', 'ts-demo-ok', 'ts-demo-err');
+                            result.classList.add(ok ? 'ts-demo-ok' : 'ts-demo-err');
+                            result.textContent = (ok ? '✅ Pure — render-safe: ' : '⚡ Side effect — needs useEffect: ') + btn.getAttribute('data-msg');
+                        });
                     });
                 })();
                 </script>
 
-                <p><strong>The key insight:</strong> Render functions should be pure. Side effects should happen <em>after</em> rendering completes. That's what useEffect is for!</p>
+                <p><strong>The key insight:</strong> render functions should be pure. Side effects should happen <em>after</em> rendering completes—and <code>useEffect</code> is React's official doorway from pure rendering into the messy, wonderful outside world.</p>
             </section>
 
             <!-- Section 2: Introduction to useEffect -->
             <section id="section2" class="lesson-section">
                 <h2>🎣 Introduction to useEffect</h2>
-                <p>The useEffect hook tells React "after you finish rendering this component, run this code." It's your escape hatch from pure rendering into the world of side effects.</p>
+                <p>The useEffect hook tells React "after you finish rendering this component, run this code." It's your escape hatch from pure rendering into the world of side effects. The name is worth pausing on: an <em>effect</em> is meant to <strong>synchronize your component with an external system</strong>—the browser DOM, a network connection, a timer, a third-party widget. If there's no external system involved, you probably don't need an effect at all.</p>
+
+                <div class="card card-warning">
+                    <h4>🤔 First, ask: do I even need an Effect?</h4>
+                    <p>This is the single most important mindset shift in modern React (2026). The official React docs have a whole page titled <em>"You Might Not Need an Effect,"</em> and it's the first thing experienced developers reach for. Before writing <code>useEffect</code>, check:</p>
+                    <ul>
+                        <li><strong>Transforming data for rendering?</strong> Just calculate it during render. <code>const total = items.reduce(...)</code>—no effect, no extra state.</li>
+                        <li><strong>Responding to a user action?</strong> Put that logic in the event handler (the <code>onClick</code>), not in an effect that watches state.</li>
+                        <li><strong>Genuinely syncing with something outside React?</strong> (a subscription, the document title, a timer) <em>That's</em> when an effect earns its place.</li>
+                    </ul>
+                    <p>We'll come back to this in <a href="#section10">Best Practices</a>. Keep it in the back of your mind for the whole lesson: <strong>an effect is a tool for synchronization, not a dumping ground for "code that runs later."</strong></p>
+                </div>
 
                 <div class="card">
                     <h4>The Concept</h4>
-                    <pre><code class="language-typescript">useEffect(() => {
+                    <pre><code class="language-typescript">useEffect(() =&gt; {
     // This code runs AFTER the component renders
     console.log('Component rendered!');
     
@@ -316,21 +307,21 @@ function addAndLog(a, b) {
                 <h3>When Does useEffect Run?</h3>
                 <div class="card card-info">
                     <h4>💡 Effect Timing</h4>
-                    <pre class="mermaid">
+                    <div class="mermaid">
 graph LR
     A[Component Mounts] --> B[Render JSX]
     B --> C[React Updates DOM]
     C --> D[Browser Paints]
     D --> E[useEffect Runs]
-    
+
     F[State Changes] --> G[Re-render]
     G --> H[React Updates DOM]
     H --> I[Browser Paints]
     I --> J[useEffect Runs Again]
-    
+
     style E fill:#4CAF50,color:#fff
     style J fill:#4CAF50,color:#fff
-</pre>
+</div>
                 </div>
 
                 <h3>Your First useEffect</h3>
@@ -338,11 +329,11 @@ graph LR
                     <h4>Simple Example: Document Title</h4>
                     <pre><code class="language-typescript">import { useState, useEffect } from 'react';
 
-const PageTitle: React.FC = () => {
+const PageTitle: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     
     // ✅ Effect runs after every render
-    useEffect(() => {
+    useEffect(() =&gt; {
         document.title = `Count: ${count}`;
         console.log('Effect ran!');
     });
@@ -350,7 +341,7 @@ const PageTitle: React.FC = () => {
     return (
         &lt;div&gt;
             &lt;p&gt;Count: {count}&lt;/p&gt;
-            &lt;button onClick={() => setCount(count + 1)}&gt;
+            &lt;button onClick={() =&gt; setCount(count + 1)}&gt;
                 Increment
             &lt;/button&gt;
         &lt;/div&gt;
@@ -366,29 +357,29 @@ const PageTitle: React.FC = () => {
                 </div>
 
                 <h3>Effect Flow Diagram</h3>
-                <pre class="mermaid">
+                <div class="mermaid">
 sequenceDiagram
     participant U as User
     participant C as Component
     participant R as React
     participant E as useEffect
     participant B as Browser
-    
+
     U->>C: Open page
-    C->>R: Render JSX (count=0)
+    C->>R: Render JSX with count 0
     R->>B: Update DOM
     B->>B: Paint screen
     B->>E: Trigger effect
     E->>B: Set document.title
-    
+
     U->>C: Click button
-    C->>C: setCount(1)
-    C->>R: Re-render JSX (count=1)
+    C->>C: Call setCount to 1
+    C->>R: Re-render JSX with count 1
     R->>B: Update DOM
     B->>B: Paint screen
     B->>E: Trigger effect again
     E->>B: Set document.title again
-</pre>
+</div>
 
                 <h3>Importing useEffect</h3>
                 <div class="card">
@@ -415,12 +406,12 @@ import { useState, useEffect } from 'react';
                     <h4>Full Form</h4>
                     <pre><code class="language-typescript">useEffect(
     // 1. Effect function (required)
-    () => {
+    () =&gt; {
         // Side effect code goes here
         console.log('Effect running');
         
         // 2. Cleanup function (optional)
-        return () => {
+        return () =&gt; {
             console.log('Cleanup running');
         };
     },
@@ -432,7 +423,7 @@ import { useState, useEffect } from 'react';
                 <h3>Part 1: The Effect Function</h3>
                 <div class="card">
                     <h4>What Goes Inside?</h4>
-                    <pre><code class="language-typescript">useEffect(() => {
+                    <pre><code class="language-typescript">useEffect(() =&gt; {
     // This is the effect function
     // Put your side effects here
     
@@ -440,7 +431,7 @@ import { useState, useEffect } from 'react';
     console.log('Component rendered');
     document.title = 'My App';
     fetch('/api/data');
-    const timer = setTimeout(() => {}, 1000);
+    const timer = setTimeout(() =&gt; {}, 1000);
     
     // Any code that should run after render
 });</code></pre>
@@ -449,22 +440,22 @@ import { useState, useEffect } from 'react';
                 <div class="card">
                     <h4>Effect Function Examples</h4>
                     <pre><code class="language-typescript">// Example 1: Update document title
-useEffect(() => {
+useEffect(() =&gt; {
     document.title = `You clicked ${count} times`;
 });
 
 // Example 2: Log when component renders
-useEffect(() => {
+useEffect(() =&gt; {
     console.log('Component rendered with props:', props);
 });
 
 // Example 3: Focus an input
-useEffect(() => {
+useEffect(() =&gt; {
     inputRef.current?.focus();
 });
 
 // Example 4: Set up analytics
-useEffect(() => {
+useEffect(() =&gt; {
     analytics.track('Page viewed', { page: 'Home' });
 });</code></pre>
                 </div>
@@ -472,14 +463,14 @@ useEffect(() => {
                 <h3>Part 2: The Cleanup Function (Optional)</h3>
                 <div class="card">
                     <h4>Returning a Cleanup Function</h4>
-                    <pre><code class="language-typescript">useEffect(() => {
+                    <pre><code class="language-typescript">useEffect(() =&gt; {
     // Set up
-    const timer = setInterval(() => {
+    const timer = setInterval(() =&gt; {
         console.log('Tick');
     }, 1000);
     
     // Cleanup (optional but often needed)
-    return () => {
+    return () =&gt; {
         clearInterval(timer);
         console.log('Timer cleaned up');
     };
@@ -493,20 +484,20 @@ useEffect(() => {
                 <div class="card card-success">
                     <h4>✅ Why Cleanup Matters</h4>
                     <pre><code class="language-typescript">// ❌ WITHOUT cleanup: Memory leak!
-useEffect(() => {
-    const timer = setInterval(() => {
+useEffect(() =&gt; {
+    const timer = setInterval(() =&gt; {
         console.log('Tick');
     }, 1000);
     // Timer keeps running even after component unmounts!
 });
 
 // ✅ WITH cleanup: Proper resource management
-useEffect(() => {
-    const timer = setInterval(() => {
+useEffect(() =&gt; {
+    const timer = setInterval(() =&gt; {
         console.log('Tick');
     }, 1000);
     
-    return () => {
+    return () =&gt; {
         clearInterval(timer); // Stop timer when done
     };
 });</code></pre>
@@ -516,17 +507,17 @@ useEffect(() => {
                 <div class="card">
                     <h4>Three Ways to Use Dependencies</h4>
                     <pre><code class="language-typescript">// 1. No dependency array: Runs after EVERY render
-useEffect(() => {
+useEffect(() =&gt; {
     console.log('Runs on every render');
 }); // ⚠️ Usually not what you want!
 
 // 2. Empty dependency array: Runs ONCE on mount
-useEffect(() => {
+useEffect(() =&gt; {
     console.log('Runs once when component mounts');
 }, []); // ✅ Common pattern
 
 // 3. With dependencies: Runs when dependencies change
-useEffect(() => {
+useEffect(() =&gt; {
     console.log('Runs when count changes');
 }, [count]); // ✅ Most common pattern</code></pre>
                 </div>
@@ -554,166 +545,33 @@ flowchart TD
                     </div>
                 </div>
 
-                <!-- Interactive Dependency Array Simulator -->
-                <h3>🎮 Interactive: Dependency Array Simulator</h3>
-                <div class="card">
-                    <p>Simulate component renders and see when your effect runs based on different dependency configurations:</p>
-                    <div id="dep-simulator" style="padding: 1rem;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                            <div>
-                                <label style="font-weight: bold;">State Values:</label>
-                                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                                    <div style="flex: 1;">
-                                        <label style="font-size: 0.85rem;">count:</label>
-                                        <div style="display: flex; align-items: center; gap: 0.25rem;">
-                                            <button id="dep-count-dec" style="padding: 0.25rem 0.5rem; cursor: pointer;">-</button>
-                                            <span id="dep-count-val" style="min-width: 2rem; text-align: center; font-weight: bold;">0</span>
-                                            <button id="dep-count-inc" style="padding: 0.25rem 0.5rem; cursor: pointer;">+</button>
-                                        </div>
-                                    </div>
-                                    <div style="flex: 1;">
-                                        <label style="font-size: 0.85rem;">name:</label>
-                                        <select id="dep-name-val" style="width: 100%; padding: 0.25rem;">
-                                            <option value="Alice">Alice</option>
-                                            <option value="Bob">Bob</option>
-                                            <option value="Charlie">Charlie</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <label style="font-weight: bold;">Dependency Array:</label>
-                                <div style="margin-top: 0.5rem;">
-                                    <select id="dep-array-type" style="width: 100%; padding: 0.5rem;">
-                                        <option value="none">No array (runs every render)</option>
-                                        <option value="empty">Empty [] (runs once)</option>
-                                        <option value="count">[count] (runs when count changes)</option>
-                                        <option value="name">[name] (runs when name changes)</option>
-                                        <option value="both">[count, name] (runs when either changes)</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="text-align: center; margin: 1rem 0;">
-                            <button id="dep-render-btn" style="padding: 0.75rem 2rem; font-size: 1rem; cursor: pointer; background: #667eea; color: white; border: none; border-radius: 4px;">🔄 Trigger Re-render</button>
-                            <button id="dep-reset-btn" style="padding: 0.75rem 1rem; font-size: 1rem; cursor: pointer; background: #9e9e9e; color: white; border: none; border-radius: 4px; margin-left: 0.5rem;">Reset</button>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                            <div style="padding: 1rem; background: #f5f5f5; border-radius: 8px;">
-                                <h5 style="margin: 0 0 0.5rem 0;">Render History</h5>
-                                <div id="dep-render-log" style="font-family: monospace; font-size: 0.8rem; max-height: 150px; overflow-y: auto;"></div>
-                            </div>
-                            <div style="padding: 1rem; background: #e3f2fd; border-radius: 8px;">
-                                <h5 style="margin: 0 0 0.5rem 0;">Effect Execution Log</h5>
-                                <div id="dep-effect-log" style="font-family: monospace; font-size: 0.8rem; max-height: 150px; overflow-y: auto;"></div>
-                            </div>
-                        </div>
-                        <canvas class="auto-invert" id="dep-canvas" width="600" height="120" style="width: 100%; max-width: 600px; margin-top: 1rem; border: 1px solid #ddd; border-radius: 8px;"></canvas>
+                <!-- Interactive Dependency Array Simulator (theme-aware ts-demo) -->
+                <h3>🎮 Interactive: When Does the Effect Run?</h3>
+                <p>The second argument to <code>useEffect</code>—the dependency array—decides <em>when</em> your effect fires. Click each configuration to see React's rule in plain English. Green means "this is a healthy, intentional pattern"; red means "this usually signals a bug or wasted work."</p>
+
+                <div class="card ts-demo" aria-live="polite">
+                    <p class="ts-demo-sig"><code>useEffect(() =&gt; { /* effect */ }, deps)</code></p>
+                    <div class="ts-demo-buttons">
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="deps = []  → the effect runs ONCE, right after the first render (on mount), and its cleanup runs on unmount. Perfect for one-time setup like a subscription.">deps: []</button>
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="deps = [count]  → the effect re-runs only when count changes value between renders. This is the everyday, correct pattern for reacting to a specific piece of state or a prop.">deps: [count]</button>
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="deps = [count, name]  → the effect re-runs whenever EITHER value changes. If both change in one render, it still runs just once.">deps: [count, name]</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="No array at all  → the effect runs after EVERY render, every time. Occasionally intended, but far more often a mistake that wastes work or hides a missing dependency.">no array</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="deps = [user] where user is an object literal  → a fresh object is created every render, so it is never === the previous one. The effect fires on every render, exactly like having no array. Depend on user.id or specific primitive fields instead.">deps: [user] (object)</button>
                     </div>
+                    <p class="ts-demo-result ts-demo-idle" id="ts-demo-deps-result">👆 Pick a dependency configuration to see when React will run the effect.</p>
                 </div>
                 <script>
-                (function() {
-                    let count = 0;
-                    let name = 'Alice';
-                    let prevCount = 0;
-                    let prevName = 'Alice';
-                    let renderNum = 0;
-                    let effectNum = 0;
-                    let isFirstRender = true;
-                    
-                    const countVal = document.getElementById('dep-count-val');
-                    const nameVal = document.getElementById('dep-name-val');
-                    const arrayType = document.getElementById('dep-array-type');
-                    const renderLog = document.getElementById('dep-render-log');
-                    const effectLog = document.getElementById('dep-effect-log');
-                    const canvas = document.getElementById('dep-canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    function shouldEffectRun() {
-                        const type = arrayType.value;
-                        if (type === 'none') return true;
-                        if (type === 'empty') return isFirstRender;
-                        if (type === 'count') return count !== prevCount || isFirstRender;
-                        if (type === 'name') return name !== prevName || isFirstRender;
-                        if (type === 'both') return count !== prevCount || name !== prevName || isFirstRender;
-                        return false;
-                    }
-                    
-                    function drawCanvas() {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.font = 'bold 14px system-ui';
-                        ctx.textAlign = 'center';
-                        
-                        // Stats
-                        ctx.fillStyle = '#667eea';
-                        ctx.fillText(`Renders: ${renderNum}`, 100, 30);
-                        ctx.fillStyle = '#4caf50';
-                        ctx.fillText(`Effects: ${effectNum}`, 300, 30);
-                        ctx.fillStyle = '#ff9800';
-                        ctx.fillText(`Ratio: ${renderNum > 0 ? (effectNum/renderNum*100).toFixed(0) : 0}%`, 500, 30);
-                        
-                        // Bar chart
-                        const maxBars = 20;
-                        const barWidth = 25;
-                        const startX = 50;
-                        
-                        ctx.font = '10px system-ui';
-                        ctx.fillStyle = '#999';
-                        ctx.fillText('Last 20 renders:', startX + 150, 60);
-                    }
-                    
-                    function triggerRender() {
-                        renderNum++;
-                        const shouldRun = shouldEffectRun();
-                        
-                        // Log render
-                        renderLog.innerHTML = `<div style="color:#667eea;">[${renderNum}] Rendered with count=${count}, name=${name}</div>` + renderLog.innerHTML;
-                        
-                        if (shouldRun) {
-                            effectNum++;
-                            effectLog.innerHTML = `<div style="color:#4caf50;">✅ [${effectNum}] Effect ran! count=${count}, name=${name}</div>` + effectLog.innerHTML;
-                        } else {
-                            effectLog.innerHTML = `<div style="color:#9e9e9e;">⏭️ Skipped (no change in deps)</div>` + effectLog.innerHTML;
-                        }
-                        
-                        prevCount = count;
-                        prevName = name;
-                        isFirstRender = false;
-                        drawCanvas();
-                    }
-                    
-                    document.getElementById('dep-count-inc').addEventListener('click', () => {
-                        count++;
-                        countVal.textContent = count;
+                (function () {
+                    const wrap = document.getElementById('ts-demo-deps-result').closest('.ts-demo');
+                    const result = wrap.querySelector('#ts-demo-deps-result');
+                    wrap.querySelectorAll('.ts-demo-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            const ok = btn.getAttribute('data-valid') === 'true';
+                            result.classList.remove('ts-demo-idle', 'ts-demo-ok', 'ts-demo-err');
+                            result.classList.add(ok ? 'ts-demo-ok' : 'ts-demo-err');
+                            result.textContent = (ok ? '✅ Healthy pattern: ' : '⚠️ Usually a problem: ') + btn.getAttribute('data-msg');
+                        });
                     });
-                    
-                    document.getElementById('dep-count-dec').addEventListener('click', () => {
-                        count--;
-                        countVal.textContent = count;
-                    });
-                    
-                    nameVal.addEventListener('change', () => {
-                        name = nameVal.value;
-                    });
-                    
-                    document.getElementById('dep-render-btn').addEventListener('click', triggerRender);
-                    
-                    document.getElementById('dep-reset-btn').addEventListener('click', () => {
-                        count = 0;
-                        name = 'Alice';
-                        prevCount = 0;
-                        prevName = 'Alice';
-                        renderNum = 0;
-                        effectNum = 0;
-                        isFirstRender = true;
-                        countVal.textContent = '0';
-                        nameVal.value = 'Alice';
-                        renderLog.innerHTML = '';
-                        effectLog.innerHTML = '';
-                        drawCanvas();
-                    });
-                    
-                    drawCanvas();
                 })();
                 </script>
 
@@ -724,17 +582,17 @@ flowchart TD
                     <pre><code class="language-typescript">import { useEffect } from 'react';
 
 // Effect function doesn't return anything (except cleanup)
-useEffect(() => {
+useEffect(() =&gt; {
     // TypeScript infers this returns void
     console.log('Hello');
 });
 
 // Cleanup function must return void
-useEffect(() => {
-    const timer = setInterval(() => {}, 1000);
+useEffect(() =&gt; {
+    const timer = setInterval(() =&gt; {}, 1000);
     
     // ✅ Correct: returns void
-    return () => {
+    return () =&gt; {
         clearInterval(timer);
     };
     
@@ -743,7 +601,7 @@ useEffect(() => {
 });
 
 // Dependencies must be array
-useEffect(() => {
+useEffect(() =&gt; {
     console.log(count);
 }, [count]); // ✅ Array of dependencies
 
@@ -752,8 +610,8 @@ interface Props {
     userId: string;
 }
 
-const UserProfile: React.FC&lt;Props&gt; = ({ userId }) => {
-    useEffect(() => {
+const UserProfile: React.FC&lt;Props&gt; = ({ userId }) =&gt; {
+    useEffect(() =&gt; {
         // userId is properly typed as string
         console.log(`Fetching data for user: ${userId}`);
     }, [userId]); // TypeScript checks userId is in scope
@@ -775,7 +633,7 @@ const UserProfile: React.FC&lt;Props&gt; = ({ userId }) => {
                     <pre><code class="language-typescript">const [count, setCount] = useState(0);
 const [name, setName] = useState('Alice');
 
-useEffect(() => {
+useEffect(() =&gt; {
     console.log(`Count: ${count}, Name: ${name}`);
 }, [count, name]);
 
@@ -796,7 +654,7 @@ useEffect(() => {
                 <div class="card">
                     <h4>Pattern 1: No Dependency Array</h4>
                     <pre><code class="language-typescript">// Runs after EVERY render
-useEffect(() => {
+useEffect(() =&gt; {
     console.log('Every render');
 }); // No second argument
 
@@ -807,10 +665,10 @@ useEffect(() => {
                 <div class="card">
                     <h4>Pattern 2: Empty Dependency Array</h4>
                     <pre><code class="language-typescript">// Runs ONCE when component mounts
-useEffect(() => {
+useEffect(() =&gt; {
     console.log('Component mounted');
     
-    return () => {
+    return () =&gt; {
         console.log('Component unmounted');
     };
 }, []); // Empty array
@@ -822,17 +680,17 @@ useEffect(() => {
 // - Fetch initial data
 
 // Example: Fetch data once
-useEffect(() => {
+useEffect(() =&gt; {
     fetch('/api/user')
-        .then(res => res.json())
-        .then(data => setUser(data));
+        .then(res =&gt; res.json())
+        .then(data =&gt; setUser(data));
 }, []); // Runs once on mount</code></pre>
                 </div>
 
                 <div class="card">
                     <h4>Pattern 3: With Dependencies</h4>
                     <pre><code class="language-typescript">// Runs when specified values change
-useEffect(() => {
+useEffect(() =&gt; {
     console.log(`User ${userId} selected`);
     fetchUserData(userId);
 }, [userId]); // Runs when userId changes
@@ -846,11 +704,11 @@ useEffect(() => {
 const [searchTerm, setSearchTerm] = useState('');
 const [results, setResults] = useState([]);
 
-useEffect(() => {
+useEffect(() =&gt; {
     if (searchTerm) {
         fetch(`/api/search?q=${searchTerm}`)
-            .then(res => res.json())
-            .then(data => setResults(data));
+            .then(res =&gt; res.json())
+            .then(data =&gt; setResults(data));
     }
 }, [searchTerm]); // Re-run when search term changes</code></pre>
                 </div>
@@ -863,13 +721,13 @@ useEffect(() => {
 const [multiplier, setMultiplier] = useState(2);
 
 // ✅ CORRECT: Both count and multiplier are dependencies
-useEffect(() => {
+useEffect(() =&gt; {
     const result = count * multiplier;
     console.log(`Result: ${result}`);
 }, [count, multiplier]);
 
 // ❌ WRONG: Missing multiplier from dependencies
-useEffect(() => {
+useEffect(() =&gt; {
     const result = count * multiplier; // Uses multiplier
     console.log(`Result: ${result}`);
 }, [count]); // But doesn't list it!
@@ -882,27 +740,27 @@ useEffect(() => {
                     <pre><code class="language-typescript">// ❌ Mistake 1: Forgetting dependencies
 const [userId, setUserId] = useState(1);
 
-useEffect(() => {
+useEffect(() =&gt; {
     fetchUser(userId); // Uses userId
 }, []); // But empty array! Will always fetch user 1
 
 // ✅ Fix: Include userId
-useEffect(() => {
+useEffect(() =&gt; {
     fetchUser(userId);
 }, [userId]);
 
 // ❌ Mistake 2: Including functions that change every render
-const handleClick = () => {
+const handleClick = () =&gt; {
     console.log('Clicked');
 };
 
-useEffect(() => {
+useEffect(() =&gt; {
     document.addEventListener('click', handleClick);
 }, [handleClick]); // handleClick is new every render!
 
 // ✅ Fix: Define function inside effect
-useEffect(() => {
-    const handleClick = () => {
+useEffect(() =&gt; {
+    const handleClick = () =&gt; {
         console.log('Clicked');
     };
     document.addEventListener('click', handleClick);
@@ -911,12 +769,12 @@ useEffect(() => {
 // ❌ Mistake 3: Object dependencies
 const config = { theme: 'dark', lang: 'en' };
 
-useEffect(() => {
+useEffect(() =&gt; {
     applyConfig(config);
 }, [config]); // config is new object every render!
 
 // ✅ Fix: Depend on individual properties
-useEffect(() => {
+useEffect(() =&gt; {
     applyConfig({ theme: 'dark', lang: 'en' });
 }, []); // Or use theme and lang as separate dependencies</code></pre>
                 </div>
@@ -926,32 +784,32 @@ useEffect(() => {
                     <h4>Understanding Comparison</h4>
                     <pre><code class="language-typescript">// Primitives: Compared by value
 const [count, setCount] = useState(0);
-useEffect(() => {
+useEffect(() =&gt; {
     console.log(count);
 }, [count]); // ✅ count compared by value (0 === 0)
 
 // Objects: Compared by reference
 const [user, setUser] = useState({ name: 'Alice' });
-useEffect(() => {
+useEffect(() =&gt; {
     console.log(user.name);
 }, [user]); // ⚠️ user compared by reference (may cause extra runs)
 
 // Better: Depend on specific properties
-useEffect(() => {
+useEffect(() =&gt; {
     console.log(user.name);
 }, [user.name]); // ✅ Compare only name property
 
 // Arrays: Also compared by reference
 const [items, setItems] = useState([1, 2, 3]);
-useEffect(() => {
+useEffect(() =&gt; {
     console.log('Items changed');
 }, [items]); // New array reference triggers effect
 
 // Functions: Always new reference
-const handleSubmit = () => {
+const handleSubmit = () =&gt; {
     console.log('Submit');
 };
-useEffect(() => {
+useEffect(() =&gt; {
     // ...
 }, [handleSubmit]); // ⚠️ Different function every render!</code></pre>
                 </div>
@@ -959,22 +817,25 @@ useEffect(() => {
                 <h3>ESLint Rule: exhaustive-deps</h3>
                 <div class="card card-info">
                     <h4>💡 Let ESLint Help You</h4>
-                    <p>React provides an ESLint rule that automatically checks your dependencies:</p>
+                    <p>You don't have to police the dependency array by hand. React ships an ESLint rule, <code>react-hooks/exhaustive-deps</code>, that reads your effect, works out exactly which values it uses, and warns you the instant the array is out of sync. Treat it as a helpful pair-programmer, not a nag.</p>
                     <pre><code class="language-bash"># Install if not already installed
-npm install eslint-plugin-react-hooks --save-dev</code></pre>
-                    <pre><code class="language-json">// .eslintrc.json
-{
-  "plugins": ["react-hooks"],
-  "rules": {
-    "react-hooks/exhaustive-deps": "warn"
-  }
-}</code></pre>
-                    <p>This rule will warn you when:</p>
+npm install --save-dev eslint-plugin-react-hooks</code></pre>
+                    <p>Modern ESLint (v9+) uses a flat config file, <code>eslint.config.js</code>. In 2026 the simplest setup is the plugin's recommended preset, which turns the rule on for you:</p>
+                    <pre><code class="language-javascript">// eslint.config.js (flat config)
+import reactHooks from 'eslint-plugin-react-hooks';
+
+export default [
+  // Enables react-hooks/rules-of-hooks (error)
+  // and react-hooks/exhaustive-deps (warn)
+  reactHooks.configs['recommended-latest'],
+];</code></pre>
+                    <p>Once it's on, the rule warns you when:</p>
                     <ul>
-                        <li>You're missing dependencies</li>
-                        <li>You have unnecessary dependencies</li>
-                        <li>Your effect might cause infinite loops</li>
+                        <li>You're missing a dependency (the classic source of stale values)</li>
+                        <li>You have an unnecessary dependency</li>
+                        <li>Your effect might cause an infinite loop</li>
                     </ul>
+                    <p><strong>Rule of thumb:</strong> if the linter wants a dependency you think you can safely omit, that's a signal to <em>restructure</em> the effect—not to silence the warning. Suppressing <code>exhaustive-deps</code> is how stale-closure bugs sneak in.</p>
                 </div>
             </section>
 
@@ -987,12 +848,12 @@ npm install eslint-plugin-react-hooks --save-dev</code></pre>
                 <div class="card">
                     <h4>The Problem</h4>
                     <pre><code class="language-typescript">// ❌ WITHOUT cleanup
-const Timer: React.FC = () => {
+const Timer: React.FC = () =&gt; {
     const [seconds, setSeconds] = useState(0);
     
-    useEffect(() => {
-        setInterval(() => {
-            setSeconds(prev => prev + 1);
+    useEffect(() =&gt; {
+        setInterval(() =&gt; {
+            setSeconds(prev =&gt; prev + 1);
         }, 1000);
     }, []);
     
@@ -1006,16 +867,16 @@ const Timer: React.FC = () => {
 
                 <div class="card">
                     <h4>✅ WITH Cleanup</h4>
-                    <pre><code class="language-typescript">const Timer: React.FC = () => {
+                    <pre><code class="language-typescript">const Timer: React.FC = () =&gt; {
     const [seconds, setSeconds] = useState(0);
     
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            setSeconds(prev => prev + 1);
+    useEffect(() =&gt; {
+        const intervalId = setInterval(() =&gt; {
+            setSeconds(prev =&gt; prev + 1);
         }, 1000);
         
         // Cleanup function
-        return () => {
+        return () =&gt; {
             clearInterval(intervalId);
             console.log('Timer cleaned up');
         };
@@ -1049,189 +910,80 @@ sequenceDiagram
                     </div>
                 </div>
 
-                <!-- Interactive Cleanup Lifecycle Demo -->
-                <h3>🎮 Interactive: Effect & Cleanup Lifecycle</h3>
-                <div class="card">
-                    <p>Watch how effects and cleanup functions run during the component lifecycle:</p>
-                    <div id="cleanup-demo" style="padding: 1rem;">
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; justify-content: center;">
-                            <button id="cleanup-mount" style="padding: 0.5rem 1rem; cursor: pointer; background: #4caf50; color: white; border: none; border-radius: 4px;">🟢 Mount Component</button>
-                            <button id="cleanup-update" style="padding: 0.5rem 1rem; cursor: pointer; background: #2196f3; color: white; border: none; border-radius: 4px;" disabled>🔄 Update (change dep)</button>
-                            <button id="cleanup-unmount" style="padding: 0.5rem 1rem; cursor: pointer; background: #f44336; color: white; border: none; border-radius: 4px;" disabled>🔴 Unmount Component</button>
-                            <button id="cleanup-reset" style="padding: 0.5rem 1rem; cursor: pointer; background: #9e9e9e; color: white; border: none; border-radius: 4px;">🔄 Reset</button>
-                        </div>
-                        <div id="cleanup-component-state" style="text-align: center; padding: 1rem; background: #f5f5f5; border-radius: 8px; margin-bottom: 1rem;">
-                            <span style="font-size: 1.2rem;">Component Status: </span>
-                            <span id="cleanup-status" style="font-weight: bold; color: #9e9e9e;">Not Mounted</span>
-                        </div>
-                        <canvas class="auto-invert" id="cleanup-canvas" width="650" height="280" style="width: 100%; max-width: 650px; border: 1px solid #ddd; border-radius: 8px; display: block; margin: 0 auto;"></canvas>
-                        <div id="cleanup-timeline" style="margin-top: 1rem; padding: 0.75rem; background: #263238; border-radius: 4px; color: #aed581; font-family: monospace; font-size: 0.85rem; max-height: 120px; overflow-y: auto;">Timeline: Click "Mount Component" to start...</div>
+                <!-- Effect lifecycle SVG figure -->
+                <figure>
+                    <svg class="svg-auto-invert" id="svg-effect-lifecycle" viewBox="0 0 640 210" width="100%" style="max-width: 640px;" aria-labelledby="lifecycle-title lifecycle-desc" role="img">
+                        <title id="lifecycle-title">The Effect Lifecycle: mount, update, unmount</title>
+                        <desc id="lifecycle-desc">A timeline showing that on mount the effect runs; on each dependency change the cleanup runs before the effect runs again; and on unmount the final cleanup runs.</desc>
+                        <line x1="60" y1="105" x2="600" y2="105" stroke="#94a3b8" stroke-width="2"/>
+                        <!-- Mount -->
+                        <circle cx="110" cy="105" r="14" fill="#4CAF50" stroke="#ffffff" stroke-width="2"/>
+                        <text x="110" y="70" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#4CAF50">Mount</text>
+                        <text x="110" y="140" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#666">effect runs</text>
+                        <!-- Update -->
+                        <circle cx="330" cy="105" r="14" fill="#2196F3" stroke="#ffffff" stroke-width="2"/>
+                        <text x="330" y="70" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#2196F3">Update</text>
+                        <text x="330" y="140" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#666">cleanup, then</text>
+                        <text x="330" y="155" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#666">effect runs again</text>
+                        <text x="330" y="172" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-style="italic" fill="#999">(repeats each dep change)</text>
+                        <!-- Unmount -->
+                        <circle cx="550" cy="105" r="14" fill="#f44336" stroke="#ffffff" stroke-width="2"/>
+                        <text x="550" y="70" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#f44336">Unmount</text>
+                        <text x="550" y="140" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#666">final cleanup runs</text>
+                        <text x="330" y="30" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#888">Every effect that runs will have its cleanup run exactly once before the next run — or on unmount.</text>
+                    </svg>
+                    <figcaption>Figure: The full lifecycle. Cleanup always pairs with the effect that set things up—React never leaves a setup un-cleaned.</figcaption>
+                </figure>
+
+                <!-- Interactive: Effect &amp; Cleanup Lifecycle (theme-aware ts-demo) -->
+                <h3>🎮 Interactive: Effect &amp; Cleanup Lifecycle</h3>
+                <p>Click through a component's life. Watch how React pairs every effect with a cleanup: it never runs the effect twice in a row without cleaning up in between.</p>
+                <div class="card ts-demo" aria-live="polite">
+                    <p class="ts-demo-sig"><code>useEffect(() =&gt; { setup(); return () =&gt; teardown(); }, [dep])</code></p>
+                    <div class="ts-demo-buttons">
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="🟢 Mount: React runs your effect for the first time. setup() happens — the timer starts, the listener is added, the subscription opens.">🟢 Mount</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="🔄 Dependency changed: React runs the PREVIOUS cleanup first (teardown of the old value), THEN runs the effect again with the new value. Cleanup-before-effect, every time.">🔄 Update (dep changed)</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="🔴 Unmount: React runs the cleanup one last time. The timer is cleared, the listener removed, the socket closed. No leaks left behind.">🔴 Unmount</button>
                     </div>
+                    <p class="ts-demo-result ts-demo-idle" id="ts-demo-lifecycle-result">👆 Step through Mount → Update → Unmount to see when the effect and its cleanup fire.</p>
                 </div>
                 <script>
-                (function() {
-                    let isMounted = false;
-                    let updateCount = 0;
-                    const events = [];
-                    
-                    const canvas = document.getElementById('cleanup-canvas');
-                    const ctx = canvas.getContext('2d');
-                    const timeline = document.getElementById('cleanup-timeline');
-                    const status = document.getElementById('cleanup-status');
-                    const mountBtn = document.getElementById('cleanup-mount');
-                    const updateBtn = document.getElementById('cleanup-update');
-                    const unmountBtn = document.getElementById('cleanup-unmount');
-                    
-                    function addEvent(type, message) {
-                        const time = new Date().toLocaleTimeString();
-                        events.push({ type, message, time });
-                        const color = type === 'effect' ? '#4caf50' : type === 'cleanup' ? '#f44336' : '#2196f3';
-                        timeline.innerHTML += `<div style="color:${color};">[${time}] ${message}</div>`;
-                        timeline.scrollTop = timeline.scrollHeight;
-                        drawCanvas();
-                    }
-                    
-                    function drawCanvas() {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        
-                        // Title
-                        ctx.font = 'bold 16px system-ui';
-                        ctx.fillStyle = '#333';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('Effect Lifecycle Visualization', canvas.width / 2, 25);
-                        
-                        // Draw lifecycle stages
-                        const stages = [
-                            { label: 'Mount', x: 100, color: '#4caf50', icon: '🟢' },
-                            { label: 'Update', x: 325, color: '#2196f3', icon: '🔄' },
-                            { label: 'Unmount', x: 550, color: '#f44336', icon: '🔴' }
-                        ];
-                        
-                        stages.forEach(stage => {
-                            ctx.beginPath();
-                            ctx.arc(stage.x, 80, 30, 0, Math.PI * 2);
-                            ctx.fillStyle = stage.color + '33';
-                            ctx.fill();
-                            ctx.strokeStyle = stage.color;
-                            ctx.lineWidth = 3;
-                            ctx.stroke();
-                            
-                            ctx.font = '20px system-ui';
-                            ctx.fillText(stage.icon, stage.x, 87);
-                            
-                            ctx.font = 'bold 12px system-ui';
-                            ctx.fillStyle = '#333';
-                            ctx.fillText(stage.label, stage.x, 125);
+                (function () {
+                    const wrap = document.getElementById('ts-demo-lifecycle-result').closest('.ts-demo');
+                    const result = wrap.querySelector('#ts-demo-lifecycle-result');
+                    wrap.querySelectorAll('.ts-demo-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            const ok = btn.getAttribute('data-valid') === 'true';
+                            result.classList.remove('ts-demo-idle', 'ts-demo-ok', 'ts-demo-err');
+                            result.classList.add(ok ? 'ts-demo-ok' : 'ts-demo-err');
+                            result.textContent = btn.getAttribute('data-msg');
                         });
-                        
-                        // Arrows between stages
-                        ctx.strokeStyle = '#ccc';
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.moveTo(140, 80);
-                        ctx.lineTo(285, 80);
-                        ctx.stroke();
-                        ctx.beginPath();
-                        ctx.moveTo(365, 80);
-                        ctx.lineTo(510, 80);
-                        ctx.stroke();
-                        
-                        // What happens at each stage
-                        ctx.font = '11px system-ui';
-                        ctx.fillStyle = '#666';
-                        ctx.fillText('Effect runs', 100, 150);
-                        
-                        ctx.fillText('1. Cleanup runs', 325, 145);
-                        ctx.fillText('2. Effect runs', 325, 160);
-                        
-                        ctx.fillText('Cleanup runs', 550, 150);
-                        
-                        // Current state indicator
-                        if (isMounted) {
-                            const x = updateCount > 0 ? 325 : 100;
-                            ctx.beginPath();
-                            ctx.arc(x, 80, 40, 0, Math.PI * 2);
-                            ctx.strokeStyle = '#667eea';
-                            ctx.lineWidth = 4;
-                            ctx.stroke();
-                            
-                            ctx.font = 'bold 11px system-ui';
-                            ctx.fillStyle = '#667eea';
-                            ctx.fillText('⬆ Current', x, 195);
-                        }
-                        
-                        // Stats
-                        ctx.fillStyle = '#333';
-                        ctx.font = '12px system-ui';
-                        ctx.textAlign = 'left';
-                        ctx.fillText(`Effects run: ${events.filter(e => e.type === 'effect').length}`, 20, 230);
-                        ctx.fillText(`Cleanups run: ${events.filter(e => e.type === 'cleanup').length}`, 20, 250);
-                        ctx.fillText(`Updates: ${updateCount}`, 20, 270);
-                    }
-                    
-                    mountBtn.addEventListener('click', () => {
-                        if (isMounted) return;
-                        isMounted = true;
-                        status.textContent = 'Mounted';
-                        status.style.color = '#4caf50';
-                        addEvent('effect', '✅ Effect runs (component mounted)');
-                        mountBtn.disabled = true;
-                        updateBtn.disabled = false;
-                        unmountBtn.disabled = false;
                     });
-                    
-                    updateBtn.addEventListener('click', () => {
-                        if (!isMounted) return;
-                        updateCount++;
-                        addEvent('cleanup', '🧹 Cleanup runs (before re-running effect)');
-                        addEvent('effect', '✅ Effect runs again (dependency changed)');
-                        status.textContent = `Mounted (updated ${updateCount}x)`;
-                    });
-                    
-                    unmountBtn.addEventListener('click', () => {
-                        if (!isMounted) return;
-                        addEvent('cleanup', '🧹 Cleanup runs (component unmounting)');
-                        isMounted = false;
-                        status.textContent = 'Unmounted';
-                        status.style.color = '#f44336';
-                        mountBtn.disabled = false;
-                        updateBtn.disabled = true;
-                        unmountBtn.disabled = true;
-                        drawCanvas();
-                    });
-                    
-                    document.getElementById('cleanup-reset').addEventListener('click', () => {
-                        isMounted = false;
-                        updateCount = 0;
-                        events.length = 0;
-                        status.textContent = 'Not Mounted';
-                        status.style.color = '#9e9e9e';
-                        timeline.innerHTML = 'Timeline: Click "Mount Component" to start...';
-                        mountBtn.disabled = false;
-                        updateBtn.disabled = true;
-                        unmountBtn.disabled = true;
-                        drawCanvas();
-                    });
-                    
-                    drawCanvas();
                 })();
                 </script>
 
+                <div class="card card-warning">
+                    <h4>🔁 StrictMode runs your effect twice in development — on purpose</h4>
+                    <p>When you first run a React 18 or 19 app in development with <code>&lt;StrictMode&gt;</code> on (the default in every <code>create-vite</code> / Next.js starter), you'll notice each effect runs <strong>twice</strong> on mount: React deliberately does <em>mount → cleanup → mount</em>. This is not a bug and it does <strong>not</strong> happen in production.</p>
+                    <p>Why? It's a stress test for your cleanup. If your effect sets something up but forgets to tear it down, the double-invoke makes the bug obvious immediately (two sockets, two listeners, a doubled log) instead of in front of a user weeks later.</p>
+                    <p><strong>The fix is never to "make it run once."</strong> The fix is to write a correct cleanup so that setup-then-cleanup-then-setup lands you in exactly the right state. Get cleanup right and StrictMode's double-invoke becomes invisible.</p>
+                </div>
+
                 <div class="card">
                     <h4>Cleanup Timing Example</h4>
-                    <pre><code class="language-typescript">const EffectLifecycle: React.FC = () => {
+                    <pre><code class="language-typescript">const EffectLifecycle: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         console.log(`Effect running for count: ${count}`);
         
-        return () => {
+        return () =&gt; {
             console.log(`Cleanup running for count: ${count}`);
         };
     }, [count]);
     
     return (
-        &lt;button onClick={() => setCount(count + 1)}&gt;
+        &lt;button onClick={() =&gt; setCount(count + 1)}&gt;
             Count: {count}
         &lt;/button&gt;
     );
@@ -1250,23 +1002,23 @@ sequenceDiagram
                 <div class="card">
                     <h4>1. Timers</h4>
                     <pre><code class="language-typescript">// setTimeout
-useEffect(() => {
-    const timeoutId = setTimeout(() => {
+useEffect(() =&gt; {
+    const timeoutId = setTimeout(() =&gt; {
         console.log('Delayed action');
     }, 3000);
     
-    return () => {
+    return () =&gt; {
         clearTimeout(timeoutId);
     };
 }, []);
 
 // setInterval
-useEffect(() => {
-    const intervalId = setInterval(() => {
+useEffect(() =&gt; {
+    const intervalId = setInterval(() =&gt; {
         console.log('Repeating action');
     }, 1000);
     
-    return () => {
+    return () =&gt; {
         clearInterval(intervalId);
     };
 }, []);</code></pre>
@@ -1274,27 +1026,27 @@ useEffect(() => {
 
                 <div class="card">
                     <h4>2. Event Listeners</h4>
-                    <pre><code class="language-typescript">useEffect(() => {
-    const handleResize = () => {
+                    <pre><code class="language-typescript">useEffect(() =&gt; {
+    const handleResize = () =&gt; {
         console.log('Window resized');
     };
     
     window.addEventListener('resize', handleResize);
     
-    return () => {
+    return () =&gt; {
         window.removeEventListener('resize', handleResize);
     };
 }, []);
 
 // Mouse events
-useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+useEffect(() =&gt; {
+    const handleMouseMove = (e: MouseEvent) =&gt; {
         console.log(`Mouse: ${e.clientX}, ${e.clientY}`);
     };
     
     document.addEventListener('mousemove', handleMouseMove);
     
-    return () => {
+    return () =&gt; {
         document.removeEventListener('mousemove', handleMouseMove);
     };
 }, []);</code></pre>
@@ -1303,39 +1055,41 @@ useEffect(() => {
                 <div class="card">
                     <h4>3. Subscriptions</h4>
                     <pre><code class="language-typescript">// WebSocket
-useEffect(() => {
+useEffect(() =&gt; {
     const ws = new WebSocket('ws://localhost:8080');
     
-    ws.onmessage = (event) => {
+    ws.onmessage = (event) =&gt; {
         console.log('Message:', event.data);
     };
     
-    return () => {
+    return () =&gt; {
         ws.close();
         console.log('WebSocket closed');
     };
 }, []);
 
 // EventSource (Server-Sent Events)
-useEffect(() => {
+useEffect(() =&gt; {
     const eventSource = new EventSource('/api/events');
     
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = (event) =&gt; {
         console.log('Event:', event.data);
     };
     
-    return () => {
+    return () =&gt; {
         eventSource.close();
     };
 }, []);</code></pre>
                 </div>
 
                 <div class="card">
-                    <h4>4. Async Operations</h4>
-                    <pre><code class="language-typescript">useEffect(() => {
+                    <h4>4. Async Operations (avoiding race conditions)</h4>
+                    <p>Fetching inside an effect has a subtle trap. If <code>userId</code> changes from <code>1</code> to <code>2</code> quickly, you fire two requests—and the response for user 1 might arrive <em>after</em> user 2's, leaving the wrong data on screen. The cleanup function is how you cancel the stale request. There are two idiomatic patterns:</p>
+                    <pre><code class="language-typescript">// Pattern A: a "cancelled" flag — ignore a late response
+useEffect(() =&gt; {
     let cancelled = false;
     
-    const fetchData = async () => {
+    const fetchData = async () =&gt; {
         const response = await fetch('/api/data');
         const data = await response.json();
         
@@ -1347,28 +1101,39 @@ useEffect(() => {
     
     fetchData();
     
-    return () => {
+    return () =&gt; {
         cancelled = true; // Mark as cancelled
     };
 }, []);
 
-// AbortController (modern approach)
-useEffect(() => {
+// Pattern B: AbortController — actually cancel the request (preferred)
+useEffect(() =&gt; {
     const controller = new AbortController();
-    
+
     fetch('/api/data', { signal: controller.signal })
-        .then(res => res.json())
-        .then(data => setData(data))
-        .catch(err => {
-            if (err.name === 'AbortError') {
-                console.log('Fetch aborted');
-            }
+        .then(res =&gt; res.json())
+        .then(data =&gt; setData(data))
+        .catch(err =&gt; {
+            // Aborting rejects the promise — ignore that specific error
+            if (err.name === 'AbortError') return;
+            console.error(err);
         });
-    
-    return () => {
-        controller.abort(); // Cancel fetch
+
+    return () =&gt; {
+        controller.abort(); // Cancel the in-flight request on cleanup
     };
 }, []);</code></pre>
+                </div>
+
+                <div class="card card-info">
+                    <h4>📦 For real data fetching, reach for a library (not raw useEffect)</h4>
+                    <p>Everything above is worth understanding—but here's the honest 2026 guidance: <strong>you usually should not hand-roll data fetching with <code>useEffect</code> in a production app.</strong> The manual version has to juggle loading state, error state, race conditions, caching, refetching, and cleanup, and it's easy to get one of them wrong.</p>
+                    <p>Instead, prefer a purpose-built tool:</p>
+                    <ul>
+                        <li><strong><a href="https://tanstack.com/query" target="_blank" rel="noopener">TanStack Query</a></strong> (React Query) — handles caching, deduping, background refetch, retries, and loading/error states for you. This is the community default for client-side fetching.</li>
+                        <li><strong>A framework's data layer</strong> — if you're on Next.js or Remix, fetch in a <strong>Server Component</strong> or route loader so the data is ready before the component renders. No effect needed at all.</li>
+                    </ul>
+                    <p>So why learn the <code>useEffect</code> + <code>AbortController</code> pattern? Because these libraries are built <em>on top of</em> these exact ideas, and you'll still write raw effects for the non-fetch side effects—subscriptions, timers, and DOM work—that are what <code>useEffect</code> is genuinely best at. We go deep on TanStack Query later in the course.</p>
                 </div>
 
                 <div class="card card-success">
@@ -1412,164 +1177,45 @@ graph TD
                     </div>
                 </div>
 
-                <!-- Interactive Effect Timing Visualization -->
-                <h3>🎮 Interactive: Effect Execution Timeline</h3>
-                <div class="card">
-                    <p>Watch the exact order of execution during a React render cycle:</p>
-                    <div id="timing-demo" style="padding: 1rem;">
-                        <div style="text-align: center; margin-bottom: 1rem;">
-                            <button id="timing-render" style="padding: 0.75rem 2rem; font-size: 1rem; cursor: pointer; background: #667eea; color: white; border: none; border-radius: 4px;">🔄 Trigger Render</button>
-                            <button id="timing-reset" style="padding: 0.75rem 1rem; font-size: 1rem; cursor: pointer; background: #9e9e9e; color: white; border: none; border-radius: 4px; margin-left: 0.5rem;">Reset</button>
-                        </div>
-                        <canvas class="auto-invert" id="timing-canvas" width="700" height="320" style="width: 100%; max-width: 700px; border: 1px solid #ddd; border-radius: 8px; display: block; margin: 0 auto;"></canvas>
-                        <div id="timing-console" style="margin-top: 1rem; padding: 0.75rem; background: #1e1e1e; border-radius: 4px; color: #d4d4d4; font-family: monospace; font-size: 0.85rem; max-height: 120px; overflow-y: auto;"><span style="color:#666;">// Console output will appear here...</span></div>
-                    </div>
-                </div>
-                <script>
-                (function() {
-                    const canvas = document.getElementById('timing-canvas');
-                    const ctx = canvas.getContext('2d');
-                    const consoleDiv = document.getElementById('timing-console');
-                    let animationStep = 0;
-                    let animationId = null;
-                    let renderCount = 0;
-                    
-                    const steps = [
-                        { label: '1. Component Function', color: '#667eea', icon: '🔄', desc: 'Component function is called' },
-                        { label: '2. Calculate JSX', color: '#7c4dff', icon: '📝', desc: 'JSX expressions are evaluated' },
-                        { label: '3. Return JSX', color: '#536dfe', icon: '📤', desc: 'JSX returned to React' },
-                        { label: '4. Virtual DOM Diff', color: '#448aff', icon: '🔍', desc: 'React compares old vs new' },
-                        { label: '5. Update Real DOM', color: '#2196f3', icon: '🎨', desc: 'DOM changes applied' },
-                        { label: '6. Browser Paint', color: '#00bcd4', icon: '🖼️', desc: 'User sees the update' },
-                        { label: '7. useEffect Runs', color: '#4caf50', icon: '⚡', desc: 'Effect callback executes' }
-                    ];
-                    
-                    function drawCanvas() {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        
-                        // Title
-                        ctx.font = 'bold 16px system-ui';
-                        ctx.fillStyle = '#333';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('React Render Cycle Timeline', canvas.width / 2, 25);
-                        
-                        const startY = 50;
-                        const stepHeight = 36;
-                        const barWidth = 450;
-                        const startX = 130;
-                        
-                        steps.forEach((step, i) => {
-                            const y = startY + i * stepHeight;
-                            const isActive = i < animationStep;
-                            const isCurrent = i === animationStep - 1;
-                            
-                            // Step number and icon
-                            ctx.font = '16px system-ui';
-                            ctx.textAlign = 'right';
-                            ctx.fillStyle = isActive ? step.color : '#ccc';
-                            ctx.fillText(step.icon, 35, y + 22);
-                            
-                            // Progress bar background
-                            ctx.fillStyle = '#f0f0f0';
-                            ctx.fillRect(startX, y + 5, barWidth, 24);
-                            
-                            // Progress bar fill
-                            if (isActive) {
-                                ctx.fillStyle = step.color;
-                                ctx.fillRect(startX, y + 5, barWidth, 24);
-                                
-                                // Label
-                                ctx.font = 'bold 12px system-ui';
-                                ctx.fillStyle = 'white';
-                                ctx.textAlign = 'left';
-                                ctx.fillText(step.label, startX + 10, y + 22);
-                            } else {
-                                ctx.font = '12px system-ui';
-                                ctx.fillStyle = '#999';
-                                ctx.textAlign = 'left';
-                                ctx.fillText(step.label, startX + 10, y + 22);
-                            }
-                            
-                            // Current step indicator
-                            if (isCurrent) {
-                                ctx.strokeStyle = '#333';
-                                ctx.lineWidth = 3;
-                                ctx.strokeRect(startX - 2, y + 3, barWidth + 4, 28);
-                                
-                                // Description
-                                ctx.font = 'italic 11px system-ui';
-                                ctx.fillStyle = '#666';
-                                ctx.textAlign = 'left';
-                                ctx.fillText(step.desc, startX + barWidth + 15, y + 22);
-                            }
-                        });
-                        
-                        // Timing labels
-                        ctx.font = '10px system-ui';
-                        ctx.fillStyle = '#999';
-                        ctx.textAlign = 'center';
-                        
-                        const syncY = startY + 4.5 * stepHeight;
-                        ctx.fillStyle = '#667eea33';
-                        ctx.fillRect(45, startY, 80, 5 * stepHeight);
-                        ctx.fillStyle = '#667eea';
-                        ctx.font = 'bold 10px system-ui';
-                        ctx.save();
-                        ctx.translate(55, syncY);
-                        ctx.rotate(-Math.PI / 2);
-                        ctx.fillText('SYNCHRONOUS', 0, 0);
-                        ctx.restore();
-                        
-                        ctx.fillStyle = '#4caf5033';
-                        ctx.fillRect(45, startY + 5 * stepHeight, 80, 2 * stepHeight);
-                        ctx.fillStyle = '#4caf50';
-                        ctx.save();
-                        ctx.translate(55, startY + 6 * stepHeight + 10);
-                        ctx.rotate(-Math.PI / 2);
-                        ctx.fillText('ASYNC', 0, 0);
-                        ctx.restore();
-                    }
-                    
-                    function logStep(step) {
-                        const colors = {
-                            '#667eea': '#b794f6', '#7c4dff': '#b388ff', '#536dfe': '#8c9eff',
-                            '#448aff': '#82b1ff', '#2196f3': '#90caf9', '#00bcd4': '#80deea', '#4caf50': '#a5d6a7'
-                        };
-                        const logColor = colors[step.color] || step.color;
-                        consoleDiv.innerHTML += `<div style="color:${logColor};">console.log('${step.label}');</div>`;
-                        consoleDiv.scrollTop = consoleDiv.scrollHeight;
-                    }
-                    
-                    function animate() {
-                        if (animationStep <= steps.length) {
-                            if (animationStep > 0) {
-                                logStep(steps[animationStep - 1]);
-                            }
-                            drawCanvas();
-                            animationStep++;
-                            animationId = setTimeout(animate, 600);
-                        }
-                    }
-                    
-                    document.getElementById('timing-render').addEventListener('click', () => {
-                        if (animationId) clearTimeout(animationId);
-                        renderCount++;
-                        animationStep = 0;
-                        consoleDiv.innerHTML = `<div style="color:#ffd700;">// Render #${renderCount} triggered</div>`;
-                        animate();
-                    });
-                    
-                    document.getElementById('timing-reset').addEventListener('click', () => {
-                        if (animationId) clearTimeout(animationId);
-                        animationStep = 0;
-                        renderCount = 0;
-                        consoleDiv.innerHTML = '<span style="color:#666;">// Console output will appear here...</span>';
-                        drawCanvas();
-                    });
-                    
-                    drawCanvas();
-                })();
-                </script>
+                <!-- Render cycle timeline SVG figure -->
+                <h3>The Order of Operations, Step by Step</h3>
+                <p>Here's the exact sequence every render follows. Steps 1–5 are <strong>synchronous</strong>: React runs your component, diffs the result, and mutates the DOM in one uninterrupted burst. Then the browser <strong>paints</strong> the pixels the user actually sees—and only <em>after</em> that does your effect run, <strong>asynchronously</strong>. That's the whole reason effects never block the screen from updating.</p>
+                <figure>
+                    <svg class="svg-auto-invert" id="svg-render-timeline" viewBox="0 0 560 340" width="100%" style="max-width: 560px;" aria-labelledby="rendertl-title rendertl-desc" role="img">
+                        <title id="rendertl-title">The React render cycle: synchronous work, then paint, then the effect</title>
+                        <desc id="rendertl-desc">Seven stacked steps. Steps 1 to 5 (run component, calculate JSX, diff, update DOM) are grouped as synchronous. Then the browser paints. Step 7, useEffect, runs asynchronously after paint.</desc>
+                        <!-- Synchronous bracket -->
+                        <rect x="20" y="30" width="14" height="150" rx="4" fill="#667eea" fill-opacity="0.3" stroke="#667eea" stroke-width="1.5"/>
+                        <text x="27" y="110" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#667eea" transform="rotate(-90 27 110)">SYNCHRONOUS</text>
+                        <!-- Async bracket -->
+                        <rect x="20" y="270" width="14" height="50" rx="4" fill="#4CAF50" fill-opacity="0.3" stroke="#4CAF50" stroke-width="1.5"/>
+                        <text x="27" y="295" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="bold" fill="#4CAF50" transform="rotate(-90 27 295)">ASYNC</text>
+                        <!-- Steps -->
+                        <g font-family="system-ui, sans-serif" font-size="13">
+                            <rect x="50" y="32" width="490" height="26" rx="5" fill="#667eea" fill-opacity="0.12" stroke="#667eea" stroke-width="1"/>
+                            <text x="64" y="49" fill="#334155">1. Component function runs</text>
+                            <rect x="50" y="62" width="490" height="26" rx="5" fill="#667eea" fill-opacity="0.12" stroke="#667eea" stroke-width="1"/>
+                            <text x="64" y="79" fill="#334155">2. Calculate JSX</text>
+                            <rect x="50" y="92" width="490" height="26" rx="5" fill="#667eea" fill-opacity="0.12" stroke="#667eea" stroke-width="1"/>
+                            <text x="64" y="109" fill="#334155">3. React diffs new vs previous tree</text>
+                            <rect x="50" y="122" width="490" height="26" rx="5" fill="#667eea" fill-opacity="0.12" stroke="#667eea" stroke-width="1"/>
+                            <text x="64" y="139" fill="#334155">4. React mutates the real DOM</text>
+                            <rect x="50" y="152" width="490" height="26" rx="5" fill="#2196F3" fill-opacity="0.15" stroke="#2196F3" stroke-width="1"/>
+                            <text x="64" y="169" fill="#334155">5. Browser paints — the user sees the update</text>
+                            <rect x="50" y="270" width="490" height="26" rx="5" fill="#4CAF50" fill-opacity="0.18" stroke="#4CAF50" stroke-width="1.5"/>
+                            <text x="64" y="287" fill="#334155" font-weight="bold">6. useEffect runs (after paint)</text>
+                        </g>
+                        <!-- gap arrow -->
+                        <line x1="295" y1="180" x2="295" y2="268" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#tl-arrow)"/>
+                        <text x="305" y="228" font-family="system-ui, sans-serif" font-size="11" font-style="italic" fill="#888">screen is already updated…</text>
+                        <defs>
+                            <marker id="tl-arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8"/>
+                            </marker>
+                        </defs>
+                    </svg>
+                    <figcaption>Figure: The render-to-paint work is synchronous; your effect runs afterward, so it never delays what the user sees. (Need to run <em>before</em> paint—say, to measure the DOM and avoid a flicker? That's the one job for <code>useLayoutEffect</code>, covered next.)</figcaption>
+                </figure>
 
                 <h3>useEffect vs useLayoutEffect</h3>
                 <div class="card">
@@ -1614,18 +1260,18 @@ graph TD
 
                 <div class="card">
                     <h4>useEffect Timing (Standard)</h4>
-                    <pre><code class="language-typescript">const TimingExample: React.FC = () => {
+                    <pre><code class="language-typescript">const TimingExample: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     
     console.log('1. Component rendering, count:', count);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         console.log('3. Effect running, count:', count);
     });
     
     console.log('2. About to return JSX');
     
-    return &lt;button onClick={() => setCount(count + 1)}&gt;{count}&lt;/button&gt;;
+    return &lt;button onClick={() =&gt; setCount(count + 1)}&gt;{count}&lt;/button&gt;;
 };
 
 // Console output when component mounts:
@@ -1642,20 +1288,20 @@ graph TD
                 <h3>Multiple Effects Execution Order</h3>
                 <div class="card">
                     <h4>When You Have Multiple Effects</h4>
-                    <pre><code class="language-typescript">const MultipleEffects: React.FC = () => {
-    useEffect(() => {
+                    <pre><code class="language-typescript">const MultipleEffects: React.FC = () =&gt; {
+    useEffect(() =&gt; {
         console.log('Effect 1');
-        return () => console.log('Cleanup 1');
+        return () =&gt; console.log('Cleanup 1');
     }, []);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         console.log('Effect 2');
-        return () => console.log('Cleanup 2');
+        return () =&gt; console.log('Cleanup 2');
     }, []);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         console.log('Effect 3');
-        return () => console.log('Cleanup 3');
+        return () =&gt; console.log('Cleanup 3');
     }, []);
     
     return &lt;div&gt;Hello&lt;/div&gt;;
@@ -1677,12 +1323,12 @@ graph TD
                 <h3>Effects and State Updates</h3>
                 <div class="card">
                     <h4>Setting State Inside Effects</h4>
-                    <pre><code class="language-typescript">const EffectWithState: React.FC = () => {
+                    <pre><code class="language-typescript">const EffectWithState: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     const [doubled, setDoubled] = useState(0);
     
     // Effect that updates state
-    useEffect(() => {
+    useEffect(() =&gt; {
         console.log('Effect: Doubling count');
         setDoubled(count * 2);
     }, [count]);
@@ -1691,7 +1337,7 @@ graph TD
         &lt;div&gt;
             &lt;p&gt;Count: {count}&lt;/p&gt;
             &lt;p&gt;Doubled: {doubled}&lt;/p&gt;
-            &lt;button onClick={() => setCount(count + 1)}&gt;Increment&lt;/button&gt;
+            &lt;button onClick={() =&gt; setCount(count + 1)}&gt;Increment&lt;/button&gt;
         &lt;/div&gt;
     );
 };
@@ -1707,10 +1353,10 @@ graph TD
                 <div class="card card-warning">
                     <h4>⚠️ Be Careful: Effects Can Trigger More Renders</h4>
                     <pre><code class="language-typescript">// ❌ This causes infinite loop!
-const InfiniteLoop: React.FC = () => {
+const InfiniteLoop: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         setCount(count + 1); // Updates state
     }); // No dependency array!
     // Effect runs after every render
@@ -1722,7 +1368,7 @@ const InfiniteLoop: React.FC = () => {
 };
 
 // ✅ Fix: Add proper dependencies
-useEffect(() => {
+useEffect(() =&gt; {
     // Only run once on mount
 }, []);</code></pre>
                 </div>
@@ -1731,14 +1377,14 @@ useEffect(() => {
                 <div class="card">
                     <h4>Effects Can't Be Async Functions</h4>
                     <pre><code class="language-typescript">// ❌ WRONG: Can't make effect function async
-useEffect(async () => {
+useEffect(async () =&gt; {
     const data = await fetch('/api/data');
     // TypeScript error: Effect must return cleanup or void
 }, []);
 
 // ✅ CORRECT: Define async function inside
-useEffect(() => {
-    const fetchData = async () => {
+useEffect(() =&gt; {
+    const fetchData = async () =&gt; {
         const response = await fetch('/api/data');
         const data = await response.json();
         setData(data);
@@ -1748,11 +1394,11 @@ useEffect(() => {
 }, []);
 
 // ✅ CORRECT: Use .then()
-useEffect(() => {
+useEffect(() =&gt; {
     fetch('/api/data')
-        .then(res => res.json())
-        .then(data => setData(data))
-        .catch(err => console.error(err));
+        .then(res =&gt; res.json())
+        .then(data =&gt; setData(data))
+        .catch(err =&gt; console.error(err));
 }, []);</code></pre>
                 </div>
             </section>
@@ -1765,12 +1411,12 @@ useEffect(() => {
                 <h3>Pattern 1: Document Title Updates</h3>
                 <div class="card">
                     <h4>Updating the Browser Tab Title</h4>
-                    <pre><code class="language-typescript">const DocumentTitle: React.FC = () => {
+                    <pre><code class="language-typescript">const DocumentTitle: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     const [unread, setUnread] = useState(0);
     
-    useEffect(() => {
-        if (unread > 0) {
+    useEffect(() =&gt; {
+        if (unread &gt; 0) {
             document.title = `(${unread}) You have notifications`;
         } else {
             document.title = 'My App';
@@ -1781,7 +1427,7 @@ useEffect(() => {
         &lt;div&gt;
             &lt;h1&gt;Notifications&lt;/h1&gt;
             &lt;p&gt;Unread: {unread}&lt;/p&gt;
-            &lt;button onClick={() => setUnread(unread + 1)}&gt;
+            &lt;button onClick={() =&gt; setUnread(unread + 1)}&gt;
                 New Notification
             &lt;/button&gt;
         &lt;/div&gt;
@@ -1792,11 +1438,11 @@ useEffect(() => {
                 <h3>Pattern 2: Timers and Intervals</h3>
                 <div class="card">
                     <h4>Countdown Timer</h4>
-                    <pre><code class="language-typescript">const Countdown: React.FC&lt;{ seconds: number }&gt; = ({ seconds: initialSeconds }) => {
+                    <pre><code class="language-typescript">const Countdown: React.FC&lt;{ seconds: number }&gt; = ({ seconds: initialSeconds }) =&gt; {
     const [seconds, setSeconds] = useState(initialSeconds);
     const [isActive, setIsActive] = useState(false);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (!isActive) return;
         
         if (seconds === 0) {
@@ -1805,20 +1451,20 @@ useEffect(() => {
             return;
         }
         
-        const intervalId = setInterval(() => {
-            setSeconds(prev => prev - 1);
+        const intervalId = setInterval(() =&gt; {
+            setSeconds(prev =&gt; prev - 1);
         }, 1000);
         
-        return () => clearInterval(intervalId);
+        return () =&gt; clearInterval(intervalId);
     }, [seconds, isActive]);
     
     return (
         &lt;div&gt;
             &lt;h2&gt;{seconds} seconds&lt;/h2&gt;
-            &lt;button onClick={() => setIsActive(!isActive)}&gt;
+            &lt;button onClick={() =&gt; setIsActive(!isActive)}&gt;
                 {isActive ? 'Pause' : 'Start'}
             &lt;/button&gt;
-            &lt;button onClick={() => setSeconds(initialSeconds)}&gt;
+            &lt;button onClick={() =&gt; setSeconds(initialSeconds)}&gt;
                 Reset
             &lt;/button&gt;
         &lt;/div&gt;
@@ -1828,23 +1474,23 @@ useEffect(() => {
 
                 <div class="card">
                     <h4>Stopwatch</h4>
-                    <pre><code class="language-typescript">const Stopwatch: React.FC = () => {
+                    <pre><code class="language-typescript">const Stopwatch: React.FC = () =&gt; {
     const [time, setTime] = useState(0);
     const [isRunning, setIsRunning] = useState(false);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (!isRunning) return;
         
         const startTime = Date.now() - time;
         
-        const intervalId = setInterval(() => {
+        const intervalId = setInterval(() =&gt; {
             setTime(Date.now() - startTime);
         }, 10);
         
-        return () => clearInterval(intervalId);
+        return () =&gt; clearInterval(intervalId);
     }, [isRunning]);
     
-    const formatTime = (ms: number) => {
+    const formatTime = (ms: number) =&gt; {
         const seconds = Math.floor(ms / 1000);
         const minutes = Math.floor(seconds / 60);
         const hours = Math.floor(minutes / 60);
@@ -1857,10 +1503,10 @@ useEffect(() => {
     return (
         &lt;div&gt;
             &lt;h1&gt;{formatTime(time)}&lt;/h1&gt;
-            &lt;button onClick={() => setIsRunning(!isRunning)}&gt;
+            &lt;button onClick={() =&gt; setIsRunning(!isRunning)}&gt;
                 {isRunning ? 'Pause' : 'Start'}
             &lt;/button&gt;
-            &lt;button onClick={() => { setTime(0); setIsRunning(false); }}&gt;
+            &lt;button onClick={() =&gt; { setTime(0); setIsRunning(false); }}&gt;
                 Reset
             &lt;/button&gt;
         &lt;/div&gt;
@@ -1871,14 +1517,14 @@ useEffect(() => {
                 <h3>Pattern 3: Event Listeners</h3>
                 <div class="card">
                     <h4>Window Resize Listener</h4>
-                    <pre><code class="language-typescript">const WindowSize: React.FC = () => {
+                    <pre><code class="language-typescript">const WindowSize: React.FC = () =&gt; {
     const [windowSize, setWindowSize] = useState({
         width: window.innerWidth,
         height: window.innerHeight
     });
     
-    useEffect(() => {
-        const handleResize = () => {
+    useEffect(() =&gt; {
+        const handleResize = () =&gt; {
             setWindowSize({
                 width: window.innerWidth,
                 height: window.innerHeight
@@ -1887,7 +1533,7 @@ useEffect(() => {
         
         window.addEventListener('resize', handleResize);
         
-        return () => {
+        return () =&gt; {
             window.removeEventListener('resize', handleResize);
         };
     }, []);
@@ -1904,13 +1550,13 @@ useEffect(() => {
 
                 <div class="card">
                     <h4>Keyboard Shortcuts</h4>
-                    <pre><code class="language-typescript">const KeyboardShortcuts: React.FC = () => {
+                    <pre><code class="language-typescript">const KeyboardShortcuts: React.FC = () =&gt; {
     const [lastKey, setLastKey] = useState('');
     
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
+    useEffect(() =&gt; {
+        const handleKeyDown = (e: KeyboardEvent) =&gt; {
             // Ctrl+S to save
-            if (e.ctrlKey && e.key === 's') {
+            if (e.ctrlKey &amp;&amp; e.key === 's') {
                 e.preventDefault();
                 console.log('Save triggered');
                 setLastKey('Ctrl+S');
@@ -1925,7 +1571,7 @@ useEffect(() => {
         
         document.addEventListener('keydown', handleKeyDown);
         
-        return () => {
+        return () =&gt; {
             document.removeEventListener('keydown', handleKeyDown);
         };
     }, []);
@@ -1943,22 +1589,22 @@ useEffect(() => {
                 <h3>Pattern 4: Local Storage Sync</h3>
                 <div class="card">
                     <h4>Persist State to localStorage</h4>
-                    <pre><code class="language-typescript">const PersistentCounter: React.FC = () => {
-    const [count, setCount] = useState(() => {
+                    <pre><code class="language-typescript">const PersistentCounter: React.FC = () =&gt; {
+    const [count, setCount] = useState(() =&gt; {
         // Load from localStorage on mount
         const saved = localStorage.getItem('count');
         return saved ? parseInt(saved, 10) : 0;
     });
     
     // Save to localStorage whenever count changes
-    useEffect(() => {
+    useEffect(() =&gt; {
         localStorage.setItem('count', count.toString());
     }, [count]);
     
     return (
         &lt;div&gt;
             &lt;h2&gt;Count: {count}&lt;/h2&gt;
-            &lt;button onClick={() => setCount(count + 1)}&gt;Increment&lt;/button&gt;
+            &lt;button onClick={() =&gt; setCount(count + 1)}&gt;Increment&lt;/button&gt;
             &lt;p&gt;Refresh the page - count persists!&lt;/p&gt;
         &lt;/div&gt;
     );
@@ -1970,10 +1616,10 @@ useEffect(() => {
                     <h4>Auto-focus Input on Mount</h4>
                     <pre><code class="language-typescript">import { useRef, useEffect } from 'react';
 
-const AutoFocusInput: React.FC = () => {
+const AutoFocusInput: React.FC = () =&gt; {
     const inputRef = useRef&lt;HTMLInputElement&gt;(null);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         // Focus input when component mounts
         inputRef.current?.focus();
     }, []);
@@ -1995,15 +1641,15 @@ const AutoFocusInput: React.FC = () => {
                 <h3>Pattern 6: Click Outside Detection</h3>
                 <div class="card">
                     <h4>Detect Clicks Outside Element</h4>
-                    <pre><code class="language-typescript">const DropdownMenu: React.FC = () => {
+                    <pre><code class="language-typescript">const DropdownMenu: React.FC = () =&gt; {
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef&lt;HTMLDivElement&gt;(null);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (!isOpen) return;
         
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && 
+        const handleClickOutside = (event: MouseEvent) =&gt; {
+            if (dropdownRef.current &amp;&amp; 
                 !dropdownRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
@@ -2011,17 +1657,17 @@ const AutoFocusInput: React.FC = () => {
         
         document.addEventListener('mousedown', handleClickOutside);
         
-        return () => {
+        return () =&gt; {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isOpen]);
     
     return (
         &lt;div ref={dropdownRef}&gt;
-            &lt;button onClick={() => setIsOpen(!isOpen)}&gt;
+            &lt;button onClick={() =&gt; setIsOpen(!isOpen)}&gt;
                 Toggle Menu
             &lt;/button&gt;
-            {isOpen && (
+            {isOpen &amp;&amp; (
                 &lt;ul className="dropdown-menu"&gt;
                     &lt;li&gt;Option 1&lt;/li&gt;
                     &lt;li&gt;Option 2&lt;/li&gt;
@@ -2036,24 +1682,24 @@ const AutoFocusInput: React.FC = () => {
                 <h3>Pattern 7: Debouncing</h3>
                 <div class="card">
                     <h4>Debounce Search Input</h4>
-                    <pre><code class="language-typescript">const SearchWithDebounce: React.FC = () => {
+                    <pre><code class="language-typescript">const SearchWithDebounce: React.FC = () =&gt; {
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedTerm, setDebouncedTerm] = useState('');
     const [results, setResults] = useState&lt;string[]&gt;([]);
     
     // Debounce the search term
-    useEffect(() => {
-        const timerId = setTimeout(() => {
+    useEffect(() =&gt; {
+        const timerId = setTimeout(() =&gt; {
             setDebouncedTerm(searchTerm);
         }, 500); // Wait 500ms after user stops typing
         
-        return () => {
+        return () =&gt; {
             clearTimeout(timerId);
         };
     }, [searchTerm]);
     
     // Fetch results when debounced term changes
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (debouncedTerm) {
             console.log('Searching for:', debouncedTerm);
             // Simulate API call
@@ -2072,11 +1718,11 @@ const AutoFocusInput: React.FC = () => {
             &lt;input
                 type="search"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) =&gt; setSearchTerm(e.target.value)}
                 placeholder="Search..."
             /&gt;
             &lt;ul&gt;
-                {results.map((result, i) => (
+                {results.map((result, i) =&gt; (
                     &lt;li key={i}&gt;{result}&lt;/li&gt;
                 ))}
             &lt;/ul&gt;
@@ -2107,199 +1753,32 @@ graph TD
                     </div>
                 </div>
 
-                <!-- Interactive Infinite Loop Simulator -->
-                <h3>🎮 Interactive: Infinite Loop Simulator</h3>
-                <div class="card">
-                    <p>See what happens when you create an infinite loop (safely simulated!):</p>
-                    <div id="loop-demo" style="padding: 1rem;">
-                        <div style="margin-bottom: 1rem;">
-                            <label style="font-weight: bold;">Select a scenario:</label>
-                            <select id="loop-scenario" style="width: 100%; padding: 0.5rem; margin-top: 0.5rem;">
-                                <option value="safe">Safe: useEffect with [] (runs once)</option>
-                                <option value="controlled">Safe: useEffect with [count] (runs on change)</option>
-                                <option value="danger">DANGER: useEffect without deps (runs every render)</option>
-                                <option value="loop">INFINITE LOOP: setState in effect without deps</option>
-                            </select>
-                        </div>
-                        <div style="text-align: center; margin: 1rem 0;">
-                            <button id="loop-start" style="padding: 0.75rem 2rem; font-size: 1rem; cursor: pointer; background: #667eea; color: white; border: none; border-radius: 4px;">▶️ Start Simulation</button>
-                            <button id="loop-stop" style="padding: 0.75rem 1rem; font-size: 1rem; cursor: pointer; background: #f44336; color: white; border: none; border-radius: 4px; margin-left: 0.5rem;" disabled>⏹️ Stop</button>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                            <div style="padding: 1rem; background: #f5f5f5; border-radius: 8px;">
-                                <h5 style="margin: 0 0 0.5rem 0;">Render Count</h5>
-                                <div id="loop-render-count" style="font-size: 2rem; font-weight: bold; color: #667eea;">0</div>
-                            </div>
-                            <div style="padding: 1rem; background: #f5f5f5; border-radius: 8px;">
-                                <h5 style="margin: 0 0 0.5rem 0;">Effect Count</h5>
-                                <div id="loop-effect-count" style="font-size: 2rem; font-weight: bold; color: #4caf50;">0</div>
-                            </div>
-                        </div>
-                        <div id="loop-warning" style="margin-top: 1rem; padding: 1rem; border-radius: 8px; display: none;"></div>
-                        <canvas class="auto-invert" id="loop-canvas" width="600" height="100" style="width: 100%; max-width: 600px; margin-top: 1rem; border: 1px solid #ddd; border-radius: 8px;"></canvas>
-                        <div id="loop-code" style="margin-top: 1rem; padding: 0.75rem; background: #263238; border-radius: 4px; color: #aed581; font-family: monospace; font-size: 0.85rem; white-space: pre;"></div>
+                <!-- Interactive: Infinite Loop scenarios (theme-aware ts-demo) -->
+                <h3>🎮 Interactive: Will This Effect Loop?</h3>
+                <p>Each button is a real <code>useEffect</code> configuration. Green means it's safe. Red means it either wastes work on every render or spirals into an infinite loop that freezes the tab. Can you predict each one before you click?</p>
+                <div class="card ts-demo" aria-live="polite">
+                    <p class="ts-demo-sig"><code>useEffect(effect, deps?)  //  the deps decide your fate</code></p>
+                    <div class="ts-demo-buttons">
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="deps = []  → the effect runs once on mount and never again. Rock solid. This is the go-to for one-time setup.">console.log(...), []</button>
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="deps = [count]  → runs only when count actually changes. Safe and intentional — the effect and its trigger are decoupled.">reacts to count, [count]</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="No dependency array  → the effect runs after EVERY render. Not always a crash, but almost always wasted work and a sign you forgot the array.">no array</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="💥 setCount(count + 1) with NO deps  → the effect updates state, the state change triggers a re-render, the re-render runs the effect, which updates state again… forever. React bails out with 'Maximum update depth exceeded.'">setCount in effect, no array</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="💥 fetch → setData with deps = [data]  → each fetch sets data, data changing re-runs the effect, which fetches again. An infinite network loop. Fix: use [] or a stable key like [userId].">fetch → setData, [data]</button>
                     </div>
+                    <p class="ts-demo-result ts-demo-idle" id="ts-demo-loop-result">👆 Predict, then click. Green = safe, red = wasteful or an infinite loop.</p>
                 </div>
                 <script>
-                (function() {
-                    let renderCount = 0;
-                    let effectCount = 0;
-                    let intervalId = null;
-                    let isRunning = false;
-                    const history = [];
-                    
-                    const scenario = document.getElementById('loop-scenario');
-                    const renderDisplay = document.getElementById('loop-render-count');
-                    const effectDisplay = document.getElementById('loop-effect-count');
-                    const warning = document.getElementById('loop-warning');
-                    const codeDisplay = document.getElementById('loop-code');
-                    const startBtn = document.getElementById('loop-start');
-                    const stopBtn = document.getElementById('loop-stop');
-                    const canvas = document.getElementById('loop-canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    const scenarios = {
-                        safe: {
-                            code: `useEffect(() => {\n  console.log('Effect ran once');\n}, []); // Empty deps = run once`,
-                            effectOnRender: (r) => r === 1,
-                            maxRenders: 5,
-                            warningLevel: 'success',
-                            message: '✅ Safe! Effect only runs once on mount.'
-                        },
-                        controlled: {
-                            code: `useEffect(() => {\n  console.log('Count changed to', count);\n}, [count]); // Runs when count changes`,
-                            effectOnRender: (r) => r === 1 || r === 3,
-                            maxRenders: 5,
-                            warningLevel: 'success',
-                            message: '✅ Safe! Effect only runs when dependency changes.'
-                        },
-                        danger: {
-                            code: `useEffect(() => {\n  console.log('Effect running');\n}); // No deps = EVERY render!`,
-                            effectOnRender: (r) => true,
-                            maxRenders: 10,
-                            warningLevel: 'warning',
-                            message: '⚠️ Wasteful! Effect runs on every single render.'
-                        },
-                        loop: {
-                            code: `useEffect(() => {\n  setCount(count + 1); // Updates state!\n}); // No deps = INFINITE LOOP!`,
-                            effectOnRender: (r) => true,
-                            maxRenders: 50,
-                            warningLevel: 'error',
-                            message: '💥 CRASH! Infinite loop - browser would freeze!'
-                        }
-                    };
-                    
-                    function updateCode() {
-                        codeDisplay.textContent = scenarios[scenario.value].code;
-                    }
-                    
-                    function drawCanvas() {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.font = '12px system-ui';
-                        ctx.textAlign = 'center';
-                        ctx.fillStyle = '#666';
-                        ctx.fillText('Render/Effect Timeline (last 30)', canvas.width / 2, 15);
-                        
-                        const barWidth = 18;
-                        const startX = 20;
-                        const maxBars = 30;
-                        const visibleHistory = history.slice(-maxBars);
-                        
-                        visibleHistory.forEach((item, i) => {
-                            const x = startX + i * barWidth;
-                            // Render bar
-                            ctx.fillStyle = '#667eea';
-                            ctx.fillRect(x, 30, barWidth - 2, 25);
-                            // Effect indicator
-                            if (item.effectRan) {
-                                ctx.fillStyle = '#4caf50';
-                                ctx.fillRect(x, 60, barWidth - 2, 25);
-                            }
+                (function () {
+                    const wrap = document.getElementById('ts-demo-loop-result').closest('.ts-demo');
+                    const result = wrap.querySelector('#ts-demo-loop-result');
+                    wrap.querySelectorAll('.ts-demo-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            const ok = btn.getAttribute('data-valid') === 'true';
+                            result.classList.remove('ts-demo-idle', 'ts-demo-ok', 'ts-demo-err');
+                            result.classList.add(ok ? 'ts-demo-ok' : 'ts-demo-err');
+                            result.textContent = (ok ? '✅ Safe: ' : '⚠️ Problem: ') + btn.getAttribute('data-msg');
                         });
-                        
-                        // Legend
-                        ctx.fillStyle = '#667eea';
-                        ctx.fillRect(canvas.width - 120, 35, 15, 15);
-                        ctx.fillStyle = '#333';
-                        ctx.textAlign = 'left';
-                        ctx.fillText('Render', canvas.width - 100, 47);
-                        
-                        ctx.fillStyle = '#4caf50';
-                        ctx.fillRect(canvas.width - 120, 60, 15, 15);
-                        ctx.fillStyle = '#333';
-                        ctx.fillText('Effect', canvas.width - 100, 72);
-                    }
-                    
-                    function simulate() {
-                        const s = scenarios[scenario.value];
-                        
-                        if (renderCount >= s.maxRenders) {
-                            stopSimulation();
-                            return;
-                        }
-                        
-                        renderCount++;
-                        const effectRan = s.effectOnRender(renderCount);
-                        if (effectRan) effectCount++;
-                        
-                        history.push({ render: renderCount, effectRan });
-                        
-                        renderDisplay.textContent = renderCount;
-                        effectDisplay.textContent = effectCount;
-                        
-                        // Speed up for loop scenario
-                        const speed = scenario.value === 'loop' ? 50 : 500;
-                        
-                        drawCanvas();
-                        
-                        if (renderCount >= s.maxRenders) {
-                            stopSimulation();
-                            warning.style.display = 'block';
-                            warning.style.background = s.warningLevel === 'error' ? '#ffebee' : 
-                                                        s.warningLevel === 'warning' ? '#fff3e0' : '#e8f5e9';
-                            warning.style.color = s.warningLevel === 'error' ? '#c62828' : 
-                                                  s.warningLevel === 'warning' ? '#e65100' : '#2e7d32';
-                            warning.textContent = s.message;
-                        }
-                    }
-                    
-                    function startSimulation() {
-                        if (isRunning) return;
-                        isRunning = true;
-                        renderCount = 0;
-                        effectCount = 0;
-                        history.length = 0;
-                        warning.style.display = 'none';
-                        startBtn.disabled = true;
-                        stopBtn.disabled = false;
-                        
-                        const speed = scenario.value === 'loop' ? 50 : 500;
-                        intervalId = setInterval(simulate, speed);
-                    }
-                    
-                    function stopSimulation() {
-                        isRunning = false;
-                        if (intervalId) clearInterval(intervalId);
-                        startBtn.disabled = false;
-                        stopBtn.disabled = true;
-                    }
-                    
-                    startBtn.addEventListener('click', startSimulation);
-                    stopBtn.addEventListener('click', stopSimulation);
-                    scenario.addEventListener('change', () => {
-                        stopSimulation();
-                        renderCount = 0;
-                        effectCount = 0;
-                        history.length = 0;
-                        renderDisplay.textContent = '0';
-                        effectDisplay.textContent = '0';
-                        warning.style.display = 'none';
-                        updateCode();
-                        drawCanvas();
                     });
-                    
-                    updateCode();
-                    drawCanvas();
                 })();
                 </script>
 
@@ -2307,10 +1786,10 @@ graph TD
                 <div class="card card-warning">
                     <h4>⚠️ Scenario 1: No Dependency Array</h4>
                     <pre><code class="language-typescript">// ❌ INFINITE LOOP!
-const BadComponent: React.FC = () => {
+const BadComponent: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         setCount(count + 1); // Updates state
     }); // No dependency array = runs after EVERY render
     
@@ -2325,7 +1804,7 @@ const BadComponent: React.FC = () => {
 // 5. Back to step 2... forever! 💥
 
 // ✅ FIX: Add empty dependency array
-useEffect(() => {
+useEffect(() =&gt; {
     setCount(count + 1);
 }, []); // Runs once on mount only</code></pre>
                 </div>
@@ -2333,14 +1812,14 @@ useEffect(() => {
                 <div class="card card-warning">
                     <h4>⚠️ Scenario 2: Missing Dependencies (with state update)</h4>
                     <pre><code class="language-typescript">// ❌ INFINITE LOOP!
-const BadComponent: React.FC = () => {
+const BadComponent: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     const [data, setData] = useState(null);
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         fetch('/api/data')
-            .then(res => res.json())
-            .then(result => setData(result));
+            .then(res =&gt; res.json())
+            .then(result =&gt; setData(result));
     }, [data]); // data is a dependency!
     
     return &lt;div&gt;{data}&lt;/div&gt;;
@@ -2354,20 +1833,20 @@ const BadComponent: React.FC = () => {
 // 5. Infinite loop! 💥
 
 // ✅ FIX: Remove data from dependencies
-useEffect(() => {
+useEffect(() =&gt; {
     fetch('/api/data')
-        .then(res => res.json())
-        .then(result => setData(result));
+        .then(res =&gt; res.json())
+        .then(result =&gt; setData(result));
 }, []); // Fetch only once on mount</code></pre>
                 </div>
 
                 <div class="card card-warning">
                     <h4>⚠️ Scenario 3: Object/Array Dependencies</h4>
                     <pre><code class="language-typescript">// ❌ INFINITE LOOP!
-const BadComponent: React.FC = () => {
+const BadComponent: React.FC = () =&gt; {
     const [user, setUser] = useState({ name: 'Alice', age: 30 });
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         // Create new object
         setUser({ name: 'Alice', age: 30 });
     }, [user]); // user is new object every time!
@@ -2383,12 +1862,12 @@ const BadComponent: React.FC = () => {
 // 5. Creates another new object... 💥
 
 // ✅ FIX 1: Only depend on specific properties
-useEffect(() => {
+useEffect(() =&gt; {
     setUser({ name: 'Alice', age: 30 });
 }, [user.name, user.age]); // Primitives, not object
 
 // ✅ FIX 2: Don't include in dependencies if not needed
-useEffect(() => {
+useEffect(() =&gt; {
     // If user doesn't actually trigger the effect...
     console.log('Component mounted');
 }, []); // Empty array</code></pre>
@@ -2397,14 +1876,14 @@ useEffect(() => {
                 <div class="card card-warning">
                     <h4>⚠️ Scenario 4: Function Dependencies</h4>
                     <pre><code class="language-typescript">// ❌ INFINITE LOOP!
-const BadComponent: React.FC = () => {
+const BadComponent: React.FC = () =&gt; {
     const [count, setCount] = useState(0);
     
-    const incrementCount = () => {
-        setCount(prev => prev + 1);
+    const incrementCount = () =&gt; {
+        setCount(prev =&gt; prev + 1);
     };
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         incrementCount();
     }, [incrementCount]); // New function every render!
     
@@ -2412,19 +1891,19 @@ const BadComponent: React.FC = () => {
 };
 
 // ✅ FIX 1: Define function inside effect
-useEffect(() => {
-    const incrementCount = () => {
-        setCount(prev => prev + 1);
+useEffect(() =&gt; {
+    const incrementCount = () =&gt; {
+        setCount(prev =&gt; prev + 1);
     };
     incrementCount();
 }, []); // No external dependencies
 
 // ✅ FIX 2: Use useCallback for function
-const incrementCount = useCallback(() => {
-    setCount(prev => prev + 1);
+const incrementCount = useCallback(() =&gt; {
+    setCount(prev =&gt; prev + 1);
 }, []); // Memoized function
 
-useEffect(() => {
+useEffect(() =&gt; {
     incrementCount();
 }, [incrementCount]); // Same function reference</code></pre>
                 </div>
@@ -2435,7 +1914,7 @@ useEffect(() => {
                     <ol>
                         <li><strong>Check the Console:</strong> Look for "Maximum update depth exceeded" error</li>
                         <li><strong>Add Logging:</strong> Log when effect runs
-                            <pre><code class="language-typescript">useEffect(() => {
+                            <pre><code class="language-typescript">useEffect(() =&gt; {
     console.log('Effect running with deps:', { count, data });
     // Your effect code
 }, [count, data]);</code></pre>
@@ -2464,22 +1943,22 @@ useEffect(() => {
                 <div class="card">
                     <h4>✅ Correct Patterns</h4>
                     <pre><code class="language-typescript">// Pattern 1: Fetch data once
-useEffect(() => {
+useEffect(() =&gt; {
     fetch('/api/data')
-        .then(res => res.json())
+        .then(res =&gt; res.json())
         .then(setData);
 }, []); // Empty array = once on mount
 
 // Pattern 2: Update based on prop
-useEffect(() => {
+useEffect(() =&gt; {
     if (userId) {
         fetchUser(userId);
     }
 }, [userId]); // Only when userId changes
 
 // Pattern 3: Conditional state update
-useEffect(() => {
-    if (count > 10 && !hasShownAlert) {
+useEffect(() =&gt; {
+    if (count &gt; 10 &amp;&amp; !hasShownAlert) {
         alert('Count is over 10!');
         setHasShownAlert(true); // Update different state
     }
@@ -2489,11 +1968,11 @@ useEffect(() => {
 const [input, setInput] = useState('');
 const [debouncedInput, setDebouncedInput] = useState('');
 
-useEffect(() => {
-    const timer = setTimeout(() => {
+useEffect(() =&gt; {
+    const timer = setTimeout(() =&gt; {
         setDebouncedInput(input); // Updates different state
     }, 500);
-    return () => clearTimeout(timer);
+    return () =&gt; clearTimeout(timer);
 }, [input]); // input changes, but we don't update it</code></pre>
                 </div>
             </section>
@@ -2516,16 +1995,16 @@ useEffect(() => {
                     </ul>
 
                     <h4>Starter Code:</h4>
-                    <pre><code class="language-typescript">const Clock: React.FC = () => {
+                    <pre><code class="language-typescript">const Clock: React.FC = () =&gt; {
     const [time, setTime] = useState(new Date());
     
     // Your code here!
     
-    const formatTime = (date: Date): string => {
+    const formatTime = (date: Date): string =&gt; {
         return date.toLocaleTimeString();
     };
     
-    const formatDate = (date: Date): string => {
+    const formatDate = (date: Date): string =&gt; {
         return date.toLocaleDateString();
     };
     
@@ -2541,12 +2020,12 @@ useEffect(() => {
                         <summary>💡 Hint</summary>
                         <div class="card">
                             <p>Use setInterval to update the time state every second. Don't forget to clean up!</p>
-                            <pre><code class="language-typescript">useEffect(() => {
-    const intervalId = setInterval(() => {
+                            <pre><code class="language-typescript">useEffect(() =&gt; {
+    const intervalId = setInterval(() =&gt; {
         // Update time
     }, 1000);
     
-    return () => {
+    return () =&gt; {
         // Cleanup
     };
 }, []);</code></pre>
@@ -2556,24 +2035,24 @@ useEffect(() => {
                     <details>
                         <summary>✅ Solution</summary>
                         <div class="card">
-                            <pre><code class="language-typescript">const Clock: React.FC = () => {
+                            <pre><code class="language-typescript">const Clock: React.FC = () =&gt; {
     const [time, setTime] = useState(new Date());
     
-    useEffect(() => {
-        const intervalId = setInterval(() => {
+    useEffect(() =&gt; {
+        const intervalId = setInterval(() =&gt; {
             setTime(new Date());
         }, 1000);
         
-        return () => {
+        return () =&gt; {
             clearInterval(intervalId);
         };
     }, []);
     
-    const formatTime = (date: Date): string => {
+    const formatTime = (date: Date): string =&gt; {
         return date.toLocaleTimeString();
     };
     
-    const formatDate = (date: Date): string => {
+    const formatDate = (date: Date): string =&gt; {
         return date.toLocaleDateString();
     };
     
@@ -2606,7 +2085,7 @@ useEffect(() => {
     y: number;
 }
 
-const MouseTracker: React.FC = () => {
+const MouseTracker: React.FC = () =&gt; {
     const [position, setPosition] = useState&lt;MousePosition&gt;({ x: 0, y: 0 });
     
     // Your code here!
@@ -2623,11 +2102,11 @@ const MouseTracker: React.FC = () => {
                     <details>
                         <summary>✅ Solution</summary>
                         <div class="card">
-                            <pre><code class="language-typescript">const MouseTracker: React.FC = () => {
+                            <pre><code class="language-typescript">const MouseTracker: React.FC = () =&gt; {
     const [position, setPosition] = useState&lt;MousePosition&gt;({ x: 0, y: 0 });
     
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
+    useEffect(() =&gt; {
+        const handleMouseMove = (e: MouseEvent) =&gt; {
             setPosition({
                 x: e.clientX,
                 y: e.clientY
@@ -2636,7 +2115,7 @@ const MouseTracker: React.FC = () => {
         
         document.addEventListener('mousemove', handleMouseMove);
         
-        return () => {
+        return () =&gt; {
             document.removeEventListener('mousemove', handleMouseMove);
         };
     }, []);
@@ -2666,7 +2145,7 @@ const MouseTracker: React.FC = () => {
                     </ul>
 
                     <h4>Starter Code:</h4>
-                    <pre><code class="language-typescript">const TitleManager: React.FC = () => {
+                    <pre><code class="language-typescript">const TitleManager: React.FC = () =&gt; {
     const [notifications, setNotifications] = useState(0);
     const [pageName, setPageName] = useState('Home');
     
@@ -2676,13 +2155,13 @@ const MouseTracker: React.FC = () => {
         &lt;div&gt;
             &lt;h2&gt;Title Manager&lt;/h2&gt;
             &lt;p&gt;Notifications: {notifications}&lt;/p&gt;
-            &lt;button onClick={() => setNotifications(notifications + 1)}&gt;
+            &lt;button onClick={() =&gt; setNotifications(notifications + 1)}&gt;
                 Add Notification
             &lt;/button&gt;
-            &lt;button onClick={() => setNotifications(0)}&gt;
+            &lt;button onClick={() =&gt; setNotifications(0)}&gt;
                 Clear Notifications
             &lt;/button&gt;
-            &lt;select value={pageName} onChange={(e) => setPageName(e.target.value)}&gt;
+            &lt;select value={pageName} onChange={(e) =&gt; setPageName(e.target.value)}&gt;
                 &lt;option value="Home"&gt;Home&lt;/option&gt;
                 &lt;option value="Profile"&gt;Profile&lt;/option&gt;
                 &lt;option value="Settings"&gt;Settings&lt;/option&gt;
@@ -2694,14 +2173,14 @@ const MouseTracker: React.FC = () => {
                     <details>
                         <summary>✅ Solution</summary>
                         <div class="card">
-                            <pre><code class="language-typescript">const TitleManager: React.FC = () => {
+                            <pre><code class="language-typescript">const TitleManager: React.FC = () =&gt; {
     const [notifications, setNotifications] = useState(0);
     const [pageName, setPageName] = useState('Home');
     
-    useEffect(() => {
+    useEffect(() =&gt; {
         let title = 'My App';
         
-        if (notifications > 0) {
+        if (notifications &gt; 0) {
             title = `(${notifications}) ${title}`;
         }
         
@@ -2714,13 +2193,13 @@ const MouseTracker: React.FC = () => {
         &lt;div&gt;
             &lt;h2&gt;Title Manager&lt;/h2&gt;
             &lt;p&gt;Notifications: {notifications}&lt;/p&gt;
-            &lt;button onClick={() => setNotifications(notifications + 1)}&gt;
+            &lt;button onClick={() =&gt; setNotifications(notifications + 1)}&gt;
                 Add Notification
             &lt;/button&gt;
-            &lt;button onClick={() => setNotifications(0)}&gt;
+            &lt;button onClick={() =&gt; setNotifications(0)}&gt;
                 Clear Notifications
             &lt;/button&gt;
-            &lt;select value={pageName} onChange={(e) => setPageName(e.target.value)}&gt;
+            &lt;select value={pageName} onChange={(e) =&gt; setPageName(e.target.value)}&gt;
                 &lt;option value="Home"&gt;Home&lt;/option&gt;
                 &lt;option value="Profile"&gt;Profile&lt;/option&gt;
                 &lt;option value="Settings"&gt;Settings&lt;/option&gt;
@@ -2787,21 +2266,21 @@ const MouseTracker: React.FC = () => {
                 <h3>Effect Organization</h3>
                 <div class="card">
                     <h4>✅ Good: Separate Concerns</h4>
-                    <pre><code class="language-typescript">const MyComponent: React.FC = () => {
+                    <pre><code class="language-typescript">const MyComponent: React.FC = () =&gt; {
     // Effect 1: Document title
-    useEffect(() => {
+    useEffect(() =&gt; {
         document.title = `Page ${page}`;
     }, [page]);
     
     // Effect 2: Data fetching
-    useEffect(() => {
+    useEffect(() =&gt; {
         fetchData();
     }, [userId]);
     
     // Effect 3: Event listener
-    useEffect(() => {
+    useEffect(() =&gt; {
         window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        return () =&gt; window.removeEventListener('resize', handleResize);
     }, []);
     
     // Each effect has single responsibility
@@ -2810,37 +2289,40 @@ const MouseTracker: React.FC = () => {
 
                 <div class="card">
                     <h4>❌ Bad: Everything in One Effect</h4>
-                    <pre><code class="language-typescript">const MyComponent: React.FC = () => {
-    useEffect(() => {
+                    <pre><code class="language-typescript">const MyComponent: React.FC = () =&gt; {
+    useEffect(() =&gt; {
         // Too much in one effect!
         document.title = `Page ${page}`;
         fetchData();
         window.addEventListener('resize', handleResize);
         
-        return () => {
+        return () =&gt; {
             window.removeEventListener('resize', handleResize);
         };
     }, [page, userId]); // Runs for both changes
 };</code></pre>
                 </div>
 
-                <h3>When NOT to Use useEffect</h3>
+                <h3>🤔 You Might Not Need an Effect</h3>
+                <p>This deserves its own heading because it's the mistake even experienced developers make most often. The React team wrote an entire documentation page called <em>"You Might Not Need an Effect,"</em> and the message is simple: a huge fraction of effects in real codebases shouldn't be effects at all. Two patterns cover most cases.</p>
+                <p><strong>1. Derived state — calculate it during render.</strong> If a value can be computed from existing props or state, just compute it. Don't mirror it into extra state and sync it with an effect; that's an extra render and one more thing to keep in sync.</p>
+                <p><strong>2. Responding to a user action — put it in the event handler.</strong> If something should happen <em>because the user clicked</em>, do it in the <code>onClick</code>. Routing state through an effect that "watches" a flag is indirect, harder to follow, and runs one render too late.</p>
                 <div class="card card-info">
                     <h4>💡 Consider Alternatives</h4>
                     <pre><code class="language-typescript">// ❌ DON'T: Use effect for derived state
 const [items, setItems] = useState([]);
 const [total, setTotal] = useState(0);
 
-useEffect(() => {
-    setTotal(items.reduce((sum, item) => sum + item.price, 0));
+useEffect(() =&gt; {
+    setTotal(items.reduce((sum, item) =&gt; sum + item.price, 0));
 }, [items]);
 
 // ✅ DO: Calculate during render
 const [items, setItems] = useState([]);
-const total = items.reduce((sum, item) => sum + item.price, 0);
+const total = items.reduce((sum, item) =&gt; sum + item.price, 0);
 
 // ❌ DON'T: Use effect to transform props
-useEffect(() => {
+useEffect(() =&gt; {
     setUpperName(name.toUpperCase());
 }, [name]);
 
@@ -2848,14 +2330,14 @@ useEffect(() => {
 const upperName = name.toUpperCase();
 
 // ❌ DON'T: Use effect for event handlers
-useEffect(() => {
+useEffect(() =&gt; {
     if (shouldSubmit) {
         submitForm();
     }
 }, [shouldSubmit]);
 
 // ✅ DO: Call directly in event handler
-const handleClick = () => {
+const handleClick = () =&gt; {
     submitForm();
 };</code></pre>
                 </div>
@@ -2864,17 +2346,17 @@ const handleClick = () => {
                 <div class="card">
                     <h4>Optimize Effect Execution</h4>
                     <pre><code class="language-typescript">// ❌ Runs on every render
-useEffect(() => {
+useEffect(() =&gt; {
     expensiveOperation();
 });
 
 // ✅ Runs only when needed
-useEffect(() => {
+useEffect(() =&gt; {
     expensiveOperation();
 }, [dependency]);
 
 // ✅ Early return for unnecessary work
-useEffect(() => {
+useEffect(() =&gt; {
     if (!shouldRun) return;
     expensiveOperation();
 }, [shouldRun, dependency]);</code></pre>
@@ -2902,13 +2384,14 @@ useEffect(() => {
                 </div>
 
                 <div class="card card-accent">
-                    <h3 style="color: white;">🎯 Key Takeaways</h3>
-                    <ul style="color: white;">
-                        <li><strong>Pure render functions:</strong> Side effects go in useEffect, not render</li>
-                        <li><strong>Dependency arrays matter:</strong> They control when effects run</li>
-                        <li><strong>Always clean up:</strong> Prevent memory leaks and stale updates</li>
-                        <li><strong>One effect per concern:</strong> Keep effects focused and maintainable</li>
-                        <li><strong>Trust ESLint:</strong> The exhaustive-deps rule catches real problems</li>
+                    <h3>🎯 Key Takeaways</h3>
+                    <ul>
+                        <li><strong>An effect is for synchronization:</strong> reach for it only when you're syncing with something outside React—and ask "do I need an effect at all?" first</li>
+                        <li><strong>Pure render functions:</strong> side effects go in useEffect, not in the render body</li>
+                        <li><strong>Dependency arrays matter:</strong> they control when effects run—keep them exhaustive</li>
+                        <li><strong>Always clean up:</strong> return a cleanup to prevent leaks, stale updates, and race conditions</li>
+                        <li><strong>StrictMode's double-run is a feature:</strong> if your cleanup is correct, it's harmless</li>
+                        <li><strong>For data fetching, prefer a library</strong> (TanStack Query) or a framework/Server Component over raw useEffect</li>
                     </ul>
                 </div>
 
@@ -2950,29 +2433,29 @@ useEffect(() => {
                 <h3>Common Use Cases Cheatsheet</h3>
                 <div class="card">
                     <pre><code class="language-typescript">// Document title
-useEffect(() => {
+useEffect(() =&gt; {
     document.title = title;
 }, [title]);
 
 // Timer
-useEffect(() => {
-    const id = setInterval(() => {}, 1000);
-    return () => clearInterval(id);
+useEffect(() =&gt; {
+    const id = setInterval(() =&gt; {}, 1000);
+    return () =&gt; clearInterval(id);
 }, []);
 
 // Event listener
-useEffect(() => {
+useEffect(() =&gt; {
     window.addEventListener('event', handler);
-    return () => window.removeEventListener('event', handler);
+    return () =&gt; window.removeEventListener('event', handler);
 }, []);
 
 // Focus input
-useEffect(() => {
+useEffect(() =&gt; {
     inputRef.current?.focus();
 }, []);
 
 // localStorage sync
-useEffect(() => {
+useEffect(() =&gt; {
     localStorage.setItem('key', value);
 }, [value]);</code></pre>
                 </div>

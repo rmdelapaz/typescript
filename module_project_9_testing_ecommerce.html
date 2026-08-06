@@ -142,7 +142,30 @@
             <section id="setup" class="lesson-section">
                 <h2>⚙️ Test Setup and Configuration</h2>
                 
-                <p>Let's start by setting up our testing infrastructure. We'll install all necessary testing libraries and configure them properly.</p>
+                <p>Before we write a single assertion, we need a solid foundation. A test suite is only as trustworthy as its infrastructure: if the environment is misconfigured, tests pass when they should fail (false confidence) or fail when the code is fine (flaky noise that trains you to ignore red). So we'll invest a little upfront to get it right, then reap the reward across every test we write. Our stack for 2026 is <strong>Vitest</strong> (the test runner, built on Vite so it shares your app's exact config), <strong>React Testing Library</strong> for rendering components the way a user sees them, <strong>user-event v14</strong> for realistic interactions, <strong>MSW v2</strong> for intercepting network calls, and <strong>Playwright</strong> for full browser end-to-end runs.</p>
+
+                <p>Here's the map of what we're going to test and which tool covers each layer. Keep this picture in mind — every section below fills in one part of it:</p>
+
+                <div class="mermaid">
+                    graph TD
+                        App["E-commerce App"] --> Utils["Utilities &amp; calc<br/>(pure functions)"]
+                        App --> Comp["UI components<br/>(ProductCard, Cart, SearchBar)"]
+                        App --> State["State layer<br/>(reducer, hooks, context)"]
+                        App --> Net["Data fetching<br/>(fetch / API)"]
+                        App --> Flows["User journeys<br/>(browse to checkout)"]
+
+                        Utils --> T1["Unit tests<br/>Vitest"]
+                        Comp --> T2["Component tests<br/>RTL + user-event"]
+                        State --> T3["Hook + reducer tests<br/>renderHook"]
+                        Net --> T4["API tests<br/>MSW v2"]
+                        Flows --> T5["E2E tests<br/>Playwright"]
+
+                        style T1 fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
+                        style T2 fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
+                        style T3 fill:#339af0,stroke:#1971c2,stroke-width:2px,color:#fff
+                        style T4 fill:#339af0,stroke:#1971c2,stroke-width:2px,color:#fff
+                        style T5 fill:#f59f00,stroke:#e67700,stroke-width:2px,color:#fff
+                </div>
 
                 <h3>Installing Testing Dependencies</h3>
                 <pre><code class="language-bash">
@@ -161,7 +184,12 @@ npx playwright install
 
 # Additional utilities
 npm install -D @vitest/coverage-v8
+
+# App runtime deps our render helper wraps (regular deps, not -D)
+# These are already in a real app; listed here so the test utils compile.
+npm install react-router-dom @tanstack/react-query
                 </code></pre>
+                <p>A quick note on versions: this project targets <strong>React 19</strong>, <strong>TypeScript 5.x</strong>, <strong>Vitest 3</strong>, <strong>MSW 2</strong>, <strong>user-event 14</strong>, and <strong>TanStack Query 5</strong>. The APIs below assume those major versions — mixing in an older major (especially MSW 1 or user-event 13) is the most common reason copied snippets fail to run.</p>
 
                 <h3>Vitest Configuration</h3>
                 <p>Create or update your <code>vite.config.ts</code> file:</p>
@@ -209,55 +237,53 @@ import { afterEach, beforeAll, afterAll } from 'vitest';
 import { server } from './mocks/server';
 
 // Start MSW server before all tests
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(() =&gt; server.listen({ onUnhandledRequest: 'error' }));
 
 // Reset handlers after each test
-afterEach(() => {
+afterEach(() =&gt; {
   server.resetHandlers();
   cleanup();
 });
 
 // Clean up after all tests
-afterAll(() => server.close());
+afterAll(() =&gt; server.close());
                 </code></pre>
 
                 <h3>MSW Setup</h3>
-                <p>Create MSW handlers for API mocking:</p>
+                <p>MSW (Mock Service Worker) intercepts requests at the network layer, so your components use the real <code>fetch</code> they'd use in production — you never have to stub <code>fetch</code> itself. In tests it runs through <code>msw/node</code>. Note the <strong>MSW v2</strong> API we use below: request handlers come from <code>http</code> (not the old <code>rest</code>), and you build responses with <code>HttpResponse</code> instead of the old <code>(req, res, ctx)</code> signature. This is the current, actively-maintained API — anything you find online using <code>rest.get(...)</code> and <code>res(ctx.json(...))</code> is MSW v1 and will not run against v2.</p>
 
                 <pre><code class="language-typescript">
 // src/test/mocks/handlers.ts
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { products } from '../../data/products';
 
 export const handlers = [
   // Get all products
-  rest.get('/api/products', (req, res, ctx) => {
-    return res(
-      ctx.status(200),
-      ctx.json(products)
-    );
+  http.get('/api/products', () =&gt; {
+    return HttpResponse.json(products);
   }),
-  
-  // Get single product
-  rest.get('/api/products/:id', (req, res, ctx) => {
-    const { id } = req.params;
-    const product = products.find(p => p.id === id);
-    
+
+  // Get single product — params are typed and destructured from the callback arg
+  http.get('/api/products/:id', ({ params }) =&gt; {
+    const { id } = params;
+    const product = products.find((p) =&gt; p.id === id);
+
     if (!product) {
-      return res(ctx.status(404), ctx.json({ message: 'Product not found' }));
+      return HttpResponse.json({ message: 'Product not found' }, { status: 404 });
     }
-    
-    return res(ctx.status(200), ctx.json(product));
+
+    return HttpResponse.json(product);
   }),
-  
-  // Search products
-  rest.get('/api/products/search', (req, res, ctx) => {
-    const query = req.url.searchParams.get('q');
-    const filtered = products.filter(p =>
-      p.name.toLowerCase().includes(query?.toLowerCase() || '')
+
+  // Search products — read the query string from the intercepted Request
+  http.get('/api/products/search', ({ request }) =&gt; {
+    const url = new URL(request.url);
+    const query = url.searchParams.get('q') ?? '';
+    const filtered = products.filter((p) =&gt;
+      p.name.toLowerCase().includes(query.toLowerCase())
     );
-    
-    return res(ctx.status(200), ctx.json(filtered));
+
+    return HttpResponse.json(filtered);
   }),
 ];
 
@@ -265,41 +291,79 @@ export const handlers = [
 import { setupServer } from 'msw/node';
 import { handlers } from './handlers';
 
+// setupServer spins up the interceptor for the Node (Vitest) environment
 export const server = setupServer(...handlers);
                 </code></pre>
 
+                <div class="card card-warning">
+                    <h4>⚠️ MSW v1 vs v2 at a glance</h4>
+                    <p>If you've seen older tutorials, here's the translation you'll need constantly:</p>
+                    <ul>
+                        <li><code>rest.get(url, resolver)</code> &rarr; <code>http.get(url, resolver)</code></li>
+                        <li><code>(req, res, ctx) =&gt; res(ctx.json(data))</code> &rarr; <code>() =&gt; HttpResponse.json(data)</code></li>
+                        <li><code>res(ctx.status(500))</code> &rarr; <code>new HttpResponse(null, { status: 500 })</code></li>
+                        <li><code>req.params</code> &rarr; the <code>{ params }</code> argument</li>
+                        <li><code>req.url.searchParams</code> &rarr; <code>new URL(request.url).searchParams</code></li>
+                        <li><code>res.networkError('...')</code> &rarr; <code>HttpResponse.error()</code></li>
+                        <li><code>ctx.delay(ms)</code> &rarr; <code>await delay(ms)</code> (import <code>delay</code> from <code>'msw'</code>)</li>
+                    </ul>
+                </div>
+
                 <h3>Test Utilities</h3>
-                <p>Create reusable test helpers:</p>
+                <p>Almost every component in a real app assumes it's rendered inside some providers — a router for navigation, a data-fetching client, our cart context. If we had to wire those up by hand in every test, the boilerplate would bury the actual assertions. So we create one <code>renderWithProviders</code> helper that wraps the component under test in the same provider tree the real app uses, then re-export it as <code>render</code> so tests read cleanly.</p>
+
+                <p>Two details matter for correctness. First, we create a <strong>fresh <code>QueryClient</code> for every render</strong> — a shared client would leak cached data between tests and make them order-dependent. Second, we disable retries so a mocked error surfaces immediately instead of TanStack Query silently retrying and timing out your test.</p>
 
                 <pre><code class="language-typescript">
 // src/test/utils.tsx
-import { render, RenderOptions } from '@testing-library/react';
-import { ReactElement } from 'react';
+import { render, type RenderOptions } from '@testing-library/react';
+import { type ReactElement, type ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CartProvider } from '../context/CartContext';
 
-interface AllTheProvidersProps {
-  children: React.ReactNode;
+// A brand-new client per render keeps tests fully isolated.
+function makeTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },        // fail fast in tests
+      mutations: { retry: false },
+    },
+  });
 }
 
-function AllTheProviders({ children }: AllTheProvidersProps) {
-  return (
-    &lt;CartProvider&gt;
-      {children}
-    &lt;/CartProvider&gt;
-  );
+interface RenderWithProvidersOptions extends Omit&lt;RenderOptions, 'wrapper'&gt; {
+  route?: string; // let a test control the starting URL
 }
 
-function renderWithProviders(
+export function renderWithProviders(
   ui: ReactElement,
-  options?: Omit&lt;RenderOptions, 'wrapper'&gt;
+  { route = '/', ...options }: RenderWithProvidersOptions = {}
 ) {
-  return render(ui, { wrapper: AllTheProviders, ...options });
+  const queryClient = makeTestQueryClient();
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      &lt;QueryClientProvider client={queryClient}&gt;
+        &lt;MemoryRouter initialEntries={[route]}&gt;
+          &lt;CartProvider&gt;{children}&lt;/CartProvider&gt;
+        &lt;/MemoryRouter&gt;
+      &lt;/QueryClientProvider&gt;
+    );
+  }
+
+  return render(ui, { wrapper: Wrapper, ...options });
 }
 
-// Re-export everything
+// Re-export the full RTL API, then override render with our wrapped version.
 export * from '@testing-library/react';
 export { renderWithProviders as render };
                 </code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 Why <code>MemoryRouter</code> and not <code>BrowserRouter</code>?</h4>
+                    <p><code>MemoryRouter</code> keeps its history in memory instead of touching <code>window.location</code>, which jsdom only partially implements. It also lets each test set its own starting route via <code>initialEntries</code>, so you can render a component "as if" the user landed on <code>/products/1</code> without any real navigation.</p>
+                </div>
 
                 <h3>Playwright Configuration</h3>
                 <p>Create <code>playwright.config.ts</code>:</p>
@@ -344,7 +408,7 @@ export default defineConfig({
 {
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc &amp;&amp; vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -422,7 +486,7 @@ npm run test:e2e
             <section id="unit-tests" class="lesson-section">
                 <h2>🔬 Unit Tests: Utilities and Calculations</h2>
                 
-                <p>Let's start with unit tests for our utility functions. These are the foundation of our test suite—they're fast, focused, and test pure logic.</p>
+                <p>We start with unit tests for our utility functions, and that ordering is deliberate. These functions are <strong>pure</strong> — same input, same output, no side effects, no DOM, no network — which makes them the cheapest and most reliable things to test. A pure-function test needs no render, no mocking, and no async waiting, so it runs in microseconds and never flakes. In an e-commerce app the money math lives here (subtotals, tax, shipping, discounts), so a bug in these functions is exactly the kind that silently overcharges a customer. Locking them down first gives us a rock-solid base the higher layers can build on.</p>
 
                 <h3>Testing Price Calculations</h3>
                 <p>First, let's create the utility functions we'll test:</p>
@@ -430,7 +494,7 @@ npm run test:e2e
                 <pre><code class="language-typescript">
 // src/utils/calculations.ts
 export function calculateSubtotal(items: CartItem[]): number {
-  return items.reduce((total, item) => {
+  return items.reduce((total, item) =&gt; {
     return total + (item.price * item.quantity);
   }, 0);
 }
@@ -440,8 +504,8 @@ export function calculateTax(subtotal: number, taxRate: number = 0.08): number {
 }
 
 export function calculateShipping(subtotal: number): number {
-  if (subtotal >= 100) return 0;
-  if (subtotal >= 50) return 5.99;
+  if (subtotal &gt;= 100) return 0;
+  if (subtotal &gt;= 50) return 5.99;
   return 9.99;
 }
 
@@ -489,13 +553,13 @@ import {
   applyDiscount,
 } from './calculations';
 
-describe('calculateSubtotal', () => {
-  it('calculates subtotal for single item', () => {
+describe('calculateSubtotal', () =&gt; {
+  it('calculates subtotal for single item', () =&gt; {
     const items = [{ id: '1', name: 'Product', price: 10, quantity: 2 }];
     expect(calculateSubtotal(items)).toBe(20);
   });
   
-  it('calculates subtotal for multiple items', () => {
+  it('calculates subtotal for multiple items', () =&gt; {
     const items = [
       { id: '1', name: 'Product 1', price: 10, quantity: 2 },
       { id: '2', name: 'Product 2', price: 15, quantity: 1 },
@@ -503,60 +567,60 @@ describe('calculateSubtotal', () => {
     expect(calculateSubtotal(items)).toBe(35);
   });
   
-  it('returns 0 for empty cart', () => {
+  it('returns 0 for empty cart', () =&gt; {
     expect(calculateSubtotal([])).toBe(0);
   });
   
-  it('handles decimal prices correctly', () => {
+  it('handles decimal prices correctly', () =&gt; {
     const items = [{ id: '1', name: 'Product', price: 9.99, quantity: 3 }];
     expect(calculateSubtotal(items)).toBeCloseTo(29.97);
   });
 });
 
-describe('calculateTax', () => {
-  it('calculates tax with default rate (8%)', () => {
+describe('calculateTax', () =&gt; {
+  it('calculates tax with default rate (8%)', () =&gt; {
     expect(calculateTax(100)).toBe(8);
   });
   
-  it('calculates tax with custom rate', () => {
+  it('calculates tax with custom rate', () =&gt; {
     expect(calculateTax(100, 0.10)).toBe(10);
   });
   
-  it('returns 0 for zero subtotal', () => {
+  it('returns 0 for zero subtotal', () =&gt; {
     expect(calculateTax(0)).toBe(0);
   });
   
-  it('handles decimal amounts correctly', () => {
+  it('handles decimal amounts correctly', () =&gt; {
     expect(calculateTax(49.99, 0.08)).toBeCloseTo(3.9992);
   });
 });
 
-describe('calculateShipping', () => {
-  it('returns free shipping for orders $100 or more', () => {
+describe('calculateShipping', () =&gt; {
+  it('returns free shipping for orders $100 or more', () =&gt; {
     expect(calculateShipping(100)).toBe(0);
     expect(calculateShipping(150)).toBe(0);
   });
   
-  it('returns $5.99 for orders between $50 and $99.99', () => {
+  it('returns $5.99 for orders between $50 and $99.99', () =&gt; {
     expect(calculateShipping(50)).toBe(5.99);
     expect(calculateShipping(75)).toBe(5.99);
     expect(calculateShipping(99.99)).toBe(5.99);
   });
   
-  it('returns $9.99 for orders under $50', () => {
+  it('returns $9.99 for orders under $50', () =&gt; {
     expect(calculateShipping(0)).toBe(9.99);
     expect(calculateShipping(25)).toBe(9.99);
     expect(calculateShipping(49.99)).toBe(9.99);
   });
 });
 
-describe('calculateTotal', () => {
+describe('calculateTotal', () =&gt; {
   const items = [
     { id: '1', name: 'Product 1', price: 50, quantity: 1 },
     { id: '2', name: 'Product 2', price: 30, quantity: 1 },
   ];
   
-  it('calculates total with tax and shipping', () => {
+  it('calculates total with tax and shipping', () =&gt; {
     // Subtotal: 80
     // Tax (8%): 6.40
     // Shipping: 5.99 (between 50-100)
@@ -565,7 +629,7 @@ describe('calculateTotal', () => {
     expect(total).toBeCloseTo(92.39);
   });
   
-  it('uses custom tax rate', () => {
+  it('uses custom tax rate', () =&gt; {
     const total = calculateTotal(items, 0.10);
     // Subtotal: 80
     // Tax (10%): 8.00
@@ -574,7 +638,7 @@ describe('calculateTotal', () => {
     expect(total).toBeCloseTo(93.99);
   });
   
-  it('includes free shipping for large orders', () => {
+  it('includes free shipping for large orders', () =&gt; {
     const largeOrder = [
       { id: '1', name: 'Expensive Item', price: 100, quantity: 1 },
     ];
@@ -587,55 +651,55 @@ describe('calculateTotal', () => {
   });
 });
 
-describe('formatCurrency', () => {
-  it('formats whole numbers', () => {
+describe('formatCurrency', () =&gt; {
+  it('formats whole numbers', () =&gt; {
     expect(formatCurrency(100)).toBe('$100.00');
   });
   
-  it('formats decimal numbers', () => {
+  it('formats decimal numbers', () =&gt; {
     expect(formatCurrency(99.99)).toBe('$99.99');
   });
   
-  it('formats zero', () => {
+  it('formats zero', () =&gt; {
     expect(formatCurrency(0)).toBe('$0.00');
   });
   
-  it('formats large numbers with commas', () => {
+  it('formats large numbers with commas', () =&gt; {
     expect(formatCurrency(1234.56)).toBe('$1,234.56');
   });
   
-  it('handles negative numbers', () => {
+  it('handles negative numbers', () =&gt; {
     expect(formatCurrency(-50)).toBe('-$50.00');
   });
 });
 
-describe('discount calculations', () => {
-  describe('calculateDiscount', () => {
-    it('calculates discount amount', () => {
+describe('discount calculations', () =&gt; {
+  describe('calculateDiscount', () =&gt; {
+    it('calculates discount amount', () =&gt; {
       expect(calculateDiscount(100, 10)).toBe(10);
       expect(calculateDiscount(50, 20)).toBe(10);
     });
     
-    it('handles zero discount', () => {
+    it('handles zero discount', () =&gt; {
       expect(calculateDiscount(100, 0)).toBe(0);
     });
     
-    it('handles 100% discount', () => {
+    it('handles 100% discount', () =&gt; {
       expect(calculateDiscount(100, 100)).toBe(100);
     });
   });
   
-  describe('applyDiscount', () => {
-    it('applies discount to price', () => {
+  describe('applyDiscount', () =&gt; {
+    it('applies discount to price', () =&gt; {
       expect(applyDiscount(100, 10)).toBe(90);
       expect(applyDiscount(50, 20)).toBe(40);
     });
     
-    it('returns original price for zero discount', () => {
+    it('returns original price for zero discount', () =&gt; {
       expect(applyDiscount(100, 0)).toBe(100);
     });
     
-    it('returns zero for 100% discount', () => {
+    it('returns zero for 100% discount', () =&gt; {
       expect(applyDiscount(100, 100)).toBe(0);
     });
   });
@@ -657,30 +721,30 @@ export function filterProducts(
   products: Product[],
   filters: Partial&lt;FilterOptions&gt;
 ): Product[] {
-  return products.filter(product => {
+  return products.filter(product =&gt; {
     // Search by name or description
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
       const matchesName = product.name.toLowerCase().includes(query);
       const matchesDesc = product.description?.toLowerCase().includes(query);
-      if (!matchesName && !matchesDesc) return false;
+      if (!matchesName &amp;&amp; !matchesDesc) return false;
     }
     
     // Filter by category
-    if (filters.category && filters.category !== 'all') {
+    if (filters.category &amp;&amp; filters.category !== 'all') {
       if (product.category !== filters.category) return false;
     }
     
     // Filter by price range
-    if (filters.minPrice !== undefined && product.price < filters.minPrice) {
+    if (filters.minPrice !== undefined &amp;&amp; product.price &lt; filters.minPrice) {
       return false;
     }
-    if (filters.maxPrice !== undefined && product.price > filters.maxPrice) {
+    if (filters.maxPrice !== undefined &amp;&amp; product.price &gt; filters.maxPrice) {
       return false;
     }
     
     // Filter by stock status
-    if (filters.inStock && product.stock === 0) {
+    if (filters.inStock &amp;&amp; product.stock === 0) {
       return false;
     }
     
@@ -696,13 +760,13 @@ export function sortProducts(
   
   switch (sortBy) {
     case 'name':
-      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      return sorted.sort((a, b) =&gt; a.name.localeCompare(b.name));
     case 'price-low':
-      return sorted.sort((a, b) => a.price - b.price);
+      return sorted.sort((a, b) =&gt; a.price - b.price);
     case 'price-high':
-      return sorted.sort((a, b) => b.price - a.price);
+      return sorted.sort((a, b) =&gt; b.price - a.price);
     case 'newest':
-      return sorted.sort((a, b) => 
+      return sorted.sort((a, b) =&gt; 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     default:
@@ -747,30 +811,30 @@ const mockProducts = [
   },
 ];
 
-describe('filterProducts', () => {
-  it('returns all products with empty filters', () => {
+describe('filterProducts', () =&gt; {
+  it('returns all products with empty filters', () =&gt; {
     const result = filterProducts(mockProducts, {});
     expect(result).toHaveLength(3);
   });
   
-  it('filters by search query in name', () => {
+  it('filters by search query in name', () =&gt; {
     const result = filterProducts(mockProducts, { searchQuery: 'laptop' });
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('Laptop');
   });
   
-  it('filters by search query in description', () => {
+  it('filters by search query in description', () =&gt; {
     const result = filterProducts(mockProducts, { searchQuery: 'wireless' });
     expect(result).toHaveLength(1);
     expect(result[0].name).toBe('Mouse');
   });
   
-  it('filters by category', () => {
+  it('filters by category', () =&gt; {
     const result = filterProducts(mockProducts, { category: 'electronics' });
     expect(result).toHaveLength(2);
   });
   
-  it('filters by price range', () => {
+  it('filters by price range', () =&gt; {
     const result = filterProducts(mockProducts, { 
       minPrice: 50, 
       maxPrice: 500 
@@ -779,13 +843,13 @@ describe('filterProducts', () => {
     expect(result[0].name).toBe('Desk');
   });
   
-  it('filters by stock status', () => {
+  it('filters by stock status', () =&gt; {
     const result = filterProducts(mockProducts, { inStock: true });
     expect(result).toHaveLength(2);
-    expect(result.every(p => p.stock > 0)).toBe(true);
+    expect(result.every(p =&gt; p.stock &gt; 0)).toBe(true);
   });
   
-  it('applies multiple filters together', () => {
+  it('applies multiple filters together', () =&gt; {
     const result = filterProducts(mockProducts, {
       category: 'electronics',
       minPrice: 100,
@@ -796,34 +860,34 @@ describe('filterProducts', () => {
   });
 });
 
-describe('sortProducts', () => {
-  it('sorts by name alphabetically', () => {
+describe('sortProducts', () =&gt; {
+  it('sorts by name alphabetically', () =&gt; {
     const result = sortProducts(mockProducts, 'name');
     expect(result[0].name).toBe('Desk');
     expect(result[1].name).toBe('Laptop');
     expect(result[2].name).toBe('Mouse');
   });
   
-  it('sorts by price low to high', () => {
+  it('sorts by price low to high', () =&gt; {
     const result = sortProducts(mockProducts, 'price-low');
     expect(result[0].price).toBe(29);
     expect(result[2].price).toBe(999);
   });
   
-  it('sorts by price high to low', () => {
+  it('sorts by price high to low', () =&gt; {
     const result = sortProducts(mockProducts, 'price-high');
     expect(result[0].price).toBe(999);
     expect(result[2].price).toBe(29);
   });
   
-  it('sorts by newest first', () => {
+  it('sorts by newest first', () =&gt; {
     const result = sortProducts(mockProducts, 'newest');
     expect(result[0].id).toBe('2'); // Created Jan 15
     expect(result[1].id).toBe('3'); // Created Jan 10
     expect(result[2].id).toBe('1'); // Created Jan 1
   });
   
-  it('does not mutate original array', () => {
+  it('does not mutate original array', () =&gt; {
     const original = [...mockProducts];
     sortProducts(mockProducts, 'price-low');
     expect(mockProducts).toEqual(original);
@@ -865,7 +929,7 @@ npm test -- --watch
             <section id="component-tests" class="lesson-section">
                 <h2>🧩 Component Tests: UI Components</h2>
                 
-                <p>Now let's test our React components using React Testing Library. We'll focus on testing user-facing behavior, not implementation details.</p>
+                <p>Now we move up a layer to the components themselves, using React Testing Library. RTL's guiding philosophy is that <em>the more your tests resemble the way your software is used, the more confidence they give you</em>. So instead of reaching into a component's state or props, we query the rendered output the way a user (or a screen reader) would — by visible text, by role, by label — and we drive it with realistic clicks and typing through <code>user-event</code>. The payoff: these tests survive refactors. Rename an internal variable, switch <code>useState</code> for <code>useReducer</code>, restructure the JSX — as long as the user-visible behavior is unchanged, the tests stay green. That is exactly the safety net that lets you refactor without fear.</p>
 
                 <h3>Testing ProductCard Component</h3>
                 <p>First, let's look at the component we're testing:</p>
@@ -874,15 +938,15 @@ npm test -- --watch
 // src/components/Product/ProductCard.tsx
 interface ProductCardProps {
   product: Product;
-  onAddToCart: (product: Product) => void;
+  onAddToCart: (product: Product) =&gt; void;
 }
 
 export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const [isAdding, setIsAdding] = React.useState(false);
   
-  const handleAddToCart = async () => {
+  const handleAddToCart = async () =&gt; {
     setIsAdding(true);
-    await new Promise(resolve => setTimeout(resolve, 300)); // Simulate async
+    await new Promise(resolve =&gt; setTimeout(resolve, 300)); // Simulate async
     onAddToCart(product);
     setIsAdding(false);
   };
@@ -906,7 +970,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
         &lt;/button&gt;
       )}
       
-      {product.stock > 0 && product.stock < 5 && (
+      {product.stock &gt; 0 &amp;&amp; product.stock &lt; 5 &amp;&amp; (
         &lt;p className="low-stock"&gt;Only {product.stock} left!&lt;/p&gt;
       )}
     &lt;/article&gt;
@@ -932,8 +996,8 @@ const mockProduct = {
   stock: 10,
 };
 
-describe('ProductCard', () => {
-  it('renders product information', () => {
+describe('ProductCard', () =&gt; {
+  it('renders product information', () =&gt; {
     const onAddToCart = vi.fn();
     
     render(&lt;ProductCard product={mockProduct} onAddToCart={onAddToCart} /&gt;);
@@ -944,7 +1008,7 @@ describe('ProductCard', () => {
     expect(screen.getByAltText('Gaming Laptop')).toBeInTheDocument();
   });
   
-  it('calls onAddToCart when button is clicked', async () => {
+  it('calls onAddToCart when button is clicked', async () =&gt; {
     const user = userEvent.setup();
     const onAddToCart = vi.fn();
     
@@ -957,7 +1021,7 @@ describe('ProductCard', () => {
     expect(onAddToCart).toHaveBeenCalledTimes(1);
   });
   
-  it('shows loading state while adding to cart', async () => {
+  it('shows loading state while adding to cart', async () =&gt; {
     const user = userEvent.setup();
     const onAddToCart = vi.fn();
     
@@ -975,7 +1039,7 @@ describe('ProductCard', () => {
     expect(button).toBeDisabled();
   });
   
-  it('shows "Out of Stock" when stock is 0', () => {
+  it('shows "Out of Stock" when stock is 0', () =&gt; {
     const onAddToCart = vi.fn();
     const outOfStockProduct = { ...mockProduct, stock: 0 };
     
@@ -985,7 +1049,7 @@ describe('ProductCard', () => {
     expect(screen.queryByRole('button', { name: /add.*to cart/i })).not.toBeInTheDocument();
   });
   
-  it('shows low stock warning when stock is less than 5', () => {
+  it('shows low stock warning when stock is less than 5', () =&gt; {
     const onAddToCart = vi.fn();
     const lowStockProduct = { ...mockProduct, stock: 3 };
     
@@ -994,7 +1058,7 @@ describe('ProductCard', () => {
     expect(screen.getByText('Only 3 left!')).toBeInTheDocument();
   });
   
-  it('does not show low stock warning when stock is 5 or more', () => {
+  it('does not show low stock warning when stock is 5 or more', () =&gt; {
     const onAddToCart = vi.fn();
     
     render(&lt;ProductCard product={mockProduct} onAddToCart={onAddToCart} /&gt;);
@@ -1002,7 +1066,7 @@ describe('ProductCard', () => {
     expect(screen.queryByText(/only.*left/i)).not.toBeInTheDocument();
   });
   
-  it('has accessible add to cart button', () => {
+  it('has accessible add to cart button', () =&gt; {
     const onAddToCart = vi.fn();
     
     render(&lt;ProductCard product={mockProduct} onAddToCart={onAddToCart} /&gt;);
@@ -1018,14 +1082,14 @@ describe('ProductCard', () => {
 // src/components/Cart/CartItem.tsx
 interface CartItemProps {
   item: CartItem;
-  onUpdateQuantity: (id: string, quantity: number) => void;
-  onRemove: (id: string) => void;
+  onUpdateQuantity: (id: string, quantity: number) =&gt; void;
+  onRemove: (id: string) =&gt; void;
 }
 
 export function CartItem({ item, onUpdateQuantity, onRemove }: CartItemProps) {
-  const handleQuantityChange = (delta: number) => {
+  const handleQuantityChange = (delta: number) =&gt; {
     const newQuantity = item.quantity + delta;
-    if (newQuantity > 0) {
+    if (newQuantity &gt; 0) {
       onUpdateQuantity(item.id, newQuantity);
     }
   };
@@ -1043,7 +1107,7 @@ export function CartItem({ item, onUpdateQuantity, onRemove }: CartItemProps) {
       
       &lt;div className="quantity-controls"&gt;
         &lt;button
-          onClick={() => handleQuantityChange(-1)}
+          onClick={() =&gt; handleQuantityChange(-1)}
           aria-label="Decrease quantity"
           disabled={item.quantity === 1}
         &gt;
@@ -1053,7 +1117,7 @@ export function CartItem({ item, onUpdateQuantity, onRemove }: CartItemProps) {
         &lt;span aria-label="Quantity"&gt;{item.quantity}&lt;/span&gt;
         
         &lt;button
-          onClick={() => handleQuantityChange(1)}
+          onClick={() =&gt; handleQuantityChange(1)}
           aria-label="Increase quantity"
         &gt;
           +
@@ -1063,7 +1127,7 @@ export function CartItem({ item, onUpdateQuantity, onRemove }: CartItemProps) {
       &lt;p className="subtotal"&gt;{formatCurrency(subtotal)}&lt;/p&gt;
       
       &lt;button
-        onClick={() => onRemove(item.id)}
+        onClick={() =&gt; onRemove(item.id)}
         aria-label={`Remove ${item.name} from cart`}
         className="remove-button"
       &gt;
@@ -1090,8 +1154,8 @@ const mockItem = {
   image: '/images/laptop.jpg',
 };
 
-describe('CartItem', () => {
-  it('renders item information', () => {
+describe('CartItem', () =&gt; {
+  it('renders item information', () =&gt; {
     const onUpdateQuantity = vi.fn();
     const onRemove = vi.fn();
     
@@ -1109,7 +1173,7 @@ describe('CartItem', () => {
     expect(screen.getByText('$1,999.98')).toBeInTheDocument(); // Subtotal
   });
   
-  it('increases quantity when + button is clicked', async () => {
+  it('increases quantity when + button is clicked', async () =&gt; {
     const user = userEvent.setup();
     const onUpdateQuantity = vi.fn();
     const onRemove = vi.fn();
@@ -1127,7 +1191,7 @@ describe('CartItem', () => {
     expect(onUpdateQuantity).toHaveBeenCalledWith('1', 3);
   });
   
-  it('decreases quantity when - button is clicked', async () => {
+  it('decreases quantity when - button is clicked', async () =&gt; {
     const user = userEvent.setup();
     const onUpdateQuantity = vi.fn();
     const onRemove = vi.fn();
@@ -1145,7 +1209,7 @@ describe('CartItem', () => {
     expect(onUpdateQuantity).toHaveBeenCalledWith('1', 1);
   });
   
-  it('disables decrease button when quantity is 1', () => {
+  it('disables decrease button when quantity is 1', () =&gt; {
     const onUpdateQuantity = vi.fn();
     const onRemove = vi.fn();
     const singleItem = { ...mockItem, quantity: 1 };
@@ -1162,7 +1226,7 @@ describe('CartItem', () => {
     expect(decreaseButton).toBeDisabled();
   });
   
-  it('calls onRemove when remove button is clicked', async () => {
+  it('calls onRemove when remove button is clicked', async () =&gt; {
     const user = userEvent.setup();
     const onUpdateQuantity = vi.fn();
     const onRemove = vi.fn();
@@ -1180,7 +1244,7 @@ describe('CartItem', () => {
     expect(onRemove).toHaveBeenCalledWith('1');
   });
   
-  it('calculates subtotal correctly', () => {
+  it('calculates subtotal correctly', () =&gt; {
     const onUpdateQuantity = vi.fn();
     const onRemove = vi.fn();
     const item = { ...mockItem, price: 50, quantity: 3 };
@@ -1203,7 +1267,7 @@ describe('CartItem', () => {
 // src/components/Filters/SearchBar.tsx
 interface SearchBarProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string) =&gt; void;
   placeholder?: string;
 }
 
@@ -1213,13 +1277,15 @@ export function SearchBar({
   placeholder = 'Search products...' 
 }: SearchBarProps) {
   const [localValue, setLocalValue] = React.useState(value);
-  const timeoutRef = React.useRef&lt;NodeJS.Timeout&gt;();
+  // In React 19 + strict TS, useRef needs an initial value; the browser/Node
+  // timer type is portable via ReturnType&lt;typeof setTimeout&gt;.
+  const timeoutRef = React.useRef&lt;ReturnType&lt;typeof setTimeout&gt; | null&gt;(null);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     setLocalValue(value);
   }, [value]);
   
-  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
     const newValue = e.target.value;
     setLocalValue(newValue);
     
@@ -1228,12 +1294,12 @@ export function SearchBar({
       clearTimeout(timeoutRef.current);
     }
     
-    timeoutRef.current = setTimeout(() => {
+    timeoutRef.current = setTimeout(() =&gt; {
       onChange(newValue);
     }, 300);
   };
   
-  const handleClear = () => {
+  const handleClear = () =&gt; {
     setLocalValue('');
     onChange('');
   };
@@ -1253,7 +1319,7 @@ export function SearchBar({
         aria-label="Search products"
       /&gt;
       
-      {localValue && (
+      {localValue &amp;&amp; (
         &lt;button
           onClick={handleClear}
           aria-label="Clear search"
@@ -1275,16 +1341,16 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SearchBar } from './SearchBar';
 
-describe('SearchBar', () => {
-  beforeEach(() => {
+describe('SearchBar', () =&gt; {
+  beforeEach(() =&gt; {
     vi.useFakeTimers();
   });
   
-  afterEach(() => {
+  afterEach(() =&gt; {
     vi.useRealTimers();
   });
   
-  it('renders with initial value', () => {
+  it('renders with initial value', () =&gt; {
     const onChange = vi.fn();
     
     render(&lt;SearchBar value="laptop" onChange={onChange} /&gt;);
@@ -1293,7 +1359,7 @@ describe('SearchBar', () => {
     expect(input).toHaveValue('laptop');
   });
   
-  it('calls onChange after debounce delay', async () => {
+  it('calls onChange after debounce delay', async () =&gt; {
     const user = userEvent.setup({ delay: null });
     const onChange = vi.fn();
     
@@ -1309,13 +1375,13 @@ describe('SearchBar', () => {
     vi.advanceTimersByTime(300);
     
     // Should have been called once with final value
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(onChange).toHaveBeenCalledWith('laptop');
       expect(onChange).toHaveBeenCalledTimes(1);
     });
   });
   
-  it('debounces multiple rapid changes', async () => {
+  it('debounces multiple rapid changes', async () =&gt; {
     const user = userEvent.setup({ delay: null });
     const onChange = vi.fn();
     
@@ -1337,13 +1403,13 @@ describe('SearchBar', () => {
     vi.advanceTimersByTime(300);
     
     // Should have been called only once with final value
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(onChange).toHaveBeenCalledTimes(1);
       expect(onChange).toHaveBeenCalledWith('lap');
     });
   });
   
-  it('shows clear button when input has value', async () => {
+  it('shows clear button when input has value', async () =&gt; {
     const user = userEvent.setup({ delay: null });
     const onChange = vi.fn();
     
@@ -1359,7 +1425,7 @@ describe('SearchBar', () => {
     expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
   });
   
-  it('clears input when clear button is clicked', async () => {
+  it('clears input when clear button is clicked', async () =&gt; {
     const user = userEvent.setup();
     const onChange = vi.fn();
     
@@ -1372,7 +1438,7 @@ describe('SearchBar', () => {
     expect(onChange).toHaveBeenCalledWith('');
   });
   
-  it('uses custom placeholder', () => {
+  it('uses custom placeholder', () =&gt; {
     const onChange = vi.fn();
     
     render(
@@ -1386,7 +1452,7 @@ describe('SearchBar', () => {
     expect(screen.getByPlaceholderText('Find your product...')).toBeInTheDocument();
   });
   
-  it('is accessible', () => {
+  it('is accessible', () =&gt; {
     const onChange = vi.fn();
     
     render(&lt;SearchBar value="" onChange={onChange} /&gt;);
@@ -1443,13 +1509,13 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case 'ADD_ITEM': {
       const existingItem = state.items.find(
-        item => item.id === action.payload.id
+        item =&gt; item.id === action.payload.id
       );
       
       if (existingItem) {
         return {
           ...state,
-          items: state.items.map(item =>
+          items: state.items.map(item =&gt;
             item.id === action.payload.id
               ? { ...item, quantity: item.quantity + action.payload.quantity }
               : item
@@ -1466,14 +1532,14 @@ export function cartReducer(state: CartState, action: CartAction): CartState {
     case 'REMOVE_ITEM': {
       return {
         ...state,
-        items: state.items.filter(item => item.id !== action.payload),
+        items: state.items.filter(item =&gt; item.id !== action.payload),
       };
     }
     
     case 'UPDATE_QUANTITY': {
       return {
         ...state,
-        items: state.items.map(item =>
+        items: state.items.map(item =&gt;
           item.id === action.payload.id
             ? { ...item, quantity: action.payload.quantity }
             : item
@@ -1516,9 +1582,9 @@ const mockItem2: CartItem = {
   image: '/mouse.jpg',
 };
 
-describe('cartReducer', () => {
-  describe('ADD_ITEM', () => {
-    it('adds new item to empty cart', () => {
+describe('cartReducer', () =&gt; {
+  describe('ADD_ITEM', () =&gt; {
+    it('adds new item to empty cart', () =&gt; {
       const initialState: CartState = { items: [] };
       
       const newState = cartReducer(initialState, {
@@ -1530,7 +1596,7 @@ describe('cartReducer', () => {
       expect(newState.items[0]).toEqual(mockItem);
     });
     
-    it('adds new item to cart with existing items', () => {
+    it('adds new item to cart with existing items', () =&gt; {
       const initialState: CartState = { items: [mockItem] };
       
       const newState = cartReducer(initialState, {
@@ -1542,7 +1608,7 @@ describe('cartReducer', () => {
       expect(newState.items[1]).toEqual(mockItem2);
     });
     
-    it('increases quantity when adding existing item', () => {
+    it('increases quantity when adding existing item', () =&gt; {
       const initialState: CartState = { items: [mockItem] };
       
       const newState = cartReducer(initialState, {
@@ -1554,7 +1620,7 @@ describe('cartReducer', () => {
       expect(newState.items[0].quantity).toBe(3); // 1 + 2
     });
     
-    it('does not mutate original state', () => {
+    it('does not mutate original state', () =&gt; {
       const initialState: CartState = { items: [mockItem] };
       const originalItems = [...initialState.items];
       
@@ -1567,8 +1633,8 @@ describe('cartReducer', () => {
     });
   });
   
-  describe('REMOVE_ITEM', () => {
-    it('removes item from cart', () => {
+  describe('REMOVE_ITEM', () =&gt; {
+    it('removes item from cart', () =&gt; {
       const initialState: CartState = {
         items: [mockItem, mockItem2],
       };
@@ -1582,7 +1648,7 @@ describe('cartReducer', () => {
       expect(newState.items[0].id).toBe('2');
     });
     
-    it('handles removing non-existent item', () => {
+    it('handles removing non-existent item', () =&gt; {
       const initialState: CartState = { items: [mockItem] };
       
       const newState = cartReducer(initialState, {
@@ -1594,7 +1660,7 @@ describe('cartReducer', () => {
       expect(newState.items[0]).toEqual(mockItem);
     });
     
-    it('handles removing from empty cart', () => {
+    it('handles removing from empty cart', () =&gt; {
       const initialState: CartState = { items: [] };
       
       const newState = cartReducer(initialState, {
@@ -1606,8 +1672,8 @@ describe('cartReducer', () => {
     });
   });
   
-  describe('UPDATE_QUANTITY', () => {
-    it('updates quantity of existing item', () => {
+  describe('UPDATE_QUANTITY', () =&gt; {
+    it('updates quantity of existing item', () =&gt; {
       const initialState: CartState = { items: [mockItem] };
       
       const newState = cartReducer(initialState, {
@@ -1618,7 +1684,7 @@ describe('cartReducer', () => {
       expect(newState.items[0].quantity).toBe(5);
     });
     
-    it('does not affect other items', () => {
+    it('does not affect other items', () =&gt; {
       const initialState: CartState = {
         items: [mockItem, mockItem2],
       };
@@ -1632,7 +1698,7 @@ describe('cartReducer', () => {
       expect(newState.items[1].quantity).toBe(1);
     });
     
-    it('handles updating non-existent item', () => {
+    it('handles updating non-existent item', () =&gt; {
       const initialState: CartState = { items: [mockItem] };
       
       const newState = cartReducer(initialState, {
@@ -1644,8 +1710,8 @@ describe('cartReducer', () => {
     });
   });
   
-  describe('CLEAR_CART', () => {
-    it('removes all items from cart', () => {
+  describe('CLEAR_CART', () =&gt; {
+    it('removes all items from cart', () =&gt; {
       const initialState: CartState = {
         items: [mockItem, mockItem2],
       };
@@ -1657,7 +1723,7 @@ describe('cartReducer', () => {
       expect(newState.items).toHaveLength(0);
     });
     
-    it('handles clearing empty cart', () => {
+    it('handles clearing empty cart', () =&gt; {
       const initialState: CartState = { items: [] };
       
       const newState = cartReducer(initialState, {
@@ -1668,8 +1734,8 @@ describe('cartReducer', () => {
     });
   });
   
-  describe('Complex scenarios', () => {
-    it('handles multiple operations in sequence', () => {
+  describe('Complex scenarios', () =&gt; {
+    it('handles multiple operations in sequence', () =&gt; {
       let state: CartState = { items: [] };
       
       // Add first item
@@ -1741,7 +1807,7 @@ export function useCart() {
   
   const { state, dispatch } = context;
   
-  const addItem = React.useCallback((product: Product) => {
+  const addItem = React.useCallback((product: Product) =&gt; {
     dispatch({
       type: 'ADD_ITEM',
       payload: {
@@ -1754,19 +1820,19 @@ export function useCart() {
     });
   }, [dispatch]);
   
-  const removeItem = React.useCallback((id: string) => {
+  const removeItem = React.useCallback((id: string) =&gt; {
     dispatch({ type: 'REMOVE_ITEM', payload: id });
   }, [dispatch]);
   
-  const updateQuantity = React.useCallback((id: string, quantity: number) => {
+  const updateQuantity = React.useCallback((id: string, quantity: number) =&gt; {
     dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity } });
   }, [dispatch]);
   
-  const clearCart = React.useCallback(() => {
+  const clearCart = React.useCallback(() =&gt; {
     dispatch({ type: 'CLEAR_CART' });
   }, [dispatch]);
   
-  const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
+  const itemCount = state.items.reduce((sum, item) =&gt; sum + item.quantity, 0);
   const subtotal = calculateSubtotal(state.items);
   
   return {
@@ -1784,12 +1850,12 @@ export function useCart() {
                 <h3>Hook Tests</h3>
                 <pre><code class="language-typescript">
 // src/hooks/useCart.test.tsx
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { CartProvider } from '../context/CartContext';
 import { useCart } from './useCart';
 
-const wrapper = ({ children }: { children: React.ReactNode }) => (
+const wrapper = ({ children }: { children: React.ReactNode }) =&gt; (
   &lt;CartProvider&gt;{children}&lt;/CartProvider&gt;
 );
 
@@ -1803,19 +1869,19 @@ const mockProduct = {
   stock: 10,
 };
 
-describe('useCart', () => {
-  it('starts with empty cart', () => {
-    const { result } = renderHook(() => useCart(), { wrapper });
+describe('useCart', () =&gt; {
+  it('starts with empty cart', () =&gt; {
+    const { result } = renderHook(() =&gt; useCart(), { wrapper });
     
     expect(result.current.items).toHaveLength(0);
     expect(result.current.itemCount).toBe(0);
     expect(result.current.subtotal).toBe(0);
   });
   
-  it('adds item to cart', () => {
-    const { result } = renderHook(() => useCart(), { wrapper });
+  it('adds item to cart', () =&gt; {
+    const { result } = renderHook(() =&gt; useCart(), { wrapper });
     
-    act(() => {
+    act(() =&gt; {
       result.current.addItem(mockProduct);
     });
     
@@ -1824,10 +1890,10 @@ describe('useCart', () => {
     expect(result.current.itemCount).toBe(1);
   });
   
-  it('calculates itemCount correctly with multiple items', () => {
-    const { result } = renderHook(() => useCart(), { wrapper });
+  it('calculates itemCount correctly with multiple items', () =&gt; {
+    const { result } = renderHook(() =&gt; useCart(), { wrapper });
     
-    act(() => {
+    act(() =&gt; {
       result.current.addItem(mockProduct);
       result.current.addItem(mockProduct); // Add same item twice
       result.current.addItem({ ...mockProduct, id: '2', name: 'Mouse' });
@@ -1836,10 +1902,10 @@ describe('useCart', () => {
     expect(result.current.itemCount).toBe(3); // 2 laptops + 1 mouse
   });
   
-  it('calculates subtotal correctly', () => {
-    const { result } = renderHook(() => useCart(), { wrapper });
+  it('calculates subtotal correctly', () =&gt; {
+    const { result } = renderHook(() =&gt; useCart(), { wrapper });
     
-    act(() => {
+    act(() =&gt; {
       result.current.addItem(mockProduct);
       result.current.addItem(mockProduct);
     });
@@ -1847,32 +1913,32 @@ describe('useCart', () => {
     expect(result.current.subtotal).toBe(1998); // 999 * 2
   });
   
-  it('removes item from cart', () => {
-    const { result } = renderHook(() => useCart(), { wrapper });
+  it('removes item from cart', () =&gt; {
+    const { result } = renderHook(() =&gt; useCart(), { wrapper });
     
-    act(() => {
+    act(() =&gt; {
       result.current.addItem(mockProduct);
     });
     
     expect(result.current.items).toHaveLength(1);
     
-    act(() => {
+    act(() =&gt; {
       result.current.removeItem('1');
     });
     
     expect(result.current.items).toHaveLength(0);
   });
   
-  it('updates item quantity', () => {
-    const { result } = renderHook(() => useCart(), { wrapper });
+  it('updates item quantity', () =&gt; {
+    const { result } = renderHook(() =&gt; useCart(), { wrapper });
     
-    act(() => {
+    act(() =&gt; {
       result.current.addItem(mockProduct);
     });
     
     expect(result.current.items[0].quantity).toBe(1);
     
-    act(() => {
+    act(() =&gt; {
       result.current.updateQuantity('1', 5);
     });
     
@@ -1880,17 +1946,17 @@ describe('useCart', () => {
     expect(result.current.itemCount).toBe(5);
   });
   
-  it('clears entire cart', () => {
-    const { result } = renderHook(() => useCart(), { wrapper });
+  it('clears entire cart', () =&gt; {
+    const { result } = renderHook(() =&gt; useCart(), { wrapper });
     
-    act(() => {
+    act(() =&gt; {
       result.current.addItem(mockProduct);
       result.current.addItem({ ...mockProduct, id: '2' });
     });
     
     expect(result.current.items).toHaveLength(2);
     
-    act(() => {
+    act(() =&gt; {
       result.current.clearCart();
     });
     
@@ -1899,12 +1965,12 @@ describe('useCart', () => {
     expect(result.current.subtotal).toBe(0);
   });
   
-  it('throws error when used outside CartProvider', () => {
+  it('throws error when used outside CartProvider', () =&gt; {
     // Suppress console.error for this test
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const spy = vi.spyOn(console, 'error').mockImplementation(() =&gt; {});
     
-    expect(() => {
-      renderHook(() => useCart());
+    expect(() =&gt; {
+      renderHook(() =&gt; useCart());
     }).toThrow('useCart must be used within CartProvider');
     
     spy.mockRestore();
@@ -1916,7 +1982,7 @@ describe('useCart', () => {
                 <pre><code class="language-typescript">
 // src/hooks/useLocalStorage.ts
 export function useLocalStorage&lt;T&gt;(key: string, initialValue: T) {
-  const [storedValue, setStoredValue] = React.useState&lt;T&gt;(() => {
+  const [storedValue, setStoredValue] = React.useState&lt;T&gt;(() =&gt; {
     try {
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
@@ -1926,7 +1992,7 @@ export function useLocalStorage&lt;T&gt;(key: string, initialValue: T) {
     }
   });
   
-  const setValue = (value: T | ((val: T) => T)) => {
+  const setValue = (value: T | ((val: T) =&gt; T)) =&gt; {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
@@ -1940,21 +2006,21 @@ export function useLocalStorage&lt;T&gt;(key: string, initialValue: T) {
 }
 
 // src/hooks/useLocalStorage.test.ts
-describe('useLocalStorage', () => {
-  beforeEach(() => {
+describe('useLocalStorage', () =&gt; {
+  beforeEach(() =&gt; {
     window.localStorage.clear();
   });
   
-  it('returns initial value when no stored value', () => {
-    const { result } = renderHook(() => useLocalStorage('test-key', 'initial'));
+  it('returns initial value when no stored value', () =&gt; {
+    const { result } = renderHook(() =&gt; useLocalStorage('test-key', 'initial'));
     
     expect(result.current[0]).toBe('initial');
   });
   
-  it('stores and retrieves value', () => {
-    const { result } = renderHook(() => useLocalStorage('test-key', 'initial'));
+  it('stores and retrieves value', () =&gt; {
+    const { result } = renderHook(() =&gt; useLocalStorage('test-key', 'initial'));
     
-    act(() => {
+    act(() =&gt; {
       result.current[1]('new value');
     });
     
@@ -1962,31 +2028,31 @@ describe('useLocalStorage', () => {
     expect(window.localStorage.getItem('test-key')).toBe('"new value"');
   });
   
-  it('reads existing value from localStorage', () => {
+  it('reads existing value from localStorage', () =&gt; {
     window.localStorage.setItem('test-key', JSON.stringify('existing'));
     
-    const { result } = renderHook(() => useLocalStorage('test-key', 'initial'));
+    const { result } = renderHook(() =&gt; useLocalStorage('test-key', 'initial'));
     
     expect(result.current[0]).toBe('existing');
   });
   
-  it('handles complex objects', () => {
-    const { result } = renderHook(() => 
+  it('handles complex objects', () =&gt; {
+    const { result } = renderHook(() =&gt; 
       useLocalStorage('test-key', { count: 0, name: 'test' })
     );
     
-    act(() => {
+    act(() =&gt; {
       result.current[1]({ count: 5, name: 'updated' });
     });
     
     expect(result.current[0]).toEqual({ count: 5, name: 'updated' });
   });
   
-  it('handles function updater', () => {
-    const { result } = renderHook(() => useLocalStorage('test-key', 0));
+  it('handles function updater', () =&gt; {
+    const { result } = renderHook(() =&gt; useLocalStorage('test-key', 0));
     
-    act(() => {
-      result.current[1](prev => prev + 1);
+    act(() =&gt; {
+      result.current[1](prev =&gt; prev + 1);
     });
     
     expect(result.current[0]).toBe(1);
@@ -2043,8 +2109,8 @@ const mockProducts = [
   },
 ];
 
-describe('Cart Integration', () => {
-  it('adds product to cart and displays in cart component', async () => {
+describe('Cart Integration', () =&gt; {
+  it('adds product to cart and displays in cart component', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2068,7 +2134,7 @@ describe('Cart Integration', () => {
     expect(screen.getByText(/1 item/i)).toBeInTheDocument();
   });
   
-  it('adds multiple products and calculates total correctly', async () => {
+  it('adds multiple products and calculates total correctly', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2097,7 +2163,7 @@ describe('Cart Integration', () => {
     expect(screen.getByText('$1,029.98')).toBeInTheDocument();
   });
   
-  it('increases quantity when same product added twice', async () => {
+  it('increases quantity when same product added twice', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2124,7 +2190,7 @@ describe('Cart Integration', () => {
     expect(screen.getByText('$1,999.98')).toBeInTheDocument();
   });
   
-  it('updates quantity using cart controls', async () => {
+  it('updates quantity using cart controls', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2153,7 +2219,7 @@ describe('Cart Integration', () => {
     expect(screen.getByText(/1 item/i)).toBeInTheDocument();
   });
   
-  it('removes product from cart', async () => {
+  it('removes product from cart', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2185,7 +2251,7 @@ describe('Cart Integration', () => {
     expect(screen.getByText(/1 item/i)).toBeInTheDocument();
   });
   
-  it('clears entire cart', async () => {
+  it('clears entire cart', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2212,7 +2278,7 @@ describe('Cart Integration', () => {
     expect(screen.queryByText('Wireless Mouse')).not.toBeInTheDocument();
   });
   
-  it('calculates tax and shipping correctly', async () => {
+  it('calculates tax and shipping correctly', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2249,14 +2315,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProductList } from './ProductList';
 
-describe('Product Filtering Integration', () => {
-  it('filters products by search query', async () => {
+describe('Product Filtering Integration', () =&gt; {
+  it('filters products by search query', async () =&gt; {
     const user = userEvent.setup();
     
     render(&lt;ProductList /&gt;);
     
     // Initially shows all products
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByText('Gaming Laptop')).toBeInTheDocument();
       expect(screen.getByText('Wireless Mouse')).toBeInTheDocument();
       expect(screen.getByText('Standing Desk')).toBeInTheDocument();
@@ -2266,14 +2332,14 @@ describe('Product Filtering Integration', () => {
     await user.type(screen.getByPlaceholderText(/search/i), 'laptop');
     
     // Wait for debounce
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByText('Gaming Laptop')).toBeInTheDocument();
       expect(screen.queryByText('Wireless Mouse')).not.toBeInTheDocument();
       expect(screen.queryByText('Standing Desk')).not.toBeInTheDocument();
     });
   });
   
-  it('filters by category', async () => {
+  it('filters by category', async () =&gt; {
     const user = userEvent.setup();
     
     render(&lt;ProductList /&gt;);
@@ -2286,14 +2352,14 @@ describe('Product Filtering Integration', () => {
       'electronics'
     );
     
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByText('Gaming Laptop')).toBeInTheDocument();
       expect(screen.getByText('Wireless Mouse')).toBeInTheDocument();
       expect(screen.queryByText('Standing Desk')).not.toBeInTheDocument();
     });
   });
   
-  it('filters by price range', async () => {
+  it('filters by price range', async () =&gt; {
     const user = userEvent.setup();
     
     render(&lt;ProductList /&gt;);
@@ -2306,13 +2372,13 @@ describe('Product Filtering Integration', () => {
     await user.clear(screen.getByLabelText(/max price/i));
     await user.type(screen.getByLabelText(/max price/i), '100');
     
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByText('Wireless Mouse')).toBeInTheDocument(); // $29.99
       expect(screen.queryByText('Gaming Laptop')).not.toBeInTheDocument(); // $999.99
     });
   });
   
-  it('combines multiple filters', async () => {
+  it('combines multiple filters', async () =&gt; {
     const user = userEvent.setup();
     
     render(&lt;ProductList /&gt;);
@@ -2324,13 +2390,13 @@ describe('Product Filtering Integration', () => {
     await user.selectOptions(screen.getByLabelText(/category/i), 'electronics');
     await user.type(screen.getByLabelText(/min price/i), '500');
     
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByText('Gaming Laptop')).toBeInTheDocument();
       expect(screen.queryByText('Wireless Mouse')).not.toBeInTheDocument();
     });
   });
   
-  it('shows "no results" when filters match nothing', async () => {
+  it('shows "no results" when filters match nothing', async () =&gt; {
     const user = userEvent.setup();
     
     render(&lt;ProductList /&gt;);
@@ -2340,13 +2406,13 @@ describe('Product Filtering Integration', () => {
     // Search for non-existent product
     await user.type(screen.getByPlaceholderText(/search/i), 'xyznonexistent');
     
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByText(/no products found/i)).toBeInTheDocument();
       expect(screen.queryByText('Gaming Laptop')).not.toBeInTheDocument();
     });
   });
   
-  it('clears all filters', async () => {
+  it('clears all filters', async () =&gt; {
     const user = userEvent.setup();
     
     render(&lt;ProductList /&gt;);
@@ -2358,7 +2424,7 @@ describe('Product Filtering Integration', () => {
     await user.selectOptions(screen.getByLabelText(/category/i), 'electronics');
     
     // Verify filtered
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByText('Gaming Laptop')).toBeInTheDocument();
       expect(screen.queryByText('Standing Desk')).not.toBeInTheDocument();
     });
@@ -2367,7 +2433,7 @@ describe('Product Filtering Integration', () => {
     await user.click(screen.getByRole('button', { name: /clear filters/i }));
     
     // All products visible again
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByText('Gaming Laptop')).toBeInTheDocument();
       expect(screen.getByText('Standing Desk')).toBeInTheDocument();
     });
@@ -2406,7 +2472,7 @@ import { CartProvider, useCart } from './CartContext';
 function TestComponent() {
   const { items, itemCount, subtotal, addItem, clearCart } = useCart();
   
-  const handleAdd = () => {
+  const handleAdd = () =&gt; {
     addItem({
       id: '1',
       name: 'Test Product',
@@ -2425,7 +2491,7 @@ function TestComponent() {
       &lt;button onClick={handleAdd}&gt;Add Item&lt;/button&gt;
       &lt;button onClick={clearCart}&gt;Clear&lt;/button&gt;
       &lt;ul&gt;
-        {items.map(item => (
+        {items.map(item =&gt; (
           &lt;li key={item.id}&gt;{item.name}&lt;/li&gt;
         ))}
       &lt;/ul&gt;
@@ -2433,8 +2499,8 @@ function TestComponent() {
   );
 }
 
-describe('CartContext', () => {
-  it('provides initial empty cart state', () => {
+describe('CartContext', () =&gt; {
+  it('provides initial empty cart state', () =&gt; {
     render(
       &lt;CartProvider&gt;
         &lt;TestComponent /&gt;
@@ -2445,7 +2511,7 @@ describe('CartContext', () => {
     expect(screen.getByText('Subtotal: $0')).toBeInTheDocument();
   });
   
-  it('updates state when items are added', async () => {
+  it('updates state when items are added', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2461,7 +2527,7 @@ describe('CartContext', () => {
     expect(screen.getByText('Test Product')).toBeInTheDocument();
   });
   
-  it('shares state across multiple consumers', async () => {
+  it('shares state across multiple consumers', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2484,7 +2550,7 @@ describe('CartContext', () => {
     expect(subtotals).toHaveLength(2);
   });
   
-  it('clears cart from any consumer', async () => {
+  it('clears cart from any consumer', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2515,7 +2581,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = React.useReducer(
     cartReducer,
     { items: [] },
-    (initial) => {
+    (initial) =&gt; {
       // Load from localStorage on init
       const saved = localStorage.getItem('cart');
       return saved ? JSON.parse(saved) : initial;
@@ -2523,7 +2589,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
   
   // Save to localStorage on every change
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     localStorage.setItem('cart', JSON.stringify(state));
   }, [state]);
   
@@ -2535,12 +2601,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 }
 
 // Test with localStorage
-describe('CartContext with localStorage', () => {
-  beforeEach(() => {
+describe('CartContext with localStorage', () =&gt; {
+  beforeEach(() =&gt; {
     localStorage.clear();
   });
   
-  it('loads initial state from localStorage', () => {
+  it('loads initial state from localStorage', () =&gt; {
     // Pre-populate localStorage
     const savedCart = {
       items: [
@@ -2559,7 +2625,7 @@ describe('CartContext with localStorage', () => {
     expect(screen.getByText('Saved Item')).toBeInTheDocument();
   });
   
-  it('persists state to localStorage', async () => {
+  it('persists state to localStorage', async () =&gt; {
     const user = userEvent.setup();
     
     render(
@@ -2579,7 +2645,7 @@ describe('CartContext with localStorage', () => {
     expect(parsed.items[0].name).toBe('Test Product');
   });
   
-  it('maintains state across provider remounts', async () => {
+  it('maintains state across provider remounts', async () =&gt; {
     const user = userEvent.setup();
     
     const { unmount } = render(
@@ -2623,7 +2689,7 @@ describe('CartContext with localStorage', () => {
             <section id="api-tests" class="lesson-section">
                 <h2>🌐 Testing with API Mocks (MSW)</h2>
                 
-                <p>Let's test components that fetch data from APIs using Mock Service Worker.</p>
+                <p>Real components talk to a server, and a good test suite must cover what happens when that server is slow, empty, or broken — not just the happy path. The naive approach is to stub <code>fetch</code>, but that couples your tests to implementation details and breaks the moment you switch to <code>axios</code> or TanStack Query. MSW takes a better approach: it intercepts requests at the network boundary, so your component makes its <em>real</em> call and MSW answers with whatever response the test needs. A global set of handlers (from our setup) gives every test a sensible default, and <code>server.use(...)</code> overrides a single endpoint for one test — for an error, an empty list, or a deliberate delay — with the override automatically reset afterward. That's how we test loading, success, empty, and error states with confidence.</p>
 
                 <h3>Testing Data Fetching Component</h3>
                 <pre><code class="language-typescript">
@@ -2633,17 +2699,17 @@ export function ProductList() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState&lt;string | null&gt;(null);
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     fetch('/api/products')
-      .then(res => {
+      .then(res =&gt; {
         if (!res.ok) throw new Error('Failed to fetch products');
         return res.json();
       })
-      .then(data => {
+      .then(data =&gt; {
         setProducts(data);
         setLoading(false);
       })
-      .catch(err => {
+      .catch(err =&gt; {
         setError(err.message);
         setLoading(false);
       });
@@ -2655,7 +2721,7 @@ export function ProductList() {
   
   return (
     &lt;div className="product-grid"&gt;
-      {products.map(product => (
+      {products.map(product =&gt; (
         &lt;ProductCard key={product.id} product={product} /&gt;
       ))}
     &lt;/div&gt;
@@ -2668,73 +2734,66 @@ export function ProductList() {
 // src/components/Product/ProductList.test.tsx
 import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { rest } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { ProductList } from './ProductList';
 
-describe('ProductList with API', () => {
-  it('displays loading state initially', () => {
+describe('ProductList with API', () =&gt; {
+  it('displays loading state initially', () =&gt; {
     render(&lt;ProductList /&gt;);
-    
+
     expect(screen.getByText('Loading products...')).toBeInTheDocument();
   });
-  
-  it('displays products after successful fetch', async () => {
+
+  it('displays products after successful fetch', async () =&gt; {
     render(&lt;ProductList /&gt;);
-    
-    // Wait for products to load
-    await waitFor(() => {
-      expect(screen.queryByText('Loading products...')).not.toBeInTheDocument();
-    });
-    
-    // Products should be visible
-    expect(screen.getByText('Gaming Laptop')).toBeInTheDocument();
+
+    // findBy* combines "wait" + "query": it retries until the element appears
+    // or times out, which is exactly what we want after an async fetch.
+    expect(await screen.findByText('Gaming Laptop')).toBeInTheDocument();
     expect(screen.getByText('Wireless Mouse')).toBeInTheDocument();
+
+    // The loading text is gone once data has arrived.
+    expect(screen.queryByText('Loading products...')).not.toBeInTheDocument();
   });
-  
-  it('displays error message on fetch failure', async () => {
-    // Override default handler to return error
+
+  it('displays error message on fetch failure', async () =&gt; {
+    // Override the default handler for THIS test only (reset after each test).
     server.use(
-      rest.get('/api/products', (req, res, ctx) => {
-        return res(ctx.status(500));
+      http.get('/api/products', () =&gt; {
+        return new HttpResponse(null, { status: 500 });
       })
     );
-    
+
     render(&lt;ProductList /&gt;);
-    
-    await waitFor(() => {
-      expect(screen.getByText(/error.*failed to fetch/i)).toBeInTheDocument();
-    });
-    
+
+    expect(await screen.findByText(/error.*failed to fetch/i)).toBeInTheDocument();
     expect(screen.queryByText('Gaming Laptop')).not.toBeInTheDocument();
   });
-  
-  it('displays empty state when no products', async () => {
+
+  it('displays empty state when no products', async () =&gt; {
     server.use(
-      rest.get('/api/products', (req, res, ctx) => {
-        return res(ctx.json([]));
+      http.get('/api/products', () =&gt; {
+        return HttpResponse.json([]);
       })
     );
-    
+
     render(&lt;ProductList /&gt;);
-    
-    await waitFor(() => {
-      expect(screen.getByText('No products available')).toBeInTheDocument();
-    });
+
+    expect(await screen.findByText('No products available')).toBeInTheDocument();
   });
-  
-  it('handles network errors', async () => {
+
+  it('handles network errors', async () =&gt; {
     server.use(
-      rest.get('/api/products', (req, res, ctx) => {
-        return res.networkError('Failed to connect');
+      http.get('/api/products', () =&gt; {
+        // HttpResponse.error() simulates a failed connection (rejected fetch).
+        return HttpResponse.error();
       })
     );
-    
+
     render(&lt;ProductList /&gt;);
-    
-    await waitFor(() => {
-      expect(screen.getByText(/error/i)).toBeInTheDocument();
-    });
+
+    expect(await screen.findByText(/error/i)).toBeInTheDocument();
   });
 });
                 </code></pre>
@@ -2748,7 +2807,7 @@ export function ProductSearch() {
   const [searching, setSearching] = React.useState(false);
   
   const handleSearch = React.useMemo(
-    () => debounce(async (searchQuery: string) => {
+    () =&gt; debounce(async (searchQuery: string) =&gt; {
       if (!searchQuery) {
         setResults([]);
         return;
@@ -2770,7 +2829,7 @@ export function ProductSearch() {
     []
   );
   
-  React.useEffect(() => {
+  React.useEffect(() =&gt; {
     handleSearch(query);
   }, [query, handleSearch]);
   
@@ -2779,14 +2838,14 @@ export function ProductSearch() {
       &lt;input
         type="text"
         value={query}
-        onChange={e => setQuery(e.target.value)}
+        onChange={e =&gt; setQuery(e.target.value)}
         placeholder="Search products..."
       /&gt;
       
-      {searching && &lt;p&gt;Searching...&lt;/p&gt;}
+      {searching &amp;&amp; &lt;p&gt;Searching...&lt;/p&gt;}
       
       &lt;div&gt;
-        {results.map(product => (
+        {results.map(product =&gt; (
           &lt;ProductCard key={product.id} product={product} /&gt;
         ))}
       &lt;/div&gt;
@@ -2794,58 +2853,65 @@ export function ProductSearch() {
   );
 }
 
-// Test
-describe('ProductSearch with API', () => {
-  beforeEach(() => {
+// src/components/Product/ProductSearch.test.tsx
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse, delay } from 'msw';
+import { server } from '@/test/mocks/server';
+import { ProductSearch } from './ProductSearch';
+
+describe('ProductSearch with API', () =&gt; {
+  beforeEach(() =&gt; {
     vi.useFakeTimers();
   });
   
-  afterEach(() => {
+  afterEach(() =&gt; {
     vi.useRealTimers();
   });
   
-  it('searches products via API', async () => {
+  it('searches products via API', async () =&gt; {
     const user = userEvent.setup({ delay: null });
-    
+
     server.use(
-      rest.get('/api/products/search', (req, res, ctx) => {
-        const query = req.url.searchParams.get('q');
-        
+      http.get('/api/products/search', ({ request }) =&gt; {
+        const query = new URL(request.url).searchParams.get('q') ?? '';
+
         const allProducts = [
           { id: '1', name: 'Gaming Laptop', price: 999 },
           { id: '2', name: 'Wireless Mouse', price: 29 },
         ];
-        
-        const filtered = allProducts.filter(p =>
-          p.name.toLowerCase().includes(query?.toLowerCase() || '')
+
+        const filtered = allProducts.filter((p) =&gt;
+          p.name.toLowerCase().includes(query.toLowerCase())
         );
-        
-        return res(ctx.json(filtered));
+
+        return HttpResponse.json(filtered);
       })
     );
-    
+
     render(&lt;ProductSearch /&gt;);
-    
+
     const input = screen.getByPlaceholderText('Search products...');
     await user.type(input, 'laptop');
-    
+
     // Advance timers past debounce
     vi.advanceTimersByTime(300);
-    
+
     // Wait for results
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.getByText('Gaming Laptop')).toBeInTheDocument();
       expect(screen.queryByText('Wireless Mouse')).not.toBeInTheDocument();
     });
   });
-  
-  it('shows loading state while searching', async () => {
+
+  it('shows loading state while searching', async () =&gt; {
     const user = userEvent.setup({ delay: null });
-    
+
     server.use(
-      rest.get('/api/products/search', async (req, res, ctx) => {
-        await ctx.delay(100);
-        return res(ctx.json([]));
+      http.get('/api/products/search', async () =&gt; {
+        await delay(100); // MSW v2: import { delay } from 'msw'
+        return HttpResponse.json([]);
       })
     );
     
@@ -2858,7 +2924,7 @@ describe('ProductSearch with API', () => {
     expect(await screen.findByText('Searching...')).toBeInTheDocument();
   });
   
-  it('clears results when search is empty', async () => {
+  it('clears results when search is empty', async () =&gt; {
     const user = userEvent.setup({ delay: null });
     
     render(&lt;ProductSearch /&gt;);
@@ -2876,7 +2942,7 @@ describe('ProductSearch with API', () => {
     vi.advanceTimersByTime(300);
     
     // Results should be gone
-    await waitFor(() => {
+    await waitFor(() =&gt; {
       expect(screen.queryByText('Gaming Laptop')).not.toBeInTheDocument();
     });
   });
@@ -2888,9 +2954,9 @@ describe('ProductSearch with API', () => {
 // Component with optimistic update
 export function AddToCartButton({ product }: { product: Product }) {
   const [isAdded, setIsAdded] = React.useState(false);
-  const { addItem } = useCart();
-  
-  const handleClick = async () => {
+  const { addItem, removeItem } = useCart(); // removeItem needed for rollback
+
+  const handleClick = async () =&gt; {
     // Optimistic update
     setIsAdded(true);
     addItem(product);
@@ -2916,13 +2982,13 @@ export function AddToCartButton({ product }: { product: Product }) {
 }
 
 // Test
-it('shows immediate feedback with optimistic update', async () => {
+it('shows immediate feedback with optimistic update', async () =&gt; {
   const user = userEvent.setup();
-  
+
   server.use(
-    rest.post('/api/cart', async (req, res, ctx) => {
-      await ctx.delay(500); // Slow API
-      return res(ctx.status(200));
+    http.post('/api/cart', async () =&gt; {
+      await delay(500); // Slow API
+      return new HttpResponse(null, { status: 200 });
     })
   );
   
@@ -2940,31 +3006,31 @@ it('shows immediate feedback with optimistic update', async () => {
   expect(button).toBeDisabled();
   
   // Wait for API call
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(button).toHaveTextContent('Added ✓');
   }, { timeout: 1000 });
 });
 
-it('rolls back on API error', async () => {
+it('rolls back on API error', async () =&gt; {
   const user = userEvent.setup();
   
   server.use(
-    rest.post('/api/cart', (req, res, ctx) => {
-      return res(ctx.status(500));
+    http.post('/api/cart', () =&gt; {
+      return new HttpResponse(null, { status: 500 });
     })
   );
-  
+
   render(&lt;AddToCartButton product={mockProduct} /&gt;);
-  
+
   const button = screen.getByRole('button');
-  
+
   await user.click(button);
-  
+
   // Initially optimistic
   expect(button).toHaveTextContent('Added ✓');
   
   // Rolls back after error
-  await waitFor(() => {
+  await waitFor(() =&gt; {
     expect(button).toHaveTextContent('Add to Cart');
     expect(button).not.toBeDisabled();
   });
@@ -2989,15 +3055,15 @@ it('rolls back on API error', async () => {
             <section id="e2e-tests" class="lesson-section">
                 <h2>🌐 E2E Tests: Complete Shopping Workflows</h2>
                 
-                <p>Now let's write end-to-end tests that verify complete user workflows in a real browser using Playwright.</p>
+                <p>At the top of the pyramid sit end-to-end (E2E) tests. Everything so far ran in jsdom, a simulated DOM — fast, but not a real browser. E2E tests with Playwright launch an actual browser, load your real built app, and click through it the way a customer would: browse, search, add to cart, check out. They're the slowest and most involved tests we write, so we keep them few and reserve them for the workflows that <em>must</em> work or the business loses money. Their unique value is that they exercise the whole stack together — routing, real network, rendering, persistence — catching integration gaps that no isolated test can see.</p>
 
                 <h3>Complete Shopping Journey Test</h3>
                 <pre><code class="language-typescript">
 // e2e/shopping-flow.spec.ts
 import { test, expect } from '@playwright/test';
 
-test.describe('Complete Shopping Flow', () => {
-  test('user can browse, add to cart, and checkout', async ({ page }) => {
+test.describe('Complete Shopping Flow', () =&gt; {
+  test('user can browse, add to cart, and checkout', async ({ page }) =&gt; {
     // 1. Visit homepage
     await page.goto('/');
     
@@ -3090,12 +3156,12 @@ test.describe('Complete Shopping Flow', () => {
 // e2e/product-filtering.spec.ts
 import { test, expect } from '@playwright/test';
 
-test.describe('Product Filtering', () => {
-  test.beforeEach(async ({ page }) => {
+test.describe('Product Filtering', () =&gt; {
+  test.beforeEach(async ({ page }) =&gt; {
     await page.goto('/');
   });
   
-  test('filters by search query', async ({ page }) => {
+  test('filters by search query', async ({ page }) =&gt; {
     // Type in search
     await page.getByPlaceholder('Search products...').fill('mouse');
     
@@ -3104,7 +3170,7 @@ test.describe('Product Filtering', () => {
     await expect(page.getByText('Gaming Laptop')).not.toBeVisible();
   });
   
-  test('filters by category', async ({ page }) => {
+  test('filters by category', async ({ page }) =&gt; {
     // Select category
     await page.getByLabel('Category').selectOption('electronics');
     
@@ -3114,7 +3180,7 @@ test.describe('Product Filtering', () => {
     await expect(page.getByText('Standing Desk')).not.toBeVisible();
   });
   
-  test('filters by price range', async ({ page }) => {
+  test('filters by price range', async ({ page }) =&gt; {
     // Set price range
     await page.getByLabel('Min Price').fill('0');
     await page.getByLabel('Max Price').fill('100');
@@ -3124,7 +3190,7 @@ test.describe('Product Filtering', () => {
     await expect(page.getByText('Gaming Laptop')).not.toBeVisible(); // $999.99
   });
   
-  test('combines multiple filters', async ({ page }) => {
+  test('combines multiple filters', async ({ page }) =&gt; {
     // Apply multiple filters
     await page.getByPlaceholder('Search products...').fill('gaming');
     await page.getByLabel('Category').selectOption('electronics');
@@ -3136,7 +3202,7 @@ test.describe('Product Filtering', () => {
     await expect(page.getByText('Standing Desk')).not.toBeVisible();
   });
   
-  test('clears all filters', async ({ page }) => {
+  test('clears all filters', async ({ page }) =&gt; {
     // Apply filters
     await page.getByPlaceholder('Search products...').fill('laptop');
     await page.getByLabel('Category').selectOption('electronics');
@@ -3154,7 +3220,7 @@ test.describe('Product Filtering', () => {
     await expect(page.getByText('Standing Desk')).toBeVisible();
   });
   
-  test('shows no results message', async ({ page }) => {
+  test('shows no results message', async ({ page }) =&gt; {
     await page.getByPlaceholder('Search products...').fill('nonexistentproduct');
     
     await expect(page.getByText(/no products found/i)).toBeVisible();
@@ -3167,12 +3233,12 @@ test.describe('Product Filtering', () => {
 // e2e/cart-management.spec.ts
 import { test, expect } from '@playwright/test';
 
-test.describe('Cart Management', () => {
-  test.beforeEach(async ({ page }) => {
+test.describe('Cart Management', () =&gt; {
+  test.beforeEach(async ({ page }) =&gt; {
     await page.goto('/');
   });
   
-  test('adds and removes items from cart', async ({ page }) => {
+  test('adds and removes items from cart', async ({ page }) =&gt; {
     // Add item
     await page.getByText('Gaming Laptop').click();
     await page.getByRole('button', { name: /add to cart/i }).click();
@@ -3191,28 +3257,28 @@ test.describe('Cart Management', () => {
     await expect(page.getByText(/cart is empty/i)).toBeVisible();
   });
   
-  test('updates item quantity', async ({ page }) => {
+  test('updates item quantity', async ({ page }) =&gt; {
     // Add item to cart
     await page.getByText('Gaming Laptop').click();
     await page.getByRole('button', { name: /add to cart/i }).click();
     await page.getByRole('link', { name: /cart/i }).click();
     
     // Initial quantity
-    await expect(page.getByLabelText('Quantity')).toHaveText('1');
+    await expect(page.getByLabel('Quantity')).toHaveText('1');
     
     // Increase quantity
     await page.getByLabel('Increase quantity').click();
-    await expect(page.getByLabelText('Quantity')).toHaveText('2');
+    await expect(page.getByLabel('Quantity')).toHaveText('2');
     
     await page.getByLabel('Increase quantity').click();
-    await expect(page.getByLabelText('Quantity')).toHaveText('3');
+    await expect(page.getByLabel('Quantity')).toHaveText('3');
     
     // Decrease quantity
     await page.getByLabel('Decrease quantity').click();
-    await expect(page.getByLabelText('Quantity')).toHaveText('2');
+    await expect(page.getByLabel('Quantity')).toHaveText('2');
   });
   
-  test('maintains cart across page navigation', async ({ page }) => {
+  test('maintains cart across page navigation', async ({ page }) =&gt; {
     // Add item
     await page.getByText('Gaming Laptop').click();
     await page.getByRole('button', { name: /add to cart/i }).click();
@@ -3229,7 +3295,7 @@ test.describe('Cart Management', () => {
     await expect(page.getByText('1 item')).toBeVisible();
   });
   
-  test('persists cart after page reload', async ({ page }) => {
+  test('persists cart after page reload', async ({ page }) =&gt; {
     // Add item
     await page.getByText('Gaming Laptop').click();
     await page.getByRole('button', { name: /add to cart/i }).click();
@@ -3246,7 +3312,7 @@ test.describe('Cart Management', () => {
     await expect(page.getByText('1 item')).toBeVisible();
   });
   
-  test('calculates totals correctly', async ({ page }) => {
+  test('calculates totals correctly', async ({ page }) =&gt; {
     // Add laptop ($999.99)
     await page.getByText('Gaming Laptop').click();
     await page.getByRole('button', { name: /add to cart/i }).click();
@@ -3280,8 +3346,8 @@ test.describe('Cart Management', () => {
 // e2e/responsive.spec.ts
 import { test, expect, devices } from '@playwright/test';
 
-test.describe('Responsive Design', () => {
-  test('desktop navigation', async ({ page }) => {
+test.describe('Responsive Design', () =&gt; {
+  test('desktop navigation', async ({ page }) =&gt; {
     await page.goto('/');
     
     // Desktop menu should be visible
@@ -3293,7 +3359,7 @@ test.describe('Responsive Design', () => {
     await expect(page.getByLabel('Open menu')).not.toBeVisible();
   });
   
-  test('mobile navigation', async ({ page }) => {
+  test('mobile navigation', async ({ page }) =&gt; {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
     
@@ -3313,7 +3379,7 @@ test.describe('Responsive Design', () => {
     await expect(nav.getByRole('link', { name: /cart/i })).toBeVisible();
   });
   
-  test('product grid on mobile', async ({ page }) => {
+  test('product grid on mobile', async ({ page }) =&gt; {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
     
@@ -3336,8 +3402,8 @@ test.describe('Responsive Design', () => {
 // e2e/error-handling.spec.ts
 import { test, expect } from '@playwright/test';
 
-test.describe('Error Handling', () => {
-  test('handles out of stock products', async ({ page }) => {
+test.describe('Error Handling', () =&gt; {
+  test('handles out of stock products', async ({ page }) =&gt; {
     await page.goto('/products/out-of-stock-item');
     
     // Add to cart button should be disabled or not present
@@ -3351,7 +3417,7 @@ test.describe('Error Handling', () => {
     await expect(page.getByText(/out of stock/i)).toBeVisible();
   });
   
-  test('validates checkout form', async ({ page }) => {
+  test('validates checkout form', async ({ page }) =&gt; {
     // Add item and go to checkout
     await page.goto('/');
     await page.getByText('Gaming Laptop').click();
@@ -3368,7 +3434,7 @@ test.describe('Error Handling', () => {
     await expect(page.getByText(/address is required/i)).toBeVisible();
   });
   
-  test('handles invalid payment information', async ({ page }) => {
+  test('handles invalid payment information', async ({ page }) =&gt; {
     // Add item and go to checkout
     await page.goto('/');
     await page.getByText('Gaming Laptop').click();
@@ -3434,17 +3500,17 @@ on:
 
 jobs:
   unit-and-integration:
-    name: Unit & Integration Tests
+    name: Unit &amp; Integration Tests
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
       
       - name: Install dependencies
@@ -3457,7 +3523,7 @@ jobs:
         run: npm run test:coverage
       
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./coverage/coverage-final.json
       
@@ -3474,12 +3540,12 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
       
       - name: Install dependencies
@@ -3496,7 +3562,7 @@ jobs:
       
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report/
@@ -3504,24 +3570,24 @@ jobs:
       
       - name: Upload test videos
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-videos
           path: test-results/
           retention-days: 7
   
   lint:
-    name: Lint & Type Check
+    name: Lint &amp; Type Check
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
       
       - name: Install dependencies
@@ -3539,7 +3605,7 @@ jobs:
 {
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc &amp;&amp; vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
@@ -3719,7 +3785,7 @@ npm run test:coverage
                     A --> D[Easy to Maintain]
                     A --> E[Fast Execution]
                     
-                    F[High Coverage] -.->|Doesn't Guarantee| A
+                    F["High Coverage"] -.->|"Doesn't Guarantee"| A
                     
                     style A fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
                     style F fill:#ffc107,stroke:#e67700,stroke-width:2px,color:#333
@@ -3759,9 +3825,9 @@ npm run test:coverage
                     graph TB
                     A[Your Test Suite]
                     
-                    A --> B[Unit Tests<br/>70-80%<br/>✓ Calculations<br/>✓ Utilities<br/>✓ Filters]
-                    A --> C[Integration Tests<br/>15-25%<br/>✓ Cart Flow<br/>✓ Context<br/>✓ API]
-                    A --> D[E2E Tests<br/>5-10%<br/>✓ Shopping Flow<br/>✓ Checkout<br/>✓ Errors]
+                    A --> B["Unit Tests<br/>70-80%<br/>✓ Calculations<br/>✓ Utilities<br/>✓ Filters"]
+                    A --> C["Integration Tests<br/>15-25%<br/>✓ Cart Flow<br/>✓ Context<br/>✓ API"]
+                    A --> D["E2E Tests<br/>5-10%<br/>✓ Shopping Flow<br/>✓ Checkout<br/>✓ Errors"]
                     
                     style B fill:#51cf66,stroke:#2f9e44,stroke-width:2px,color:#fff
                     style C fill:#339af0,stroke:#1971c2,stroke-width:2px,color:#fff
@@ -3833,15 +3899,15 @@ npm run test:coverage
 
                 <div class="card card-accent">
                     <h4>🎓 Module 9 Complete!</h4>
-                    <p style="color: white;">You've successfully completed the Testing React Applications module! You now have:</p>
-                    <ul style="color: white;">
+                    <p>You've successfully completed the Testing React Applications module! You now have:</p>
+                    <ul>
                         <li>A production-ready testing infrastructure</li>
                         <li>Comprehensive test coverage for a real application</li>
                         <li>Skills to test any React + TypeScript application</li>
                         <li>Automated testing in CI/CD</li>
                         <li>Confidence to ship quality code</li>
                     </ul>
-                    <p style="color: white;"><strong>What's Next:</strong> Module 10 - Advanced Topics and Deployment!</p>
+                    <p><strong>What's Next:</strong> Module 10 - Advanced Topics and Deployment!</p>
                 </div>
 
                 <blockquote>

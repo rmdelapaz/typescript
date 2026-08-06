@@ -62,7 +62,7 @@
                 <p class="lead">Welcome to modern Redux! Redux Toolkit has revolutionized how we use Redux by dramatically reducing boilerplate while maintaining all the power of Redux. If you've heard Redux is "too complex" or "too much code," RTK solves those problems. In this comprehensive lesson, you'll learn how to use Redux Toolkit to build scalable, maintainable state management for complex applications. We'll cover slices, async thunks, RTK Query, and TypeScript integration from the ground up.</p>
                 
                 <!-- Learning objectives -->
-                <div class="card">
+                <div class="card card-info">
                     <h2>🎯 Learning Objectives</h2>
                     <p>By the end of this lesson, you will be able to:</p>
                     <ul>
@@ -112,11 +112,13 @@
 
                 <h3>What is Redux?</h3>
 
-                <p>Redux is a predictable state container for JavaScript applications. It provides a centralized store for all application state with strict rules about how state can be updated.</p>
+                <p>Imagine a busy restaurant kitchen. If every cook kept their own private copy of the order tickets and updated them whenever they felt like it, chaos would follow — two cooks would plate the same dish, someone would miss a table entirely, and nobody could say for sure what the "real" order list was. Redux is the single pinned-up order board that <em>everyone</em> reads from and that can only be changed through one clearly defined slot: you hand a ticket to the expeditor, and the board updates. That predictability is the whole point. 🍳</p>
+
+                <p>More formally, Redux is a <strong>predictable state container</strong> for JavaScript applications. It keeps all of your shared application state in one centralized <em>store</em>, and it enforces strict rules about how that state is allowed to change — so at any moment you can answer "what is the state, and how did it get this way?" with confidence.</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Redux</strong> is a state management library based on the Flux architecture that uses a single, immutable state tree and pure reducer functions to handle state changes. <strong>Redux Toolkit (RTK)</strong> is the official, opinionated toolset for efficient Redux development that reduces boilerplate and enforces best practices.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Redux</strong> is a state management library based on the Flux architecture that uses a single, immutable state tree and pure reducer functions to handle state changes. <strong>Redux Toolkit (RTK)</strong> is the official, opinionated toolset for efficient Redux development — today it is the way the Redux team recommends you write Redux. RTK removes the boilerplate, bakes in immutable-update helpers, and ships batteries-included tools like RTK Query.</p>
                 </div>
 
                 <h3>Core Redux Concepts</h3>
@@ -129,12 +131,12 @@ graph LR
     D --> B
     B --> E[UI Updates]
     E --> A
-    
-    style A fill:#e3f2fd
-    style B fill:#c8e6c9
-    style C fill:#fff3cd
-    style D fill:#ffcdd2
-    style E fill:#f0f0f0
+
+    style A fill:#3b82f6,stroke:#333,stroke-width:2px,color:#fff
+    style B fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style C fill:#f59e0b,stroke:#333,stroke-width:2px,color:#fff
+    style D fill:#f44336,stroke:#333,stroke-width:2px,color:#fff
+    style E fill:#64748b,stroke:#333,stroke-width:2px,color:#fff
 </div>
 
                 <p>Redux follows three fundamental principles:</p>
@@ -145,9 +147,9 @@ graph LR
                     <li><strong>Changes are Made with Pure Functions:</strong> Reducers are pure functions that take the previous state and an action, and return the next state</li>
                 </ol>
 
-                <h3>The Problem with Classic Redux</h3>
+                <h3>The Problem with Classic Redux (the Old Way)</h3>
 
-                <p>Traditional Redux requires a lot of boilerplate code:</p>
+                <p>You may run into older tutorials and codebases that write Redux "by hand" — hand-written action-type string constants, separate action creators, and a big <code>switch</code> statement inside the reducer. We're showing it here <strong>only so you recognize it in the wild</strong>. This is <em>not</em> how you should write Redux anymore. Notice how much ceremony it takes just to add and subtract from a single number:</p>
 
                 <pre><code class="language-typescript">// Classic Redux - Too much boilerplate! 😫
 
@@ -226,13 +228,13 @@ const counterSlice = createSlice({
   name: 'counter',
   initialState,
   reducers: {
-    increment: (state) => {
+    increment: (state) =&gt; {
       state.value += 1; // Looks like mutation, but it's actually immutable!
     },
-    decrement: (state) => {
+    decrement: (state) =&gt; {
       state.value -= 1;
     },
-    setCount: (state, action) => {
+    setCount: (state, action) =&gt; {
       state.value = action.payload;
     }
   }
@@ -358,26 +360,40 @@ export const store = configureStore({
     auth: authReducer,
     // Add more reducers here
   },
-  // Redux Toolkit includes Redux DevTools by default in development!
+  // Redux Toolkit wires up Redux DevTools and sensible default
+  // middleware (including a serializability check) for you automatically.
 });
 
-// Infer the `RootState` and `AppDispatch` types from the store itself
+// Infer the `RootState`, `AppDispatch`, and `AppStore` types from the
+// store itself — you never write these shapes by hand, so they can
+// never drift out of sync with your actual reducers.
 export type RootState = ReturnType&lt;typeof store.getState&gt;;
-export type AppDispatch = typeof store.dispatch;</code></pre>
+export type AppDispatch = typeof store.dispatch;
+export type AppStore = typeof store;</code></pre>
 
                 <h3>Creating Typed Hooks</h3>
 
-                <p>Create pre-typed versions of Redux hooks for better TypeScript support:</p>
+                <p>Create pre-typed versions of Redux hooks for better TypeScript support. In <strong>react-redux 9</strong> (the current version), the idiomatic way to do this is <code>.withTypes&lt;...&gt;()</code>, which bakes your store's types directly into the hook. This replaces the older <code>TypedUseSelectorHook</code> pattern you'll see in pre-2024 tutorials:</p>
 
                 <pre><code class="language-typescript">// src/store/hooks.ts
 
-import { useDispatch, useSelector } from 'react-redux';
-import type { TypedUseSelectorHook } from 'react-redux';
-import type { RootState, AppDispatch } from './index';
+import { useDispatch, useSelector, useStore } from 'react-redux';
+import type { RootState, AppDispatch, AppStore } from './index';
 
-// Use throughout your app instead of plain `useDispatch` and `useSelector`
-export const useAppDispatch: () => AppDispatch = useDispatch;
+// Modern react-redux 9 approach — no TypedUseSelectorHook boilerplate.
+// Use these throughout your app instead of the plain hooks.
+export const useAppDispatch = useDispatch.withTypes&lt;AppDispatch&gt;();
+export const useAppSelector = useSelector.withTypes&lt;RootState&gt;();
+export const useAppStore = useStore.withTypes&lt;AppStore&gt;();</code></pre>
+
+                <div class="card card-warning">
+                    <h4>⚠️ The Old Way vs. the New Way</h4>
+                    <p>If you see this in an older codebase, it still works, but prefer <code>.withTypes</code> in new code:</p>
+                    <pre><code class="language-typescript">// ❌ Legacy pattern (pre react-redux 9)
+import type { TypedUseSelectorHook } from 'react-redux';
+export const useAppDispatch: () =&gt; AppDispatch = useDispatch;
 export const useAppSelector: TypedUseSelectorHook&lt;RootState&gt; = useSelector;</code></pre>
+                </div>
 
                 <div class="card card-success">
                     <h4>✅ Why Custom Hooks?</h4>
@@ -396,18 +412,19 @@ export const useAppSelector: TypedUseSelectorHook&lt;RootState&gt; = useSelector
 
                 <pre><code class="language-typescript">// src/main.tsx (or App.tsx)
 
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import App from './App';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  &lt;React.StrictMode&gt;
+// React 19 + the modern JSX transform: no default `React` import needed.
+createRoot(document.getElementById('root')!).render(
+  &lt;StrictMode&gt;
     &lt;Provider store={store}&gt;
       &lt;App /&gt;
     &lt;/Provider&gt;
-  &lt;/React.StrictMode&gt;
+  &lt;/StrictMode&gt;
 );</code></pre>
 
                 <div class="card card-info">
@@ -434,7 +451,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
                 <pre><code class="language-typescript">// src/features/counter/counterSlice.ts
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 // Define the shape of the state
 interface CounterState {
@@ -454,28 +471,28 @@ const counterSlice = createSlice({
   initialState,
   reducers: {
     // Reducer with no payload
-    increment: (state) => {
+    increment: (state) =&gt; {
       // Immer makes this safe!
       state.value += state.step;
     },
     
     // Reducer with no payload
-    decrement: (state) => {
+    decrement: (state) =&gt; {
       state.value -= state.step;
     },
     
     // Reducer with payload
-    incrementByAmount: (state, action: PayloadAction&lt;number&gt;) => {
+    incrementByAmount: (state, action: PayloadAction&lt;number&gt;) =&gt; {
       state.value += action.payload;
     },
     
     // Reducer to update step
-    setStep: (state, action: PayloadAction&lt;number&gt;) => {
+    setStep: (state, action: PayloadAction&lt;number&gt;) =&gt; {
       state.step = action.payload;
     },
     
     // Reducer to reset state
-    reset: (state) => {
+    reset: (state) =&gt; {
       state.value = 0;
       state.step = 1;
     }
@@ -495,8 +512,8 @@ export const {
 export default counterSlice.reducer;</code></pre>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Understanding PayloadAction</h4>
-                    <p style="color: white;"><strong>PayloadAction&lt;T&gt;</strong> is a TypeScript type from Redux Toolkit that represents an action with a typed payload. When you define <code>action: PayloadAction&lt;number&gt;</code>, you're saying "this action carries a number as its payload."</p>
+                    <h4>📖 Understanding PayloadAction</h4>
+                    <p><strong>PayloadAction&lt;T&gt;</strong> is a TypeScript type from Redux Toolkit that represents an action with a typed payload. When you define <code>action: PayloadAction&lt;number&gt;</code>, you're saying "this action carries a number as its payload." Because it's a type (not a value), we import it with <code>import type</code> / the inline <code>type</code> keyword — it disappears entirely at compile time.</p>
                 </div>
 
                 <h3>How Immer Works</h3>
@@ -541,7 +558,7 @@ export type AppDispatch = typeof store.dispatch;</code></pre>
 
                 <pre><code class="language-typescript">// src/features/todos/todosSlice.ts
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 interface Todo {
   id: string;
@@ -563,7 +580,7 @@ const todosSlice = createSlice({
   name: 'todos',
   initialState,
   reducers: {
-    addTodo: (state, action: PayloadAction&lt;string&gt;) => {
+    addTodo: (state, action: PayloadAction&lt;string&gt;) =&gt; {
       // Immer lets us push to arrays!
       state.items.push({
         id: Date.now().toString(),
@@ -572,20 +589,20 @@ const todosSlice = createSlice({
       });
     },
     
-    toggleTodo: (state, action: PayloadAction&lt;string&gt;) => {
+    toggleTodo: (state, action: PayloadAction&lt;string&gt;) =&gt; {
       // Find and "mutate" - Immer handles immutability
-      const todo = state.items.find(t => t.id === action.payload);
+      const todo = state.items.find(t =&gt; t.id === action.payload);
       if (todo) {
         todo.completed = !todo.completed;
       }
     },
     
-    removeTodo: (state, action: PayloadAction&lt;string&gt;) => {
+    removeTodo: (state, action: PayloadAction&lt;string&gt;) =&gt; {
       // Filter works too
-      state.items = state.items.filter(t => t.id !== action.payload);
+      state.items = state.items.filter(t =&gt; t.id !== action.payload);
     },
     
-    setFilter: (state, action: PayloadAction&lt;'all' | 'active' | 'completed'&gt;) => {
+    setFilter: (state, action: PayloadAction&lt;'all' | 'active' | 'completed'&gt;) =&gt; {
       state.filter = action.payload;
     }
   }
@@ -604,7 +621,7 @@ export default todosSlice.reducer;</code></pre>
                     </ul>
                     <pre><code class="language-typescript">// ❌ Bad: Both mutating AND returning
 reducers: {
-  bad: (state) => {
+  bad: (state) =&gt; {
     state.value = 5;
     return { value: 10 }; // DON'T DO THIS!
   }
@@ -612,12 +629,12 @@ reducers: {
 
 // ✅ Good: Either mutate...
 reducers: {
-  good1: (state) => {
+  good1: (state) =&gt; {
     state.value = 5;
   },
   
   // ...OR return new state
-  good2: (state) => {
+  good2: (state) =&gt; {
     return { value: 10 };
   }
 }</code></pre>
@@ -627,8 +644,24 @@ reducers: {
             <!-- Section 4: Using Redux in Components -->
             <section id="section4" class="lesson-section">
                 <h2>⚛️ Using Redux in Components</h2>
-                
-                <p>Now let's use our Redux slices in React components with full TypeScript support.</p>
+
+                <p>Now let's use our Redux slices in React components with full TypeScript support. The mental model never changes, no matter how big the app gets: a component <em>reads</em> state with <code>useAppSelector</code> and <em>requests changes</em> by dispatching an action with <code>useAppDispatch</code>. It's a strict one-way loop — data flows down, actions flow up, and the store is the only thing in the middle that ever mutates.</p>
+
+                <figure>
+                    <div class="mermaid">
+flowchart LR
+    A["Component calls useAppDispatch()"] -->|"dispatch(increment())"| B["Slice reducer (Immer draft)"]
+    B -->|"produces new state"| C["Store: single source of truth"]
+    C -->|"useAppSelector(...)"| D["Component re-renders"]
+    D -.->|"user clicks"| A
+
+    style A fill:#3b82f6,stroke:#333,stroke-width:2px,color:#fff
+    style B fill:#f59e0b,stroke:#333,stroke-width:2px,color:#fff
+    style C fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style D fill:#6366f1,stroke:#333,stroke-width:2px,color:#fff
+                    </div>
+                    <figcaption>Figure 1: The Redux Toolkit data flow. You never write to the store directly — you dispatch a typed action, the slice reducer produces the next state, and every subscribed <code>useAppSelector</code> re-reads and re-renders.</figcaption>
+                </figure>
 
                 <h3>Reading State with useAppSelector</h3>
 
@@ -638,8 +671,8 @@ import { useAppSelector } from '../../store/hooks';
 
 function Counter() {
   // Select state from the store
-  const count = useAppSelector((state) => state.counter.value);
-  const step = useAppSelector((state) => state.counter.step);
+  const count = useAppSelector((state) =&gt; state.counter.value);
+  const step = useAppSelector((state) =&gt; state.counter.step);
   
   return (
     &lt;div&gt;
@@ -663,44 +696,76 @@ import {
 
 function CounterControls() {
   const dispatch = useAppDispatch();
-  const count = useAppSelector((state) => state.counter.value);
+  const count = useAppSelector((state) =&gt; state.counter.value);
   
   return (
     &lt;div&gt;
       &lt;h2&gt;Count: {count}&lt;/h2&gt;
       
-      &lt;button onClick={() => dispatch(increment())}&gt;
+      &lt;button onClick={() =&gt; dispatch(increment())}&gt;
         +1
       &lt;/button&gt;
       
-      &lt;button onClick={() => dispatch(decrement())}&gt;
+      &lt;button onClick={() =&gt; dispatch(decrement())}&gt;
         -1
       &lt;/button&gt;
       
-      &lt;button onClick={() => dispatch(incrementByAmount(5))}&gt;
+      &lt;button onClick={() =&gt; dispatch(incrementByAmount(5))}&gt;
         +5
       &lt;/button&gt;
       
-      &lt;button onClick={() => dispatch(reset())}&gt;
+      &lt;button onClick={() =&gt; dispatch(reset())}&gt;
         Reset
       &lt;/button&gt;
     &lt;/div&gt;
   );
 }</code></pre>
 
+                <h3>See the Types Work For You</h3>
+                <p>Because our hooks and actions are fully typed, the compiler polices every call site. Click each example to see whether it would compile against our counter and todos slices — and, when it fails, exactly why.</p>
+
+                <!-- Interactive: Typed Redux usage demo (theme-aware, no canvas) -->
+                <div class="card ts-demo" aria-live="polite">
+                    <p class="ts-demo-sig"><code>const dispatch = useAppDispatch();  //  increment/incrementByAmount from counterSlice</code></p>
+                    <div class="ts-demo-buttons">
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="increment() takes no payload, and useAppSelector infers state.counter.value as number.">dispatch(increment())</button>
+                        <button type="button" class="ts-demo-btn" data-valid="true"  data-msg="incrementByAmount expects a number payload — 5 is fine.">dispatch(incrementByAmount(5))</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="Argument of type 'string' is not assignable to parameter of type 'number'.">dispatch(incrementByAmount('5'))</button>
+                        <button type="button" class="ts-demo-btn" data-valid="false" data-msg="Property 'valeu' does not exist on type 'CounterState'. Did you mean 'value'?">useAppSelector(s =&gt; s.counter.valeu)</button>
+                    </div>
+                    <p class="ts-demo-result ts-demo-idle" id="ts-demo-redux-usage">👆 Click an example above to see what TypeScript thinks.</p>
+                </div>
+
+                <script>
+                (function () {
+                    const wrap = document.getElementById('ts-demo-redux-usage').closest('.ts-demo');
+                    if (!wrap) return;
+                    const result = wrap.querySelector('#ts-demo-redux-usage');
+                    wrap.querySelectorAll('.ts-demo-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            const ok = btn.getAttribute('data-valid') === 'true';
+                            const msg = btn.getAttribute('data-msg');
+                            result.classList.remove('ts-demo-idle', 'ts-demo-ok', 'ts-demo-err');
+                            result.classList.add(ok ? 'ts-demo-ok' : 'ts-demo-err');
+                            result.textContent = (ok ? '✅ Compiles: ' : '❌ Type error: ') + msg;
+                        });
+                    });
+                })();
+                </script>
+
                 <h3>Selecting Multiple Values</h3>
 
                 <pre><code class="language-typescript">// Option 1: Multiple selectors (best for performance)
 function TodoList() {
-  const todos = useAppSelector((state) => state.todos.items);
-  const filter = useAppSelector((state) => state.todos.filter);
+  const todos = useAppSelector((state) =&gt; state.todos.items);
+  const filter = useAppSelector((state) =&gt; state.todos.filter);
   
   // Component only re-renders when todos or filter change
 }
 
 // Option 2: Single selector returning object (re-renders if ANY field changes)
 function TodoList() {
-  const { items, filter } = useAppSelector((state) => ({
+  const { items, filter } = useAppSelector((state) =&gt; ({
     items: state.todos.items,
     filter: state.todos.filter
   }));
@@ -717,22 +782,22 @@ function TodoList() {
 // ... slice definition ...
 
 // Selector functions
-export const selectAllTodos = (state: RootState) => state.todos.items;
+export const selectAllTodos = (state: RootState) =&gt; state.todos.items;
 
-export const selectActiveTodos = (state: RootState) =>
-  state.todos.items.filter(todo => !todo.completed);
+export const selectActiveTodos = (state: RootState) =&gt;
+  state.todos.items.filter(todo =&gt; !todo.completed);
 
-export const selectCompletedTodos = (state: RootState) =>
-  state.todos.items.filter(todo => todo.completed);
+export const selectCompletedTodos = (state: RootState) =&gt;
+  state.todos.items.filter(todo =&gt; todo.completed);
 
-export const selectFilteredTodos = (state: RootState) => {
+export const selectFilteredTodos = (state: RootState) =&gt; {
   const { items, filter } = state.todos;
   
   switch (filter) {
     case 'active':
-      return items.filter(t => !t.completed);
+      return items.filter(t =&gt; !t.completed);
     case 'completed':
-      return items.filter(t => t.completed);
+      return items.filter(t =&gt; t.completed);
     default:
       return items;
   }
@@ -747,7 +812,7 @@ function TodoList() {
   
   return (
     &lt;ul&gt;
-      {filteredTodos.map(todo => (
+      {filteredTodos.map(todo =&gt; (
         &lt;TodoItem key={todo.id} todo={todo} /&gt;
       ))}
     &lt;/ul&gt;
@@ -782,10 +847,10 @@ import {
 function TodoApp() {
   const dispatch = useAppDispatch();
   const filteredTodos = useAppSelector(selectFilteredTodos);
-  const filter = useAppSelector((state) => state.todos.filter);
+  const filter = useAppSelector((state) =&gt; state.todos.filter);
   const [inputText, setInputText] = useState('');
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     if (inputText.trim()) {
       dispatch(addTodo(inputText));
@@ -801,7 +866,7 @@ function TodoApp() {
         &lt;input
           type="text"
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={(e) =&gt; setInputText(e.target.value)}
           placeholder="Add a todo..."
         /&gt;
         &lt;button type="submit"&gt;Add&lt;/button&gt;
@@ -809,19 +874,19 @@ function TodoApp() {
       
       &lt;div&gt;
         &lt;button 
-          onClick={() => dispatch(setFilter('all'))}
+          onClick={() =&gt; dispatch(setFilter('all'))}
           disabled={filter === 'all'}
         &gt;
           All
         &lt;/button&gt;
         &lt;button 
-          onClick={() => dispatch(setFilter('active'))}
+          onClick={() =&gt; dispatch(setFilter('active'))}
           disabled={filter === 'active'}
         &gt;
           Active
         &lt;/button&gt;
         &lt;button 
-          onClick={() => dispatch(setFilter('completed'))}
+          onClick={() =&gt; dispatch(setFilter('completed'))}
           disabled={filter === 'completed'}
         &gt;
           Completed
@@ -829,12 +894,12 @@ function TodoApp() {
       &lt;/div&gt;
       
       &lt;ul&gt;
-        {filteredTodos.map(todo => (
+        {filteredTodos.map(todo =&gt; (
           &lt;li key={todo.id}&gt;
             &lt;input
               type="checkbox"
               checked={todo.completed}
-              onChange={() => dispatch(toggleTodo(todo.id))}
+              onChange={() =&gt; dispatch(toggleTodo(todo.id))}
             /&gt;
             &lt;span 
               style={{ 
@@ -843,7 +908,7 @@ function TodoApp() {
             &gt;
               {todo.text}
             &lt;/span&gt;
-            &lt;button onClick={() => dispatch(removeTodo(todo.id))}&gt;
+            &lt;button onClick={() =&gt; dispatch(removeTodo(todo.id))}&gt;
               Delete
             &lt;/button&gt;
           &lt;/li&gt;
@@ -911,7 +976,7 @@ export type AppStore = typeof store;</code></pre>
 
                 <pre><code class="language-typescript">// src/features/posts/postsSlice.ts
 
-import { createSlice, PayloadAction, nanoid } from '@reduxjs/toolkit';
+import { createSlice, nanoid, type PayloadAction } from '@reduxjs/toolkit';
 
 interface Post {
   id: string;
@@ -935,11 +1000,11 @@ const postsSlice = createSlice({
     // Simple action - RTK generates the prepare function
     addPost: {
       // Reducer function
-      reducer: (state, action: PayloadAction&lt;Post&gt;) => {
+      reducer: (state, action: PayloadAction&lt;Post&gt;) =&gt; {
         state.posts.push(action.payload);
       },
       // Prepare function - transforms arguments into payload
-      prepare: (title: string, content: string) => {
+      prepare: (title: string, content: string) =&gt; {
         return {
           payload: {
             id: nanoid(), // Generate unique ID
@@ -953,13 +1018,13 @@ const postsSlice = createSlice({
     
     // You can also add metadata
     postUpdated: {
-      reducer: (state, action: PayloadAction&lt;Post, string, { updatedAt: string }&gt;) => {
-        const index = state.posts.findIndex(p => p.id === action.payload.id);
+      reducer: (state, action: PayloadAction&lt;Post, string, { updatedAt: string }&gt;) =&gt; {
+        const index = state.posts.findIndex(p =&gt; p.id === action.payload.id);
         if (index !== -1) {
           state.posts[index] = action.payload;
         }
       },
-      prepare: (post: Post) => {
+      prepare: (post: Post) =&gt; {
         return {
           payload: post,
           meta: {
@@ -978,15 +1043,15 @@ export default postsSlice.reducer;
 function CreatePost() {
   const dispatch = useAppDispatch();
   
-  const handleSubmit = (title: string, content: string) => {
+  const handleSubmit = (title: string, content: string) =&gt; {
     // ID and timestamp added automatically!
     dispatch(addPost(title, content));
   };
 }</code></pre>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Understanding Prepare Callbacks</h4>
-                    <p style="color: white;"><strong>Prepare callbacks</strong> let you customize how action payloads are created. They're useful for generating IDs, adding timestamps, or transforming multiple arguments into a single payload object. The prepare function returns an object with <code>payload</code> and optionally <code>meta</code> and <code>error</code>.</p>
+                    <h4>📖 Understanding Prepare Callbacks</h4>
+                    <p><strong>Prepare callbacks</strong> let you customize how action payloads are created. They're useful for generating IDs, adding timestamps, or transforming multiple arguments into a single payload object. The prepare function returns an object with <code>payload</code> and optionally <code>meta</code> and <code>error</code>.</p>
                 </div>
 
                 <h3>Typing Action Creators</h3>
@@ -1011,23 +1076,23 @@ const action3 = addTodo(123); // ❌ Error: number not assignable to string</cod
 
                 <pre><code class="language-typescript">// src/features/todos/todosSelectors.ts
 
-import { RootState } from '../../store';
+import type { RootState } from '../../store';
 import { createSelector } from '@reduxjs/toolkit';
 
 // Basic selector with explicit typing
-export const selectTodos = (state: RootState) => state.todos.items;
+export const selectTodos = (state: RootState) =&gt; state.todos.items;
 
-export const selectFilter = (state: RootState) => state.todos.filter;
+export const selectFilter = (state: RootState) =&gt; state.todos.filter;
 
 // Memoized selector with createSelector
 export const selectFilteredTodos = createSelector(
   [selectTodos, selectFilter],
-  (todos, filter) => {
+  (todos, filter) =&gt; {
     switch (filter) {
       case 'active':
-        return todos.filter(t => !t.completed);
+        return todos.filter(t =&gt; !t.completed);
       case 'completed':
-        return todos.filter(t => t.completed);
+        return todos.filter(t =&gt; t.completed);
       default:
         return todos;
     }
@@ -1035,14 +1100,14 @@ export const selectFilteredTodos = createSelector(
 );
 
 // Selector with parameter
-export const selectTodoById = (state: RootState, todoId: string) =>
-  state.todos.items.find(todo => todo.id === todoId);
+export const selectTodoById = (state: RootState, todoId: string) =&gt;
+  state.todos.items.find(todo =&gt; todo.id === todoId);
 
 // Memoized parametric selector
-export const makeSelectTodoById = () =>
+export const makeSelectTodoById = () =&gt;
   createSelector(
-    [selectTodos, (_state: RootState, todoId: string) => todoId],
-    (todos, todoId) => todos.find(todo => todo.id === todoId)
+    [selectTodos, (_state: RootState, todoId: string) =&gt; todoId],
+    (todos, todoId) =&gt; todos.find(todo =&gt; todo.id === todoId)
   );</code></pre>
 
                 <div class="card card-success">
@@ -1062,11 +1127,13 @@ export const makeSelectTodoById = () =>
 
                 <pre><code class="language-typescript">// src/store/middleware/logger.ts
 
-import { Middleware } from '@reduxjs/toolkit';
-import { RootState } from '../index';
+import type { Middleware } from '@reduxjs/toolkit';
+import type { RootState } from '../index';
 
-export const loggerMiddleware: Middleware&lt;{}, RootState&gt; = 
-  (storeAPI) => (next) => (action) => {
+// In Redux 5 / RTK 2.x, `action` arrives typed as `unknown`, so you
+// narrow it before touching action-specific fields.
+export const loggerMiddleware: Middleware&lt;{}, RootState&gt; =
+  (storeAPI) =&gt; (next) =&gt; (action) =&gt; {
     console.log('Dispatching:', action);
     console.log('Current state:', storeAPI.getState());
     
@@ -1081,7 +1148,7 @@ export const store = configureStore({
   reducer: {
     // ... reducers
   },
-  middleware: (getDefaultMiddleware) =>
+  middleware: (getDefaultMiddleware) =&gt;
     getDefaultMiddleware().concat(loggerMiddleware)
 });</code></pre>
 
@@ -1091,7 +1158,7 @@ export const store = configureStore({
 
                 <pre><code class="language-typescript">// src/features/notifications/notificationsSlice.ts
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { addTodo, toggleTodo } from '../todos/todosSlice';
 
 interface Notification {
@@ -1112,26 +1179,26 @@ const notificationsSlice = createSlice({
   name: 'notifications',
   initialState,
   reducers: {
-    addNotification: (state, action: PayloadAction&lt;Notification&gt;) => {
+    addNotification: (state, action: PayloadAction&lt;Notification&gt;) =&gt; {
       state.notifications.push(action.payload);
     },
-    removeNotification: (state, action: PayloadAction&lt;string&gt;) => {
+    removeNotification: (state, action: PayloadAction&lt;string&gt;) =&gt; {
       state.notifications = state.notifications.filter(
-        n => n.id !== action.payload
+        n =&gt; n.id !== action.payload
       );
     }
   },
-  extraReducers: (builder) => {
+  extraReducers: (builder) =&gt; {
     // Listen to actions from other slices
     builder
-      .addCase(addTodo, (state) => {
+      .addCase(addTodo, (state) =&gt; {
         state.notifications.push({
           id: Date.now().toString(),
           message: 'Todo added successfully!',
           type: 'success'
         });
       })
-      .addCase(toggleTodo, (state) => {
+      .addCase(toggleTodo, (state) =&gt; {
         state.notifications.push({
           id: Date.now().toString(),
           message: 'Todo status updated!',
@@ -1161,7 +1228,7 @@ export default notificationsSlice.reducer;</code></pre>
 
                 <pre><code class="language-typescript">// src/store/genericSlice.ts
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 interface LoadingState&lt;T&gt; {
   data: T | null;
@@ -1180,20 +1247,20 @@ function createLoadingSlice&lt;T&gt;(name: string) {
     name,
     initialState,
     reducers: {
-      startLoading: (state) => {
+      startLoading: (state) =&gt; {
         state.isLoading = true;
         state.error = null;
       },
-      loadSuccess: (state, action: PayloadAction&lt;T&gt;) => {
+      loadSuccess: (state, action: PayloadAction&lt;T&gt;) =&gt; {
         state.data = action.payload;
         state.isLoading = false;
         state.error = null;
       },
-      loadFailure: (state, action: PayloadAction&lt;string&gt;) => {
+      loadFailure: (state, action: PayloadAction&lt;string&gt;) =&gt; {
         state.isLoading = false;
         state.error = action.payload;
       },
-      reset: (state) => {
+      reset: (state) =&gt; {
         state.data = null;
         state.isLoading = false;
         state.error = null;
@@ -1238,25 +1305,25 @@ const userSlice = createSlice({
   name: 'user',
   initialState,
   reducers: {},
-  extraReducers: (builder) => {
+  extraReducers: (builder) =&gt; {
     // Match multiple actions at once
     builder
       .addMatcher(
         isAnyOf(fetchUser.pending, updateUser.pending, deleteUser.pending),
-        (state) => {
+        (state) =&gt; {
           state.isLoading = true;
         }
       )
       .addMatcher(
         isAnyOf(fetchUser.fulfilled, updateUser.fulfilled),
-        (state, action) => {
+        (state, action) =&gt; {
           state.user = action.payload;
           state.isLoading = false;
         }
       )
       .addMatcher(
         isAnyOf(fetchUser.rejected, updateUser.rejected, deleteUser.rejected),
-        (state, action) => {
+        (state, action) =&gt; {
           state.error = action.error.message || 'Something went wrong';
           state.isLoading = false;
         }
@@ -1289,19 +1356,19 @@ const userSlice = createSlice({
 graph LR
     A[Dispatch Thunk] --> B[Pending Action]
     B --> C[Async Function]
-    C --> D{Success?}
+    C --> D{"Success?"}
     D -->|Yes| E[Fulfilled Action]
     D -->|No| F[Rejected Action]
     E --> G[Update State]
     F --> G
-    
-    style A fill:#e3f2fd
-    style B fill:#fff3cd
-    style C fill:#e3f2fd
-    style D fill:#f0f0f0
-    style E fill:#c8e6c9
-    style F fill:#ffcdd2
-    style G fill:#c8e6c9
+
+    style A fill:#3b82f6,stroke:#333,stroke-width:2px,color:#fff
+    style B fill:#f59e0b,stroke:#333,stroke-width:2px,color:#fff
+    style C fill:#3b82f6,stroke:#333,stroke-width:2px,color:#fff
+    style D fill:#64748b,stroke:#333,stroke-width:2px,color:#fff
+    style E fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style F fill:#f44336,stroke:#333,stroke-width:2px,color:#fff
+    style G fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
 </div>
 
                 <p>When you create an async thunk, Redux Toolkit automatically generates three action types:</p>
@@ -1315,7 +1382,7 @@ graph LR
 
                 <pre><code class="language-typescript">// src/features/users/usersSlice.ts
 
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 
 interface User {
   id: string;
@@ -1338,7 +1405,7 @@ const initialState: UsersState = {
 // Create async thunk
 export const fetchUsers = createAsyncThunk(
   'users/fetchUsers', // Action type prefix
-  async () => {
+  async () =&gt; {
     const response = await fetch('https://api.example.com/users');
     
     if (!response.ok) {
@@ -1354,20 +1421,20 @@ const usersSlice = createSlice({
   name: 'users',
   initialState,
   reducers: {},
-  extraReducers: (builder) => {
+  extraReducers: (builder) =&gt; {
     builder
       // Handle pending state
-      .addCase(fetchUsers.pending, (state) => {
+      .addCase(fetchUsers.pending, (state) =&gt; {
         state.isLoading = true;
         state.error = null;
       })
       // Handle fulfilled state
-      .addCase(fetchUsers.fulfilled, (state, action: PayloadAction&lt;User[]&gt;) => {
+      .addCase(fetchUsers.fulfilled, (state, action: PayloadAction&lt;User[]&gt;) =&gt; {
         state.users = action.payload;
         state.isLoading = false;
       })
       // Handle rejected state
-      .addCase(fetchUsers.rejected, (state, action) => {
+      .addCase(fetchUsers.rejected, (state, action) =&gt; {
         state.isLoading = false;
         state.error = action.error.message || 'Failed to fetch users';
       });
@@ -1386,9 +1453,9 @@ import { fetchUsers } from '../../features/users/usersSlice';
 
 function UserList() {
   const dispatch = useAppDispatch();
-  const { users, isLoading, error } = useAppSelector((state) => state.users);
+  const { users, isLoading, error } = useAppSelector((state) =&gt; state.users);
   
-  useEffect(() => {
+  useEffect(() =&gt; {
     // Dispatch the async thunk
     dispatch(fetchUsers());
   }, [dispatch]);
@@ -1403,7 +1470,7 @@ function UserList() {
   
   return (
     &lt;ul&gt;
-      {users.map(user => (
+      {users.map(user =&gt; (
         &lt;li key={user.id}&gt;
           {user.name} - {user.email}
         &lt;/li&gt;
@@ -1417,7 +1484,7 @@ function UserList() {
                 <pre><code class="language-typescript">// Fetch a single user by ID
 export const fetchUserById = createAsyncThunk(
   'users/fetchUserById',
-  async (userId: string) => {
+  async (userId: string) =&gt; {
     const response = await fetch(`https://api.example.com/users/${userId}`);
     
     if (!response.ok) {
@@ -1431,7 +1498,7 @@ export const fetchUserById = createAsyncThunk(
 // Create a new user
 export const createUser = createAsyncThunk(
   'users/createUser',
-  async (userData: Omit&lt;User, 'id'&gt;) => {
+  async (userData: Omit&lt;User, 'id'&gt;) =&gt; {
     const response = await fetch('https://api.example.com/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1449,7 +1516,7 @@ export const createUser = createAsyncThunk(
 // Update existing user
 export const updateUser = createAsyncThunk(
   'users/updateUser',
-  async ({ id, updates }: { id: string; updates: Partial&lt;User&gt; }) => {
+  async ({ id, updates }: { id: string; updates: Partial&lt;User&gt; }) =&gt; {
     const response = await fetch(`https://api.example.com/users/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -1467,7 +1534,7 @@ export const updateUser = createAsyncThunk(
 // Delete user
 export const deleteUser = createAsyncThunk(
   'users/deleteUser',
-  async (userId: string) => {
+  async (userId: string) =&gt; {
     const response = await fetch(`https://api.example.com/users/${userId}`, {
       method: 'DELETE'
     });
@@ -1489,51 +1556,51 @@ const usersSlice = createSlice({
   initialState,
   reducers: {
     // Synchronous actions if needed
-    clearError: (state) => {
+    clearError: (state) =&gt; {
       state.error = null;
     }
   },
-  extraReducers: (builder) => {
+  extraReducers: (builder) =&gt; {
     builder
       // Fetch all users
-      .addCase(fetchUsers.pending, (state) => {
+      .addCase(fetchUsers.pending, (state) =&gt; {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(fetchUsers.fulfilled, (state, action) => {
+      .addCase(fetchUsers.fulfilled, (state, action) =&gt; {
         state.users = action.payload;
         state.isLoading = false;
       })
-      .addCase(fetchUsers.rejected, (state, action) => {
+      .addCase(fetchUsers.rejected, (state, action) =&gt; {
         state.isLoading = false;
         state.error = action.error.message || 'Failed to fetch users';
       })
       
       // Create user
-      .addCase(createUser.pending, (state) => {
+      .addCase(createUser.pending, (state) =&gt; {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(createUser.fulfilled, (state, action) => {
+      .addCase(createUser.fulfilled, (state, action) =&gt; {
         state.users.push(action.payload);
         state.isLoading = false;
       })
-      .addCase(createUser.rejected, (state, action) => {
+      .addCase(createUser.rejected, (state, action) =&gt; {
         state.isLoading = false;
         state.error = action.error.message || 'Failed to create user';
       })
       
       // Update user
-      .addCase(updateUser.fulfilled, (state, action) => {
-        const index = state.users.findIndex(u => u.id === action.payload.id);
+      .addCase(updateUser.fulfilled, (state, action) =&gt; {
+        const index = state.users.findIndex(u =&gt; u.id === action.payload.id);
         if (index !== -1) {
           state.users[index] = action.payload;
         }
       })
       
       // Delete user
-      .addCase(deleteUser.fulfilled, (state, action) => {
-        state.users = state.users.filter(u => u.id !== action.payload);
+      .addCase(deleteUser.fulfilled, (state, action) =&gt; {
+        state.users = state.users.filter(u =&gt; u.id !== action.payload);
       });
   }
 });
@@ -1546,7 +1613,7 @@ export default usersSlice.reducer;</code></pre>
                 <pre><code class="language-typescript">// Thunk with custom error handling
 export const fetchUsers = createAsyncThunk(
   'users/fetchUsers',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) =&gt; {
     try {
       const response = await fetch('https://api.example.com/users');
       
@@ -1577,7 +1644,7 @@ export const fetchUsers = createAsyncThunk(
 );
 
 // Handle in reducer
-.addCase(fetchUsers.rejected, (state, action) => {
+.addCase(fetchUsers.rejected, (state, action) =&gt; {
   state.isLoading = false;
   
   if (action.payload) {
@@ -1603,15 +1670,27 @@ export const fetchUsers = createAsyncThunk(
 
                 <h3>Accessing State and Dispatch in Thunks</h3>
 
-                <p>The thunkAPI provides access to store state, dispatch, and more:</p>
+                <p>The thunkAPI provides access to store state, dispatch, and more. In an untyped thunk, <code>getState()</code> returns <code>unknown</code>, so people reach for an ugly <code>getState() as RootState</code> cast. The modern fix is to create a <strong>pre-typed thunk creator</strong> once with <code>.withTypes</code>, then use it everywhere — no casts, full autocomplete:</p>
 
-                <pre><code class="language-typescript">export const conditionalFetch = createAsyncThunk(
+                <pre><code class="language-typescript">// src/store/withTypes.ts — define this ONCE for the whole app
+import { createAsyncThunk } from '@reduxjs/toolkit';
+import type { RootState, AppDispatch } from './index';
+
+export const createAppAsyncThunk = createAsyncThunk.withTypes&lt;{
+  state: RootState;
+  dispatch: AppDispatch;
+  rejectValue: string; // the type you pass to rejectWithValue
+}&gt;();</code></pre>
+
+                <pre><code class="language-typescript">import { createAppAsyncThunk } from '../../store/withTypes';
+
+export const conditionalFetch = createAppAsyncThunk(
   'users/conditionalFetch',
-  async (_, { getState, dispatch, rejectWithValue }) => {
-    const state = getState() as RootState;
-    
+  async (_, { getState, dispatch, rejectWithValue }) =&gt; {
+    const state = getState(); // ✅ already typed as RootState — no cast!
+
     // Only fetch if not already loaded
-    if (state.users.users.length > 0) {
+    if (state.users.users.length &gt; 0) {
       return state.users.users;
     }
     
@@ -1640,12 +1719,12 @@ export const fetchUsers = createAsyncThunk(
 function UserList() {
   const dispatch = useAppDispatch();
   
-  useEffect(() => {
+  useEffect(() =&gt; {
     // Dispatch returns a promise with an abort method
     const promise = dispatch(fetchUsers());
     
     // Cancel on unmount
-    return () => {
+    return () =&gt; {
       promise.abort();
     };
   }, [dispatch]);
@@ -1653,17 +1732,19 @@ function UserList() {
 
                 <h3>Sequential and Parallel Thunks</h3>
 
-                <pre><code class="language-typescript">// Sequential: Wait for one before starting the next
-async function loadUserData(userId: string) {
-  const dispatch = useAppDispatch();
-  
+                <p>Remember: hooks like <code>useAppDispatch</code> can only be called inside a component or another hook. So these orchestration helpers take <code>dispatch</code> as an argument — the component calls the hook and passes it in.</p>
+
+                <pre><code class="language-typescript">import type { AppDispatch } from '../../store';
+
+// Sequential: Wait for one before starting the next
+async function loadUserData(dispatch: AppDispatch, userId: string) {
   try {
     // Wait for user to load
     const user = await dispatch(fetchUserById(userId)).unwrap();
-    
+
     // Then load their posts
     await dispatch(fetchUserPosts(user.id)).unwrap();
-    
+
     // Then load their comments
     await dispatch(fetchUserComments(user.id)).unwrap();
   } catch (error) {
@@ -1672,9 +1753,7 @@ async function loadUserData(userId: string) {
 }
 
 // Parallel: Start all at once
-async function loadDashboardData() {
-  const dispatch = useAppDispatch();
-  
+async function loadDashboardData(dispatch: AppDispatch) {
   try {
     // Start all requests simultaneously
     await Promise.all([
@@ -1718,9 +1797,35 @@ async function loadDashboardData() {
                 <p>RTK Query solves common problems in data fetching:</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>RTK Query</strong> is a data fetching and caching tool built into Redux Toolkit. It automatically manages loading states, caching, invalidation, and refetching, eliminating the need for hand-written async thunks for most data fetching scenarios.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>RTK Query</strong> is a data fetching and caching tool built into Redux Toolkit. It automatically manages loading states, caching, invalidation, and refetching, eliminating the need for hand-written async thunks for most data fetching scenarios.</p>
                 </div>
+
+                <p>Think of RTK Query as a smart librarian for your server data. The first time a component asks for "the list of users," the librarian walks to the shelf (your API), fetches the book, hands it over, <em>and keeps a copy at the front desk</em>. The next component that asks gets the desk copy instantly — no second trip. When you write a new user (a mutation), you tell the librarian "the users shelf is now out of date" by invalidating a tag, and it quietly re-fetches so every reader sees fresh data. You describe your endpoints once; the caching, deduping, and refetching are handled for you.</p>
+
+                <figure>
+                    <div class="mermaid">
+flowchart TD
+    A["useGetUsersQuery()"] --> B{"In cache?"}
+    B -->|Yes| C["Serve cached data instantly"]
+    B -->|No| D["fetchBaseQuery calls the API"]
+    D --> E["Store result in cache, tag User"]
+    E --> C
+    F["useCreateUserMutation()"] --> G["invalidatesTags: User"]
+    G -->|"marks cache stale"| H["Auto-refetch getUsers"]
+    H --> D
+
+    style A fill:#3b82f6,stroke:#333,stroke-width:2px,color:#fff
+    style B fill:#64748b,stroke:#333,stroke-width:2px,color:#fff
+    style C fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
+    style D fill:#f59e0b,stroke:#333,stroke-width:2px,color:#fff
+    style E fill:#6366f1,stroke:#333,stroke-width:2px,color:#fff
+    style F fill:#3b82f6,stroke:#333,stroke-width:2px,color:#fff
+    style G fill:#f59e0b,stroke:#333,stroke-width:2px,color:#fff
+    style H fill:#f44336,stroke:#333,stroke-width:2px,color:#fff
+                    </div>
+                    <figcaption>Figure 2: RTK Query's cache lifecycle. Queries read from (and populate) a tagged cache; mutations invalidate tags, which triggers an automatic refetch so the UI stays in sync.</figcaption>
+                </figure>
 
                 <table>
                     <thead>
@@ -1779,26 +1884,26 @@ export const api = createApi({
     baseUrl: 'https://jsonplaceholder.typicode.com' 
   }),
   tagTypes: ['User', 'Post'], // For cache invalidation
-  endpoints: (builder) => ({
+  endpoints: (builder) =&gt; ({
     // Query endpoints (GET requests)
     getUsers: builder.query&lt;User[], void&gt;({
-      query: () => '/users',
+      query: () =&gt; '/users',
       providesTags: ['User'] // This data is tagged as 'User'
     }),
     
     getUserById: builder.query&lt;User, string&gt;({
-      query: (id) => `/users/${id}`,
-      providesTags: (result, error, id) => [{ type: 'User', id }]
+      query: (id) =&gt; `/users/${id}`,
+      providesTags: (result, error, id) =&gt; [{ type: 'User', id }]
     }),
     
     getPosts: builder.query&lt;Post[], void&gt;({
-      query: () => '/posts',
+      query: () =&gt; '/posts',
       providesTags: ['Post']
     }),
     
     // Mutation endpoints (POST, PUT, DELETE)
     createUser: builder.mutation&lt;User, Omit&lt;User, 'id'&gt;&gt;({
-      query: (newUser) => ({
+      query: (newUser) =&gt; ({
         url: '/users',
         method: 'POST',
         body: newUser
@@ -1807,16 +1912,16 @@ export const api = createApi({
     }),
     
     updateUser: builder.mutation&lt;User, { id: string; updates: Partial&lt;User&gt; }&gt;({
-      query: ({ id, updates }) => ({
+      query: ({ id, updates }) =&gt; ({
         url: `/users/${id}`,
         method: 'PATCH',
         body: updates
       }),
-      invalidatesTags: (result, error, { id }) => [{ type: 'User', id }]
+      invalidatesTags: (result, error, { id }) =&gt; [{ type: 'User', id }]
     }),
     
     deleteUser: builder.mutation&lt;void, string&gt;({
-      query: (id) => ({
+      query: (id) =&gt; ({
         url: `/users/${id}`,
         method: 'DELETE'
       }),
@@ -1851,7 +1956,7 @@ export const store = configureStore({
     // ... other reducers
   },
   // Add the API middleware
-  middleware: (getDefaultMiddleware) =>
+  middleware: (getDefaultMiddleware) =&gt;
     getDefaultMiddleware().concat(api.middleware)
 });
 
@@ -1889,7 +1994,7 @@ function UserList() {
   
   return (
     &lt;ul&gt;
-      {users?.map(user => (
+      {users?.map(user =&gt; (
         &lt;li key={user.id}&gt;
           {user.name} - {user.email}
         &lt;/li&gt;
@@ -1927,7 +2032,7 @@ function CreateUserForm() {
   // Mutation hook returns [trigger function, result object]
   const [createUser, { isLoading, isSuccess, isError }] = useCreateUserMutation();
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) =&gt; {
     e.preventDefault();
     
     try {
@@ -1947,13 +2052,13 @@ function CreateUserForm() {
     &lt;form onSubmit={handleSubmit}&gt;
       &lt;input
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={(e) =&gt; setName(e.target.value)}
         placeholder="Name"
         required
       /&gt;
       &lt;input
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) =&gt; setEmail(e.target.value)}
         placeholder="Email"
         type="email"
         required
@@ -1962,8 +2067,8 @@ function CreateUserForm() {
         {isLoading ? 'Creating...' : 'Create User'}
       &lt;/button&gt;
       
-      {isSuccess && &lt;p&gt;User created!&lt;/p&gt;}
-      {isError && &lt;p&gt;Failed to create user&lt;/p&gt;}
+      {isSuccess &amp;&amp; &lt;p&gt;User created!&lt;/p&gt;}
+      {isError &amp;&amp; &lt;p&gt;Failed to create user&lt;/p&gt;}
     &lt;/form&gt;
   );
 }</code></pre>
@@ -2017,12 +2122,12 @@ function UserList() {
   
   return (
     &lt;div&gt;
-      &lt;button onClick={() => refetch()}&gt;
+      &lt;button onClick={() =&gt; refetch()}&gt;
         Refresh Users
       &lt;/button&gt;
       
       &lt;ul&gt;
-        {users?.map(user => (
+        {users?.map(user =&gt; (
           &lt;li key={user.id}&gt;{user.name}&lt;/li&gt;
         ))}
       &lt;/ul&gt;
@@ -2037,7 +2142,7 @@ function SearchUser() {
   const [trigger, result] = useLazyGetUserByIdQuery();
   const [userId, setUserId] = useState('');
   
-  const handleSearch = () => {
+  const handleSearch = () =&gt; {
     if (userId) {
       trigger(userId); // Manually trigger the query
     }
@@ -2045,11 +2150,11 @@ function SearchUser() {
   
   return (
     &lt;div&gt;
-      &lt;input value={userId} onChange={(e) => setUserId(e.target.value)} /&gt;
+      &lt;input value={userId} onChange={(e) =&gt; setUserId(e.target.value)} /&gt;
       &lt;button onClick={handleSearch}&gt;Search&lt;/button&gt;
       
-      {result.isLoading && &lt;div&gt;Loading...&lt;/div&gt;}
-      {result.data && &lt;div&gt;Found: {result.data.name}&lt;/div&gt;}
+      {result.isLoading &amp;&amp; &lt;div&gt;Loading...&lt;/div&gt;}
+      {result.data &amp;&amp; &lt;div&gt;Found: {result.data.name}&lt;/div&gt;}
     &lt;/div&gt;
   );
 }</code></pre>
@@ -2062,9 +2167,9 @@ function SearchUser() {
 
 export const api = createApi({
   // ... base config
-  endpoints: (builder) => ({
+  endpoints: (builder) =&gt; ({
     updateUser: builder.mutation&lt;User, { id: string; updates: Partial&lt;User&gt; }&gt;({
-      query: ({ id, updates }) => ({
+      query: ({ id, updates }) =&gt; ({
         url: `/users/${id}`,
         method: 'PATCH',
         body: updates
@@ -2073,7 +2178,7 @@ export const api = createApi({
       async onQueryStarted({ id, updates }, { dispatch, queryFulfilled }) {
         // Optimistically update the cache
         const patchResult = dispatch(
-          api.util.updateQueryData('getUserById', id, (draft) => {
+          api.util.updateQueryData('getUserById', id, (draft) =&gt; {
             Object.assign(draft, updates);
           })
         );
@@ -2089,15 +2194,15 @@ export const api = createApi({
     }),
     
     deleteUser: builder.mutation&lt;void, string&gt;({
-      query: (id) => ({
+      query: (id) =&gt; ({
         url: `/users/${id}`,
         method: 'DELETE'
       }),
       // Optimistically remove from list
       async onQueryStarted(id, { dispatch, queryFulfilled }) {
         const patchResult = dispatch(
-          api.util.updateQueryData('getUsers', undefined, (draft) => {
-            const index = draft.findIndex(user => user.id === id);
+          api.util.updateQueryData('getUsers', undefined, (draft) =&gt; {
+            const index = draft.findIndex(user =&gt; user.id === id);
             if (index !== -1) {
               draft.splice(index, 1);
             }
@@ -2120,20 +2225,20 @@ export const api = createApi({
 
                 <pre><code class="language-typescript">export const api = createApi({
   // ... config
-  endpoints: (builder) => ({
+  endpoints: (builder) =&gt; ({
     getUsers: builder.query&lt;User[], void&gt;({
-      query: () => '/users',
+      query: () =&gt; '/users',
       // Transform response
-      transformResponse: (response: any[]) => {
+      transformResponse: (response: any[]) =&gt; {
         // Add a computed field
-        return response.map(user => ({
+        return response.map(user =&gt; ({
           ...user,
           fullName: `${user.firstName} ${user.lastName}`,
           isActive: user.status === 'active'
         }));
       },
       // Transform error response
-      transformErrorResponse: (response: { status: number; data: any }) => {
+      transformErrorResponse: (response: { status: number; data: any }) =&gt; {
         return {
           status: response.status,
           message: response.data?.message || 'An error occurred'
@@ -2148,50 +2253,50 @@ export const api = createApi({
                 <pre><code class="language-typescript">export const api = createApi({
   // ... config
   tagTypes: ['User', 'Post', 'Comment'],
-  endpoints: (builder) => ({
+  endpoints: (builder) =&gt; ({
     getUsers: builder.query&lt;User[], void&gt;({
-      query: () => '/users',
+      query: () =&gt; '/users',
       // Provide tags for each user
-      providesTags: (result) =>
+      providesTags: (result) =&gt;
         result
           ? [
-              ...result.map(({ id }) => ({ type: 'User' as const, id })),
+              ...result.map(({ id }) =&gt; ({ type: 'User' as const, id })),
               { type: 'User', id: 'LIST' }
             ]
           : [{ type: 'User', id: 'LIST' }]
     }),
     
     getUserPosts: builder.query&lt;Post[], string&gt;({
-      query: (userId) => `/users/${userId}/posts`,
-      providesTags: (result, error, userId) =>
+      query: (userId) =&gt; `/users/${userId}/posts`,
+      providesTags: (result, error, userId) =&gt;
         result
           ? [
-              ...result.map(({ id }) => ({ type: 'Post' as const, id })),
+              ...result.map(({ id }) =&gt; ({ type: 'Post' as const, id })),
               { type: 'Post', id: userId }
             ]
           : [{ type: 'Post', id: userId }]
     }),
     
     createPost: builder.mutation&lt;Post, Omit&lt;Post, 'id'&gt;&gt;({
-      query: (post) => ({
+      query: (post) =&gt; ({
         url: '/posts',
         method: 'POST',
         body: post
       }),
       // Invalidate specific user's posts and the list
-      invalidatesTags: (result, error, { userId }) => [
+      invalidatesTags: (result, error, { userId }) =&gt; [
         { type: 'Post', id: userId },
         { type: 'Post', id: 'LIST' }
       ]
     }),
     
     deleteUser: builder.mutation&lt;void, string&gt;({
-      query: (id) => ({
+      query: (id) =&gt; ({
         url: `/users/${id}`,
         method: 'DELETE'
       }),
       // Invalidate both the specific user and the list
-      invalidatesTags: (result, error, id) => [
+      invalidatesTags: (result, error, id) =&gt; [
         { type: 'User', id },
         { type: 'User', id: 'LIST' }
       ]
@@ -2219,16 +2324,16 @@ export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: fetchBaseQuery({ baseUrl: 'https://api.example.com' }),
   tagTypes: ['User', 'Post', 'Comment'],
-  endpoints: () => ({}) // Empty initially
+  endpoints: () =&gt; ({}) // Empty initially
 });
 
 // src/services/users.ts
 import { baseApi } from './baseApi';
 
 export const usersApi = baseApi.injectEndpoints({
-  endpoints: (builder) => ({
+  endpoints: (builder) =&gt; ({
     getUsers: builder.query&lt;User[], void&gt;({
-      query: () => '/users',
+      query: () =&gt; '/users',
       providesTags: ['User']
     }),
     // ... other user endpoints
@@ -2241,9 +2346,9 @@ export const { useGetUsersQuery } = usersApi;
 import { baseApi } from './baseApi';
 
 export const postsApi = baseApi.injectEndpoints({
-  endpoints: (builder) => ({
+  endpoints: (builder) =&gt; ({
     getPosts: builder.query&lt;Post[], void&gt;({
-      query: () => '/posts',
+      query: () =&gt; '/posts',
       providesTags: ['Post']
     }),
     // ... other post endpoints
@@ -2257,7 +2362,7 @@ export const store = configureStore({
   reducer: {
     [baseApi.reducerPath]: baseApi.reducer
   },
-  middleware: (getDefaultMiddleware) =>
+  middleware: (getDefaultMiddleware) =&gt;
     getDefaultMiddleware().concat(baseApi.middleware)
 });</code></pre>
 
@@ -2380,11 +2485,11 @@ interface ProductsState {
 
 // ✅ Good: Memoized with createSelector
 export const selectFilteredTodos = createSelector(
-  [(state: RootState) => state.todos.items, 
-   (state: RootState) => state.todos.filter],
-  (items, filter) => {
+  [(state: RootState) =&gt; state.todos.items, 
+   (state: RootState) =&gt; state.todos.filter],
+  (items, filter) =&gt; {
     // Expensive filtering only runs when items or filter change
-    return items.filter(item => {
+    return items.filter(item =&gt; {
       if (filter === 'active') return !item.completed;
       if (filter === 'completed') return item.completed;
       return true;
@@ -2394,11 +2499,11 @@ export const selectFilteredTodos = createSelector(
 
 // ❌ Bad: Filtering in component or non-memoized selector
 function TodoList() {
-  const items = useAppSelector(state => state.todos.items);
-  const filter = useAppSelector(state => state.todos.filter);
+  const items = useAppSelector(state =&gt; state.todos.items);
+  const filter = useAppSelector(state =&gt; state.todos.filter);
   
   // Runs on every render!
-  const filtered = items.filter(item => {
+  const filtered = items.filter(item =&gt; {
     if (filter === 'active') return !item.completed;
     if (filter === 'completed') return item.completed;
     return true;
@@ -2409,7 +2514,7 @@ function TodoList() {
 
                 <pre><code class="language-typescript">// ✅ Good: Select only what you need
 function UserName({ userId }: { userId: string }) {
-  const name = useAppSelector(state => 
+  const name = useAppSelector(state =&gt; 
     state.users.byId[userId]?.name
   );
   
@@ -2418,7 +2523,7 @@ function UserName({ userId }: { userId: string }) {
 
 // ❌ Bad: Select entire user
 function UserName({ userId }: { userId: string }) {
-  const user = useAppSelector(state => state.users.byId[userId]);
+  const user = useAppSelector(state =&gt; state.users.byId[userId]);
   
   // Re-renders when ANY user property changes
   return &lt;div&gt;{user?.name}&lt;/div&gt;;
@@ -2465,17 +2570,17 @@ const usersSlice = createSlice({
     isLoading: false,
     error: null
   },
-  extraReducers: (builder) => {
+  extraReducers: (builder) =&gt; {
     builder
-      .addCase(fetchUsers.pending, (state) => {
+      .addCase(fetchUsers.pending, (state) =&gt; {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(fetchUsers.fulfilled, (state, action) => {
+      .addCase(fetchUsers.fulfilled, (state, action) =&gt; {
         state.data = action.payload;
         state.isLoading = false;
       })
-      .addCase(fetchUsers.rejected, (state, action) => {
+      .addCase(fetchUsers.rejected, (state, action) =&gt; {
         state.isLoading = false;
         state.error = action.error.message || 'Failed';
       });
@@ -2511,12 +2616,12 @@ const initialState: TodosState = {
                 <h4>2. Use Type Inference</h4>
 
                 <pre><code class="language-typescript">// ✅ Good: Let TypeScript infer
-const increment = (state: CounterState) => {
+const increment = (state: CounterState) =&gt; {
   state.value += 1; // Type of value is inferred
 };
 
 // ❌ Unnecessary: Over-annotation
-const increment = (state: CounterState): void => {
+const increment = (state: CounterState): void =&gt; {
   state.value = (state.value as number) + (1 as number);
 };</code></pre>
 
@@ -2525,15 +2630,15 @@ const increment = (state: CounterState): void => {
                 <pre><code class="language-typescript">// Testing reducers
 import counterReducer, { increment, decrement } from './counterSlice';
 
-describe('counter reducer', () => {
+describe('counter reducer', () =&gt; {
   const initialState = { value: 0, step: 1 };
   
-  it('should handle increment', () => {
+  it('should handle increment', () =&gt; {
     const actual = counterReducer(initialState, increment());
     expect(actual.value).toEqual(1);
   });
   
-  it('should handle decrement', () => {
+  it('should handle decrement', () =&gt; {
     const actual = counterReducer(initialState, decrement());
     expect(actual.value).toEqual(-1);
   });
@@ -2542,7 +2647,7 @@ describe('counter reducer', () => {
 // Testing selectors
 import { selectFilteredTodos } from './todosSelectors';
 
-describe('selectFilteredTodos', () => {
+describe('selectFilteredTodos', () =&gt; {
   const state = {
     todos: {
       items: [
@@ -2553,7 +2658,7 @@ describe('selectFilteredTodos', () => {
     }
   };
   
-  it('returns active todos when filter is active', () => {
+  it('returns active todos when filter is active', () =&gt; {
     const result = selectFilteredTodos(state as RootState);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('1');
@@ -2582,7 +2687,7 @@ function renderWithRedux(
   );
 }
 
-test('displays count', () => {
+test('displays count', () =&gt; {
   renderWithRedux(&lt;Counter /&gt;, {
     initialState: { counter: { value: 5, step: 1 } }
   });
@@ -2614,8 +2719,8 @@ test('displays count', () => {
                 <h3>Key Takeaways</h3>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">🎯 What You've Learned</h4>
-                    <ul style="color: white;">
+                    <h4>🎯 What You've Learned</h4>
+                    <ul>
                         <li><strong>Redux Fundamentals:</strong> Understanding Redux principles and when to use it</li>
                         <li><strong>Redux Toolkit Setup:</strong> Configuring store with TypeScript support</li>
                         <li><strong>Creating Slices:</strong> Using createSlice with Immer for simpler state updates</li>
@@ -2693,7 +2798,7 @@ test('displays count', () => {
 
                 <details>
                     <summary style="cursor: pointer; font-weight: bold; padding: 0.5rem;">Creating a Slice</summary>
-                    <pre><code class="language-typescript">import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+                    <pre><code class="language-typescript">import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 interface CounterState {
   value: number;
@@ -2703,13 +2808,13 @@ const counterSlice = createSlice({
   name: 'counter',
   initialState: { value: 0 } as CounterState,
   reducers: {
-    increment: (state) => {
+    increment: (state) =&gt; {
       state.value += 1;
     },
-    decrement: (state) => {
+    decrement: (state) =&gt; {
       state.value -= 1;
     },
-    setCount: (state, action: PayloadAction&lt;number&gt;) => {
+    setCount: (state, action: PayloadAction&lt;number&gt;) =&gt; {
       state.value = action.payload;
     }
   }
@@ -2725,23 +2830,23 @@ export default counterSlice.reducer;</code></pre>
 
 export const fetchUsers = createAsyncThunk(
   'users/fetchUsers',
-  async () => {
+  async () =&gt; {
     const response = await fetch('/api/users');
     return response.json();
   }
 );
 
 // In slice
-extraReducers: (builder) => {
+extraReducers: (builder) =&gt; {
   builder
-    .addCase(fetchUsers.pending, (state) => {
+    .addCase(fetchUsers.pending, (state) =&gt; {
       state.isLoading = true;
     })
-    .addCase(fetchUsers.fulfilled, (state, action) => {
+    .addCase(fetchUsers.fulfilled, (state, action) =&gt; {
       state.users = action.payload;
       state.isLoading = false;
     })
-    .addCase(fetchUsers.rejected, (state, action) => {
+    .addCase(fetchUsers.rejected, (state, action) =&gt; {
       state.error = action.error.message;
       state.isLoading = false;
     });
@@ -2756,13 +2861,13 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
   tagTypes: ['User'],
-  endpoints: (builder) => ({
+  endpoints: (builder) =&gt; ({
     getUsers: builder.query&lt;User[], void&gt;({
-      query: () => '/users',
+      query: () =&gt; '/users',
       providesTags: ['User']
     }),
     createUser: builder.mutation&lt;User, Partial&lt;User&gt;&gt;({
-      query: (user) => ({
+      query: (user) =&gt; ({
         url: '/users',
         method: 'POST',
         body: user
@@ -2843,8 +2948,8 @@ export const { useGetUsersQuery, useCreateUserMutation } = api;</code></pre>
                     </ul>
 
                     <details>
-                        <summary style="cursor: pointer; color: #2196F3; margin-top: 1rem;">💡 Hint</summary>
-                        <div style="padding: 1rem; background: white; margin-top: 0.5rem;">
+                        <summary style="cursor: pointer; margin-top: 1rem;">💡 Hint</summary>
+                        <div class="card card-info">
                             <p>Start with this structure:</p>
                             <pre><code class="language-typescript">interface CartItem {
   id: string;
@@ -2860,10 +2965,10 @@ interface CartState {
 }</code></pre>
                             <p>Use createSelector to calculate totals:</p>
                             <pre><code class="language-typescript">export const selectCartTotal = createSelector(
-  [(state: RootState) => state.cart.items,
-   (state: RootState) => state.cart.discountPercent],
-  (items, discount) => {
-    const subtotal = items.reduce((sum, item) => 
+  [(state: RootState) =&gt; state.cart.items,
+   (state: RootState) =&gt; state.cart.discountPercent],
+  (items, discount) =&gt; {
+    const subtotal = items.reduce((sum, item) =&gt; 
       sum + item.price * item.quantity, 0
     );
     return subtotal * (1 - discount / 100);
@@ -2889,21 +2994,21 @@ interface CartState {
                     </ul>
 
                     <details>
-                        <summary style="cursor: pointer; color: #2196F3; margin-top: 1rem;">💡 Hint</summary>
-                        <div style="padding: 1rem; background: white; margin-top: 0.5rem;">
+                        <summary style="cursor: pointer; margin-top: 1rem;">💡 Hint</summary>
+                        <div class="card card-info">
                             <p>API structure:</p>
                             <pre><code class="language-typescript">export const blogApi = createApi({
   reducerPath: 'blogApi',
   baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
   tagTypes: ['Post', 'Comment'],
-  endpoints: (builder) => ({
+  endpoints: (builder) =&gt; ({
     getPosts: builder.query&lt;Post[], void&gt;({
-      query: () => '/posts',
+      query: () =&gt; '/posts',
       providesTags: ['Post']
     }),
     getPostComments: builder.query&lt;Comment[], string&gt;({
-      query: (postId) => `/posts/${postId}/comments`,
-      providesTags: (result, error, postId) => 
+      query: (postId) =&gt; `/posts/${postId}/comments`,
+      providesTags: (result, error, postId) =&gt; 
         [{ type: 'Comment', id: postId }]
     }),
     // Add more endpoints...
@@ -2954,8 +3059,8 @@ interface CartState {
                     </div>
                     
                     <details>
-                        <summary style="cursor: pointer; color: #4CAF50; margin-top: 1rem;">Show Answer</summary>
-                        <div style="padding: 1rem; background: #e8f5e9; margin-top: 0.5rem;">
+                        <summary style="cursor: pointer; margin-top: 1rem;">Show Answer</summary>
+                        <div class="card card-success">
                             <p><strong>Answer: B</strong></p>
                             <p>Immer uses JavaScript Proxy objects to track all changes you make to a draft state. Behind the scenes, it produces a completely new immutable state based on those changes. This allows you to write simpler code that looks like mutations while maintaining immutability.</p>
                         </div>
@@ -2982,8 +3087,8 @@ interface CartState {
                     </div>
                     
                     <details>
-                        <summary style="cursor: pointer; color: #4CAF50; margin-top: 1rem;">Show Answer</summary>
-                        <div style="padding: 1rem; background: #e8f5e9; margin-top: 0.5rem;">
+                        <summary style="cursor: pointer; margin-top: 1rem;">Show Answer</summary>
+                        <div class="card card-success">
                             <p><strong>Answer: B</strong></p>
                             <p>RTK Query excels at REST APIs with CRUD operations. It provides automatic caching, cache invalidation, loading states, and request deduplication. For simple one-off calls, plain fetch is sufficient. For WebSockets, you'd need custom middleware or other solutions.</p>
                         </div>
@@ -3010,8 +3115,8 @@ interface CartState {
                     </div>
                     
                     <details>
-                        <summary style="cursor: pointer; color: #4CAF50; margin-top: 1rem;">Show Answer</summary>
-                        <div style="padding: 1rem; background: #e8f5e9; margin-top: 0.5rem;">
+                        <summary style="cursor: pointer; margin-top: 1rem;">Show Answer</summary>
+                        <div class="card card-success">
                             <p><strong>Answer: B</strong></p>
                             <p>createAsyncThunk generates three action types following Promise terminology: <code>pending</code> (when the async function starts), <code>fulfilled</code> (when it completes successfully), and <code>rejected</code> (when it throws an error or returns a rejected promise). You handle these in extraReducers.</p>
                         </div>

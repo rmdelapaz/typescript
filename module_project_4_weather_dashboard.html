@@ -188,6 +188,7 @@
                 </div>
 
                 <h3>Application Architecture</h3>
+                <p>Before writing a line of code, it helps to see how the pieces fit together. Notice the layering: components never talk to the network directly — they lean on <strong>custom hooks</strong>, which lean on a <strong>service layer</strong>, which is the only part that knows the API even exists. That separation is what keeps the app testable and lets us slot a cache in front of the API without any component knowing.</p>
                 <div class="mermaid">
 graph TD
     A[App Component] --> B[Search Bar]
@@ -393,7 +394,6 @@ body {
                 <h3>Step 5: Basic App Structure</h3>
                 <div class="card">
                     <pre><code class="language-typescript">// src/App.tsx
-import { useState } from 'react';
 import './index.css';
 
 function App() {
@@ -473,25 +473,43 @@ VITE_WEATHER_API_URL=https://api.openweathermap.org/data/2.5</code></pre>
 .env.*.local</code></pre>
                 </div>
 
-                <h3>Step 3: Create Configuration File</h3>
+                <h3>Step 3: Type Your Environment Variables</h3>
+                <p>By default, <code>import.meta.env.VITE_WEATHER_API_KEY</code> is typed as <code>string | undefined</code> with no autocomplete. Since our whole app depends on this key, let's teach TypeScript about it. Extend the <code>ImportMetaEnv</code> interface in the <code>vite-env.d.ts</code> file Vite already generated for you:</p>
+                <div class="card">
+                    <pre><code class="language-typescript">// src/vite-env.d.ts
+/// &lt;reference types="vite/client" /&gt;
+
+interface ImportMetaEnv {
+    readonly VITE_WEATHER_API_KEY: string;
+    readonly VITE_WEATHER_API_URL: string;
+}
+
+interface ImportMeta {
+    readonly env: ImportMetaEnv;
+}</code></pre>
+                    <p>Now every <code>import.meta.env.VITE_*</code> access is autocompleted and type-checked. This is a small file, but it pays off every time you touch config.</p>
+                </div>
+
+                <h3>Step 4: Create a Configuration Module</h3>
+                <p>Rather than scatter <code>import.meta.env</code> reads across the codebase, we centralize them in one module and validate up front. If the key is missing, we fail loudly on startup instead of getting a confusing 401 from the API later:</p>
                 <div class="card">
                     <pre><code class="language-typescript">// src/config/env.ts
 export const config = {
     weatherApiKey: import.meta.env.VITE_WEATHER_API_KEY,
-    weatherApiUrl: import.meta.env.VITE_WEATHER_API_URL || 'https://api.openweathermap.org/data/2.5',
+    weatherApiUrl: import.meta.env.VITE_WEATHER_API_URL ?? 'https://api.openweathermap.org/data/2.5',
     isDevelopment: import.meta.env.DEV,
     isProduction: import.meta.env.PROD,
 } as const;
 
-// Validate required environment variables
+// Fail fast: a missing key is a developer error, so surface it immediately.
 if (!config.weatherApiKey) {
-    throw new Error('VITE_WEATHER_API_KEY is required in .env file');
+    throw new Error('VITE_WEATHER_API_KEY is required — add it to your .env file');
 }</code></pre>
                 </div>
 
                 <h3>API Endpoints We'll Use</h3>
                 <div class="card">
-                    <table>
+                    <div class="table-wrap"><table>
                         <thead>
                             <tr>
                                 <th>Endpoint</th>
@@ -516,7 +534,7 @@ if (!config.weatherApiKey) {
                                 <td><code>/weather?lat=51.5&lon=-0.1&appid=KEY</code></td>
                             </tr>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
 
                 <div class="card card-warning">
@@ -620,12 +638,12 @@ export interface WeatherData {
         lon: number;
         lat: number;
     };
-    weather: Array<{
+    weather: Array&lt;{
         id: number;
         main: string;
         description: string;
         icon: string;
-    }>;
+    }&gt;;
     main: {
         temp: number;
         feels_like: number;
@@ -653,7 +671,7 @@ export interface WeatherData {
 
 // Forecast data from API
 export interface ForecastData {
-    list: Array<{
+    list: Array&lt;{
         dt: number;
         main: {
             temp: number;
@@ -662,17 +680,17 @@ export interface ForecastData {
             temp_max: number;
             humidity: number;
         };
-        weather: Array<{
+        weather: Array&lt;{
             id: number;
             main: string;
             description: string;
             icon: string;
-        }>;
+        }&gt;;
         wind: {
             speed: number;
         };
         dt_txt: string;
-    }>;
+    }&gt;;
     city: {
         name: string;
         country: string;
@@ -730,7 +748,7 @@ class CacheService {
         const age = Date.now() - entry.timestamp;
         const maxAge = ttl || this.defaultTTL;
 
-        if (age > maxAge) {
+        if (age &gt; maxAge) {
             this.cache.delete(key);
             return null;
         }
@@ -760,7 +778,7 @@ export const cacheService = new CacheService();</code></pre>
                     <pre><code class="language-typescript">// src/services/weatherService.ts
 import { config } from '@/config/env';
 import { cacheService } from './cacheService';
-import { WeatherData, ForecastData, DailyForecast } from '@/types/weather';
+import type { WeatherData, ForecastData, DailyForecast } from '@/types/weather';
 
 class WeatherService {
     private baseUrl = config.weatherApiUrl;
@@ -776,22 +794,19 @@ class WeatherService {
         return `${this.baseUrl}${endpoint}?${searchParams.toString()}`;
     }
 
-    async getCurrentWeather(city: string): Promise&lt;WeatherData&gt; {
+    async getCurrentWeather(city: string, signal?: AbortSignal): Promise&lt;WeatherData&gt; {
         const cacheKey = `weather-${city.toLowerCase()}`;
-        
+
         // Check cache first
         const cached = cacheService.get&lt;WeatherData&gt;(cacheKey);
-        if (cached) {
-            console.log('Returning cached weather data for:', city);
-            return cached;
-        }
+        if (cached) return cached;
 
-        // Fetch from API
         const url = this.buildUrl('/weather', { q: city });
-        
+
         try {
-            const response = await fetch(url);
-            
+            // Passing `signal` lets an in-flight request be cancelled (see the hook)
+            const response = await fetch(url, { signal });
+
             if (!response.ok) {
                 if (response.status === 404) {
                     throw new Error(`City "${city}" not found`);
@@ -800,72 +815,55 @@ class WeatherService {
             }
 
             const data: WeatherData = await response.json();
-            
-            // Cache the result
             cacheService.set(cacheKey, data);
-            
             return data;
         } catch (error) {
-            if (error instanceof Error) {
-                throw error;
-            }
+            // A cancelled request is not a real failure — re-throw it so the caller can ignore it.
+            if (error instanceof DOMException &amp;&amp; error.name === 'AbortError') throw error;
+            if (error instanceof Error) throw error;
             throw new Error('An unexpected error occurred');
         }
     }
 
-    async getWeatherByCoords(lat: number, lon: number): Promise&lt;WeatherData&gt; {
+    async getWeatherByCoords(lat: number, lon: number, signal?: AbortSignal): Promise&lt;WeatherData&gt; {
         const cacheKey = `weather-coords-${lat}-${lon}`;
-        
-        // Check cache first
-        const cached = cacheService.get&lt;WeatherData&gt;(cacheKey);
-        if (cached) {
-            console.log('Returning cached weather data for coordinates');
-            return cached;
-        }
 
-        // Fetch from API
+        const cached = cacheService.get&lt;WeatherData&gt;(cacheKey);
+        if (cached) return cached;
+
         const url = this.buildUrl('/weather', {
             lat: lat.toString(),
             lon: lon.toString()
         });
-        
+
         try {
-            const response = await fetch(url);
-            
+            const response = await fetch(url, { signal });
+
             if (!response.ok) {
                 throw new Error(`Failed to fetch weather data: ${response.statusText}`);
             }
 
             const data: WeatherData = await response.json();
-            
-            // Cache the result
             cacheService.set(cacheKey, data);
-            
             return data;
         } catch (error) {
-            if (error instanceof Error) {
-                throw error;
-            }
+            if (error instanceof DOMException &amp;&amp; error.name === 'AbortError') throw error;
+            if (error instanceof Error) throw error;
             throw new Error('An unexpected error occurred');
         }
     }
 
-    async getForecast(city: string): Promise&lt;DailyForecast[]&gt; {
+    async getForecast(city: string, signal?: AbortSignal): Promise&lt;DailyForecast[]&gt; {
         const cacheKey = `forecast-${city.toLowerCase()}`;
-        
-        // Check cache first
-        const cached = cacheService.get&lt;DailyForecast[]&gt;(cacheKey);
-        if (cached) {
-            console.log('Returning cached forecast data for:', city);
-            return cached;
-        }
 
-        // Fetch from API
+        const cached = cacheService.get&lt;DailyForecast[]&gt;(cacheKey);
+        if (cached) return cached;
+
         const url = this.buildUrl('/forecast', { q: city });
-        
+
         try {
-            const response = await fetch(url);
-            
+            const response = await fetch(url, { signal });
+
             if (!response.ok) {
                 if (response.status === 404) {
                     throw new Error(`City "${city}" not found`);
@@ -874,18 +872,14 @@ class WeatherService {
             }
 
             const data: ForecastData = await response.json();
-            
-            // Process forecast data - group by day and get daily high/low
+
+            // Raw API data arrives in 3-hour slices; collapse it to one entry per day.
             const dailyForecasts = this.processForecastData(data);
-            
-            // Cache the result
             cacheService.set(cacheKey, dailyForecasts);
-            
             return dailyForecasts;
         } catch (error) {
-            if (error instanceof Error) {
-                throw error;
-            }
+            if (error instanceof DOMException &amp;&amp; error.name === 'AbortError') throw error;
+            if (error instanceof Error) throw error;
             throw new Error('An unexpected error occurred');
         }
     }
@@ -894,7 +888,7 @@ class WeatherService {
         // Group forecast data by day
         const dailyData = new Map&lt;string, typeof data.list[0][]&gt;();
 
-        data.list.forEach(item => {
+        data.list.forEach(item =&gt; {
             const date = item.dt_txt.split(' ')[0]; // Get date part (YYYY-MM-DD)
             
             if (!dailyData.has(date)) {
@@ -907,15 +901,15 @@ class WeatherService {
         // Convert to DailyForecast array (take first 5 days)
         const forecasts: DailyForecast[] = [];
         
-        Array.from(dailyData.entries()).slice(0, 5).forEach(([date, items]) => {
+        Array.from(dailyData.entries()).slice(0, 5).forEach(([date, items]) =&gt; {
             // Calculate daily averages and extremes
-            const temps = items.map(item => item.main.temp);
+            const temps = items.map(item =&gt; item.main.temp);
             const tempMin = Math.min(...temps);
             const tempMax = Math.max(...temps);
-            const avgTemp = temps.reduce((a, b) => a + b) / temps.length;
+            const avgTemp = temps.reduce((a, b) =&gt; a + b) / temps.length;
             
             // Use midday weather data (around 12:00) if available
-            const middayItem = items.find(item => item.dt_txt.includes('12:00:00')) || items[0];
+            const middayItem = items.find(item =&gt; item.dt_txt.includes('12:00:00')) || items[0];
 
             forecasts.push({
                 date,
@@ -947,6 +941,11 @@ export const weatherService = new WeatherService();</code></pre>
                     </ul>
                 </div>
 
+                <div class="card card-warning">
+                    <h4>⚠️ Why every method takes an <code>AbortSignal</code></h4>
+                    <p>Imagine a user types "Lo", then quickly finishes "London". Two requests go out. If the slower "Lo" response lands <em>after</em> "London", it overwrites the correct data — a classic <strong>race condition</strong>. By threading an <code>AbortSignal</code> through <code>fetch</code>, the hook can cancel the older request before starting the new one, so only the latest search can ever win. We re-throw the resulting <code>AbortError</code> untouched so the calling hook knows to quietly ignore it rather than showing an error to the user.</p>
+                </div>
+
                 <h3>Step 4: Create Utility Functions</h3>
                 <div class="card">
                     <pre><code class="language-typescript">// src/utils/formatters.ts
@@ -968,7 +967,7 @@ export function formatTime(timestamp: number): string {
 export function capitalizeWords(str: string): string {
     return str
         .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .map(word =&gt; word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
 }</code></pre>
 
@@ -1045,14 +1044,14 @@ import { useState, useEffect } from 'react';
 export function useDebounce&lt;T&gt;(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState&lt;T&gt;(value);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         // Set up a timer to update the debounced value
-        const timer = setTimeout(() => {
+        const timer = setTimeout(() =&gt; {
             setDebouncedValue(value);
         }, delay);
 
         // Clean up the timer if value changes before delay expires
-        return () => {
+        return () =&gt; {
             clearTimeout(timer);
         };
     }, [value, delay]);
@@ -1062,80 +1061,84 @@ export function useDebounce&lt;T&gt;(value: T, delay: number): T {
                 </div>
 
                 <h3>Hook 2: useWeather</h3>
+                <p>This is the heart of the app. Instead of juggling four loosely-related pieces of state (<code>weather</code>, <code>forecast</code>, <code>loading</code>, <code>error</code>) that can drift out of sync — what does <code>loading: true</code> with a non-null <code>error</code> even mean? — we model the UI as a single <strong>discriminated union</strong>. At any moment the app is in exactly one of four states, and TypeScript forces us to handle each one:</p>
                 <div class="card card-success">
                     <h4>✅ Complete useWeather Hook</h4>
                     <pre><code class="language-typescript">// src/hooks/useWeather.ts
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { weatherService } from '@/services/weatherService';
-import { WeatherData, DailyForecast } from '@/types/weather';
+import type { WeatherData, DailyForecast } from '@/types/weather';
 
-interface UseWeatherReturn {
-    weather: WeatherData | null;
-    forecast: DailyForecast[];
-    loading: boolean;
-    error: string | null;
-    fetchWeather: (city: string) => Promise&lt;void&gt;;
-    fetchWeatherByCoords: (lat: number, lon: number) => Promise&lt;void&gt;;
-}
+// A discriminated union: exactly ONE of these shapes is ever active.
+// The `status` field is the discriminant that TypeScript narrows on.
+export type WeatherState =
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'success'; weather: WeatherData; forecast: DailyForecast[] }
+    | { status: 'error'; error: string };
 
-export function useWeather(): UseWeatherReturn {
-    const [weather, setWeather] = useState&lt;WeatherData | null&gt;(null);
-    const [forecast, setForecast] = useState&lt;DailyForecast[]&gt;([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState&lt;string | null&gt;(null);
+export function useWeather() {
+    const [state, setState] = useState&lt;WeatherState&gt;({ status: 'idle' });
 
-    const fetchWeather = async (city: string) => {
+    // Holds the controller for the request currently in flight so we can cancel it.
+    const controllerRef = useRef&lt;AbortController | null&gt;(null);
+
+    // Shared runner: cancels any previous request, then runs the given task.
+    const run = useCallback(async (
+        task: (signal: AbortSignal) =&gt; Promise&lt;{ weather: WeatherData; forecast: DailyForecast[] }&gt;
+    ) =&gt; {
+        // Cancel the previous request so a stale response can't overwrite fresh data.
+        controllerRef.current?.abort();
+        const controller = new AbortController();
+        controllerRef.current = controller;
+
+        setState({ status: 'loading' });
+
+        try {
+            const { weather, forecast } = await task(controller.signal);
+            if (controller.signal.aborted) return; // superseded by a newer request
+            setState({ status: 'success', weather, forecast });
+        } catch (err) {
+            // Ignore cancellations — they're expected, not real errors.
+            if (controller.signal.aborted || (err as Error).name === 'AbortError') return;
+            setState({
+                status: 'error',
+                error: err instanceof Error ? err.message : 'Failed to fetch weather data'
+            });
+        }
+    }, []);
+
+    const fetchWeather = useCallback((city: string) =&gt; {
         if (!city.trim()) return;
-
-        setLoading(true);
-        setError(null);
-
-        try {
-            const [weatherData, forecastData] = await Promise.all([
-                weatherService.getCurrentWeather(city),
-                weatherService.getForecast(city)
+        return run(async (signal) =&gt; {
+            // Fetch current weather and forecast in parallel — they don't depend on each other.
+            const [weather, forecast] = await Promise.all([
+                weatherService.getCurrentWeather(city, signal),
+                weatherService.getForecast(city, signal)
             ]);
+            return { weather, forecast };
+        });
+    }, [run]);
 
-            setWeather(weatherData);
-            setForecast(forecastData);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to fetch weather data');
-            setWeather(null);
-            setForecast([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const fetchWeatherByCoords = useCallback((lat: number, lon: number) =&gt; {
+        return run(async (signal) =&gt; {
+            const weather = await weatherService.getWeatherByCoords(lat, lon, signal);
+            // The coords endpoint gives us the city name; use it to pull the forecast.
+            const forecast = await weatherService.getForecast(weather.name, signal);
+            return { weather, forecast };
+        });
+    }, [run]);
 
-    const fetchWeatherByCoords = async (lat: number, lon: number) => {
-        setLoading(true);
-        setError(null);
+    // Cancel any pending request if the component unmounts mid-fetch.
+    useEffect(() =&gt; () =&gt; controllerRef.current?.abort(), []);
 
-        try {
-            const weatherData = await weatherService.getWeatherByCoords(lat, lon);
-            setWeather(weatherData);
-
-            // Fetch forecast using city name from weather data
-            const forecastData = await weatherService.getForecast(weatherData.name);
-            setForecast(forecastData);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to fetch weather data');
-            setWeather(null);
-            setForecast([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return {
-        weather,
-        forecast,
-        loading,
-        error,
-        fetchWeather,
-        fetchWeatherByCoords
-    };
+    return { state, fetchWeather, fetchWeatherByCoords };
 }</code></pre>
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Why a discriminated union beats loose booleans</h4>
+                    <p>With separate <code>loading</code> / <code>error</code> / <code>data</code> variables you can accidentally represent impossible states — loading <em>and</em> errored at once, or "success" with <code>null</code> data. Modelling <code>status</code> as <code>'idle' | 'loading' | 'success' | 'error'</code> makes those states <strong>unrepresentable</strong>. When you later write <code>if (state.status === 'success')</code>, TypeScript <em>narrows</em> the type and guarantees <code>state.weather</code> exists inside that branch — no optional chaining, no null checks.</p>
                 </div>
 
                 <h3>Hook 3: useFavorites</h3>
@@ -1146,7 +1149,7 @@ import { useState, useEffect } from 'react';
 const FAVORITES_KEY = 'weather-favorites';
 
 export function useFavorites() {
-    const [favorites, setFavorites] = useState&lt;string[]&gt;(() => {
+    const [favorites, setFavorites] = useState&lt;string[]&gt;(() =&gt; {
         try {
             const stored = localStorage.getItem(FAVORITES_KEY);
             return stored ? JSON.parse(stored) : [];
@@ -1156,7 +1159,7 @@ export function useFavorites() {
     });
 
     // Save to localStorage whenever favorites change
-    useEffect(() => {
+    useEffect(() =&gt; {
         try {
             localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
         } catch (error) {
@@ -1164,18 +1167,18 @@ export function useFavorites() {
         }
     }, [favorites]);
 
-    const addFavorite = (city: string) => {
-        setFavorites(prev => {
+    const addFavorite = (city: string) =&gt; {
+        setFavorites(prev =&gt; {
             if (prev.includes(city)) return prev;
             return [...prev, city];
         });
     };
 
-    const removeFavorite = (city: string) => {
-        setFavorites(prev => prev.filter(fav => fav !== city));
+    const removeFavorite = (city: string) =&gt; {
+        setFavorites(prev =&gt; prev.filter(fav =&gt; fav !== city));
     };
 
-    const isFavorite = (city: string): boolean => {
+    const isFavorite = (city: string): boolean =&gt; {
         return favorites.includes(city);
     };
 
@@ -1202,7 +1205,7 @@ interface UseGeolocationReturn {
     coordinates: Coordinates | null;
     loading: boolean;
     error: string | null;
-    getCurrentPosition: () => void;
+    getCurrentPosition: () =&gt; void;
 }
 
 export function useGeolocation(): UseGeolocationReturn {
@@ -1210,7 +1213,7 @@ export function useGeolocation(): UseGeolocationReturn {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState&lt;string | null&gt;(null);
 
-    const getCurrentPosition = () => {
+    const getCurrentPosition = () =&gt; {
         if (!navigator.geolocation) {
             setError('Geolocation is not supported by your browser');
             return;
@@ -1220,14 +1223,14 @@ export function useGeolocation(): UseGeolocationReturn {
         setError(null);
 
         navigator.geolocation.getCurrentPosition(
-            (position) => {
+            (position) =&gt; {
                 setCoordinates({
                     latitude: position.coords.latitude,
                     longitude: position.coords.longitude
                 });
                 setLoading(false);
             },
-            (error) => {
+            (error) =&gt; {
                 setError('Failed to get your location. Please check permissions.');
                 setLoading(false);
             }
@@ -1308,26 +1311,26 @@ export function useGeolocation(): UseGeolocationReturn {
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/SearchBar.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 
 interface SearchBarProps {
-    onSearch: (city: string) => void;
+    onSearch: (city: string) =&gt; void;
     isLoading?: boolean;
 }
 
-const SearchBar: React.FC&lt;SearchBarProps&gt; = ({ onSearch, isLoading = false }) => {
+function SearchBar({ onSearch, isLoading = false }: SearchBarProps) {
     const [inputValue, setInputValue] = useState('');
     const debouncedValue = useDebounce(inputValue, 500);
 
     // Trigger search when debounced value changes
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (debouncedValue.trim()) {
             onSearch(debouncedValue);
         }
     }, [debouncedValue, onSearch]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: FormEvent) =&gt; {
         e.preventDefault();
         if (inputValue.trim()) {
             onSearch(inputValue);
@@ -1346,7 +1349,7 @@ const SearchBar: React.FC&lt;SearchBarProps&gt; = ({ onSearch, isLoading = false
                     disabled={isLoading}
                     aria-label="City search"
                 /&gt;
-                {isLoading && (
+                {isLoading &amp;&amp; (
                     &lt;span className="search-spinner" aria-label="Searching"&gt;
                         🔄
                     &lt;/span&gt;
@@ -1384,22 +1387,17 @@ export default SearchBar;</code></pre>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/WeatherCard.tsx
-import React from 'react';
-import { WeatherData } from '../types/weather';
+import type { WeatherData } from '../types/weather';
 
 interface WeatherCardProps {
     weather: WeatherData;
-    onAddToFavorites?: (city: string) => void;
+    onAddToFavorites?: (city: string) =&gt; void;
     isFavorite?: boolean;
 }
 
-const WeatherCard: React.FC&lt;WeatherCardProps&gt; = ({ 
-    weather, 
-    onAddToFavorites,
-    isFavorite = false 
-}) => {
+function WeatherCard({ weather, onAddToFavorites, isFavorite = false }: WeatherCardProps) {
     // Get weather emoji based on condition
-    const getWeatherEmoji = (condition: string): string => {
+    const getWeatherEmoji = (condition: string): string =&gt; {
         const lowerCondition = condition.toLowerCase();
         if (lowerCondition.includes('clear')) return '☀️';
         if (lowerCondition.includes('cloud')) return '☁️';
@@ -1411,12 +1409,12 @@ const WeatherCard: React.FC&lt;WeatherCardProps&gt; = ({
     };
 
     // Format temperature
-    const formatTemp = (temp: number): string => {
+    const formatTemp = (temp: number): string =&gt; {
         return `${Math.round(temp)}°C`;
     };
 
     // Format time from timestamp
-    const formatTime = (timestamp: number): string => {
+    const formatTime = (timestamp: number): string =&gt; {
         return new Date(timestamp * 1000).toLocaleTimeString('en-US', {
             hour: 'numeric',
             minute: '2-digit'
@@ -1428,7 +1426,7 @@ const WeatherCard: React.FC&lt;WeatherCardProps&gt; = ({
             {/* Header with city name and favorite button */}
             &lt;div className="weather-header"&gt;
                 &lt;h2&gt;{weather.name}, {weather.sys.country}&lt;/h2&gt;
-                {onAddToFavorites && (
+                {onAddToFavorites &amp;&amp; (
                     &lt;button
                         onClick={() =&gt; onAddToFavorites(weather.name)}
                         className="favorite-button"
@@ -1482,10 +1480,13 @@ const WeatherCard: React.FC&lt;WeatherCardProps&gt; = ({
                     &lt;span className="detail-value"&gt;{weather.main.pressure} hPa&lt;/span&gt;
                 &lt;/div&gt;
 
-                &lt;div className="detail-item"&gt;
-                    &lt;span className="detail-label"&gt;👁️ Visibility&lt;/span&gt;
-                    &lt;span className="detail-value"&gt;{(weather.visibility / 1000).toFixed(1)} km&lt;/span&gt;
-                &lt;/div&gt;
+                {/* `visibility` is optional in the API response, so guard it */}
+                {typeof weather.visibility === 'number' &amp;&amp; (
+                    &lt;div className="detail-item"&gt;
+                        &lt;span className="detail-label"&gt;👁️ Visibility&lt;/span&gt;
+                        &lt;span className="detail-value"&gt;{(weather.visibility / 1000).toFixed(1)} km&lt;/span&gt;
+                    &lt;/div&gt;
+                )}
 
                 &lt;div className="detail-item"&gt;
                     &lt;span className="detail-label"&gt;🌅 Sunrise&lt;/span&gt;
@@ -1529,87 +1530,38 @@ export default WeatherCard;</code></pre>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/ForecastCard.tsx
-import React from 'react';
-
-interface ForecastItem {
-    dt: number;
-    main: {
-        temp: number;
-        temp_min: number;
-        temp_max: number;
-        humidity: number;
-    };
-    weather: Array&lt;{
-        main: string;
-        description: string;
-    }&gt;;
-    wind: {
-        speed: number;
-    };
-}
+import { getWeatherEmoji } from '../utils/weatherIcons';
+import { formatDate } from '../utils/formatters';
+import type { DailyForecast } from '../types/weather';
 
 interface ForecastCardProps {
-    forecast: ForecastItem;
+    forecast: DailyForecast;
 }
 
-const ForecastCard: React.FC&lt;ForecastCardProps&gt; = ({ forecast }) => {
-    // Get weather emoji
-    const getWeatherEmoji = (condition: string): string => {
-        const lowerCondition = condition.toLowerCase();
-        if (lowerCondition.includes('clear')) return '☀️';
-        if (lowerCondition.includes('cloud')) return '☁️';
-        if (lowerCondition.includes('rain')) return '🌧️';
-        if (lowerCondition.includes('snow')) return '❄️';
-        if (lowerCondition.includes('thunder')) return '⛈️';
-        return '🌤️';
-    };
-
-    // Format date
-    const formatDate = (timestamp: number): string => {
-        const date = new Date(timestamp * 1000);
-        return date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
-
-    // Format temperature
-    const formatTemp = (temp: number): string => {
-        return `${Math.round(temp)}°`;
-    };
-
+// This card renders one already-processed day. All the grouping/averaging work
+// happened once in weatherService.processForecastData — the component just displays.
+function ForecastCard({ forecast }: ForecastCardProps) {
     return (
         &lt;div className="forecast-card"&gt;
-            {/* Date */}
-            &lt;div className="forecast-date"&gt;
-                {formatDate(forecast.dt)}
-            &lt;/div&gt;
+            &lt;div className="forecast-date"&gt;{formatDate(forecast.date)}&lt;/div&gt;
 
-            {/* Weather icon */}
-            &lt;div className="forecast-icon"&gt;
-                {getWeatherEmoji(forecast.weather[0].main)}
-            &lt;/div&gt;
+            {/* icon is the OpenWeatherMap code (e.g. "10d"); map it to an emoji */}
+            &lt;div className="forecast-icon"&gt;{getWeatherEmoji(forecast.icon)}&lt;/div&gt;
 
-            {/* Temperature range */}
             &lt;div className="forecast-temps"&gt;
-                &lt;span className="temp-high"&gt;{formatTemp(forecast.main.temp_max)}&lt;/span&gt;
-                &lt;span className="temp-low"&gt;{formatTemp(forecast.main.temp_min)}&lt;/span&gt;
+                &lt;span className="temp-high"&gt;{Math.round(forecast.tempMax)}°&lt;/span&gt;
+                &lt;span className="temp-low"&gt;{Math.round(forecast.tempMin)}°&lt;/span&gt;
             &lt;/div&gt;
 
-            {/* Weather description */}
-            &lt;div className="forecast-description"&gt;
-                {forecast.weather[0].description}
-            &lt;/div&gt;
+            &lt;div className="forecast-description"&gt;{forecast.description}&lt;/div&gt;
 
-            {/* Additional details */}
             &lt;div className="forecast-details"&gt;
-                &lt;small&gt;💧 {forecast.main.humidity}%&lt;/small&gt;
-                &lt;small&gt;🌬️ {forecast.wind.speed} m/s&lt;/small&gt;
+                &lt;small&gt;💧 {forecast.humidity}%&lt;/small&gt;
+                &lt;small&gt;🌬️ {forecast.windSpeed} m/s&lt;/small&gt;
             &lt;/div&gt;
         &lt;/div&gt;
     );
-};
+}
 
 export default ForecastCard;</code></pre>
                 </div>
@@ -1621,77 +1573,36 @@ export default ForecastCard;</code></pre>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/ForecastList.tsx
-import React from 'react';
 import ForecastCard from './ForecastCard';
-
-interface ForecastData {
-    list: Array&lt;{
-        dt: number;
-        main: {
-            temp: number;
-            temp_min: number;
-            temp_max: number;
-            humidity: number;
-        };
-        weather: Array&lt;{
-            main: string;
-            description: string;
-        }&gt;;
-        wind: {
-            speed: number;
-        };
-    }&gt;;
-}
+import type { DailyForecast } from '../types/weather';
 
 interface ForecastListProps {
-    forecast: ForecastData;
+    forecast: DailyForecast[];
 }
 
-const ForecastList: React.FC&lt;ForecastListProps&gt; = ({ forecast }) => {
-    // Group forecast by day (take one entry per day at noon)
-    const getDailyForecasts = () => {
-        const dailyForecasts = [];
-        const seenDates = new Set&lt;string&gt;();
-
-        for (const item of forecast.list) {
-            const date = new Date(item.dt * 1000);
-            const dateString = date.toDateString();
-
-            // Take the noon forecast for each day (or closest to noon)
-            if (!seenDates.has(dateString) || date.getHours() === 12) {
-                if (!seenDates.has(dateString)) {
-                    seenDates.add(dateString);
-                    dailyForecasts.push(item);
-                }
-            }
-
-            // Limit to 5 days
-            if (dailyForecasts.length >= 5) break;
-        }
-
-        return dailyForecasts;
-    };
-
-    const dailyForecasts = getDailyForecasts();
+// The list is purely presentational: it receives the 5 already-computed days
+// from the hook and lays them out. No data massaging happens here.
+function ForecastList({ forecast }: ForecastListProps) {
+    if (forecast.length === 0) return null;
 
     return (
         &lt;div className="forecast-list"&gt;
             &lt;h3 className="forecast-title"&gt;📅 5-Day Forecast&lt;/h3&gt;
             &lt;div className="forecast-grid"&gt;
-                {dailyForecasts.map((item) =&gt; (
-                    &lt;ForecastCard key={item.dt} forecast={item} /&gt;
+                {forecast.map((day) =&gt; (
+                    &lt;ForecastCard key={day.date} forecast={day} /&gt;
                 ))}
             &lt;/div&gt;
         &lt;/div&gt;
     );
-};
+}
 
 export default ForecastList;</code></pre>
                 </div>
 
                 <div class="card card-warning">
                     <h4>⚠️ Forecast Data Processing</h4>
-                    <p>The OpenWeatherMap 5-day forecast API returns data in 3-hour intervals, giving you 40 data points. We filter this to get one forecast per day (preferably at noon) to create a clean 5-day view.</p>
+                    <p>The OpenWeatherMap 5-day forecast API returns data in 3-hour intervals — about 40 data points. We collapse those into one entry per day (preferring the midday reading) inside <code>weatherService.processForecastData</code>, so this component receives a clean <code>DailyForecast[]</code> and never has to think about raw slices. Doing the transformation in one place keeps every component that shows forecast data consistent.</p>
                 </div>
 
                 <h3>⭐ FavoritesList Component</h3>
@@ -1701,21 +1612,20 @@ export default ForecastList;</code></pre>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/FavoritesList.tsx
-import React from 'react';
 
 interface FavoritesListProps {
     favorites: string[];
-    onSelectCity: (city: string) => void;
-    onRemoveFavorite: (city: string) => void;
+    onSelectCity: (city: string) =&gt; void;
+    onRemoveFavorite: (city: string) =&gt; void;
     currentCity?: string;
 }
 
-const FavoritesList: React.FC&lt;FavoritesListProps&gt; = ({
+function FavoritesList({
     favorites,
     onSelectCity,
     onRemoveFavorite,
     currentCity
-}) => {
+}: FavoritesListProps) {
     if (favorites.length === 0) {
         return (
             &lt;div className="favorites-list empty"&gt;
@@ -1781,15 +1691,12 @@ export default FavoritesList;</code></pre>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/LoadingSpinner.tsx
-import React from 'react';
 
 interface LoadingSpinnerProps {
     message?: string;
 }
 
-const LoadingSpinner: React.FC&lt;LoadingSpinnerProps&gt; = ({ 
-    message = 'Loading...' 
-}) => {
+function LoadingSpinner({ message = 'Loading...' }: LoadingSpinnerProps) {
     return (
         &lt;div className="loading-spinner" role="status" aria-live="polite"&gt;
             &lt;div className="spinner-icon"&gt;🔄&lt;/div&gt;
@@ -1805,20 +1712,19 @@ export default LoadingSpinner;</code></pre>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/ErrorMessage.tsx
-import React from 'react';
 
 interface ErrorMessageProps {
     message: string;
-    onRetry?: () => void;
+    onRetry?: () =&gt; void;
 }
 
-const ErrorMessage: React.FC&lt;ErrorMessageProps&gt; = ({ message, onRetry }) => {
+function ErrorMessage({ message, onRetry }: ErrorMessageProps) {
     return (
         &lt;div className="error-message" role="alert"&gt;
             &lt;div className="error-icon"&gt;❌&lt;/div&gt;
             &lt;h3&gt;Oops! Something went wrong&lt;/h3&gt;
             &lt;p&gt;{message}&lt;/p&gt;
-            {onRetry && (
+            {onRetry &amp;&amp; (
                 &lt;button onClick={onRetry} className="retry-button"&gt;
                     🔄 Try Again
                 &lt;/button&gt;
@@ -2360,7 +2266,7 @@ body {
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/App.tsx
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import SearchBar from './components/SearchBar';
 import WeatherCard from './components/WeatherCard';
 import ForecastList from './components/ForecastList';
@@ -2372,59 +2278,36 @@ import { useFavorites } from './hooks/useFavorites';
 import { useGeolocation } from './hooks/useGeolocation';
 import './App.css';
 
-const App: React.FC = () => {
-    // State for selected city
-    const [selectedCity, setSelectedCity] = useState&lt;string&gt;('London');
+function App() {
+    const [selectedCity, setSelectedCity] = useState('London');
 
-    // Custom hooks
-    const { 
-        currentWeather, 
-        forecast, 
-        loading, 
-        error, 
-        fetchWeather 
-    } = useWeather();
-
-    const { 
-        favorites, 
-        addFavorite, 
-        removeFavorite, 
-        isFavorite 
-    } = useFavorites();
-
-    const { 
-        coordinates, 
-        loading: geoLoading, 
-        error: geoError, 
-        getCurrentPosition 
+    // The single source of truth for weather is the discriminated-union `state`.
+    const { state, fetchWeather, fetchWeatherByCoords } = useWeather();
+    const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
+    const {
+        coordinates,
+        loading: geoLoading,
+        error: geoError,
+        getCurrentPosition
     } = useGeolocation();
 
-    // Fetch weather when selected city changes
-    useEffect(() => {
-        if (selectedCity) {
-            fetchWeather(selectedCity);
-        }
+    // Fetch whenever the selected city changes (also runs once on mount).
+    useEffect(() =&gt; {
+        if (selectedCity) fetchWeather(selectedCity);
     }, [selectedCity, fetchWeather]);
 
-    // Fetch weather for user's location when coordinates are available
-    useEffect(() => {
+    // When geolocation returns coordinates, fetch weather for that point.
+    useEffect(() =&gt; {
         if (coordinates) {
-            fetchWeather(undefined, coordinates);
+            fetchWeatherByCoords(coordinates.latitude, coordinates.longitude);
         }
-    }, [coordinates, fetchWeather]);
+    }, [coordinates, fetchWeatherByCoords]);
 
-    // Handle city search
-    const handleSearch = useCallback((city: string) => {
+    const handleSearch = useCallback((city: string) =&gt; {
         setSelectedCity(city);
     }, []);
 
-    // Handle favorite city selection
-    const handleSelectFavorite = useCallback((city: string) => {
-        setSelectedCity(city);
-    }, []);
-
-    // Handle add/remove favorite
-    const handleToggleFavorite = useCallback((city: string) => {
+    const handleToggleFavorite = useCallback((city: string) =&gt; {
         if (isFavorite(city)) {
             removeFavorite(city);
         } else {
@@ -2432,33 +2315,23 @@ const App: React.FC = () => {
         }
     }, [isFavorite, addFavorite, removeFavorite]);
 
-    // Handle retry after error
-    const handleRetry = useCallback(() => {
-        if (selectedCity) {
-            fetchWeather(selectedCity);
-        }
+    const handleRetry = useCallback(() =&gt; {
+        if (selectedCity) fetchWeather(selectedCity);
     }, [selectedCity, fetchWeather]);
-
-    // Handle get current location
-    const handleGetLocation = useCallback(() => {
-        getCurrentPosition();
-    }, [getCurrentPosition]);
 
     return (
         &lt;div className="app-container"&gt;
-            {/* Header */}
             &lt;header className="app-header"&gt;
                 &lt;h1&gt;🌤️ Weather Dashboard&lt;/h1&gt;
                 &lt;p&gt;Get real-time weather information for cities worldwide&lt;/p&gt;
             &lt;/header&gt;
 
-            {/* Search Bar */}
-            &lt;SearchBar onSearch={handleSearch} isLoading={loading} /&gt;
+            &lt;SearchBar onSearch={handleSearch} isLoading={state.status === 'loading'} /&gt;
 
-            {/* Geolocation Button */}
+            {/* Geolocation button */}
             &lt;div style={{ textAlign: 'center', marginBottom: '2rem' }}&gt;
-                &lt;button 
-                    onClick={handleGetLocation}
+                &lt;button
+                    onClick={getCurrentPosition}
                     disabled={geoLoading}
                     className="location-button"
                     style={{
@@ -2474,46 +2347,42 @@ const App: React.FC = () => {
                 &gt;
                     📍 {geoLoading ? 'Getting location...' : 'Use My Location'}
                 &lt;/button&gt;
-                {geoError && (
-                    &lt;p style={{ color: '#dc3545', marginTop: '0.5rem' }}&gt;
-                        {geoError}
-                    &lt;/p&gt;
+                {geoError &amp;&amp; (
+                    &lt;p style={{ color: '#dc3545', marginTop: '0.5rem' }}&gt;{geoError}&lt;/p&gt;
                 )}
             &lt;/div&gt;
 
-            {/* Main Content */}
-            {loading && !currentWeather && (
+            {/* Render exactly one branch of the state machine */}
+            {state.status === 'loading' &amp;&amp; (
                 &lt;LoadingSpinner message="Fetching weather data..." /&gt;
             )}
 
-            {error && !loading && (
-                &lt;ErrorMessage message={error} onRetry={handleRetry} /&gt;
+            {state.status === 'error' &amp;&amp; (
+                &lt;ErrorMessage message={state.error} onRetry={handleRetry} /&gt;
             )}
 
-            {currentWeather && !error && (
+            {state.status === 'success' &amp;&amp; (
                 &lt;&gt;
-                    {/* Current Weather */}
+                    {/* Inside this branch TypeScript KNOWS state.weather exists */}
                     &lt;WeatherCard
-                        weather={currentWeather}
+                        weather={state.weather}
                         onAddToFavorites={handleToggleFavorite}
-                        isFavorite={isFavorite(currentWeather.name)}
+                        isFavorite={isFavorite(state.weather.name)}
                     /&gt;
 
-                    {/* 5-Day Forecast */}
-                    {forecast && &lt;ForecastList forecast={forecast} /&gt;}
+                    &lt;ForecastList forecast={state.forecast} /&gt;
 
-                    {/* Favorites List */}
                     &lt;FavoritesList
                         favorites={favorites}
-                        onSelectCity={handleSelectFavorite}
+                        onSelectCity={handleSearch}
                         onRemoveFavorite={removeFavorite}
-                        currentCity={currentWeather.name}
+                        currentCity={state.weather.name}
                     /&gt;
                 &lt;/&gt;
             )}
         &lt;/div&gt;
     );
-};
+}
 
 export default App;</code></pre>
                 </div>
@@ -2557,21 +2426,18 @@ export default App;</code></pre>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/main.tsx
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// Create root element
-const root = ReactDOM.createRoot(
-    document.getElementById('root') as HTMLElement
-);
+const rootElement = document.getElementById('root');
+if (!rootElement) throw new Error('Root element #root not found in index.html');
 
-// Render app
-root.render(
-    &lt;React.StrictMode&gt;
+createRoot(rootElement).render(
+    &lt;StrictMode&gt;
         &lt;App /&gt;
-    &lt;/React.StrictMode&gt;
+    &lt;/StrictMode&gt;
 );</code></pre>
                 </div>
 
@@ -2610,7 +2476,12 @@ code {
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-bash"># .env
-VITE_OPENWEATHER_API_KEY=your_api_key_here</code></pre>
+VITE_WEATHER_API_KEY=your_api_key_here</code></pre>
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 StrictMode runs your effects twice (on purpose)</h4>
+                    <p>In development, React 19's <code>&lt;StrictMode&gt;</code> intentionally mounts, unmounts, and remounts each component to surface missing cleanup. That means your <code>useEffect</code> fires twice and fires two fetches. This is exactly why <code>useWeather</code> aborts the previous request and cleans up on unmount — with that in place, the double-invoke is harmless and you'll see only the correct final result.</p>
                 </div>
 
                 <div class="card card-warning">
@@ -2734,7 +2605,7 @@ npm run dev
                     <p><strong>Solution:</strong></p>
                     <ul>
                         <li>Verify your API key is correct in .env file</li>
-                        <li>Check that the variable name is VITE_OPENWEATHER_API_KEY</li>
+                        <li>Check that the variable name is exactly <code>VITE_WEATHER_API_KEY</code> (Vite only exposes vars prefixed with <code>VITE_</code>)</li>
                         <li>Restart the development server after changing .env</li>
                         <li>Wait a few minutes for new API keys to activate</li>
                     </ul>
@@ -2778,15 +2649,15 @@ npm run dev
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// In App.tsx, add this useEffect
-useEffect(() => {
+useEffect(() =&gt; {
     // Refresh weather every 10 minutes
-    const interval = setInterval(() => {
+    const interval = setInterval(() =&gt; {
         if (selectedCity) {
             fetchWeather(selectedCity);
         }
     }, 10 * 60 * 1000); // 10 minutes
 
-    return () => clearInterval(interval);
+    return () =&gt; clearInterval(interval);
 }, [selectedCity, fetchWeather]);</code></pre>
                 </div>
 
@@ -2801,21 +2672,24 @@ const [unit, setUnit] = useState&lt;'metric' | 'imperial'&gt;('metric');
     {unit === 'metric' ? '°C' : '°F'}
 &lt;/button&gt;
 
-// Pass unit to fetchWeather
-fetchWeather(selectedCity, undefined, unit);</code></pre>
+// To make this real, thread `unit` into the service's URL builder
+// (units: unit) and re-fetch when it changes:
+useEffect(() =&gt; {
+    if (selectedCity) fetchWeather(selectedCity);
+}, [selectedCity, unit, fetchWeather]);</code></pre>
                 </div>
 
                 <h4>3. Weather Alerts</h4>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
-                    <pre><code class="language-typescript">// Show alerts for extreme weather
-{currentWeather.main.temp &gt; 35 && (
+                    <pre><code class="language-typescript">// Inside the state.status === 'success' branch, `state.weather` is available:
+{state.weather.main.temp &gt; 35 &amp;&amp; (
     &lt;div className="alert alert-danger"&gt;
         🔥 Extreme Heat Warning!
     &lt;/div&gt;
 )}
 
-{currentWeather.main.temp &lt; 0 && (
+{state.weather.main.temp &lt; 0 &amp;&amp; (
     &lt;div className="alert alert-info"&gt;
         ❄️ Freezing Temperature Alert!
     &lt;/div&gt;
@@ -2835,7 +2709,7 @@ const WeatherSkeleton = () =&gt; (
 );
 
 // Use it instead of LoadingSpinner
-{loading && &lt;WeatherSkeleton /&gt;}</code></pre>
+{loading &amp;&amp; &lt;WeatherSkeleton /&gt;}</code></pre>
                 </div>
 
                 <div class="card card-success">
@@ -2864,98 +2738,98 @@ const WeatherSkeleton = () =&gt; (
                     <h4>🎯 Functional Testing</h4>
                     
                     <h5>Search Feature</h5>
-                    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+                    <div class="table-wrap"><table>
                         <thead>
-                            <tr style="background: #f8f9fa;">
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Test Case</th>
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Expected Result</th>
-                                <th style="padding: 0.75rem; text-align: center; border: 1px solid #dee2e6; width: 80px;">Pass</th>
+                            <tr>
+                                <th>Test Case</th>
+                                <th>Expected Result</th>
+                                <th>Pass</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Search for valid city (e.g., "Paris")</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Weather data loads correctly</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Search for valid city (e.g., "Paris")</td>
+                                <td>Weather data loads correctly</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Search for invalid city</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Error message displays</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Search for invalid city</td>
+                                <td>Error message displays</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Type slowly (debouncing)</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Search waits 500ms before fetching</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Type slowly (debouncing)</td>
+                                <td>Search waits 500ms before fetching</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Submit with Enter key</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Search triggers immediately</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Submit with Enter key</td>
+                                <td>Search triggers immediately</td>
+                                <td>☐</td>
                             </tr>
                         </tbody>
-                    </table>
+                    </table></div>
 
                     <h5>Favorites Feature</h5>
-                    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+                    <div class="table-wrap"><table>
                         <thead>
-                            <tr style="background: #f8f9fa;">
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Test Case</th>
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Expected Result</th>
-                                <th style="padding: 0.75rem; text-align: center; border: 1px solid #dee2e6; width: 80px;">Pass</th>
+                            <tr>
+                                <th>Test Case</th>
+                                <th>Expected Result</th>
+                                <th>Pass</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Click star to add favorite</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">City appears in favorites list</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Click star to add favorite</td>
+                                <td>City appears in favorites list</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Refresh page</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Favorites persist</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Refresh page</td>
+                                <td>Favorites persist</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Click favorite city</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Weather loads for that city</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Click favorite city</td>
+                                <td>Weather loads for that city</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Click X to remove</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">City removed from favorites</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Click X to remove</td>
+                                <td>City removed from favorites</td>
+                                <td>☐</td>
                             </tr>
                         </tbody>
-                    </table>
+                    </table></div>
 
                     <h5>Geolocation Feature</h5>
-                    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+                    <div class="table-wrap"><table>
                         <thead>
-                            <tr style="background: #f8f9fa;">
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Test Case</th>
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Expected Result</th>
-                                <th style="padding: 0.75rem; text-align: center; border: 1px solid #dee2e6; width: 80px;">Pass</th>
+                            <tr>
+                                <th>Test Case</th>
+                                <th>Expected Result</th>
+                                <th>Pass</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Click "Use My Location"</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Browser asks for permission</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Click "Use My Location"</td>
+                                <td>Browser asks for permission</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Allow location access</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Weather loads for current location</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Allow location access</td>
+                                <td>Weather loads for current location</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Deny location access</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Error message displays</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td>Deny location access</td>
+                                <td>Error message displays</td>
+                                <td>☐</td>
                             </tr>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
 
                 <h3>🎨 UI/UX Testing</h3>
@@ -2976,32 +2850,32 @@ const WeatherSkeleton = () =&gt; (
                 <h3>📱 Responsive Design Testing</h3>
                 <div class="card">
                     <h4>Device Testing</h4>
-                    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+                    <div class="table-wrap"><table>
                         <thead>
-                            <tr style="background: #f8f9fa;">
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Device/Size</th>
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Checks</th>
-                                <th style="padding: 0.75rem; text-align: center; border: 1px solid #dee2e6; width: 80px;">Pass</th>
+                            <tr>
+                                <th>Device/Size</th>
+                                <th>Checks</th>
+                                <th>Pass</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;"><strong>Mobile (320-480px)</strong></td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Single column layout, stacked elements</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td><strong>Mobile (320-480px)</strong></td>
+                                <td>Single column layout, stacked elements</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;"><strong>Tablet (768-1024px)</strong></td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">2-3 column grids, proper spacing</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td><strong>Tablet (768-1024px)</strong></td>
+                                <td>2-3 column grids, proper spacing</td>
+                                <td>☐</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;"><strong>Desktop (1024px+)</strong></td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Full grid layout, max width applied</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6; text-align: center;">☐</td>
+                                <td><strong>Desktop (1024px+)</strong></td>
+                                <td>Full grid layout, max width applied</td>
+                                <td>☐</td>
                             </tr>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
 
                 <h3>♿ Accessibility Testing</h3>
@@ -3067,42 +2941,42 @@ const WeatherSkeleton = () =&gt; (
                 <h3>Deployment Options Overview</h3>
                 <div class="card card-info">
                     <h4>💡 Popular Hosting Platforms</h4>
-                    <table style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+                    <div class="table-wrap"><table>
                         <thead>
-                            <tr style="background: #f8f9fa;">
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Platform</th>
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Difficulty</th>
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Free Tier</th>
-                                <th style="padding: 0.75rem; text-align: left; border: 1px solid #dee2e6;">Best For</th>
+                            <tr>
+                                <th>Platform</th>
+                                <th>Difficulty</th>
+                                <th>Free Tier</th>
+                                <th>Best For</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;"><strong>Vercel</strong></td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">⭐ Easy</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">✅ Yes</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">React apps, fast deployment</td>
+                                <td><strong>Vercel</strong></td>
+                                <td>⭐ Easy</td>
+                                <td>✅ Yes</td>
+                                <td>React apps, fast deployment</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;"><strong>Netlify</strong></td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">⭐ Easy</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">✅ Yes</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Static sites, continuous deployment</td>
+                                <td><strong>Netlify</strong></td>
+                                <td>⭐ Easy</td>
+                                <td>✅ Yes</td>
+                                <td>Static sites, continuous deployment</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;"><strong>GitHub Pages</strong></td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">⭐⭐ Medium</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">✅ Yes</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Public repos, GitHub integration</td>
+                                <td><strong>GitHub Pages</strong></td>
+                                <td>⭐⭐ Medium</td>
+                                <td>✅ Yes</td>
+                                <td>Public repos, GitHub integration</td>
                             </tr>
                             <tr>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;"><strong>AWS Amplify</strong></td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">⭐⭐⭐ Advanced</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">✅ Limited</td>
-                                <td style="padding: 0.75rem; border: 1px solid #dee2e6;">Scalable apps, AWS ecosystem</td>
+                                <td><strong>AWS Amplify</strong></td>
+                                <td>⭐⭐⭐ Advanced</td>
+                                <td>✅ Limited</td>
+                                <td>Scalable apps, AWS ecosystem</td>
                             </tr>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
 
                 <h3>🎯 Deployment with Vercel (Recommended)</h3>
@@ -3132,11 +3006,12 @@ git push -u origin main</code></pre>
 
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
-                    <pre><code class="language-typescript">// Update src/services/weatherService.ts to use Vite env vars
-const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY;
+                    <pre><code class="language-typescript">// We already centralised this in src/config/env.ts, which throws on a missing key.
+// The same value is read via Vite's typed env:
+const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
 
 if (!API_KEY) {
-    console.error('API key is missing! Please set VITE_OPENWEATHER_API_KEY');
+    console.error('API key is missing! Please set VITE_WEATHER_API_KEY');
 }</code></pre>
                 </div>
 
@@ -3155,7 +3030,7 @@ if (!API_KEY) {
                         </li>
                         <li><strong>Add Environment Variables</strong>:
                             <ul>
-                                <li>Key: <code>VITE_OPENWEATHER_API_KEY</code></li>
+                                <li>Key: <code>VITE_WEATHER_API_KEY</code></li>
                                 <li>Value: Your API key</li>
                             </ul>
                         </li>
@@ -3230,7 +3105,7 @@ if (!API_KEY) {
   "homepage": "https://yourusername.github.io/weather-dashboard",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc -b &amp;&amp; vite build",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
@@ -3359,7 +3234,7 @@ root.render(
                 graph TD
                     A[Write Code] --> B[Commit to Git]
                     B --> C[Push to GitHub]
-                    C --> D[Vercel/Netlify Detects Push]
+                    C --> D["Vercel/Netlify Detects Push"]
                     D --> E[Automated Build]
                     E --> F[Run Tests]
                     F -->|Pass| G[Deploy to Production]
@@ -3410,19 +3285,19 @@ import { useState, useEffect } from 'react';
 
 type Theme = 'light' | 'dark';
 
-export const useTheme = () => {
-    const [theme, setTheme] = useState&lt;Theme&gt;(() => {
+export const useTheme = () =&gt; {
+    const [theme, setTheme] = useState&lt;Theme&gt;(() =&gt; {
         const saved = localStorage.getItem('theme');
         return (saved as Theme) || 'light';
     });
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         localStorage.setItem('theme', theme);
         document.documentElement.setAttribute('data-theme', theme);
     }, [theme]);
 
-    const toggleTheme = () => {
-        setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    const toggleTheme = () =&gt; {
+        setTheme(prev =&gt; prev === 'light' ? 'dark' : 'light');
     };
 
     return { theme, toggleTheme };
@@ -3490,7 +3365,6 @@ const { theme, toggleTheme } = useTheme();
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/TemperatureChart.tsx
-import React from 'react';
 import {
     LineChart,
     Line,
@@ -3510,7 +3384,7 @@ interface TemperatureChartProps {
     data: ChartData[];
 }
 
-const TemperatureChart: React.FC&lt;TemperatureChartProps&gt; = ({ data }) => {
+function TemperatureChart({ data }: TemperatureChartProps) {
     return (
         &lt;div className="temperature-chart"&gt;
             &lt;h3&gt;📈 Temperature Trend&lt;/h3&gt;
@@ -3545,20 +3419,20 @@ import { useState } from 'react';
 
 type Unit = 'metric' | 'imperial';
 
-export const useTemperatureUnit = () => {
+export const useTemperatureUnit = () =&gt; {
     const [unit, setUnit] = useState&lt;Unit&gt;('metric');
 
-    const toggleUnit = () => {
-        setUnit(prev => prev === 'metric' ? 'imperial' : 'metric');
+    const toggleUnit = () =&gt; {
+        setUnit(prev =&gt; prev === 'metric' ? 'imperial' : 'metric');
     };
 
-    const convertTemp = (celsius: number): number => {
+    const convertTemp = (celsius: number): number =&gt; {
         return unit === 'metric' 
             ? celsius 
             : (celsius * 9/5) + 32;
     };
 
-    const getUnitSymbol = (): string => {
+    const getUnitSymbol = (): string =&gt; {
         return unit === 'metric' ? '°C' : '°F';
     };
 
@@ -3580,7 +3454,6 @@ npm install --save-dev @types/leaflet</code></pre>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/WeatherMap.tsx
-import React from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -3590,7 +3463,7 @@ interface WeatherMapProps {
     cityName: string;
 }
 
-const WeatherMap: React.FC&lt;WeatherMapProps&gt; = ({ lat, lon, cityName }) => {
+function WeatherMap({ lat, lon, cityName }: WeatherMapProps) {
     return (
         &lt;div className="weather-map"&gt;
             &lt;h3&gt;🗺️ Location&lt;/h3&gt;
@@ -3621,17 +3494,18 @@ export default WeatherMap;</code></pre>
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/hooks/useNotifications.ts
 import { useEffect } from 'react';
+import type { WeatherData } from '@/types/weather';
 
-export const useNotifications = () => {
-    useEffect(() => {
+export const useNotifications = () =&gt; {
+    useEffect(() =&gt; {
         // Request notification permission
-        if ('Notification' in window && Notification.permission === 'default') {
+        if ('Notification' in window &amp;&amp; Notification.permission === 'default') {
             Notification.requestPermission();
         }
     }, []);
 
-    const sendNotification = (title: string, body: string) => {
-        if ('Notification' in window && Notification.permission === 'granted') {
+    const sendNotification = (title: string, body: string) =&gt; {
+        if ('Notification' in window &amp;&amp; Notification.permission === 'granted') {
             new Notification(title, {
                 body,
                 icon: '/weather-icon.png',
@@ -3640,9 +3514,9 @@ export const useNotifications = () => {
         }
     };
 
-    const checkWeatherAlerts = (weather: any) => {
+    const checkWeatherAlerts = (weather: WeatherData) =&gt; {
         // Extreme heat
-        if (weather.main.temp > 35) {
+        if (weather.main.temp &gt; 35) {
             sendNotification(
                 '🔥 Extreme Heat Warning!',
                 `Temperature in ${weather.name} is ${weather.main.temp}°C`
@@ -3650,7 +3524,7 @@ export const useNotifications = () => {
         }
 
         // Freezing temperatures
-        if (weather.main.temp < 0) {
+        if (weather.main.temp &lt; 0) {
             sendNotification(
                 '❄️ Freezing Alert!',
                 `Temperature in ${weather.name} is below freezing`
@@ -3658,7 +3532,7 @@ export const useNotifications = () => {
         }
 
         // High wind speeds
-        if (weather.wind.speed > 15) {
+        if (weather.wind.speed &gt; 15) {
             sendNotification(
                 '💨 High Wind Warning!',
                 `Wind speed in ${weather.name} is ${weather.wind.speed} m/s`
@@ -3785,15 +3659,14 @@ npm install react-animated-weather</code></pre>
                 <div class="code-block">
                     <button class="copy-button">Copy</button>
                     <pre><code class="language-typescript">// src/components/AnimatedWeatherIcon.tsx
-import React from 'react';
 import ReactAnimatedWeather from 'react-animated-weather';
 
 interface AnimatedWeatherIconProps {
     condition: string;
 }
 
-const AnimatedWeatherIcon: React.FC&lt;AnimatedWeatherIconProps&gt; = ({ condition }) => {
-    const getIcon = (condition: string) => {
+function AnimatedWeatherIcon({ condition }: AnimatedWeatherIconProps) {
+    const getIcon = (condition: string) =&gt; {
         const lower = condition.toLowerCase();
         if (lower.includes('clear')) return 'CLEAR_DAY';
         if (lower.includes('cloud')) return 'CLOUDY';
@@ -3864,8 +3737,8 @@ export default AnimatedWeatherIcon;</code></pre>
                 <p>You've completed the Module 4 Weather Dashboard project! This was a comprehensive application that brought together everything you learned in this module and beyond. Let's recap what you've accomplished:</p>
 
                 <div class="card card-accent">
-                    <h3 style="color: white;">🏆 What You Built</h3>
-                    <ul style="color: white;">
+                    <h3>🏆 What You Built</h3>
+                    <ul>
                         <li><strong>✅ Complete React + TypeScript Application</strong> - Full-stack frontend app</li>
                         <li><strong>✅ API Integration</strong> - Real-time data from OpenWeatherMap</li>
                         <li><strong>✅ Custom Hooks Library</strong> - Reusable logic (useWeather, useFavorites, useDebounce, useGeolocation)</li>
@@ -3909,14 +3782,14 @@ export default AnimatedWeatherIcon;</code></pre>
                 </div>
 
                 <div class="card card-accent" style="text-align: center; padding: 3rem;">
-                    <h2 style="color: white; font-size: 3rem; margin-bottom: 1rem;">🌟 Amazing Work! 🌟</h2>
-                    <p style="color: white; font-size: 1.3rem; margin-bottom: 2rem;">
+                    <h2 style="font-size: 3rem; margin-bottom: 1rem;">🌟 Amazing Work! 🌟</h2>
+                    <p style="font-size: 1.3rem; margin-bottom: 2rem;">
                         You've built a production-ready weather application from scratch. This is a major milestone in your React and TypeScript journey!
                     </p>
-                    <p style="color: white; font-size: 1.1rem;">
+                    <p style="font-size: 1.1rem;">
                         <strong>Keep building, keep learning, and keep pushing yourself to create amazing things!</strong>
                     </p>
-                    <p style="color: white; font-size: 2rem; margin-top: 2rem;">
+                    <p style="font-size: 2rem; margin-top: 2rem;">
                         🚀 Ready for Module 5? Let's go! 🚀
                     </p>
                 </div>

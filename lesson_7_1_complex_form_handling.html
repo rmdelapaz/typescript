@@ -59,20 +59,21 @@
             <!-- Lesson Header -->
             <header>
                 <h1>📝 Lesson 7.1: Complex Form Handling</h1>
-                <p class="lead">Forms are the backbone of user interaction in web applications. While simple forms are straightforward, real-world applications often require handling complex scenarios like multiple steps, dynamic fields, conditional validation, and nested data structures. In this lesson, you'll master the patterns and techniques needed to build robust, user-friendly forms in React with TypeScript.</p>
-                
+                <p class="lead">Forms are where your users actually <em>talk</em> to your app — every signup, checkout, and profile edit is a conversation happening through inputs. A form with two fields is easy. But real products demand forms with dozens of fields, nested data, fields that appear and disappear, arrays that grow and shrink, and validation rules that depend on each other. In this lesson you'll learn to build forms that stay robust and friendly even as that complexity piles up, all fully typed with TypeScript so the compiler catches mistakes before your users ever do. 📝</p>
+
                 <!-- Learning objectives -->
-                <div class="card">
+                <div class="card card-info">
                     <h2>🎯 Learning Objectives</h2>
                     <p>By the end of this lesson, you will be able to:</p>
                     <ul>
-                        <li>Manage complex form state with multiple fields and nested data structures</li>
-                        <li>Implement comprehensive validation strategies with real-time feedback</li>
+                        <li>Manage complex form state with a single typed state object and nested data structures</li>
+                        <li>Write typed change handlers that update multi-field and nested state immutably</li>
+                        <li>Implement per-field validation with properly typed error state and real-time feedback</li>
                         <li>Build dynamic forms with field arrays and conditional fields</li>
                         <li>Create clear, accessible error messaging for users</li>
                         <li>Optimize form performance to prevent unnecessary re-renders</li>
-                        <li>Handle advanced form scenarios like multi-step wizards and dependent fields</li>
-                        <li>Type form data and handlers properly with TypeScript</li>
+                        <li>Handle advanced scenarios like multi-step wizards and dependent fields</li>
+                        <li>Recognize when React 19's built-in form <strong>Actions</strong> (<code>useActionState</code>, <code>useFormStatus</code>) are the right tool</li>
                     </ul>
                     <p><strong>Estimated Time:</strong> 60-75 minutes</p>
                     <p><strong>Project:</strong> Build a comprehensive job application form with validation, dynamic fields, and multi-step flow</p>
@@ -106,6 +107,8 @@
             <section id="section1" aria-labelledby="section1-title">
                 <h2 id="section1-title">📋 Introduction to Complex Forms</h2>
                 <p>Forms are everywhere in web applications—user registration, profile editing, checkout flows, search filters, content creation, and much more. While simple forms with a few fields are straightforward, real-world applications often need to handle much more complex scenarios.</p>
+
+                <p>Think of a simple form like a paper sticky note: one line, one thought, done. A complex form is more like a job application packet — multiple pages, sections that only apply to some people, places where you attach extra sheets, and a reviewer who bounces it back if anything is missing. The skill you're building in this lesson is how to keep that packet feeling as effortless as the sticky note, even though there's a lot going on underneath. That "keep it simple for the user, organized for you" balance is exactly what separates a form people abandon from one they finish. 💡</p>
 
                 <h3>What Makes a Form "Complex"?</h3>
                 <p>A form becomes complex when it involves one or more of these challenges:</p>
@@ -152,7 +155,6 @@
                     style B fill:#48bb78,color:#fff
                     style C fill:#48bb78,color:#fff
                     style D fill:#48bb78,color:#fff
-                </graph>
                 </div>
 
                 <div class="card card-info">
@@ -205,7 +207,23 @@
             <!-- Section 2: Form State Management Patterns -->
             <section id="section2" aria-labelledby="section2-title">
                 <h2 id="section2-title">🗂️ Form State Management Patterns</h2>
-                <p>Managing form state is the foundation of form handling. Let's explore different patterns, from simple to sophisticated, and understand when to use each approach.</p>
+                <p>Managing form state is the foundation of everything else in this lesson. Before you can validate a field, show an error, or submit data, you need a reliable answer to one question: "where does each field's current value live?" Get this layer right and validation, error display, and submission all fall into place. Get it wrong and you'll fight your own form on every keystroke.</p>
+
+                <p>Nearly every React form is built from <strong>controlled inputs</strong>: the input's <code>value</code> comes <em>from</em> state, and every keystroke fires <code>onChange</code>, which updates state, which re-renders the input with the new value. It's a tight little loop, and understanding it is the key to everything that follows.</p>
+
+                <div class="mermaid">
+                graph LR
+                    A["User types a character"] --> B["onChange fires"]
+                    B --> C["setState updates formData"]
+                    C --> D["Component re-renders"]
+                    D --> E["input value = state"]
+                    E --> A
+
+                    style C fill:#667eea,color:#fff
+                    style E fill:#48bb78,color:#fff
+                </div>
+
+                <p>Let's explore different ways to hold that state, from simple to sophisticated, and understand when to reach for each.</p>
 
                 <h3>Pattern 1: Individual useState for Each Field</h3>
                 <p>The simplest approach is to create separate state variables for each form field:</p>
@@ -218,7 +236,7 @@ function SimpleForm() {
   const [address, setAddress] = useState('');
   // ... imagine 20 more fields
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     console.log({ name, email, phone, address });
   };
@@ -227,11 +245,11 @@ function SimpleForm() {
     &lt;form onSubmit={handleSubmit}&gt;
       &lt;input 
         value={name} 
-        onChange={(e) => setName(e.target.value)} 
+        onChange={(e) =&gt; setName(e.target.value)} 
       /&gt;
       &lt;input 
         value={email} 
-        onChange={(e) => setEmail(e.target.value)} 
+        onChange={(e) =&gt; setEmail(e.target.value)} 
       /&gt;
       {/* More inputs... */}
     &lt;/form&gt;
@@ -289,18 +307,18 @@ function BetterForm() {
   });
 
   // Generic handler for simple fields
-  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData(prev =&gt; ({
       ...prev,
       [name]: value
     }));
   };
 
   // Handler for nested fields
-  const handleAddressChange = (field: keyof FormData['address']) => 
-    (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
-      setFormData(prev => ({
+  const handleAddressChange = (field: keyof FormData['address']) =&gt; 
+    (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
+      setFormData(prev =&gt; ({
         ...prev,
         address: {
           ...prev.address,
@@ -309,7 +327,7 @@ function BetterForm() {
       }));
     };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     console.log(formData); // All data in one object
   };
@@ -453,8 +471,8 @@ const initialFormState: FormState = {
 function AdvancedForm() {
   const [state, dispatch] = useReducer(formReducer, initialFormState);
 
-  const handleChange = (field: string) => 
-    (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleChange = (field: string) =&gt; 
+    (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
       dispatch({ 
         type: 'SET_FIELD', 
         field, 
@@ -462,12 +480,12 @@ function AdvancedForm() {
       });
     };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) =&gt; {
     e.preventDefault();
     
     // Validate
     const validationErrors = validateForm(state.formData);
-    if (Object.keys(validationErrors).length > 0) {
+    if (Object.keys(validationErrors).length &gt; 0) {
       dispatch({ type: 'SUBMIT_FAILURE', errors: validationErrors });
       return;
     }
@@ -492,7 +510,7 @@ function AdvancedForm() {
         onChange={handleChange('name')}
         disabled={state.isSubmitting}
       /&gt;
-      {state.errors.name && &lt;span&gt;{state.errors.name}&lt;/span&gt;}
+      {state.errors.name &amp;&amp; &lt;span&gt;{state.errors.name}&lt;/span&gt;}
       {/* More fields... */}
       
       &lt;button type="submit" disabled={state.isSubmitting}&gt;
@@ -562,11 +580,11 @@ function UserForm() {
 
   return (
     &lt;form&gt;
-      &lt;input value={firstName} onChange={e => setFirstName(e.target.value)} /&gt;
-      &lt;input value={lastName} onChange={e => setLastName(e.target.value)} /&gt;
-      &lt;input value={email} onChange={e => setEmail(e.target.value)} /&gt;
-      &lt;input value={age} onChange={e => setAge(e.target.value)} /&gt;
-      &lt;select value={country} onChange={e => setCountry(e.target.value)}&gt;
+      &lt;input value={firstName} onChange={e =&gt; setFirstName(e.target.value)} /&gt;
+      &lt;input value={lastName} onChange={e =&gt; setLastName(e.target.value)} /&gt;
+      &lt;input value={email} onChange={e =&gt; setEmail(e.target.value)} /&gt;
+      &lt;input value={age} onChange={e =&gt; setAge(e.target.value)} /&gt;
+      &lt;select value={country} onChange={e =&gt; setCountry(e.target.value)}&gt;
         &lt;option value=""&gt;Select country&lt;/option&gt;
         &lt;option value="us"&gt;United States&lt;/option&gt;
         &lt;option value="uk"&gt;United Kingdom&lt;/option&gt;
@@ -601,9 +619,9 @@ function UserForm() {
 
   const handleChange = (
     e: React.ChangeEvent&lt;HTMLInputElement | HTMLSelectElement&gt;
-  ) => {
+  ) =&gt; {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData(prev =&gt; ({
       ...prev,
       [name]: value
     }));
@@ -681,7 +699,6 @@ function UserForm() {
                     style A fill:#667eea,color:#fff
                     style B fill:#48bb78,color:#fff
                     style C fill:#ed8936,color:#fff
-                </graph>
                 </div>
 
                 <h3>When to Validate?</h3>
@@ -727,12 +744,9 @@ function UserForm() {
                 </div>
 
                 <!-- Interactive Validation Timing Visualization -->
-                <div class="card" style="padding: 0; overflow: hidden; margin: 2rem 0;">
-                    <div style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; padding: 1rem 1.5rem;">
-                        <h4 style="color: white; margin: 0;">⚡ Interactive: Validation Timing Comparison</h4>
-                        <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 0.9rem;">Experience how different validation strategies feel from a user's perspective</p>
-                    </div>
-                    <div style="padding: 1.5rem;">
+                <div class="card">
+                    <h4>⚡ Interactive: Validation Timing Comparison</h4>
+                    <p>Experience how different validation strategies feel from a user's perspective.</p>
                         <svg class="svg-auto-invert" id="validationTimingViz" viewBox="0 0 750 380" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; font-family: system-ui, sans-serif;">
                             <defs>
                                 <linearGradient id="inputGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -793,8 +807,7 @@ function UserForm() {
                             <button onclick="resetValidationDemo()" style="padding: 0.6rem 1rem; background: #f5f5f5; color: #666; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;">Reset</button>
                         </div>
                         
-                        <p style="text-align: center; margin-top: 1rem; font-size: 0.85rem; color: #666;">Try different strategies to see how validation timing affects user experience</p>
-                    </div>
+                        <p>Try different strategies to see how validation timing affects user experience.</p>
                 </div>
                 
                 <script>
@@ -955,7 +968,7 @@ function RegistrationForm() {
   const [touched, setTouched] = useState&lt;Record&lt;string, boolean&gt;&gt;({});
 
   // Validation functions
-  const validateEmail = (email: string): string | undefined => {
+  const validateEmail = (email: string): string | undefined =&gt; {
     if (!email) return 'Email is required';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return 'Invalid email format';
@@ -963,9 +976,9 @@ function RegistrationForm() {
     return undefined;
   };
 
-  const validatePassword = (password: string): string | undefined => {
+  const validatePassword = (password: string): string | undefined =&gt; {
     if (!password) return 'Password is required';
-    if (password.length < 8) return 'Password must be at least 8 characters';
+    if (password.length &lt; 8) return 'Password must be at least 8 characters';
     if (!/[A-Z]/.test(password)) return 'Password must contain uppercase letter';
     if (!/[a-z]/.test(password)) return 'Password must contain lowercase letter';
     if (!/[0-9]/.test(password)) return 'Password must contain a number';
@@ -975,27 +988,27 @@ function RegistrationForm() {
   const validateConfirmPassword = (
     password: string, 
     confirmPassword: string
-  ): string | undefined => {
+  ): string | undefined =&gt; {
     if (!confirmPassword) return 'Please confirm your password';
     if (password !== confirmPassword) return 'Passwords do not match';
     return undefined;
   };
 
   // Real-time validation for password strength
-  const handlePasswordChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handlePasswordChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
     const newPassword = e.target.value;
-    setFormData(prev => ({ ...prev, password: newPassword }));
+    setFormData(prev =&gt; ({ ...prev, password: newPassword }));
     
     // Real-time validation shows password strength immediately
     if (touched.password) {
       const error = validatePassword(newPassword);
-      setErrors(prev => ({ ...prev, password: error }));
+      setErrors(prev =&gt; ({ ...prev, password: error }));
     }
   };
 
   // On blur validation for most fields
-  const handleBlur = (field: keyof FormData) => () => {
-    setTouched(prev => ({ ...prev, [field]: true }));
+  const handleBlur = (field: keyof FormData) =&gt; () =&gt; {
+    setTouched(prev =&gt; ({ ...prev, [field]: true }));
     
     let error: string | undefined;
     
@@ -1011,11 +1024,11 @@ function RegistrationForm() {
         break;
     }
     
-    setErrors(prev => ({ ...prev, [field]: error }));
+    setErrors(prev =&gt; ({ ...prev, [field]: error }));
   };
 
   // On submit validation (validates everything)
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) =&gt; {
     e.preventDefault();
     
     // Mark all fields as touched
@@ -1037,7 +1050,7 @@ function RegistrationForm() {
     };
 
     // Remove undefined errors
-    Object.keys(newErrors).forEach(key => {
+    Object.keys(newErrors).forEach(key =&gt; {
       if (newErrors[key as keyof FormErrors] === undefined) {
         delete newErrors[key as keyof FormErrors];
       }
@@ -1046,7 +1059,7 @@ function RegistrationForm() {
     setErrors(newErrors);
 
     // If there are errors, don't submit
-    if (Object.keys(newErrors).length > 0) {
+    if (Object.keys(newErrors).length &gt; 0) {
       return;
     }
 
@@ -1068,12 +1081,12 @@ function RegistrationForm() {
           type="email"
           name="email"
           value={formData.email}
-          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+          onChange={(e) =&gt; setFormData(prev =&gt; ({ ...prev, email: e.target.value }))}
           onBlur={handleBlur('email')}
           aria-invalid={!!errors.email}
           aria-describedby={errors.email ? 'email-error' : undefined}
         /&gt;
-        {errors.email && touched.email && (
+        {errors.email &amp;&amp; touched.email &amp;&amp; (
           &lt;span id="email-error" role="alert" style={{ color: 'red' }}&gt;
             {errors.email}
           &lt;/span&gt;
@@ -1092,7 +1105,7 @@ function RegistrationForm() {
           aria-invalid={!!errors.password}
           aria-describedby={errors.password ? 'password-error' : undefined}
         /&gt;
-        {errors.password && (
+        {errors.password &amp;&amp; (
           &lt;span id="password-error" role="alert" style={{ color: 'red' }}&gt;
             {errors.password}
           &lt;/span&gt;
@@ -1106,12 +1119,12 @@ function RegistrationForm() {
           type="password"
           name="confirmPassword"
           value={formData.confirmPassword}
-          onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+          onChange={(e) =&gt; setFormData(prev =&gt; ({ ...prev, confirmPassword: e.target.value }))}
           onBlur={handleBlur('confirmPassword')}
           aria-invalid={!!errors.confirmPassword}
           aria-describedby={errors.confirmPassword ? 'confirm-password-error' : undefined}
         /&gt;
-        {errors.confirmPassword && touched.confirmPassword && (
+        {errors.confirmPassword &amp;&amp; touched.confirmPassword &amp;&amp; (
           &lt;span id="confirm-password-error" role="alert" style={{ color: 'red' }}&gt;
             {errors.confirmPassword}
           &lt;/span&gt;
@@ -1143,14 +1156,14 @@ function RegistrationForm() {
   const [isChecking, setIsChecking] = useState(false);
 
   // Debounced validation check
-  useEffect(() => {
+  useEffect(() =&gt; {
     if (!username) {
       setError(undefined);
       return;
     }
 
     // Don't check immediately - wait for user to stop typing
-    const timeoutId = setTimeout(async () => {
+    const timeoutId = setTimeout(async () =&gt; {
       setIsChecking(true);
       
       try {
@@ -1168,7 +1181,7 @@ function RegistrationForm() {
     }, 500); // Wait 500ms after user stops typing
 
     // Cleanup function cancels the previous timeout
-    return () => clearTimeout(timeoutId);
+    return () =&gt; clearTimeout(timeoutId);
   }, [username]);
 
   return (
@@ -1177,12 +1190,12 @@ function RegistrationForm() {
       &lt;input
         id="username"
         value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        onChange={(e) =&gt; setUsername(e.target.value)}
         aria-invalid={!!error}
         aria-describedby={error ? 'username-error' : undefined}
       /&gt;
-      {isChecking && &lt;span&gt;Checking availability...&lt;/span&gt;}
-      {error && !isChecking && (
+      {isChecking &amp;&amp; &lt;span&gt;Checking availability...&lt;/span&gt;}
+      {error &amp;&amp; !isChecking &amp;&amp; (
         &lt;span id="username-error" role="alert" style={{ color: 'red' }}&gt;
           {error}
         &lt;/span&gt;
@@ -1227,12 +1240,12 @@ function SignupForm() {
     age: ''
   });
 
-  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev =&gt; ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     console.log('Submit:', formData);
   };
@@ -1277,13 +1290,13 @@ function SignupForm() {
   const [touched, setTouched] = useState&lt;Record&lt;string, boolean&gt;&gt;({});
 
   // Validation functions
-  const validateName = (name: string): string | undefined => {
+  const validateName = (name: string): string | undefined =&gt; {
     if (!name) return 'Name is required';
-    if (name.length < 2) return 'Name must be at least 2 characters';
+    if (name.length &lt; 2) return 'Name must be at least 2 characters';
     return undefined;
   };
 
-  const validateEmail = (email: string): string | undefined => {
+  const validateEmail = (email: string): string | undefined =&gt; {
     if (!email) return 'Email is required';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return 'Invalid email format';
@@ -1291,26 +1304,26 @@ function SignupForm() {
     return undefined;
   };
 
-  const validateAge = (age: string): string | undefined => {
+  const validateAge = (age: string): string | undefined =&gt; {
     if (!age) return 'Age is required';
     const ageNum = parseInt(age);
     if (isNaN(ageNum)) return 'Age must be a number';
-    if (ageNum < 18) return 'You must be at least 18 years old';
+    if (ageNum &lt; 18) return 'You must be at least 18 years old';
     return undefined;
   };
 
-  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev =&gt; ({ ...prev, [name]: value }));
     
     // Clear error when user starts typing (if field was touched)
     if (touched[name]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
+      setErrors(prev =&gt; ({ ...prev, [name]: undefined }));
     }
   };
 
-  const handleBlur = (field: keyof FormData) => () => {
-    setTouched(prev => ({ ...prev, [field]: true }));
+  const handleBlur = (field: keyof FormData) =&gt; () =&gt; {
+    setTouched(prev =&gt; ({ ...prev, [field]: true }));
     
     let error: string | undefined;
     switch (field) {
@@ -1325,10 +1338,10 @@ function SignupForm() {
         break;
     }
     
-    setErrors(prev => ({ ...prev, [field]: error }));
+    setErrors(prev =&gt; ({ ...prev, [field]: error }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     
     // Mark all as touched
@@ -1342,7 +1355,7 @@ function SignupForm() {
     };
     
     // Remove undefined errors
-    Object.keys(newErrors).forEach(key => {
+    Object.keys(newErrors).forEach(key =&gt; {
       if (!newErrors[key as keyof FormErrors]) {
         delete newErrors[key as keyof FormErrors];
       }
@@ -1368,7 +1381,7 @@ function SignupForm() {
           onBlur={handleBlur('name')}
           aria-invalid={!!errors.name}
         /&gt;
-        {errors.name && touched.name && (
+        {errors.name &amp;&amp; touched.name &amp;&amp; (
           &lt;span role="alert" style={{ color: 'red' }}&gt;{errors.name}&lt;/span&gt;
         )}
       &lt;/div&gt;
@@ -1384,7 +1397,7 @@ function SignupForm() {
           onBlur={handleBlur('email')}
           aria-invalid={!!errors.email}
         /&gt;
-        {errors.email && touched.email && (
+        {errors.email &amp;&amp; touched.email &amp;&amp; (
           &lt;span role="alert" style={{ color: 'red' }}&gt;{errors.email}&lt;/span&gt;
         )}
       &lt;/div&gt;
@@ -1400,7 +1413,7 @@ function SignupForm() {
           onBlur={handleBlur('age')}
           aria-invalid={!!errors.age}
         /&gt;
-        {errors.age && touched.age && (
+        {errors.age &amp;&amp; touched.age &amp;&amp; (
           &lt;span role="alert" style={{ color: 'red' }}&gt;{errors.age}&lt;/span&gt;
         )}
       &lt;/div&gt;
@@ -1506,7 +1519,7 @@ function SignupForm() {
         id="email"
         type="email"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) =&gt; setEmail(e.target.value)}
         aria-invalid={!!error}
         aria-describedby={error ? 'email-error' : undefined}
         style={{
@@ -1515,7 +1528,7 @@ function SignupForm() {
           width: '100%'
         }}
       /&gt;
-      {error && (
+      {error &amp;&amp; (
         &lt;div
           id="email-error"
           role="alert"
@@ -1538,7 +1551,7 @@ function SignupForm() {
 
   return (
     &lt;form&gt;
-      {Object.keys(errors).length > 0 && (
+      {Object.keys(errors).length &gt; 0 &amp;&amp; (
         &lt;div
           role="alert"
           aria-live="polite"
@@ -1554,7 +1567,7 @@ function SignupForm() {
             ⚠️ Please fix the following errors:
           &lt;/h3&gt;
           &lt;ul style={{ margin: 0, paddingLeft: '1.5rem' }}&gt;
-            {Object.entries(errors).map(([field, error]) => (
+            {Object.entries(errors).map(([field, error]) =&gt; (
               &lt;li key={field}&gt;
                 &lt;strong&gt;{field}:&lt;/strong&gt; {error}
               &lt;/li&gt;
@@ -1573,7 +1586,7 @@ function SignupForm() {
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) =&gt; {
     e.preventDefault();
     
     try {
@@ -1581,13 +1594,13 @@ function SignupForm() {
     } catch (error) {
       setToastMessage('Failed to submit form. Please try again.');
       setShowToast(true);
-      setTimeout(() => setShowToast(false), 5000);
+      setTimeout(() =&gt; setShowToast(false), 5000);
     }
   };
 
   return (
     &lt;&gt;
-      {showToast && (
+      {showToast &amp;&amp; (
         &lt;div
           role="alert"
           style={{
@@ -1639,20 +1652,20 @@ function SignupForm() {
         id="email-input"
         type="email"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        onBlur={() => setTouched(true)}
+        onChange={(e) =&gt; setEmail(e.target.value)}
+        onBlur={() =&gt; setTouched(true)}
         
         {/* aria-invalid tells screen readers the field has an error */}
-        aria-invalid={!!error && touched}
+        aria-invalid={!!error &amp;&amp; touched}
         
         {/* aria-describedby links the input to the error message */}
-        aria-describedby={error && touched ? 'email-error' : undefined}
+        aria-describedby={error &amp;&amp; touched ? 'email-error' : undefined}
         
         {/* aria-required tells screen readers this is required */}
         aria-required="true"
       /&gt;
       
-      {error && touched && (
+      {error &amp;&amp; touched &amp;&amp; (
         &lt;div
           id="email-error"
           
@@ -1695,14 +1708,14 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState&lt;Record&lt;string, string&gt;&gt;({});
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     
     const newErrors: Record&lt;string, string&gt; = {};
     
     if (!email) newErrors.email = 'Required';
     if (!password) newErrors.password = 'Required';
-    if (password && password.length < 8) newErrors.password = 'Too short';
+    if (password &amp;&amp; password.length &lt; 8) newErrors.password = 'Too short';
     
     setErrors(newErrors);
   };
@@ -1712,16 +1725,16 @@ function LoginForm() {
       &lt;input 
         type="email"
         value={email}
-        onChange={(e) => setEmail(e.target.value)}
+        onChange={(e) =&gt; setEmail(e.target.value)}
       /&gt;
-      {errors.email && &lt;span&gt;{errors.email}&lt;/span&gt;}
+      {errors.email &amp;&amp; &lt;span&gt;{errors.email}&lt;/span&gt;}
       
       &lt;input 
         type="password"
         value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        onChange={(e) =&gt; setPassword(e.target.value)}
       /&gt;
-      {errors.password && &lt;span&gt;{errors.password}&lt;/span&gt;}
+      {errors.password &amp;&amp; &lt;span&gt;{errors.password}&lt;/span&gt;}
       
       &lt;button type="submit"&gt;Login&lt;/button&gt;
     &lt;/form&gt;
@@ -1741,11 +1754,11 @@ function LoginForm() {
   const [errors, setErrors] = useState&lt;Record&lt;string, string&gt;&gt;({});
   const [touched, setTouched] = useState&lt;Record&lt;string, boolean&gt;&gt;({});
 
-  const handleBlur = (field: string) => () => {
-    setTouched(prev => ({ ...prev, [field]: true }));
+  const handleBlur = (field: string) =&gt; () =&gt; {
+    setTouched(prev =&gt; ({ ...prev, [field]: true }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     
     // Mark all as touched
@@ -1762,7 +1775,7 @@ function LoginForm() {
     
     if (!password) {
       newErrors.password = 'Please enter your password';
-    } else if (password.length < 8) {
+    } else if (password.length &lt; 8) {
       newErrors.password = 'Password must be at least 8 characters long';
     }
     
@@ -1788,26 +1801,26 @@ function LoginForm() {
           id="email-input"
           type="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) =&gt; setEmail(e.target.value)}
           onBlur={handleBlur('email')}
           
           {/* Accessibility attributes */}
-          aria-invalid={!!errors.email && touched.email}
-          aria-describedby={errors.email && touched.email ? 'email-error' : undefined}
+          aria-invalid={!!errors.email &amp;&amp; touched.email}
+          aria-describedby={errors.email &amp;&amp; touched.email ? 'email-error' : undefined}
           aria-required="true"
           
           {/* Visual styling */}
           style={{
             width: '100%',
             padding: '0.5rem',
-            border: `2px solid ${errors.email && touched.email ? '#f44336' : '#ddd'}`,
+            border: `2px solid ${errors.email &amp;&amp; touched.email ? '#f44336' : '#ddd'}`,
             borderRadius: '4px',
             fontSize: '1rem'
           }}
         /&gt;
         
         {/* Improved error display */}
-        {errors.email && touched.email && (
+        {errors.email &amp;&amp; touched.email &amp;&amp; (
           &lt;div
             id="email-error"
             role="alert"
@@ -1839,21 +1852,21 @@ function LoginForm() {
           id="password-input"
           type="password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(e) =&gt; setPassword(e.target.value)}
           onBlur={handleBlur('password')}
-          aria-invalid={!!errors.password && touched.password}
-          aria-describedby={errors.password && touched.password ? 'password-error' : undefined}
+          aria-invalid={!!errors.password &amp;&amp; touched.password}
+          aria-describedby={errors.password &amp;&amp; touched.password ? 'password-error' : undefined}
           aria-required="true"
           style={{
             width: '100%',
             padding: '0.5rem',
-            border: `2px solid ${errors.password && touched.password ? '#f44336' : '#ddd'}`,
+            border: `2px solid ${errors.password &amp;&amp; touched.password ? '#f44336' : '#ddd'}`,
             borderRadius: '4px',
             fontSize: '1rem'
           }}
         /&gt;
         
-        {errors.password && touched.password && (
+        {errors.password &amp;&amp; touched.password &amp;&amp; (
           &lt;div
             id="password-error"
             role="alert"
@@ -1935,13 +1948,12 @@ function LoginForm() {
                     D --> D2[Validate item]
                     
                     E --> E1[Drag and drop]
-                    E --> E2[Move up/down buttons]
+                    E --> E2["Move up/down buttons"]
                     
                     style A fill:#667eea,color:#fff
                     style B fill:#48bb78,color:#fff
                     style C fill:#f56565,color:#fff
                     style D fill:#ed8936,color:#fff
-                </graph>
                 </div>
 
                 <h3>Basic Field Array Implementation</h3>
@@ -1959,28 +1971,28 @@ function PhoneNumbersForm() {
   ]);
 
   // Add a new phone number
-  const addPhone = () => {
-    setPhones(prev => [
+  const addPhone = () =&gt; {
+    setPhones(prev =&gt; [
       ...prev,
       { id: crypto.randomUUID(), type: 'mobile', number: '' }
     ]);
   };
 
   // Remove a phone number by ID
-  const removePhone = (id: string) => {
-    setPhones(prev => prev.filter(phone => phone.id !== id));
+  const removePhone = (id: string) =&gt; {
+    setPhones(prev =&gt; prev.filter(phone =&gt; phone.id !== id));
   };
 
   // Update a specific phone number
-  const updatePhone = (id: string, field: keyof PhoneNumber, value: string) => {
-    setPhones(prev => prev.map(phone =>
+  const updatePhone = (id: string, field: keyof PhoneNumber, value: string) =&gt; {
+    setPhones(prev =&gt; prev.map(phone =&gt;
       phone.id === id
         ? { ...phone, [field]: value }
         : phone
     ));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     console.log('Phones:', phones);
   };
@@ -1989,7 +2001,7 @@ function PhoneNumbersForm() {
     &lt;form onSubmit={handleSubmit}&gt;
       &lt;h3&gt;Phone Numbers&lt;/h3&gt;
       
-      {phones.map((phone, index) => (
+      {phones.map((phone, index) =&gt; (
         &lt;div 
           key={phone.id}
           style={{
@@ -2001,10 +2013,10 @@ function PhoneNumbersForm() {
         &gt;
           &lt;div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}&gt;
             &lt;strong&gt;Phone {index + 1}&lt;/strong&gt;
-            {phones.length > 1 && (
+            {phones.length &gt; 1 &amp;&amp; (
               &lt;button
                 type="button"
-                onClick={() => removePhone(phone.id)}
+                onClick={() =&gt; removePhone(phone.id)}
                 style={{
                   background: '#f56565',
                   color: 'white',
@@ -2022,7 +2034,7 @@ function PhoneNumbersForm() {
           &lt;div style={{ display: 'grid', gap: '0.5rem' }}&gt;
             &lt;select
               value={phone.type}
-              onChange={(e) => updatePhone(phone.id, 'type', e.target.value)}
+              onChange={(e) =&gt; updatePhone(phone.id, 'type', e.target.value)}
               style={{ padding: '0.5rem' }}
             &gt;
               &lt;option value="mobile"&gt;Mobile&lt;/option&gt;
@@ -2033,7 +2045,7 @@ function PhoneNumbersForm() {
             &lt;input
               type="tel"
               value={phone.number}
-              onChange={(e) => updatePhone(phone.id, 'number', e.target.value)}
+              onChange={(e) =&gt; updatePhone(phone.id, 'number', e.target.value)}
               placeholder="(555) 123-4567"
               style={{ padding: '0.5rem' }}
             /&gt;
@@ -2121,7 +2133,7 @@ function WorkExperienceForm() {
   const [errors, setErrors] = useState&lt;Record&lt;string, WorkExperienceErrors&gt;&gt;({});
 
   // Add new experience
-  const addExperience = () => {
+  const addExperience = () =&gt; {
     const newExp: WorkExperience = {
       id: crypto.randomUUID(),
       company: '',
@@ -2131,14 +2143,14 @@ function WorkExperienceForm() {
       current: false,
       description: ''
     };
-    setExperiences(prev => [...prev, newExp]);
+    setExperiences(prev =&gt; [...prev, newExp]);
   };
 
   // Remove experience
-  const removeExperience = (id: string) => {
-    setExperiences(prev => prev.filter(exp => exp.id !== id));
+  const removeExperience = (id: string) =&gt; {
+    setExperiences(prev =&gt; prev.filter(exp =&gt; exp.id !== id));
     // Also remove errors for this experience
-    setErrors(prev => {
+    setErrors(prev =&gt; {
       const newErrors = { ...prev };
       delete newErrors[id];
       return newErrors;
@@ -2150,14 +2162,14 @@ function WorkExperienceForm() {
     id: string, 
     field: keyof WorkExperience, 
     value: string | boolean
-  ) => {
-    setExperiences(prev => prev.map(exp =>
+  ) =&gt; {
+    setExperiences(prev =&gt; prev.map(exp =&gt;
       exp.id === id ? { ...exp, [field]: value } : exp
     ));
 
     // Clear error when user starts typing
     if (errors[id]?.[field as keyof WorkExperienceErrors]) {
-      setErrors(prev => ({
+      setErrors(prev =&gt; ({
         ...prev,
         [id]: {
           ...prev[id],
@@ -2168,7 +2180,7 @@ function WorkExperienceForm() {
   };
 
   // Validate a single experience
-  const validateExperience = (exp: WorkExperience): WorkExperienceErrors => {
+  const validateExperience = (exp: WorkExperience): WorkExperienceErrors =&gt; {
     const expErrors: WorkExperienceErrors = {};
 
     if (!exp.company.trim()) {
@@ -2183,11 +2195,11 @@ function WorkExperienceForm() {
       expErrors.startDate = 'Start date is required';
     }
 
-    if (!exp.current && !exp.endDate) {
+    if (!exp.current &amp;&amp; !exp.endDate) {
       expErrors.endDate = 'End date is required (or mark as current position)';
     }
 
-    if (exp.startDate && exp.endDate && exp.startDate > exp.endDate) {
+    if (exp.startDate &amp;&amp; exp.endDate &amp;&amp; exp.startDate &gt; exp.endDate) {
       expErrors.endDate = 'End date must be after start date';
     }
 
@@ -2195,13 +2207,13 @@ function WorkExperienceForm() {
   };
 
   // Validate all experiences
-  const validateAll = (): boolean => {
+  const validateAll = (): boolean =&gt; {
     const allErrors: Record&lt;string, WorkExperienceErrors&gt; = {};
     let hasErrors = false;
 
-    experiences.forEach(exp => {
+    experiences.forEach(exp =&gt; {
       const expErrors = validateExperience(exp);
-      if (Object.keys(expErrors).length > 0) {
+      if (Object.keys(expErrors).length &gt; 0) {
         allErrors[exp.id] = expErrors;
         hasErrors = true;
       }
@@ -2211,7 +2223,7 @@ function WorkExperienceForm() {
     return !hasErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
 
     if (validateAll()) {
@@ -2226,7 +2238,7 @@ function WorkExperienceForm() {
     &lt;form onSubmit={handleSubmit}&gt;
       &lt;h2&gt;Work Experience&lt;/h2&gt;
       
-      {experiences.map((exp, index) => (
+      {experiences.map((exp, index) =&gt; (
         &lt;div
           key={exp.id}
           style={{
@@ -2239,10 +2251,10 @@ function WorkExperienceForm() {
         &gt;
           &lt;div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}&gt;
             &lt;h3 style={{ margin: 0 }}&gt;Experience {index + 1}&lt;/h3&gt;
-            {experiences.length > 1 && (
+            {experiences.length &gt; 1 &amp;&amp; (
               &lt;button
                 type="button"
-                onClick={() => removeExperience(exp.id)}
+                onClick={() =&gt; removeExperience(exp.id)}
                 style={{
                   background: '#f56565',
                   color: 'white',
@@ -2266,7 +2278,7 @@ function WorkExperienceForm() {
               &lt;input
                 type="text"
                 value={exp.company}
-                onChange={(e) => updateExperience(exp.id, 'company', e.target.value)}
+                onChange={(e) =&gt; updateExperience(exp.id, 'company', e.target.value)}
                 placeholder="Acme Corp"
                 style={{
                   width: '100%',
@@ -2275,7 +2287,7 @@ function WorkExperienceForm() {
                   borderRadius: '4px'
                 }}
               /&gt;
-              {errors[exp.id]?.company && (
+              {errors[exp.id]?.company &amp;&amp; (
                 &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                   {errors[exp.id].company}
                 &lt;/span&gt;
@@ -2290,7 +2302,7 @@ function WorkExperienceForm() {
               &lt;input
                 type="text"
                 value={exp.position}
-                onChange={(e) => updateExperience(exp.id, 'position', e.target.value)}
+                onChange={(e) =&gt; updateExperience(exp.id, 'position', e.target.value)}
                 placeholder="Software Engineer"
                 style={{
                   width: '100%',
@@ -2299,7 +2311,7 @@ function WorkExperienceForm() {
                   borderRadius: '4px'
                 }}
               /&gt;
-              {errors[exp.id]?.position && (
+              {errors[exp.id]?.position &amp;&amp; (
                 &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                   {errors[exp.id].position}
                 &lt;/span&gt;
@@ -2315,7 +2327,7 @@ function WorkExperienceForm() {
                 &lt;input
                   type="month"
                   value={exp.startDate}
-                  onChange={(e) => updateExperience(exp.id, 'startDate', e.target.value)}
+                  onChange={(e) =&gt; updateExperience(exp.id, 'startDate', e.target.value)}
                   style={{
                     width: '100%',
                     padding: '0.5rem',
@@ -2323,7 +2335,7 @@ function WorkExperienceForm() {
                     borderRadius: '4px'
                   }}
                 /&gt;
-                {errors[exp.id]?.startDate && (
+                {errors[exp.id]?.startDate &amp;&amp; (
                   &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                     {errors[exp.id].startDate}
                   &lt;/span&gt;
@@ -2332,12 +2344,12 @@ function WorkExperienceForm() {
 
               &lt;div&gt;
                 &lt;label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: '500' }}&gt;
-                  End Date {!exp.current && '*'}
+                  End Date {!exp.current &amp;&amp; '*'}
                 &lt;/label&gt;
                 &lt;input
                   type="month"
                   value={exp.endDate}
-                  onChange={(e) => updateExperience(exp.id, 'endDate', e.target.value)}
+                  onChange={(e) =&gt; updateExperience(exp.id, 'endDate', e.target.value)}
                   disabled={exp.current}
                   style={{
                     width: '100%',
@@ -2347,7 +2359,7 @@ function WorkExperienceForm() {
                     opacity: exp.current ? 0.5 : 1
                   }}
                 /&gt;
-                {errors[exp.id]?.endDate && (
+                {errors[exp.id]?.endDate &amp;&amp; (
                   &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                     {errors[exp.id].endDate}
                   &lt;/span&gt;
@@ -2361,7 +2373,7 @@ function WorkExperienceForm() {
                 &lt;input
                   type="checkbox"
                   checked={exp.current}
-                  onChange={(e) => {
+                  onChange={(e) =&gt; {
                     updateExperience(exp.id, 'current', e.target.checked);
                     if (e.target.checked) {
                       updateExperience(exp.id, 'endDate', '');
@@ -2379,7 +2391,7 @@ function WorkExperienceForm() {
               &lt;/label&gt;
               &lt;textarea
                 value={exp.description}
-                onChange={(e) => updateExperience(exp.id, 'description', e.target.value)}
+                onChange={(e) =&gt; updateExperience(exp.id, 'description', e.target.value)}
                 placeholder="Describe your responsibilities and achievements..."
                 rows={3}
                 style={{
@@ -2456,10 +2468,10 @@ function WorkExperienceForm() {
   ]);
 
   // Move item up
-  const moveUp = (index: number) => {
+  const moveUp = (index: number) =&gt; {
     if (index === 0) return; // Already at top
     
-    setItems(prev => {
+    setItems(prev =&gt; {
       const newItems = [...prev];
       [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
       return newItems;
@@ -2467,10 +2479,10 @@ function WorkExperienceForm() {
   };
 
   // Move item down
-  const moveDown = (index: number) => {
+  const moveDown = (index: number) =&gt; {
     if (index === items.length - 1) return; // Already at bottom
     
-    setItems(prev => {
+    setItems(prev =&gt; {
       const newItems = [...prev];
       [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
       return newItems;
@@ -2479,7 +2491,7 @@ function WorkExperienceForm() {
 
   return (
     &lt;div&gt;
-      {items.map((item, index) => (
+      {items.map((item, index) =&gt; (
         &lt;div
           key={item.id}
           style={{
@@ -2494,7 +2506,7 @@ function WorkExperienceForm() {
         &gt;
           &lt;div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}&gt;
             &lt;button
-              onClick={() => moveUp(index)}
+              onClick={() =&gt; moveUp(index)}
               disabled={index === 0}
               style={{
                 padding: '0.25rem 0.5rem',
@@ -2506,7 +2518,7 @@ function WorkExperienceForm() {
               ▲
             &lt;/button&gt;
             &lt;button
-              onClick={() => moveDown(index)}
+              onClick={() =&gt; moveDown(index)}
               disabled={index === items.length - 1}
               style={{
                 padding: '0.25rem 0.5rem',
@@ -2572,8 +2584,8 @@ function EducationForm() {
 
   const [errors, setErrors] = useState&lt;Record&lt;string, EducationErrors&gt;&gt;({});
 
-  const addEducation = () => {
-    setEducation(prev => [
+  const addEducation = () =&gt; {
+    setEducation(prev =&gt; [
       ...prev,
       {
         id: crypto.randomUUID(),
@@ -2585,23 +2597,23 @@ function EducationForm() {
     ]);
   };
 
-  const removeEducation = (id: string) => {
-    setEducation(prev => prev.filter(edu => edu.id !== id));
-    setErrors(prev => {
+  const removeEducation = (id: string) =&gt; {
+    setEducation(prev =&gt; prev.filter(edu =&gt; edu.id !== id));
+    setErrors(prev =&gt; {
       const newErrors = { ...prev };
       delete newErrors[id];
       return newErrors;
     });
   };
 
-  const updateEducation = (id: string, field: keyof Education, value: string) => {
-    setEducation(prev => prev.map(edu =>
+  const updateEducation = (id: string, field: keyof Education, value: string) =&gt; {
+    setEducation(prev =&gt; prev.map(edu =&gt;
       edu.id === id ? { ...edu, [field]: value } : edu
     ));
 
     // Clear error when user types
     if (errors[id]?.[field as keyof EducationErrors]) {
-      setErrors(prev => ({
+      setErrors(prev =&gt; ({
         ...prev,
         [id]: {
           ...prev[id],
@@ -2611,7 +2623,7 @@ function EducationForm() {
     }
   };
 
-  const validateEducation = (edu: Education): EducationErrors => {
+  const validateEducation = (edu: Education): EducationErrors =&gt; {
     const eduErrors: EducationErrors = {};
     const currentYear = new Date().getFullYear();
 
@@ -2633,9 +2645,9 @@ function EducationForm() {
       const year = parseInt(edu.year);
       if (isNaN(year)) {
         eduErrors.year = 'Year must be a number';
-      } else if (year < 1950) {
+      } else if (year &lt; 1950) {
         eduErrors.year = 'Year must be 1950 or later';
-      } else if (year > currentYear + 10) {
+      } else if (year &gt; currentYear + 10) {
         eduErrors.year = `Year cannot be more than ${currentYear + 10}`;
       }
     }
@@ -2643,13 +2655,13 @@ function EducationForm() {
     return eduErrors;
   };
 
-  const validateAll = (): boolean => {
+  const validateAll = (): boolean =&gt; {
     const allErrors: Record&lt;string, EducationErrors&gt; = {};
     let hasErrors = false;
 
-    education.forEach(edu => {
+    education.forEach(edu =&gt; {
       const eduErrors = validateEducation(edu);
-      if (Object.keys(eduErrors).length > 0) {
+      if (Object.keys(eduErrors).length &gt; 0) {
         allErrors[edu.id] = eduErrors;
         hasErrors = true;
       }
@@ -2659,7 +2671,7 @@ function EducationForm() {
     return !hasErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
 
     if (validateAll()) {
@@ -2672,7 +2684,7 @@ function EducationForm() {
     &lt;form onSubmit={handleSubmit}&gt;
       &lt;h2&gt;Education History&lt;/h2&gt;
 
-      {education.map((edu, index) => (
+      {education.map((edu, index) =&gt; (
         &lt;div
           key={edu.id}
           style={{
@@ -2684,10 +2696,10 @@ function EducationForm() {
         &gt;
           &lt;div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}&gt;
             &lt;h3&gt;Education {index + 1}&lt;/h3&gt;
-            {education.length > 1 && (
+            {education.length &gt; 1 &amp;&amp; (
               &lt;button
                 type="button"
-                onClick={() => removeEducation(edu.id)}
+                onClick={() =&gt; removeEducation(edu.id)}
                 style={{
                   background: '#f56565',
                   color: 'white',
@@ -2708,7 +2720,7 @@ function EducationForm() {
               &lt;input
                 type="text"
                 value={edu.school}
-                onChange={(e) => updateEducation(edu.id, 'school', e.target.value)}
+                onChange={(e) =&gt; updateEducation(edu.id, 'school', e.target.value)}
                 placeholder="University of Example"
                 style={{
                   width: '100%',
@@ -2716,7 +2728,7 @@ function EducationForm() {
                   border: `1px solid ${errors[edu.id]?.school ? '#f56565' : '#ddd'}`
                 }}
               /&gt;
-              {errors[edu.id]?.school && (
+              {errors[edu.id]?.school &amp;&amp; (
                 &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                   {errors[edu.id].school}
                 &lt;/span&gt;
@@ -2729,7 +2741,7 @@ function EducationForm() {
                 &lt;input
                   type="text"
                   value={edu.degree}
-                  onChange={(e) => updateEducation(edu.id, 'degree', e.target.value)}
+                  onChange={(e) =&gt; updateEducation(edu.id, 'degree', e.target.value)}
                   placeholder="Bachelor of Science"
                   style={{
                     width: '100%',
@@ -2737,7 +2749,7 @@ function EducationForm() {
                     border: `1px solid ${errors[edu.id]?.degree ? '#f56565' : '#ddd'}`
                   }}
                 /&gt;
-                {errors[edu.id]?.degree && (
+                {errors[edu.id]?.degree &amp;&amp; (
                   &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                     {errors[edu.id].degree}
                   &lt;/span&gt;
@@ -2749,7 +2761,7 @@ function EducationForm() {
                 &lt;input
                   type="text"
                   value={edu.field}
-                  onChange={(e) => updateEducation(edu.id, 'field', e.target.value)}
+                  onChange={(e) =&gt; updateEducation(edu.id, 'field', e.target.value)}
                   placeholder="Computer Science"
                   style={{
                     width: '100%',
@@ -2757,7 +2769,7 @@ function EducationForm() {
                     border: `1px solid ${errors[edu.id]?.field ? '#f56565' : '#ddd'}`
                   }}
                 /&gt;
-                {errors[edu.id]?.field && (
+                {errors[edu.id]?.field &amp;&amp; (
                   &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                     {errors[edu.id].field}
                   &lt;/span&gt;
@@ -2770,7 +2782,7 @@ function EducationForm() {
               &lt;input
                 type="number"
                 value={edu.year}
-                onChange={(e) => updateEducation(edu.id, 'year', e.target.value)}
+                onChange={(e) =&gt; updateEducation(edu.id, 'year', e.target.value)}
                 placeholder="2020"
                 min="1950"
                 max={new Date().getFullYear() + 10}
@@ -2780,7 +2792,7 @@ function EducationForm() {
                   border: `1px solid ${errors[edu.id]?.year ? '#f56565' : '#ddd'}`
                 }}
               /&gt;
-              {errors[edu.id]?.year && (
+              {errors[edu.id]?.year &amp;&amp; (
                 &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                   {errors[edu.id].year}
                 &lt;/span&gt;
@@ -2862,16 +2874,12 @@ function SlowForm() {
                     style A fill:#667eea,color:#fff
                     style D fill:#f56565,color:#fff
                     style F fill:#48bb78,color:#fff
-                </graph>
                 </div>
 
                 <!-- Interactive Form Re-render Visualization -->
-                <div class="card" style="padding: 0; overflow: hidden; margin: 2rem 0;">
-                    <div style="background: linear-gradient(135deg, #f56565 0%, #c53030 100%); color: white; padding: 1rem 1.5rem;">
-                        <h4 style="color: white; margin: 0;">🔄 Interactive: Form Re-render Visualization</h4>
-                        <p style="color: rgba(255,255,255,0.9); margin: 0.5rem 0 0 0; font-size: 0.9rem;">Watch which components re-render when you type - unoptimized vs optimized forms</p>
-                    </div>
-                    <div style="padding: 1.5rem;">
+                <div class="card">
+                    <h4>🔄 Interactive: Form Re-render Visualization</h4>
+                    <p>Watch which components re-render when you type — unoptimized vs optimized forms.</p>
                         <svg class="svg-auto-invert" id="rerenderViz" viewBox="0 0 750 340" style="width: 100%; max-width: 750px; display: block; margin: 0 auto; font-family: system-ui, sans-serif;">
                             <!-- Title -->
                             <text x="375" y="25" text-anchor="middle" font-size="15" font-weight="bold" fill="#333">Type in Field 1 and Watch What Re-renders</text>
@@ -2950,8 +2958,7 @@ function SlowForm() {
                             <button onclick="resetPerfDemo()" style="padding: 0.6rem 1rem; background: #f5f5f5; color: #666; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;">Reset</button>
                         </div>
                         
-                        <p style="text-align: center; margin-top: 1rem; font-size: 0.85rem; color: #666;">Notice how the unoptimized form re-renders ALL fields, while the optimized form only re-renders Field 1</p>
-                    </div>
+                        <p>Notice how the unoptimized form re-renders ALL fields, while the optimized form only re-renders Field 1.</p>
                 </div>
                 
                 <script>
@@ -3028,12 +3035,12 @@ function SlowForm() {
 interface FieldProps {
   label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string) =&gt; void;
   error?: string;
 }
 
 // This component only re-renders when ITS value changes
-const FormField = React.memo(({ label, value, onChange, error }: FieldProps) => {
+const FormField = React.memo(({ label, value, onChange, error }: FieldProps) =&gt; {
   console.log(`Rendering ${label}`);
   
   return (
@@ -3041,10 +3048,10 @@ const FormField = React.memo(({ label, value, onChange, error }: FieldProps) => 
       &lt;label&gt;{label}&lt;/label&gt;
       &lt;input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) =&gt; onChange(e.target.value)}
         style={{ border: error ? '1px solid red' : '1px solid #ddd' }}
       /&gt;
-      {error && &lt;span style={{ color: 'red' }}&gt;{error}&lt;/span&gt;}
+      {error &amp;&amp; &lt;span style={{ color: 'red' }}&gt;{error}&lt;/span&gt;}
     &lt;/div&gt;
   );
 });
@@ -3057,8 +3064,8 @@ function OptimizedForm() {
     phone: ''
   });
 
-  const handleChange = (field: keyof typeof formData) => (value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleChange = (field: keyof typeof formData) =&gt; (value: string) =&gt; {
+    setFormData(prev =&gt; ({ ...prev, [field]: value }));
   };
 
   return (
@@ -3105,7 +3112,7 @@ function OptimizedForm() {
   const emailRef = useRef&lt;HTMLInputElement&gt;(null);
   const phoneRef = useRef&lt;HTMLInputElement&gt;(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
 
     const formData = {
@@ -3167,12 +3174,12 @@ function OptimizedForm() {
 function useDebouncedValue&lt;T&gt;(value: T, delay: number = 500): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
+  useEffect(() =&gt; {
+    const handler = setTimeout(() =&gt; {
       setDebouncedValue(value);
     }, delay);
 
-    return () => clearTimeout(handler);
+    return () =&gt; clearTimeout(handler);
   }, [value, delay]);
 
   return debouncedValue;
@@ -3183,7 +3190,7 @@ function DebouncedSearchForm() {
   const debouncedSearch = useDebouncedValue(searchTerm, 300);
 
   // This only runs when user stops typing for 300ms
-  useEffect(() => {
+  useEffect(() =&gt; {
     if (debouncedSearch) {
       console.log('Searching for:', debouncedSearch);
       // Perform expensive search/validation here
@@ -3195,7 +3202,7 @@ function DebouncedSearchForm() {
       &lt;input
         type="text"
         value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        onChange={(e) =&gt; setSearchTerm(e.target.value)}
         placeholder="Search..."
       /&gt;
       &lt;p&gt;Searching for: {debouncedSearch}&lt;/p&gt;
@@ -3221,13 +3228,13 @@ function DebouncedSearchForm() {
 
 interface FieldProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string) =&gt; void;
 }
 
-const ExpensiveField = memo(({ value, onChange }: FieldProps) => {
+const ExpensiveField = memo(({ value, onChange }: FieldProps) =&gt; {
   console.log('ExpensiveField render');
   // Imagine this has expensive rendering logic
-  return &lt;input value={value} onChange={(e) => onChange(e.target.value)} /&gt;;
+  return &lt;input value={value} onChange={(e) =&gt; onChange(e.target.value)} /&gt;;
 });
 
 function FormWithCallback() {
@@ -3236,12 +3243,12 @@ function FormWithCallback() {
 
   // Without useCallback, this creates a NEW function on every render
   // causing ExpensiveField to re-render even with memo
-  const handleNameChange = useCallback((value: string) => {
+  const handleNameChange = useCallback((value: string) =&gt; {
     setName(value);
   }, []); // Empty deps = function never changes
 
   // This one DOES change when email changes (if needed for validation)
-  const handleEmailChange = useCallback((value: string) => {
+  const handleEmailChange = useCallback((value: string) =&gt; {
     setEmail(value);
   }, [email]);
 
@@ -3284,18 +3291,18 @@ function SlowRegistrationForm() {
     zip: ''
   });
 
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleChange = (field: string, value: string) =&gt; {
+    setFormData(prev =&gt; ({ ...prev, [field]: value }));
   };
 
   return (
     &lt;form&gt;
-      {Object.keys(formData).map(field => (
+      {Object.keys(formData).map(field =&gt; (
         &lt;div key={field}&gt;
           &lt;label&gt;{field}&lt;/label&gt;
           &lt;input
             value={formData[field as keyof typeof formData]}
-            onChange={(e) => handleChange(field, e.target.value)}
+            onChange={(e) =&gt; handleChange(field, e.target.value)}
           /&gt;
         &lt;/div&gt;
       ))}
@@ -3316,11 +3323,11 @@ function SlowRegistrationForm() {
 interface FormFieldProps {
   label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string) =&gt; void;
 }
 
 // Memoized field component
-const FormField = memo(({ label, value, onChange }: FormFieldProps) => {
+const FormField = memo(({ label, value, onChange }: FormFieldProps) =&gt; {
   console.log(`Rendering ${label}`);
   
   return (
@@ -3330,7 +3337,7 @@ const FormField = memo(({ label, value, onChange }: FormFieldProps) => {
       &lt;/label&gt;
       &lt;input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) =&gt; onChange(e.target.value)}
         style={{ width: '100%', padding: '0.5rem' }}
       /&gt;
     &lt;/div&gt;
@@ -3350,9 +3357,9 @@ function OptimizedRegistrationForm() {
   });
 
   // Create stable change handler for each field
-  const createChangeHandler = useCallback((field: keyof typeof formData) => {
-    return (value: string) => {
-      setFormData(prev => ({ ...prev, [field]: value }));
+  const createChangeHandler = useCallback((field: keyof typeof formData) =&gt; {
+    return (value: string) =&gt; {
+      setFormData(prev =&gt; ({ ...prev, [field]: value }));
     };
   }, []); // Empty deps - this function never changes
 
@@ -3368,7 +3375,7 @@ function OptimizedRegistrationForm() {
     zip: createChangeHandler('zip')
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     console.log('Form data:', formData);
   };
@@ -3484,7 +3491,7 @@ function MultiStepForm() {
   const currentStepIndex = steps.indexOf(currentStep);
 
   // Validation for each step
-  const validateStep = (step: Step): boolean => {
+  const validateStep = (step: Step): boolean =&gt; {
     const newErrors: Partial&lt;Record&lt;keyof FormData, string&gt;&gt; = {};
 
     switch (step) {
@@ -3509,32 +3516,32 @@ function MultiStepForm() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = () =&gt; {
     if (validateStep(currentStep)) {
       const nextIndex = currentStepIndex + 1;
-      if (nextIndex < steps.length) {
+      if (nextIndex &lt; steps.length) {
         setCurrentStep(steps[nextIndex]);
       }
     }
   };
 
-  const handleBack = () => {
+  const handleBack = () =&gt; {
     const prevIndex = currentStepIndex - 1;
-    if (prevIndex >= 0) {
+    if (prevIndex &gt;= 0) {
       setCurrentStep(steps[prevIndex]);
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = () =&gt; {
     console.log('Final form data:', formData);
     alert('Form submitted successfully!');
   };
 
-  const updateField = (field: keyof FormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const updateField = (field: keyof FormData, value: any) =&gt; {
+    setFormData(prev =&gt; ({ ...prev, [field]: value }));
     // Clear error when user types
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors(prev =&gt; ({ ...prev, [field]: undefined }));
     }
   };
 
@@ -3543,25 +3550,25 @@ function MultiStepForm() {
       {/* Progress indicator */}
       &lt;div style={{ marginBottom: '2rem' }}&gt;
         &lt;div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}&gt;
-          {steps.map((step, index) => (
+          {steps.map((step, index) =&gt; (
             &lt;div
               key={step}
               style={{
                 flex: 1,
                 height: '4px',
-                backgroundColor: index <= currentStepIndex ? '#667eea' : '#ddd',
-                marginRight: index < steps.length - 1 ? '0.5rem' : 0
+                backgroundColor: index &lt;= currentStepIndex ? '#667eea' : '#ddd',
+                marginRight: index &lt; steps.length - 1 ? '0.5rem' : 0
               }}
             /&gt;
           ))}
         &lt;/div&gt;
         &lt;div style={{ display: 'flex', justifyContent: 'space-between' }}&gt;
-          {steps.map((step, index) => (
+          {steps.map((step, index) =&gt; (
             &lt;span
               key={step}
               style={{
                 fontSize: '0.875rem',
-                color: index <= currentStepIndex ? '#667eea' : '#999',
+                color: index &lt;= currentStepIndex ? '#667eea' : '#999',
                 fontWeight: index === currentStepIndex ? 'bold' : 'normal'
               }}
             &gt;
@@ -3573,7 +3580,7 @@ function MultiStepForm() {
 
       {/* Step content */}
       &lt;div style={{ minHeight: '300px', marginBottom: '2rem' }}&gt;
-        {currentStep === 'personal' && (
+        {currentStep === 'personal' &amp;&amp; (
           &lt;div&gt;
             &lt;h2&gt;Personal Information&lt;/h2&gt;
             &lt;div style={{ display: 'grid', gap: '1rem' }}&gt;
@@ -3582,10 +3589,10 @@ function MultiStepForm() {
                 &lt;input
                   type="text"
                   value={formData.firstName}
-                  onChange={(e) => updateField('firstName', e.target.value)}
+                  onChange={(e) =&gt; updateField('firstName', e.target.value)}
                   style={{ width: '100%', padding: '0.5rem' }}
                 /&gt;
-                {errors.firstName && &lt;span style={{ color: 'red' }}&gt;{errors.firstName}&lt;/span&gt;}
+                {errors.firstName &amp;&amp; &lt;span style={{ color: 'red' }}&gt;{errors.firstName}&lt;/span&gt;}
               &lt;/div&gt;
               
               &lt;div&gt;
@@ -3593,10 +3600,10 @@ function MultiStepForm() {
                 &lt;input
                   type="text"
                   value={formData.lastName}
-                  onChange={(e) => updateField('lastName', e.target.value)}
+                  onChange={(e) =&gt; updateField('lastName', e.target.value)}
                   style={{ width: '100%', padding: '0.5rem' }}
                 /&gt;
-                {errors.lastName && &lt;span style={{ color: 'red' }}&gt;{errors.lastName}&lt;/span&gt;}
+                {errors.lastName &amp;&amp; &lt;span style={{ color: 'red' }}&gt;{errors.lastName}&lt;/span&gt;}
               &lt;/div&gt;
               
               &lt;div&gt;
@@ -3604,16 +3611,16 @@ function MultiStepForm() {
                 &lt;input
                   type="date"
                   value={formData.birthDate}
-                  onChange={(e) => updateField('birthDate', e.target.value)}
+                  onChange={(e) =&gt; updateField('birthDate', e.target.value)}
                   style={{ width: '100%', padding: '0.5rem' }}
                 /&gt;
-                {errors.birthDate && &lt;span style={{ color: 'red' }}&gt;{errors.birthDate}&lt;/span&gt;}
+                {errors.birthDate &amp;&amp; &lt;span style={{ color: 'red' }}&gt;{errors.birthDate}&lt;/span&gt;}
               &lt;/div&gt;
             &lt;/div&gt;
           &lt;/div&gt;
         )}
 
-        {currentStep === 'contact' && (
+        {currentStep === 'contact' &amp;&amp; (
           &lt;div&gt;
             &lt;h2&gt;Contact Information&lt;/h2&gt;
             &lt;div style={{ display: 'grid', gap: '1rem' }}&gt;
@@ -3622,10 +3629,10 @@ function MultiStepForm() {
                 &lt;input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => updateField('email', e.target.value)}
+                  onChange={(e) =&gt; updateField('email', e.target.value)}
                   style={{ width: '100%', padding: '0.5rem' }}
                 /&gt;
-                {errors.email && &lt;span style={{ color: 'red' }}&gt;{errors.email}&lt;/span&gt;}
+                {errors.email &amp;&amp; &lt;span style={{ color: 'red' }}&gt;{errors.email}&lt;/span&gt;}
               &lt;/div&gt;
               
               &lt;div&gt;
@@ -3633,10 +3640,10 @@ function MultiStepForm() {
                 &lt;input
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => updateField('phone', e.target.value)}
+                  onChange={(e) =&gt; updateField('phone', e.target.value)}
                   style={{ width: '100%', padding: '0.5rem' }}
                 /&gt;
-                {errors.phone && &lt;span style={{ color: 'red' }}&gt;{errors.phone}&lt;/span&gt;}
+                {errors.phone &amp;&amp; &lt;span style={{ color: 'red' }}&gt;{errors.phone}&lt;/span&gt;}
               &lt;/div&gt;
               
               &lt;div&gt;
@@ -3644,16 +3651,16 @@ function MultiStepForm() {
                 &lt;input
                   type="text"
                   value={formData.address}
-                  onChange={(e) => updateField('address', e.target.value)}
+                  onChange={(e) =&gt; updateField('address', e.target.value)}
                   style={{ width: '100%', padding: '0.5rem' }}
                 /&gt;
-                {errors.address && &lt;span style={{ color: 'red' }}&gt;{errors.address}&lt;/span&gt;}
+                {errors.address &amp;&amp; &lt;span style={{ color: 'red' }}&gt;{errors.address}&lt;/span&gt;}
               &lt;/div&gt;
             &lt;/div&gt;
           &lt;/div&gt;
         )}
 
-        {currentStep === 'preferences' && (
+        {currentStep === 'preferences' &amp;&amp; (
           &lt;div&gt;
             &lt;h2&gt;Your Preferences&lt;/h2&gt;
             &lt;div style={{ display: 'grid', gap: '1rem' }}&gt;
@@ -3661,7 +3668,7 @@ function MultiStepForm() {
                 &lt;input
                   type="checkbox"
                   checked={formData.newsletter}
-                  onChange={(e) => updateField('newsletter', e.target.checked)}
+                  onChange={(e) =&gt; updateField('newsletter', e.target.checked)}
                 /&gt;
                 Subscribe to newsletter
               &lt;/label&gt;
@@ -3670,7 +3677,7 @@ function MultiStepForm() {
                 &lt;input
                   type="checkbox"
                   checked={formData.notifications}
-                  onChange={(e) => updateField('notifications', e.target.checked)}
+                  onChange={(e) =&gt; updateField('notifications', e.target.checked)}
                 /&gt;
                 Enable notifications
               &lt;/label&gt;
@@ -3679,7 +3686,7 @@ function MultiStepForm() {
                 &lt;label&gt;Theme&lt;/label&gt;
                 &lt;select
                   value={formData.theme}
-                  onChange={(e) => updateField('theme', e.target.value)}
+                  onChange={(e) =&gt; updateField('theme', e.target.value)}
                   style={{ width: '100%', padding: '0.5rem' }}
                 &gt;
                   &lt;option value="light"&gt;Light&lt;/option&gt;
@@ -3690,7 +3697,7 @@ function MultiStepForm() {
           &lt;/div&gt;
         )}
 
-        {currentStep === 'review' && (
+        {currentStep === 'review' &amp;&amp; (
           &lt;div&gt;
             &lt;h2&gt;Review Your Information&lt;/h2&gt;
             &lt;div style={{ display: 'grid', gap: '1rem' }}&gt;
@@ -3782,7 +3789,7 @@ function MultiStepForm() {
                 </div>
 
                 <h3>Conditional Fields</h3>
-                <p>Show or hide fields based on other field values:</p>
+                <p>Not every field applies to every user. Asking an unemployed applicant for their company name is confusing at best and a dead end at worst. Conditional fields keep the form relevant by showing inputs only when they make sense — the form quite literally reshapes itself around each user's answers. In React this is beautifully simple: it's just conditional rendering driven by state.</p>
 
                 <pre><code class="language-typescript">function ConditionalFieldsForm() {
   const [employmentStatus, setEmploymentStatus] = useState&lt;'employed' | 'unemployed' | 'student'&gt;('employed');
@@ -3795,7 +3802,7 @@ function MultiStepForm() {
         &lt;label&gt;Employment Status&lt;/label&gt;
         &lt;select
           value={employmentStatus}
-          onChange={(e) => setEmploymentStatus(e.target.value as any)}
+          onChange={(e) =&gt; setEmploymentStatus(e.target.value as any)}
           style={{ width: '100%', padding: '0.5rem' }}
         &gt;
           &lt;option value="employed"&gt;Employed&lt;/option&gt;
@@ -3805,26 +3812,26 @@ function MultiStepForm() {
       &lt;/div&gt;
 
       {/* Show company field only if employed */}
-      {employmentStatus === 'employed' && (
+      {employmentStatus === 'employed' &amp;&amp; (
         &lt;div style={{ marginTop: '1rem' }}&gt;
           &lt;label&gt;Company Name *&lt;/label&gt;
           &lt;input
             type="text"
             value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
+            onChange={(e) =&gt; setCompanyName(e.target.value)}
             style={{ width: '100%', padding: '0.5rem' }}
           /&gt;
         &lt;/div&gt;
       )}
 
       {/* Show school field only if student */}
-      {employmentStatus === 'student' && (
+      {employmentStatus === 'student' &amp;&amp; (
         &lt;div style={{ marginTop: '1rem' }}&gt;
           &lt;label&gt;School Name *&lt;/label&gt;
           &lt;input
             type="text"
             value={schoolName}
-            onChange={(e) => setSchoolName(e.target.value)}
+            onChange={(e) =&gt; setSchoolName(e.target.value)}
             style={{ width: '100%', padding: '0.5rem' }}
           /&gt;
         &lt;/div&gt;
@@ -3838,7 +3845,7 @@ function MultiStepForm() {
 }</code></pre>
 
                 <h3>Dependent Validation</h3>
-                <p>Validation rules that depend on multiple fields:</p>
+                <p>Some rules can't judge a field in isolation. "End date must be after start date" needs to see <em>both</em> dates; "confirm password must match" needs the original too. These cross-field rules are where naive per-field validation falls apart, because the same field can be valid or invalid depending on a neighbor. The fix is to validate against the whole <code>formData</code> object rather than a single value, as the example below does when the range type is selected.</p>
 
                 <pre><code class="language-typescript">interface DateRangeForm {
   startDate: string;
@@ -3855,7 +3862,7 @@ function DependentValidationForm() {
 
   const [errors, setErrors] = useState&lt;Partial&lt;Record&lt;keyof DateRangeForm, string&gt;&gt;&gt;({});
 
-  const validate = (): boolean => {
+  const validate = (): boolean =&gt; {
     const newErrors: Partial&lt;Record&lt;keyof DateRangeForm, string&gt;&gt; = {};
 
     if (!formData.startDate) {
@@ -3865,7 +3872,7 @@ function DependentValidationForm() {
     if (formData.type === 'dateRange') {
       if (!formData.endDate) {
         newErrors.endDate = 'End date is required for date range';
-      } else if (formData.startDate && formData.endDate < formData.startDate) {
+      } else if (formData.startDate &amp;&amp; formData.endDate &lt; formData.startDate) {
         newErrors.endDate = 'End date must be after start date';
       }
     }
@@ -3874,7 +3881,7 @@ function DependentValidationForm() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     if (validate()) {
       console.log('Valid form data:', formData);
@@ -3887,7 +3894,7 @@ function DependentValidationForm() {
         &lt;label&gt;Type&lt;/label&gt;
         &lt;select
           value={formData.type}
-          onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+          onChange={(e) =&gt; setFormData(prev =&gt; ({ ...prev, type: e.target.value as any }))}
           style={{ width: '100%', padding: '0.5rem' }}
         &gt;
           &lt;option value="sameDay"&gt;Same Day&lt;/option&gt;
@@ -3900,22 +3907,22 @@ function DependentValidationForm() {
         &lt;input
           type="date"
           value={formData.startDate}
-          onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+          onChange={(e) =&gt; setFormData(prev =&gt; ({ ...prev, startDate: e.target.value }))}
           style={{ width: '100%', padding: '0.5rem' }}
         /&gt;
-        {errors.startDate && &lt;span style={{ color: 'red' }}&gt;{errors.startDate}&lt;/span&gt;}
+        {errors.startDate &amp;&amp; &lt;span style={{ color: 'red' }}&gt;{errors.startDate}&lt;/span&gt;}
       &lt;/div&gt;
 
-      {formData.type === 'dateRange' && (
+      {formData.type === 'dateRange' &amp;&amp; (
         &lt;div style={{ marginTop: '1rem' }}&gt;
           &lt;label&gt;End Date *&lt;/label&gt;
           &lt;input
             type="date"
             value={formData.endDate}
-            onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+            onChange={(e) =&gt; setFormData(prev =&gt; ({ ...prev, endDate: e.target.value }))}
             style={{ width: '100%', padding: '0.5rem' }}
           /&gt;
-          {errors.endDate && &lt;span style={{ color: 'red' }}&gt;{errors.endDate}&lt;/span&gt;}
+          {errors.endDate &amp;&amp; &lt;span style={{ color: 'red' }}&gt;{errors.endDate}&lt;/span&gt;}
         &lt;/div&gt;
       )}
 
@@ -3931,7 +3938,7 @@ function DependentValidationForm() {
 
                 <pre><code class="language-typescript">function useFormPersistence&lt;T&gt;(key: string, initialValue: T) {
   // Load from localStorage on mount
-  const [value, setValue] = useState&lt;T&gt;(() => {
+  const [value, setValue] = useState&lt;T&gt;(() =&gt; {
     try {
       const stored = localStorage.getItem(key);
       return stored ? JSON.parse(stored) : initialValue;
@@ -3941,7 +3948,7 @@ function DependentValidationForm() {
   });
 
   // Save to localStorage whenever value changes
-  useEffect(() => {
+  useEffect(() =&gt; {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
@@ -3950,7 +3957,7 @@ function DependentValidationForm() {
   }, [key, value]);
 
   // Clear localStorage
-  const clearStorage = () => {
+  const clearStorage = () =&gt; {
     localStorage.removeItem(key);
     setValue(initialValue);
   };
@@ -3965,7 +3972,7 @@ function PersistentForm() {
     resume: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =&gt; {
     e.preventDefault();
     console.log('Submitting:', formData);
     // Clear saved data after successful submission
@@ -3981,7 +3988,7 @@ function PersistentForm() {
       &lt;input
         type="text"
         value={formData.name}
-        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+        onChange={(e) =&gt; setFormData(prev =&gt; ({ ...prev, name: e.target.value }))}
         placeholder="Name"
         style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
       /&gt;
@@ -3989,14 +3996,14 @@ function PersistentForm() {
       &lt;input
         type="email"
         value={formData.email}
-        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+        onChange={(e) =&gt; setFormData(prev =&gt; ({ ...prev, email: e.target.value }))}
         placeholder="Email"
         style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
       /&gt;
 
       &lt;textarea
         value={formData.resume}
-        onChange={(e) => setFormData(prev => ({ ...prev, resume: e.target.value }))}
+        onChange={(e) =&gt; setFormData(prev =&gt; ({ ...prev, resume: e.target.value }))}
         placeholder="Resume/Cover Letter"
         rows={5}
         style={{ width: '100%', padding: '0.5rem', marginBottom: '1rem' }}
@@ -4019,6 +4026,88 @@ function PersistentForm() {
                         <li>Job applications, surveys, registrations</li>
                     </ul>
                     <p><strong>Remember:</strong> Clear localStorage after successful submission and don't store sensitive data!</p>
+                </div>
+
+                <h3>Looking Forward: React 19 Form Actions</h3>
+                <p>Everything so far has been the "manual transmission" of forms — you wire up <code>onChange</code>, track <code>isSubmitting</code> by hand, and manage error state yourself. It's worth knowing every gear, because it's what libraries are built on. But React 19 (stable since December 2024) ships a higher-level, built-in way to handle submissions called <strong>Actions</strong>, and for a lot of forms it removes a surprising amount of the boilerplate you just learned.</p>
+
+                <div class="card card-accent">
+                    <h4>✨ What's an "Action"?</h4>
+                    <p>Instead of an <code>onSubmit</code> handler, you pass a function straight to the form's <code>action</code> prop. React calls it with the form's <code>FormData</code>, automatically tracks a <em>pending</em> state while it runs (even for <code>async</code> work), and resets things when it finishes. Three new hooks make this ergonomic:</p>
+                    <ul>
+                        <li><code>useActionState(action, initialState)</code> → gives you back <code>[state, formAction, isPending]</code>. Perfect for returning validation errors or a success flag from the action.</li>
+                        <li><code>useFormStatus()</code> → read from a <em>child</em> of the form, it tells that child whether the parent form is currently submitting — great for a self-managing submit button.</li>
+                        <li><code>useOptimistic(...)</code> → show an instant, optimistic result while the real submission is still in flight.</li>
+                    </ul>
+                </div>
+
+                <p>Here's the multi-strategy registration idea from earlier, rebuilt with Actions. Notice there's no <code>isSubmitting</code> state and no manual <code>e.preventDefault()</code>:</p>
+
+                <pre><code class="language-typescript">import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
+
+interface SignupState {
+  error?: string;
+  success?: boolean;
+}
+
+// The action receives the previous state and the submitted FormData.
+// It can be async and can run on the client or server.
+async function signupAction(
+  _prevState: SignupState,
+  formData: FormData
+): Promise&lt;SignupState&gt; {
+  const email = formData.get('email') as string;
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: 'Please enter a valid email address' };
+  }
+
+  await createUser({ email });
+  return { success: true };
+}
+
+// useFormStatus reads the pending state of the nearest parent &lt;form&gt;.
+// It MUST live in a child component, not the component that renders &lt;form&gt;.
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    &lt;button type="submit" disabled={pending}&gt;
+      {pending ? 'Creating account…' : 'Sign up'}
+    &lt;/button&gt;
+  );
+}
+
+function SignupForm() {
+  const [state, formAction, isPending] = useActionState&lt;SignupState, FormData&gt;(
+    signupAction,
+    {}
+  );
+
+  return (
+    &lt;form action={formAction}&gt;
+      &lt;label htmlFor="email"&gt;Email&lt;/label&gt;
+      &lt;input id="email" name="email" type="email" /&gt;
+
+      {state.error &amp;&amp; (
+        &lt;p role="alert" style={{ color: 'red' }}&gt;{state.error}&lt;/p&gt;
+      )}
+      {state.success &amp;&amp; &lt;p&gt;Account created! 🎉&lt;/p&gt;}
+
+      &lt;SubmitButton /&gt;
+      {isPending &amp;&amp; &lt;p&gt;Submitting…&lt;/p&gt;}
+    &lt;/form&gt;
+  );
+}</code></pre>
+
+                <div class="card card-info">
+                    <h4>💡 When to reach for Actions vs. controlled state</h4>
+                    <ul>
+                        <li><strong>Actions shine</strong> for straightforward submit-and-await flows, progressive-enhancement (they work with <code>FormData</code>, even before JS hydrates), and server-driven forms in frameworks like Next.js.</li>
+                        <li><strong>Controlled state (this lesson) still wins</strong> when you need rich real-time behavior <em>as the user types</em>: live password-strength meters, dynamic field arrays, cross-field previews, and conditional fields.</li>
+                        <li><strong>They mix happily.</strong> Use controlled inputs for the interactive parts and an Action for the submission, letting <code>useActionState</code> hold your server-returned errors.</li>
+                    </ul>
+                    <p style="margin: 0;">You'll go deeper on ergonomic form handling in the next lessons with React Hook Form and Zod — but now you know the built-in React 19 baseline they build alongside.</p>
                 </div>
             </section>
 
@@ -4100,31 +4189,31 @@ function JobApplicationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Validation functions
-  const validateEmail = (email: string): string | undefined => {
+  const validateEmail = (email: string): string | undefined =&gt; {
     if (!email) return 'Email is required';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return 'Please enter a valid email address';
     }
   };
 
-  const validatePhone = (phone: string): string | undefined => {
+  const validatePhone = (phone: string): string | undefined =&gt; {
     if (!phone) return 'Phone number is required';
     if (!/^\d{10}$/.test(phone.replace(/\D/g, ''))) {
       return 'Please enter a valid 10-digit phone number';
     }
   };
 
-  const validateRequired = (value: string, fieldName: string): string | undefined => {
+  const validateRequired = (value: string, fieldName: string): string | undefined =&gt; {
     if (!value.trim()) return `${fieldName} is required`;
   };
 
   // Handle field updates
-  const updateField = (field: keyof JobApplicationData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const updateField = (field: keyof JobApplicationData, value: any) =&gt; {
+    setFormData(prev =&gt; ({ ...prev, [field]: value }));
     
     // Clear error when user types
     if (errors[field]) {
-      setErrors(prev => {
+      setErrors(prev =&gt; {
         const newErrors = { ...prev };
         delete newErrors[field];
         return newErrors;
@@ -4133,8 +4222,8 @@ function JobApplicationForm() {
   };
 
   // Handle blur
-  const handleBlur = (field: string) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
+  const handleBlur = (field: string) =&gt; {
+    setTouched(prev =&gt; ({ ...prev, [field]: true }));
     
     // Run validation for this field
     let error: string | undefined;
@@ -4157,13 +4246,13 @@ function JobApplicationForm() {
     }
     
     if (error) {
-      setErrors(prev => ({ ...prev, [field]: error }));
+      setErrors(prev =&gt; ({ ...prev, [field]: error }));
     }
   };
 
   // Work experience handlers
-  const addExperience = () => {
-    setFormData(prev => ({
+  const addExperience = () =&gt; {
+    setFormData(prev =&gt; ({
       ...prev,
       workExperiences: [
         ...prev.workExperiences,
@@ -4179,35 +4268,35 @@ function JobApplicationForm() {
     }));
   };
 
-  const removeExperience = (id: string) => {
-    setFormData(prev => ({
+  const removeExperience = (id: string) =&gt; {
+    setFormData(prev =&gt; ({
       ...prev,
-      workExperiences: prev.workExperiences.filter(exp => exp.id !== id)
+      workExperiences: prev.workExperiences.filter(exp =&gt; exp.id !== id)
     }));
   };
 
-  const updateExperience = (id: string, field: keyof WorkExperience, value: any) => {
-    setFormData(prev => ({
+  const updateExperience = (id: string, field: keyof WorkExperience, value: any) =&gt; {
+    setFormData(prev =&gt; ({
       ...prev,
-      workExperiences: prev.workExperiences.map(exp =>
+      workExperiences: prev.workExperiences.map(exp =&gt;
         exp.id === id ? { ...exp, [field]: value } : exp
       )
     }));
   };
 
   // File handling
-  const handleFileChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) => {
+  const handleFileChange = (e: React.ChangeEvent&lt;HTMLInputElement&gt;) =&gt; {
     const file = e.target.files?.[0] || null;
     
     if (file) {
       // Validate file
-      if (file.size > 5 * 1024 * 1024) { // 5MB
-        setErrors(prev => ({ ...prev, resume: 'File size must be less than 5MB' }));
+      if (file.size &gt; 5 * 1024 * 1024) { // 5MB
+        setErrors(prev =&gt; ({ ...prev, resume: 'File size must be less than 5MB' }));
         return;
       }
       
       if (!['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.type)) {
-        setErrors(prev => ({ ...prev, resume: 'Only PDF and Word documents are allowed' }));
+        setErrors(prev =&gt; ({ ...prev, resume: 'Only PDF and Word documents are allowed' }));
         return;
       }
     }
@@ -4216,7 +4305,7 @@ function JobApplicationForm() {
   };
 
   // Validate entire form
-  const validateForm = (): boolean => {
+  const validateForm = (): boolean =&gt; {
     const newErrors: Record&lt;string, string&gt; = {};
 
     // Basic fields
@@ -4241,13 +4330,13 @@ function JobApplicationForm() {
     }
 
     // Work experiences
-    formData.workExperiences.forEach((exp, index) => {
+    formData.workExperiences.forEach((exp, index) =&gt; {
       if (!exp.company) newErrors[`exp-${index}-company`] = 'Company is required';
       if (!exp.position) newErrors[`exp-${index}-position`] = 'Position is required';
     });
 
     // Conditional validation
-    if (formData.referral && !formData.referralSource) {
+    if (formData.referral &amp;&amp; !formData.referralSource) {
       newErrors.referralSource = 'Please tell us who referred you';
     }
 
@@ -4256,7 +4345,7 @@ function JobApplicationForm() {
   };
 
   // Submit
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) =&gt; {
     e.preventDefault();
 
     // Mark all as touched
@@ -4277,7 +4366,7 @@ function JobApplicationForm() {
 
     try {
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve =&gt; setTimeout(resolve, 2000));
       
       console.log('Application submitted:', formData);
       alert('Application submitted successfully!');
@@ -4328,15 +4417,15 @@ function JobApplicationForm() {
               id="firstName"
               type="text"
               value={formData.firstName}
-              onChange={(e) => updateField('firstName', e.target.value)}
-              onBlur={() => handleBlur('firstName')}
+              onChange={(e) =&gt; updateField('firstName', e.target.value)}
+              onBlur={() =&gt; handleBlur('firstName')}
               style={{
                 width: '100%',
                 padding: '0.5rem',
-                border: `1px solid ${errors.firstName && touched.firstName ? '#f56565' : '#ddd'}`
+                border: `1px solid ${errors.firstName &amp;&amp; touched.firstName ? '#f56565' : '#ddd'}`
               }}
             /&gt;
-            {errors.firstName && touched.firstName && (
+            {errors.firstName &amp;&amp; touched.firstName &amp;&amp; (
               &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                 {errors.firstName}
               &lt;/span&gt;
@@ -4349,15 +4438,15 @@ function JobApplicationForm() {
               id="lastName"
               type="text"
               value={formData.lastName}
-              onChange={(e) => updateField('lastName', e.target.value)}
-              onBlur={() => handleBlur('lastName')}
+              onChange={(e) =&gt; updateField('lastName', e.target.value)}
+              onBlur={() =&gt; handleBlur('lastName')}
               style={{
                 width: '100%',
                 padding: '0.5rem',
-                border: `1px solid ${errors.lastName && touched.lastName ? '#f56565' : '#ddd'}`
+                border: `1px solid ${errors.lastName &amp;&amp; touched.lastName ? '#f56565' : '#ddd'}`
               }}
             /&gt;
-            {errors.lastName && touched.lastName && (
+            {errors.lastName &amp;&amp; touched.lastName &amp;&amp; (
               &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                 {errors.lastName}
               &lt;/span&gt;
@@ -4372,15 +4461,15 @@ function JobApplicationForm() {
               id="email"
               type="email"
               value={formData.email}
-              onChange={(e) => updateField('email', e.target.value)}
-              onBlur={() => handleBlur('email')}
+              onChange={(e) =&gt; updateField('email', e.target.value)}
+              onBlur={() =&gt; handleBlur('email')}
               style={{
                 width: '100%',
                 padding: '0.5rem',
-                border: `1px solid ${errors.email && touched.email ? '#f56565' : '#ddd'}`
+                border: `1px solid ${errors.email &amp;&amp; touched.email ? '#f56565' : '#ddd'}`
               }}
             /&gt;
-            {errors.email && touched.email && (
+            {errors.email &amp;&amp; touched.email &amp;&amp; (
               &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                 {errors.email}
               &lt;/span&gt;
@@ -4393,16 +4482,16 @@ function JobApplicationForm() {
               id="phone"
               type="tel"
               value={formData.phone}
-              onChange={(e) => updateField('phone', e.target.value)}
-              onBlur={() => handleBlur('phone')}
+              onChange={(e) =&gt; updateField('phone', e.target.value)}
+              onBlur={() =&gt; handleBlur('phone')}
               placeholder="(555) 123-4567"
               style={{
                 width: '100%',
                 padding: '0.5rem',
-                border: `1px solid ${errors.phone && touched.phone ? '#f56565' : '#ddd'}`
+                border: `1px solid ${errors.phone &amp;&amp; touched.phone ? '#f56565' : '#ddd'}`
               }}
             /&gt;
-            {errors.phone && touched.phone && (
+            {errors.phone &amp;&amp; touched.phone &amp;&amp; (
               &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                 {errors.phone}
               &lt;/span&gt;
@@ -4420,12 +4509,12 @@ function JobApplicationForm() {
           &lt;select
             id="yearsExperience"
             value={formData.yearsExperience}
-            onChange={(e) => updateField('yearsExperience', e.target.value)}
-            onBlur={() => handleBlur('yearsExperience')}
+            onChange={(e) =&gt; updateField('yearsExperience', e.target.value)}
+            onBlur={() =&gt; handleBlur('yearsExperience')}
             style={{
               width: '100%',
               padding: '0.5rem',
-              border: `1px solid ${errors.yearsExperience && touched.yearsExperience ? '#f56565' : '#ddd'}`
+              border: `1px solid ${errors.yearsExperience &amp;&amp; touched.yearsExperience ? '#f56565' : '#ddd'}`
             }}
           &gt;
             &lt;option value=""&gt;Select...&lt;/option&gt;
@@ -4435,7 +4524,7 @@ function JobApplicationForm() {
             &lt;option value="5-10"&gt;5-10 years&lt;/option&gt;
             &lt;option value="10+"&gt;10+ years&lt;/option&gt;
           &lt;/select&gt;
-          {errors.yearsExperience && touched.yearsExperience && (
+          {errors.yearsExperience &amp;&amp; touched.yearsExperience &amp;&amp; (
             &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
               {errors.yearsExperience}
             &lt;/span&gt;
@@ -4444,7 +4533,7 @@ function JobApplicationForm() {
 
         {/* Work Experiences Array */}
         &lt;h4&gt;Work History&lt;/h4&gt;
-        {formData.workExperiences.map((exp, index) => (
+        {formData.workExperiences.map((exp, index) =&gt; (
           &lt;div
             key={exp.id}
             style={{
@@ -4456,10 +4545,10 @@ function JobApplicationForm() {
           &gt;
             &lt;div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}&gt;
               &lt;strong&gt;Experience {index + 1}&lt;/strong&gt;
-              {formData.workExperiences.length > 1 && (
+              {formData.workExperiences.length &gt; 1 &amp;&amp; (
                 &lt;button
                   type="button"
-                  onClick={() => removeExperience(exp.id)}
+                  onClick={() =&gt; removeExperience(exp.id)}
                   style={{
                     background: '#f56565',
                     color: 'white',
@@ -4478,14 +4567,14 @@ function JobApplicationForm() {
               &lt;input
                 type="text"
                 value={exp.company}
-                onChange={(e) => updateExperience(exp.id, 'company', e.target.value)}
+                onChange={(e) =&gt; updateExperience(exp.id, 'company', e.target.value)}
                 placeholder="Company"
                 style={{ padding: '0.5rem' }}
               /&gt;
               &lt;input
                 type="text"
                 value={exp.position}
-                onChange={(e) => updateExperience(exp.id, 'position', e.target.value)}
+                onChange={(e) =&gt; updateExperience(exp.id, 'position', e.target.value)}
                 placeholder="Position"
                 style={{ padding: '0.5rem' }}
               /&gt;
@@ -4522,12 +4611,12 @@ function JobApplicationForm() {
             accept=".pdf,.doc,.docx"
             style={{ display: 'block', marginTop: '0.5rem' }}
           /&gt;
-          {formData.resume && (
+          {formData.resume &amp;&amp; (
             &lt;p style={{ fontSize: '0.875rem', color: '#48bb78' }}&gt;
               ✓ {formData.resume.name}
             &lt;/p&gt;
           )}
-          {errors.resume && (
+          {errors.resume &amp;&amp; (
             &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
               {errors.resume}
             &lt;/span&gt;
@@ -4539,7 +4628,7 @@ function JobApplicationForm() {
           &lt;textarea
             id="coverLetter"
             value={formData.coverLetter}
-            onChange={(e) => updateField('coverLetter', e.target.value)}
+            onChange={(e) =&gt; updateField('coverLetter', e.target.value)}
             placeholder="Tell us why you're interested in this position..."
             rows={5}
             style={{
@@ -4558,19 +4647,19 @@ function JobApplicationForm() {
           &lt;input
             type="checkbox"
             checked={formData.referral}
-            onChange={(e) => updateField('referral', e.target.checked)}
+            onChange={(e) =&gt; updateField('referral', e.target.checked)}
           /&gt;
           I was referred by someone
         &lt;/label&gt;
 
-        {formData.referral && (
+        {formData.referral &amp;&amp; (
           &lt;div style={{ marginTop: '1rem' }}&gt;
             &lt;label htmlFor="referralSource"&gt;Who referred you? *&lt;/label&gt;
             &lt;input
               id="referralSource"
               type="text"
               value={formData.referralSource}
-              onChange={(e) => updateField('referralSource', e.target.value)}
+              onChange={(e) =&gt; updateField('referralSource', e.target.value)}
               placeholder="Name of person who referred you"
               style={{
                 width: '100%',
@@ -4579,7 +4668,7 @@ function JobApplicationForm() {
                 border: `1px solid ${errors.referralSource ? '#f56565' : '#ddd'}`
               }}
             /&gt;
-            {errors.referralSource && (
+            {errors.referralSource &amp;&amp; (
               &lt;span style={{ color: '#f56565', fontSize: '0.875rem' }}&gt;
                 {errors.referralSource}
               &lt;/span&gt;
@@ -4589,7 +4678,7 @@ function JobApplicationForm() {
       &lt;/section&gt;
 
       {/* Submit Error */}
-      {errors.submit && (
+      {errors.submit &amp;&amp; (
         &lt;div
           style={{
             background: '#ffebee',
@@ -4753,15 +4842,15 @@ function JobApplicationForm() {
                 </div>
 
                 <div class="card card-accent">
-                    <h3 style="color: white;">🎯 What's Next?</h3>
-                    <p style="color: white;">In the upcoming lessons, you'll learn:</p>
-                    <ul style="color: white;">
+                    <h3>🎯 What's Next?</h3>
+                    <p>In the upcoming lessons, you'll learn:</p>
+                    <ul>
                         <li><strong>Lesson 7.2: React Hook Form</strong> - A powerful library that makes forms much easier</li>
                         <li><strong>Lesson 7.3: Form Validation with Zod</strong> - Schema-based validation for type-safe forms</li>
                         <li><strong>Lesson 7.4: File Uploads</strong> - Handling images, documents, and multiple files</li>
                         <li><strong>Lesson 7.5: Advanced Form Patterns</strong> - Form wizards, dynamic schemas, and more</li>
                     </ul>
-                    <p style="color: white;">These lessons will build on the foundation you've established here!</p>
+                    <p>These lessons will build on the foundation you've established here!</p>
                 </div>
 
                 <div class="card card-success">

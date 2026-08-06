@@ -62,22 +62,22 @@
                 <p class="lead">You've learned the basics of data fetching with useEffect and the Fetch API. But real-world applications face challenges like race conditions, slow API responses, and large datasets. How do you build a search that doesn't overwhelm the server with requests? How do you handle pagination elegantly? What about when users navigate away before data loads? In this lesson, we'll explore advanced data fetching patterns that make your React apps fast, efficient, and production-ready. Get ready to level up your data game! 🎯</p>
                 
                 <!-- Learning objectives -->
-                <div class="card">
+                <div class="card card-info">
                     <h2>🎯 Learning Objectives</h2>
                     <p>By the end of this lesson, you will be able to:</p>
                     <ul>
                         <li>Understand and prevent race conditions in data fetching</li>
                         <li>Implement debouncing and throttling for user input</li>
+                        <li>Cancel in-flight requests cleanly with <code>AbortController</code></li>
                         <li>Build paginated data displays with proper state management</li>
-                        <li>Create infinite scroll components</li>
-                        <li>Implement client-side caching strategies</li>
-                        <li>Use AbortController for request cancellation</li>
-                        <li>Handle stale data and revalidation</li>
-                        <li>Understand React Query fundamentals</li>
-                        <li>Type complex async operations properly</li>
-                        <li>Build production-ready data fetching solutions</li>
+                        <li>Create infinite-scroll components with the Intersection Observer</li>
+                        <li>Implement client-side caching, stale data, and revalidation strategies</li>
+                        <li>Use TanStack Query v5 as the production standard — typed <code>useQuery</code>/<code>useMutation</code>, <code>queryKey</code>, <code>staleTime</code>, <code>select</code>, retries, polling, and dependent queries</li>
+                        <li>Apply optimistic updates with automatic rollback</li>
+                        <li>Recognize where React 19's <code>use()</code>, <code>&lt;Suspense&gt;</code>, and Server Components fit the picture</li>
+                        <li>Type complex async operations correctly and build production-ready solutions</li>
                     </ul>
-                    <p><strong>Estimated Time:</strong> 75-90 minutes</p>
+                    <p><strong>Estimated Time:</strong> 75–90 minutes</p>
                     <p><strong>Project:</strong> Build a searchable, paginated product catalog with caching</p>
                 </div>
             </header>
@@ -97,7 +97,7 @@
                         <li><a href="#section4" class="toc-link">Pagination Patterns</a></li>
                         <li><a href="#section5" class="toc-link">Infinite Scroll</a></li>
                         <li><a href="#section6" class="toc-link">Client-Side Caching</a></li>
-                        <li><a href="#section7" class="toc-link">Introduction to React Query</a></li>
+                        <li><a href="#section7" class="toc-link">Introduction to TanStack Query</a></li>
                         <li><a href="#section8" class="toc-link">Optimistic Updates</a></li>
                         <li><a href="#section9" class="toc-link">Hands-on Practice</a></li>
                         <li><a href="#section10" class="toc-link">Best Practices</a></li>
@@ -109,11 +109,12 @@
             <!-- Section 1: Race Conditions -->
             <section id="section1" class="lesson-section">
                 <h2>🏁 Race Conditions: The Silent Bug</h2>
-                <p>Race conditions are one of the trickiest bugs in data fetching. They occur when multiple async operations complete out of order, causing your UI to display stale or incorrect data. Let's understand and fix them!</p>
+                <p>Race conditions are among the trickiest bugs in all of front-end development, precisely because nothing crashes. Your code is correct, your API is correct — and yet the screen shows the wrong thing. They happen whenever two async operations "race" to finish and the loser crosses the line last, overwriting the winner. Picture two runners handed the same baton: whoever arrives second gets to update the UI, even though their data is older.</p>
+                <p><strong>Why it matters:</strong> the faster a user interacts (typing, clicking tabs, paging), the more overlapping requests you fire, and the more likely a slow early request lands after a fast later one. On a good network you may never notice; on a flaky phone connection your users see flicker, wrong search results, and "ghost" data constantly. Let's learn to spot these bugs and shut them down for good.</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Race Condition:</strong> A bug that occurs when the outcome depends on the unpredictable timing of multiple operations. In data fetching, this happens when a later request completes before an earlier one, displaying outdated data.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Race Condition:</strong> A bug where the outcome depends on the unpredictable timing of two or more operations rather than on your logic. In data fetching, it strikes when a request you fired <em>earlier</em> resolves <em>later</em> than one you fired after it, so the screen ends up showing data that no longer matches what the user asked for. The bug is "silent" because nothing throws — the code runs perfectly, it just paints the wrong answer.</p>
                 </div>
 
                 <h3>The Problem: Out-of-Order Responses</h3>
@@ -130,19 +131,19 @@ interface SearchResult {
     title: string;
 }
 
-const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
+const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) =&gt; {
     const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (!query) return;
         
         setLoading(true);
         
         // Problem: No way to know if this is still the latest query!
         fetch(`/api/search?q=${query}`)
-            .then(res => res.json())
-            .then(data => {
+            .then(res =&gt; res.json())
+            .then(data =&gt; {
                 setResults(data); // ❌ Might be stale data!
                 setLoading(false);
             });
@@ -150,8 +151,8 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
 
     return (
         &lt;div&gt;
-            {loading && &lt;p&gt;Loading...&lt;/p&gt;}
-            {results.map(result => (
+            {loading &amp;&amp; &lt;p&gt;Loading...&lt;/p&gt;}
+            {results.map(result =&gt; (
                 &lt;div key={result.id}&gt;{result.title}&lt;/div&gt;
             ))}
         &lt;/div&gt;
@@ -170,11 +171,11 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
 
                 <div class="card card-success">
                     <h4>✅ Fixed with Ignore Flag</h4>
-                    <pre><code class="language-typescript">const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
+                    <pre><code class="language-typescript">const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) =&gt; {
     const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (!query) return;
         
         let ignore = false; // Flag to track if this effect is still active
@@ -182,8 +183,8 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
         setLoading(true);
         
         fetch(`/api/search?q=${query}`)
-            .then(res => res.json())
-            .then(data => {
+            .then(res =&gt; res.json())
+            .then(data =&gt; {
                 if (!ignore) { // ✅ Only update if still the latest query
                     setResults(data);
                     setLoading(false);
@@ -191,15 +192,15 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
             });
 
         // Cleanup: Set ignore to true when effect is cleaned up
-        return () => {
+        return () =&gt; {
             ignore = true;
         };
     }, [query]);
 
     return (
         &lt;div&gt;
-            {loading && &lt;p&gt;Loading...&lt;/p&gt;}
-            {results.map(result => (
+            {loading &amp;&amp; &lt;p&gt;Loading...&lt;/p&gt;}
+            {results.map(result =&gt; (
                 &lt;div key={result.id}&gt;{result.title}&lt;/div&gt;
             ))}
         &lt;/div&gt;
@@ -219,11 +220,11 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
 
                 <div class="card card-success">
                     <h4>✅ Best Solution: AbortController</h4>
-                    <pre><code class="language-typescript">const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
+                    <pre><code class="language-typescript">const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) =&gt; {
     const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (!query) return;
         
         // Create AbortController for this request
@@ -234,12 +235,12 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
         fetch(`/api/search?q=${query}`, {
             signal: controller.signal // Pass the signal to fetch
         })
-            .then(res => res.json())
-            .then(data => {
+            .then(res =&gt; res.json())
+            .then(data =&gt; {
                 setResults(data);
                 setLoading(false);
             })
-            .catch(err => {
+            .catch(err =&gt; {
                 if (err.name === 'AbortError') {
                     // Request was cancelled - this is expected!
                     console.log('Request cancelled');
@@ -251,15 +252,15 @@ const SearchResults: React.FC&lt;SearchProps&gt; = ({ query }) => {
             });
 
         // Cleanup: Abort the request if component unmounts or query changes
-        return () => {
+        return () =&gt; {
             controller.abort();
         };
     }, [query]);
 
     return (
         &lt;div&gt;
-            {loading && &lt;p&gt;Loading...&lt;/p&gt;}
-            {results.map(result => (
+            {loading &amp;&amp; &lt;p&gt;Loading...&lt;/p&gt;}
+            {results.map(result =&gt; (
                 &lt;div key={result.id}&gt;{result.title}&lt;/div&gt;
             ))}
         &lt;/div&gt;
@@ -512,7 +513,7 @@ interface UseFetchReturn&lt;T&gt; {
     data: T | null;
     loading: boolean;
     error: Error | null;
-    refetch: () => Promise&lt;void&gt;;
+    refetch: () =&gt; Promise&lt;void&gt;;
 }
 
 function useFetch&lt;T&gt;(
@@ -523,7 +524,7 @@ function useFetch&lt;T&gt;(
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState&lt;Error | null&gt;(null);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async () =&gt; {
         const controller = new AbortController();
         
         setLoading(true);
@@ -541,7 +542,7 @@ function useFetch&lt;T&gt;(
             const result = await response.json();
             setData(result);
         } catch (err) {
-            if (err instanceof Error && err.name !== 'AbortError') {
+            if (err instanceof Error &amp;&amp; err.name !== 'AbortError') {
                 setError(err);
             }
         } finally {
@@ -551,17 +552,17 @@ function useFetch&lt;T&gt;(
         return controller;
     }, [url]);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (options.immediate ?? true) {
             const controller = fetchData();
             
-            return () => {
-                controller.then(c => c.abort());
+            return () =&gt; {
+                controller.then(c =&gt; c.abort());
             };
         }
     }, [fetchData, options.immediate]);
 
-    const refetch = useCallback(async () => {
+    const refetch = useCallback(async () =&gt; {
         await fetchData();
     }, [fetchData]);
 
@@ -569,7 +570,7 @@ function useFetch&lt;T&gt;(
 }
 
 // Usage - race conditions handled automatically!
-const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) =&gt; {
     const { data: user, loading, error } = useFetch&lt;User&gt;(
         `/api/users/${userId}`
     );
@@ -600,31 +601,31 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                 <p>When users type in a search box, do you really want to make an API call for every single keystroke? That's a lot of unnecessary requests! Debouncing and throttling are techniques to limit how often a function runs. Let's master them!</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definitions</h4>
-                    <p style="color: white;"><strong>Debouncing:</strong> Delays executing a function until after a certain time has passed since the last call. Perfect for search inputs—wait until the user stops typing.</p>
-                    <p style="color: white; margin-top: 1rem;"><strong>Throttling:</strong> Limits how often a function can execute (e.g., at most once every 500ms). Great for scroll handlers or window resize events.</p>
+                    <h4>📖 Definitions</h4>
+                    <p><strong>Debouncing:</strong> Wait until the activity <em>stops</em> before acting. Every new event resets the timer, so the function only runs once the storm of events has settled. Think of an elevator that waits a beat after the last person steps in before closing the doors — ideal for search boxes, where you want the final query, not every keystroke.</p>
+                    <p style="margin-top: 1rem;"><strong>Throttling:</strong> Run at most once per time window, no matter how many events arrive. Think of a turnstile that lets one person through every few seconds regardless of how big the crowd is — ideal for scroll and resize handlers, where you want steady updates but not hundreds per second.</p>
                 </div>
 
                 <h3>The Problem: Too Many Requests</h3>
                 <div class="card card-warning">
                     <h4>⚠️ Without Debouncing</h4>
-                    <pre><code class="language-typescript">const Search: React.FC = () => {
+                    <pre><code class="language-typescript">const Search: React.FC = () =&gt; {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState&lt;string[]&gt;([]);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (!query) return;
         
         // ❌ Fires on EVERY keystroke!
         fetch(`/api/search?q=${query}`)
-            .then(res => res.json())
+            .then(res =&gt; res.json())
             .then(setResults);
     }, [query]);
 
     return (
         &lt;input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) =&gt; setQuery(e.target.value)}
             placeholder="Search..."
         /&gt;
     );
@@ -643,14 +644,14 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                     <pre><code class="language-typescript">function useDebounce&lt;T&gt;(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState&lt;T&gt;(value);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         // Set up a timer to update the debounced value
-        const timer = setTimeout(() => {
+        const timer = setTimeout(() =&gt; {
             setDebouncedValue(value);
         }, delay);
 
         // Clean up the timer if value changes before delay expires
-        return () => {
+        return () =&gt; {
             clearTimeout(timer);
         };
     }, [value, delay]); // Re-run effect when value or delay changes
@@ -659,12 +660,12 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
 }
 
 // Usage
-const Search: React.FC = () => {
+const Search: React.FC = () =&gt; {
     const [query, setQuery] = useState('');
     const debouncedQuery = useDebounce(query, 500); // Wait 500ms after typing stops
     const [results, setResults] = useState&lt;string[]&gt;([]);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (!debouncedQuery) return;
         
         const controller = new AbortController();
@@ -673,26 +674,26 @@ const Search: React.FC = () => {
         fetch(`/api/search?q=${debouncedQuery}`, {
             signal: controller.signal
         })
-            .then(res => res.json())
+            .then(res =&gt; res.json())
             .then(setResults)
-            .catch(err => {
+            .catch(err =&gt; {
                 if (err.name !== 'AbortError') {
                     console.error(err);
                 }
             });
 
-        return () => controller.abort();
+        return () =&gt; controller.abort();
     }, [debouncedQuery]);
 
     return (
         &lt;div&gt;
             &lt;input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) =&gt; setQuery(e.target.value)}
                 placeholder="Search..."
             /&gt;
             &lt;div&gt;
-                {results.map(result => (
+                {results.map(result =&gt; (
                     &lt;div key={result}&gt;{result}&lt;/div&gt;
                 ))}
             &lt;/div&gt;
@@ -737,190 +738,61 @@ sequenceDiagram
     Timer->>API: 500ms passed! Fire request "react" ✅
                 </div>
 
-                <!-- Interactive Debounce vs Throttle Visualization -->
-                <div class="card" style="border: 2px solid #667eea; margin: 2rem 0;">
-                    <h4>🎮 Interactive: Debounce vs Throttle Comparison</h4>
-                    <p>Type in the input below and watch how debouncing and throttling handle rapid input differently!</p>
-                    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-                        <input type="text" id="debounceThrottleInput" placeholder="Type quickly here..." style="width: 100%; max-width: 400px; padding: 0.75rem; font-size: 1rem; border: 2px solid #667eea; border-radius: 6px; outline: none;" oninput="handleInputChange(this.value)"/>
-                        
-                        <canvas class="auto-invert" id="debounceThrottleCanvas" width="600" height="280" style="max-width: 100%; border-radius: 8px; background: white; border: 1px solid #e0e0e0;"></canvas>
-                        
-                        <div style="display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; font-size: 0.9rem;">
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <span style="width: 20px; height: 20px; background: #ff6b6b; border-radius: 50%; display: inline-block;"></span>
-                                <span>Raw Input Events</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <span style="width: 20px; height: 20px; background: #667eea; border-radius: 50%; display: inline-block;"></span>
-                                <span>Debounced (500ms)</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <span style="width: 20px; height: 20px; background: #4ecdc4; border-radius: 50%; display: inline-block;"></span>
-                                <span>Throttled (500ms)</span>
-                            </div>
-                        </div>
-                        
-                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; margin-top: 0.5rem;">
-                            <div style="text-align: center; padding: 0.5rem 1rem; background: #ffebee; border-radius: 6px;">
-                                <div style="font-size: 1.5rem; font-weight: bold; color: #ff6b6b;" id="rawCount">0</div>
-                                <div style="font-size: 0.8rem; color: #666;">Raw Events</div>
-                            </div>
-                            <div style="text-align: center; padding: 0.5rem 1rem; background: #e8eaf6; border-radius: 6px;">
-                                <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;" id="debounceCount">0</div>
-                                <div style="font-size: 0.8rem; color: #666;">Debounced</div>
-                            </div>
-                            <div style="text-align: center; padding: 0.5rem 1rem; background: #e0f2f1; border-radius: 6px;">
-                                <div style="font-size: 1.5rem; font-weight: bold; color: #4ecdc4;" id="throttleCount">0</div>
-                                <div style="font-size: 0.8rem; color: #666;">Throttled</div>
-                            </div>
-                        </div>
-                        
-                        <button onclick="resetDebounceThrottleDemo()" style="padding: 0.5rem 1rem; background: #666; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                            🔄 Reset Visualization
-                        </button>
-                    </div>
-                </div>
-                
-                <script>
-                    // Debounce/Throttle visualization
-                    const dtCanvas = document.getElementById('debounceThrottleCanvas');
-                    const dtCtx = dtCanvas.getContext('2d');
-                    let rawEvents = [];
-                    let debounceEvents = [];
-                    let throttleEvents = [];
-                    let debounceTimer = null;
-                    let lastThrottleTime = 0;
-                    let startTime = null;
-                    const DEBOUNCE_DELAY = 500;
-                    const THROTTLE_LIMIT = 500;
-                    
-                    function drawDebounceThrottleCanvas() {
-                        dtCtx.clearRect(0, 0, 600, 280);
-                        
-                        // Draw background grid
-                        dtCtx.strokeStyle = '#f0f0f0';
-                        dtCtx.lineWidth = 1;
-                        for (let x = 50; x < 600; x += 50) {
-                            dtCtx.beginPath();
-                            dtCtx.moveTo(x, 20);
-                            dtCtx.lineTo(x, 240);
-                            dtCtx.stroke();
-                        }
-                        
-                        // Draw lanes
-                        dtCtx.font = '12px system-ui';
-                        dtCtx.fillStyle = '#666';
-                        dtCtx.fillText('Raw Input', 5, 65);
-                        dtCtx.fillText('Debounced', 5, 135);
-                        dtCtx.fillText('Throttled', 5, 205);
-                        
-                        // Draw lane lines
-                        dtCtx.strokeStyle = '#e0e0e0';
-                        dtCtx.lineWidth = 2;
-                        [60, 130, 200].forEach(y => {
-                            dtCtx.beginPath();
-                            dtCtx.moveTo(70, y);
-                            dtCtx.lineTo(580, y);
-                            dtCtx.stroke();
-                        });
-                        
-                        // Draw timeline
-                        dtCtx.fillStyle = '#999';
-                        dtCtx.font = '10px system-ui';
-                        dtCtx.fillText('Time →', 540, 255);
-                        
-                        if (!startTime) return;
-                        
-                        const elapsed = Date.now() - startTime;
-                        const scale = 550 / Math.max(elapsed, 5000);
-                        
-                        // Draw raw events
-                        rawEvents.forEach(t => {
-                            const x = 70 + (t - startTime) * scale;
-                            dtCtx.fillStyle = '#ff6b6b';
-                            dtCtx.beginPath();
-                            dtCtx.arc(x, 60, 6, 0, Math.PI * 2);
-                            dtCtx.fill();
-                        });
-                        
-                        // Draw debounce events
-                        debounceEvents.forEach(t => {
-                            const x = 70 + (t - startTime) * scale;
-                            dtCtx.fillStyle = '#667eea';
-                            dtCtx.beginPath();
-                            dtCtx.arc(x, 130, 8, 0, Math.PI * 2);
-                            dtCtx.fill();
-                            // Draw connecting line from last raw event
-                            if (rawEvents.length > 0) {
-                                const lastRaw = rawEvents[rawEvents.length - 1];
-                                const lastX = 70 + (lastRaw - startTime) * scale;
-                                dtCtx.strokeStyle = '#667eea';
-                                dtCtx.lineWidth = 1;
-                                dtCtx.setLineDash([4, 4]);
-                                dtCtx.beginPath();
-                                dtCtx.moveTo(lastX, 60);
-                                dtCtx.lineTo(x, 130);
-                                dtCtx.stroke();
-                                dtCtx.setLineDash([]);
-                            }
-                        });
-                        
-                        // Draw throttle events
-                        throttleEvents.forEach(t => {
-                            const x = 70 + (t - startTime) * scale;
-                            dtCtx.fillStyle = '#4ecdc4';
-                            dtCtx.beginPath();
-                            dtCtx.arc(x, 200, 8, 0, Math.PI * 2);
-                            dtCtx.fill();
-                        });
-                        
-                        // Update counts
-                        document.getElementById('rawCount').textContent = rawEvents.length;
-                        document.getElementById('debounceCount').textContent = debounceEvents.length;
-                        document.getElementById('throttleCount').textContent = throttleEvents.length;
-                    }
-                    
-                    function handleInputChange(value) {
-                        const now = Date.now();
-                        if (!startTime) startTime = now;
-                        
-                        // Record raw event
-                        rawEvents.push(now);
-                        
-                        // Debounce logic
-                        if (debounceTimer) clearTimeout(debounceTimer);
-                        debounceTimer = setTimeout(() => {
-                            debounceEvents.push(Date.now());
-                            drawDebounceThrottleCanvas();
-                        }, DEBOUNCE_DELAY);
-                        
-                        // Throttle logic
-                        if (now - lastThrottleTime >= THROTTLE_LIMIT) {
-                            throttleEvents.push(now);
-                            lastThrottleTime = now;
-                        }
-                        
-                        drawDebounceThrottleCanvas();
-                    }
-                    
-                    function resetDebounceThrottleDemo() {
-                        rawEvents = [];
-                        debounceEvents = [];
-                        throttleEvents = [];
-                        startTime = null;
-                        lastThrottleTime = 0;
-                        if (debounceTimer) clearTimeout(debounceTimer);
-                        document.getElementById('debounceThrottleInput').value = '';
-                        document.getElementById('rawCount').textContent = '0';
-                        document.getElementById('debounceCount').textContent = '0';
-                        document.getElementById('throttleCount').textContent = '0';
-                        drawDebounceThrottleCanvas();
-                    }
-                    
-                    // Initial draw
-                    drawDebounceThrottleCanvas();
-                </script>
+                <!-- Debounce vs Throttle: timeline comparison -->
+                <figure>
+                    <svg class="svg-auto-invert" viewBox="0 0 640 300" width="100%" style="max-width: 640px;" role="img" aria-labelledby="dt-title dt-desc">
+                        <title id="dt-title">Debounce versus throttle on a stream of rapid input events</title>
+                        <desc id="dt-desc">A timeline of many raw keystroke events across two bursts. The debounce lane fires a single event shortly after each burst stops. The throttle lane fires at a steady cadence while input continues.</desc>
+
+                        <!-- Lane labels -->
+                        <text x="20" y="74" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#ff6b6b">Raw input</text>
+                        <text x="20" y="154" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#667eea">Debounced</text>
+                        <text x="20" y="234" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#2aa198">Throttled</text>
+
+                        <!-- Lane baselines -->
+                        <line x1="130" y1="70" x2="610" y2="70" stroke="#ccc" stroke-width="1" stroke-dasharray="4,3"/>
+                        <line x1="130" y1="150" x2="610" y2="150" stroke="#ccc" stroke-width="1" stroke-dasharray="4,3"/>
+                        <line x1="130" y1="230" x2="610" y2="230" stroke="#ccc" stroke-width="1" stroke-dasharray="4,3"/>
+
+                        <!-- Raw input events: two rapid bursts -->
+                        <g fill="#ff6b6b">
+                            <circle cx="150" cy="70" r="6"/>
+                            <circle cx="180" cy="70" r="6"/>
+                            <circle cx="205" cy="70" r="6"/>
+                            <circle cx="230" cy="70" r="6"/>
+                            <circle cx="258" cy="70" r="6"/>
+                            <circle cx="410" cy="70" r="6"/>
+                            <circle cx="438" cy="70" r="6"/>
+                            <circle cx="465" cy="70" r="6"/>
+                            <circle cx="492" cy="70" r="6"/>
+                        </g>
+
+                        <!-- Debounce: one event after each burst settles -->
+                        <g fill="#667eea">
+                            <circle cx="330" cy="150" r="9"/>
+                            <circle cx="560" cy="150" r="9"/>
+                        </g>
+                        <line x1="258" y1="76" x2="330" y2="144" stroke="#667eea" stroke-width="1.5" stroke-dasharray="3,3"/>
+                        <line x1="492" y1="76" x2="560" y2="144" stroke="#667eea" stroke-width="1.5" stroke-dasharray="3,3"/>
+                        <text x="330" y="176" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#667eea">fires once</text>
+                        <text x="560" y="176" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#667eea">fires once</text>
+
+                        <!-- Throttle: steady cadence while active -->
+                        <g fill="#2aa198">
+                            <circle cx="150" cy="230" r="9"/>
+                            <circle cx="250" cy="230" r="9"/>
+                            <circle cx="410" cy="230" r="9"/>
+                            <circle cx="510" cy="230" r="9"/>
+                        </g>
+                        <text x="300" y="256" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#2aa198">at most once per window</text>
+
+                        <!-- Time axis -->
+                        <line x1="130" y1="285" x2="610" y2="285" stroke="#999" stroke-width="1.5"/>
+                        <polygon points="610,285 602,281 602,289" fill="#999"/>
+                        <text x="130" y="299" font-family="system-ui, sans-serif" font-size="10" fill="#999">time</text>
+                    </svg>
+                    <figcaption>Figure: The same burst of keystrokes, three ways. Many <strong style="color:#ff6b6b;">raw</strong> events fire per burst. <strong style="color:#667eea;">Debounce</strong> waits for typing to stop, then fires once. <strong style="color:#2aa198;">Throttle</strong> fires on a fixed cadence while typing continues.</figcaption>
+                </figure>
 
                 <h3>Throttling for Scroll Events</h3>
                 <p>Throttling is different—it guarantees a function runs at most once per time period:</p>
@@ -930,15 +802,15 @@ sequenceDiagram
     const [throttledValue, setThrottledValue] = useState&lt;T&gt;(value);
     const lastRan = useRef(Date.now());
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            if (Date.now() - lastRan.current >= limit) {
+    useEffect(() =&gt; {
+        const timer = setTimeout(() =&gt; {
+            if (Date.now() - lastRan.current &gt;= limit) {
                 setThrottledValue(value);
                 lastRan.current = Date.now();
             }
         }, limit - (Date.now() - lastRan.current));
 
-        return () => {
+        return () =&gt; {
             clearTimeout(timer);
         };
     }, [value, limit]);
@@ -947,26 +819,26 @@ sequenceDiagram
 }
 
 // Usage: Infinite scroll
-const InfiniteList: React.FC = () => {
+const InfiniteList: React.FC = () =&gt; {
     const [scrollY, setScrollY] = useState(0);
     const throttledScrollY = useThrottle(scrollY, 200); // At most every 200ms
 
-    useEffect(() => {
-        const handleScroll = () => {
+    useEffect(() =&gt; {
+        const handleScroll = () =&gt; {
             setScrollY(window.scrollY);
         };
 
         window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
+        return () =&gt; window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         // Check if we need to load more data
         // This only runs at most once every 200ms ✅
         const windowHeight = window.innerHeight;
         const documentHeight = document.documentElement.scrollHeight;
         
-        if (throttledScrollY + windowHeight >= documentHeight - 100) {
+        if (throttledScrollY + windowHeight &gt;= documentHeight - 100) {
             console.log('Load more data!');
             // Fetch more data...
         }
@@ -1033,7 +905,7 @@ const signal = controller.signal;
 console.log(signal.aborted); // false
 
 // Listen for abort events
-signal.addEventListener('abort', () => {
+signal.addEventListener('abort', () =&gt; {
     console.log('Request was aborted!');
 });
 
@@ -1053,13 +925,13 @@ console.log(signal.aborted); // true</code></pre>
     data: any;
 }
 
-const ReportGenerator: React.FC = () => {
+const ReportGenerator: React.FC = () =&gt; {
     const [loading, setLoading] = useState(false);
     const [report, setReport] = useState&lt;Report | null&gt;(null);
     const [error, setError] = useState&lt;string | null&gt;(null);
     const controllerRef = useRef&lt;AbortController | null&gt;(null);
 
-    const generateReport = async () => {
+    const generateReport = async () =&gt; {
         // Cancel any existing request
         if (controllerRef.current) {
             controllerRef.current.abort();
@@ -1098,7 +970,7 @@ const ReportGenerator: React.FC = () => {
         }
     };
 
-    const cancelGeneration = () => {
+    const cancelGeneration = () =&gt; {
         if (controllerRef.current) {
             controllerRef.current.abort();
             setLoading(false);
@@ -1111,15 +983,15 @@ const ReportGenerator: React.FC = () => {
                 Generate Report
             &lt;/button&gt;
             
-            {loading && (
+            {loading &amp;&amp; (
                 &lt;div&gt;
                     &lt;p&gt;Generating report...&lt;/p&gt;
                     &lt;button onClick={cancelGeneration}&gt;Cancel&lt;/button&gt;
                 &lt;/div&gt;
             )}
             
-            {error && &lt;p style={{ color: 'red' }}&gt;Error: {error}&lt;/p&gt;}
-            {report && &lt;pre&gt;{JSON.stringify(report, null, 2)}&lt;/pre&gt;}
+            {error &amp;&amp; &lt;p style={{ color: 'red' }}&gt;Error: {error}&lt;/p&gt;}
+            {report &amp;&amp; &lt;pre&gt;{JSON.stringify(report, null, 2)}&lt;/pre&gt;}
         &lt;/div&gt;
     );
 };</code></pre>
@@ -1137,7 +1009,7 @@ const ReportGenerator: React.FC = () => {
     const controller = new AbortController();
     
     // Set up timeout
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() =&gt; {
         controller.abort();
     }, timeout);
 
@@ -1152,7 +1024,7 @@ const ReportGenerator: React.FC = () => {
     } catch (err) {
         clearTimeout(timeoutId);
         
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (err instanceof Error &amp;&amp; err.name === 'AbortError') {
             throw new Error(`Request timeout after ${timeout}ms`);
         }
         throw err;
@@ -1160,15 +1032,15 @@ const ReportGenerator: React.FC = () => {
 }
 
 // Usage
-const DataFetcher: React.FC = () => {
+const DataFetcher: React.FC = () =&gt; {
     const [data, setData] = useState(null);
     const [error, setError] = useState&lt;string | null&gt;(null);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         fetchWithTimeout('/api/slow-endpoint', {}, 3000)
-            .then(res => res.json())
+            .then(res =&gt; res.json())
             .then(setData)
-            .catch(err => setError(err.message));
+            .catch(err =&gt; setError(err.message));
     }, []);
 
     if (error) return &lt;div&gt;Error: {error}&lt;/div&gt;;
@@ -1186,11 +1058,11 @@ const DataFetcher: React.FC = () => {
     analytics: Analytics;
 }
 
-const Dashboard: React.FC = () => {
+const Dashboard: React.FC = () =&gt; {
     const [data, setData] = useState&lt;Partial&lt;DashboardData&gt;&gt;({});
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         const controller = new AbortController();
         const signal = controller.signal;
 
@@ -1198,24 +1070,24 @@ const Dashboard: React.FC = () => {
 
         // Fire multiple requests with the same signal
         Promise.all([
-            fetch('/api/users', { signal }).then(r => r.json()),
-            fetch('/api/posts', { signal }).then(r => r.json()),
-            fetch('/api/analytics', { signal }).then(r => r.json())
+            fetch('/api/users', { signal }).then(r =&gt; r.json()),
+            fetch('/api/posts', { signal }).then(r =&gt; r.json()),
+            fetch('/api/analytics', { signal }).then(r =&gt; r.json())
         ])
-            .then(([users, posts, analytics]) => {
+            .then(([users, posts, analytics]) =&gt; {
                 setData({ users, posts, analytics });
             })
-            .catch(err => {
+            .catch(err =&gt; {
                 if (err.name !== 'AbortError') {
                     console.error('Error loading dashboard:', err);
                 }
             })
-            .finally(() => {
+            .finally(() =&gt; {
                 setLoading(false);
             });
 
         // Cleanup: abort ALL requests when component unmounts
-        return () => {
+        return () =&gt; {
             controller.abort();
         };
     }, []);
@@ -1225,9 +1097,9 @@ const Dashboard: React.FC = () => {
     return (
         &lt;div&gt;
             &lt;h2&gt;Dashboard&lt;/h2&gt;
-            {data.users && &lt;UsersList users={data.users} /&gt;}
-            {data.posts && &lt;PostsList posts={data.posts} /&gt;}
-            {data.analytics && &lt;Analytics data={data.analytics} /&gt;}
+            {data.users &amp;&amp; &lt;UsersList users={data.users} /&gt;}
+            {data.posts &amp;&amp; &lt;PostsList posts={data.posts} /&gt;}
+            {data.analytics &amp;&amp; &lt;Analytics data={data.analytics} /&gt;}
         &lt;/div&gt;
     );
 };</code></pre>
@@ -1247,8 +1119,8 @@ interface UseFetchReturn&lt;T&gt; {
     data: T | null;
     loading: boolean;
     error: Error | null;
-    refetch: () => Promise&lt;void&gt;;
-    abort: () => void;
+    refetch: () =&gt; Promise&lt;void&gt;;
+    abort: () =&gt; void;
 }
 
 function useFetch&lt;T&gt;(
@@ -1260,14 +1132,14 @@ function useFetch&lt;T&gt;(
     const [error, setError] = useState&lt;Error | null&gt;(null);
     const controllerRef = useRef&lt;AbortController | null&gt;(null);
 
-    const abort = useCallback(() => {
+    const abort = useCallback(() =&gt; {
         if (controllerRef.current) {
             controllerRef.current.abort();
             controllerRef.current = null;
         }
     }, []);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async () =&gt; {
         // Abort any existing request
         abort();
 
@@ -1280,9 +1152,9 @@ function useFetch&lt;T&gt;(
 
         try {
             // Set up timeout if specified
-            let timeoutId: NodeJS.Timeout | undefined;
+            let timeoutId: ReturnType&lt;typeof setTimeout&gt; | undefined;
             if (timeout) {
-                timeoutId = setTimeout(() => {
+                timeoutId = setTimeout(() =&gt; {
                     controllerRef.current?.abort();
                 }, timeout);
             }
@@ -1301,7 +1173,7 @@ function useFetch&lt;T&gt;(
             const result = await response.json();
             setData(result);
         } catch (err) {
-            if (err instanceof Error && err.name !== 'AbortError') {
+            if (err instanceof Error &amp;&amp; err.name !== 'AbortError') {
                 setError(err);
             }
         } finally {
@@ -1309,13 +1181,13 @@ function useFetch&lt;T&gt;(
         }
     }, [url, options, abort]);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (options.immediate ?? true) {
             fetchData();
         }
 
         // Cleanup: abort on unmount or dependency change
-        return () => {
+        return () =&gt; {
             abort();
         };
     }, [fetchData, options.immediate, abort]);
@@ -1330,7 +1202,7 @@ function useFetch&lt;T&gt;(
 }
 
 // Usage
-const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) =&gt; {
     const { data: user, loading, error, refetch, abort } = useFetch&lt;User&gt;(
         `/api/users/${userId}`,
         { timeout: 5000 }
@@ -1373,11 +1245,12 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
             <!-- Section 4: Pagination Patterns -->
             <section id="section4" class="lesson-section">
                 <h2>📄 Pagination Patterns</h2>
-                <p>Large datasets can't be loaded all at once—pagination splits data into manageable chunks. Let's explore different pagination strategies and build a complete pagination system!</p>
+                <p>Imagine a table with 50,000 rows. Sending all of them to the browser would mean a huge download, a sluggish render, and a phone that heats up in the user's hand — all so they can look at the first 20. Pagination fixes this by loading data in bite-sized chunks: the user sees page 1 instantly, and pages 2, 3, 4 arrive only when asked for.</p>
+                <p><strong>Why it matters:</strong> pagination is not just a performance trick — it shapes the whole data contract between your front end and your API. The strategy you pick (offset, cursor, or page numbers) determines how your requests look, how the server queries the database, and how well the UI behaves when data is changing underneath you. Let's compare the strategies, then build a complete, typed pagination system.</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Pagination:</strong> A technique for dividing large datasets into discrete pages, loading only the data needed for the current page. This improves performance, reduces bandwidth, and enhances user experience.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Pagination:</strong> Slicing a large dataset into discrete pages and loading only the slice the user is looking at right now. Instead of shipping 10,000 rows over the wire, you send 20 — like a book with pages rather than one endless scroll of paper. It cuts payload size, speeds up rendering, and lets the server do less work per request.</p>
                 </div>
 
                 <h3>Pagination Strategies</h3>
@@ -1437,7 +1310,7 @@ interface ApiResponse {
     pagination: PaginationInfo;
 }
 
-const ProductList: React.FC = () => {
+const ProductList: React.FC = () =&gt; {
     const [products, setProducts] = useState&lt;Product[]&gt;([]);
     const [pagination, setPagination] = useState&lt;PaginationInfo&gt;({
         currentPage: 1,
@@ -1448,7 +1321,7 @@ const ProductList: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState&lt;string | null&gt;(null);
 
-    const fetchProducts = useCallback(async (page: number) => {
+    const fetchProducts = useCallback(async (page: number) =&gt; {
         const controller = new AbortController();
         
         setLoading(true);
@@ -1456,7 +1329,7 @@ const ProductList: React.FC = () => {
 
         try {
             const response = await fetch(
-                `/api/products?page=${page}&limit=${pagination.itemsPerPage}`,
+                `/api/products?page=${page}&amp;limit=${pagination.itemsPerPage}`,
                 { signal: controller.signal }
             );
 
@@ -1468,7 +1341,7 @@ const ProductList: React.FC = () => {
             setProducts(data.data);
             setPagination(data.pagination);
         } catch (err) {
-            if (err instanceof Error && err.name !== 'AbortError') {
+            if (err instanceof Error &amp;&amp; err.name !== 'AbortError') {
                 setError(err.message);
             }
         } finally {
@@ -1478,31 +1351,31 @@ const ProductList: React.FC = () => {
         return controller;
     }, [pagination.itemsPerPage]);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         const controller = fetchProducts(pagination.currentPage);
-        return () => {
-            controller.then(c => c.abort());
+        return () =&gt; {
+            controller.then(c =&gt; c.abort());
         };
     }, [pagination.currentPage, fetchProducts]);
 
-    const goToPage = (page: number) => {
-        setPagination(prev => ({ ...prev, currentPage: page }));
+    const goToPage = (page: number) =&gt; {
+        setPagination(prev =&gt; ({ ...prev, currentPage: page }));
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const nextPage = () => {
-        if (pagination.currentPage < pagination.totalPages) {
+    const nextPage = () =&gt; {
+        if (pagination.currentPage &lt; pagination.totalPages) {
             goToPage(pagination.currentPage + 1);
         }
     };
 
-    const previousPage = () => {
-        if (pagination.currentPage > 1) {
+    const previousPage = () =&gt; {
+        if (pagination.currentPage &gt; 1) {
             goToPage(pagination.currentPage - 1);
         }
     };
 
-    if (loading && products.length === 0) {
+    if (loading &amp;&amp; products.length === 0) {
         return &lt;div&gt;Loading products...&lt;/div&gt;;
     }
 
@@ -1520,7 +1393,7 @@ const ProductList: React.FC = () => {
                 gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                 gap: '1rem'
             }}&gt;
-                {products.map(product => (
+                {products.map(product =&gt; (
                     &lt;div key={product.id} style={{
                         border: '1px solid #ddd',
                         padding: '1rem',
@@ -1532,7 +1405,7 @@ const ProductList: React.FC = () => {
                 ))}
             &lt;/div&gt;
 
-            {loading && &lt;div style={{ textAlign: 'center', margin: '2rem' }}&gt;Loading...&lt;/div&gt;}
+            {loading &amp;&amp; &lt;div style={{ textAlign: 'center', margin: '2rem' }}&gt;Loading...&lt;/div&gt;}
 
             {/* Pagination Controls */}
             &lt;div style={{
@@ -1570,10 +1443,10 @@ const ProductList: React.FC = () => {
                 gap: '0.5rem',
                 marginTop: '1rem'
             }}&gt;
-                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map(page => (
+                {Array.from({ length: pagination.totalPages }, (_, i) =&gt; i + 1).map(page =&gt; (
                     &lt;button
                         key={page}
-                        onClick={() => goToPage(page)}
+                        onClick={() =&gt; goToPage(page)}
                         disabled={loading}
                         style={{
                             padding: '0.5rem 1rem',
@@ -1598,7 +1471,7 @@ const ProductList: React.FC = () => {
 
                 <div class="card">
                     <pre><code class="language-typescript">interface UsePaginationOptions&lt;T&gt; {
-    fetchFunction: (page: number, limit: number) => Promise&lt;{
+    fetchFunction: (page: number, limit: number) =&gt; Promise&lt;{
         data: T[];
         pagination: PaginationInfo;
     }&gt;;
@@ -1611,10 +1484,10 @@ interface UsePaginationReturn&lt;T&gt; {
     pagination: PaginationInfo;
     loading: boolean;
     error: Error | null;
-    goToPage: (page: number) => void;
-    nextPage: () => void;
-    previousPage: () => void;
-    refresh: () => void;
+    goToPage: (page: number) =&gt; void;
+    nextPage: () =&gt; void;
+    previousPage: () =&gt; void;
+    refresh: () =&gt; void;
 }
 
 function usePagination&lt;T&gt;(
@@ -1632,7 +1505,7 @@ function usePagination&lt;T&gt;(
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState&lt;Error | null&gt;(null);
 
-    const fetchData = useCallback(async (page: number) => {
+    const fetchData = useCallback(async (page: number) =&gt; {
         setLoading(true);
         setError(null);
 
@@ -1647,26 +1520,26 @@ function usePagination&lt;T&gt;(
         }
     }, [fetchFunction, itemsPerPage]);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         fetchData(pagination.currentPage);
     }, [pagination.currentPage, fetchData]);
 
-    const goToPage = useCallback((page: number) => {
-        if (page >= 1 && page <= pagination.totalPages) {
-            setPagination(prev => ({ ...prev, currentPage: page }));
+    const goToPage = useCallback((page: number) =&gt; {
+        if (page &gt;= 1 &amp;&amp; page &lt;= pagination.totalPages) {
+            setPagination(prev =&gt; ({ ...prev, currentPage: page }));
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }, [pagination.totalPages]);
 
-    const nextPage = useCallback(() => {
+    const nextPage = useCallback(() =&gt; {
         goToPage(pagination.currentPage + 1);
     }, [pagination.currentPage, goToPage]);
 
-    const previousPage = useCallback(() => {
+    const previousPage = useCallback(() =&gt; {
         goToPage(pagination.currentPage - 1);
     }, [pagination.currentPage, goToPage]);
 
-    const refresh = useCallback(() => {
+    const refresh = useCallback(() =&gt; {
         fetchData(pagination.currentPage);
     }, [pagination.currentPage, fetchData]);
 
@@ -1683,9 +1556,9 @@ function usePagination&lt;T&gt;(
 }
 
 // Usage - Much cleaner!
-const ProductList: React.FC = () => {
-    const fetchProducts = async (page: number, limit: number) => {
-        const response = await fetch(`/api/products?page=${page}&limit=${limit}`);
+const ProductList: React.FC = () =&gt; {
+    const fetchProducts = async (page: number, limit: number) =&gt; {
+        const response = await fetch(`/api/products?page=${page}&amp;limit=${limit}`);
         return response.json();
     };
 
@@ -1703,10 +1576,10 @@ const ProductList: React.FC = () => {
 
     return (
         &lt;div&gt;
-            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
+            {loading &amp;&amp; &lt;div&gt;Loading...&lt;/div&gt;}
             
             &lt;div&gt;
-                {products.map(product => (
+                {products.map(product =&gt; (
                     &lt;div key={product.id}&gt;{product.name}&lt;/div&gt;
                 ))}
             &lt;/div&gt;
@@ -1728,7 +1601,7 @@ const ProductList: React.FC = () => {
                 <div class="card">
                     <pre><code class="language-typescript">import { useSearchParams } from 'react-router-dom';
 
-const ProductList: React.FC = () => {
+const ProductList: React.FC = () =&gt; {
     const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = Number(searchParams.get('page')) || 1;
     
@@ -1736,44 +1609,44 @@ const ProductList: React.FC = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         const controller = new AbortController();
         
         setLoading(true);
         
-        fetch(`/api/products?page=${currentPage}&limit=20`, {
+        fetch(`/api/products?page=${currentPage}&amp;limit=20`, {
             signal: controller.signal
         })
-            .then(res => res.json())
-            .then(data => {
+            .then(res =&gt; res.json())
+            .then(data =&gt; {
                 setProducts(data.data);
                 setTotalPages(data.pagination.totalPages);
             })
-            .catch(err => {
+            .catch(err =&gt; {
                 if (err.name !== 'AbortError') {
                     console.error(err);
                 }
             })
-            .finally(() => setLoading(false));
+            .finally(() =&gt; setLoading(false));
 
-        return () => controller.abort();
+        return () =&gt; controller.abort();
     }, [currentPage]);
 
-    const goToPage = (page: number) => {
+    const goToPage = (page: number) =&gt; {
         setSearchParams({ page: page.toString() });
     };
 
     return (
         &lt;div&gt;
-            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
+            {loading &amp;&amp; &lt;div&gt;Loading...&lt;/div&gt;}
             
-            {products.map(product => (
+            {products.map(product =&gt; (
                 &lt;div key={product.id}&gt;{product.name}&lt;/div&gt;
             ))}
 
             &lt;div&gt;
                 &lt;button 
-                    onClick={() => goToPage(currentPage - 1)}
+                    onClick={() =&gt; goToPage(currentPage - 1)}
                     disabled={currentPage === 1}
                 &gt;
                     Previous
@@ -1782,7 +1655,7 @@ const ProductList: React.FC = () => {
                 &lt;span&gt;Page {currentPage} of {totalPages}&lt;/span&gt;
                 
                 &lt;button 
-                    onClick={() => goToPage(currentPage + 1)}
+                    onClick={() =&gt; goToPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
                 &gt;
                     Next
@@ -1818,8 +1691,8 @@ const ProductList: React.FC = () => {
                 <p>Instead of clicking "Next Page," what if content just loaded as you scroll down? That's infinite scroll—popular on social media and modern web apps. Let's build it!</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Infinite Scroll:</strong> A UX pattern where new content automatically loads as the user scrolls down the page. Instead of pagination controls, scrolling triggers data fetching, creating a seamless, continuous browsing experience.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Infinite Scroll:</strong> A pattern where scrolling toward the bottom quietly fetches and appends the next batch, so the list appears to have no end. There are no "Next" buttons — the scroll position <em>is</em> the trigger. It is how social feeds keep you gliding, but as we'll see, that seamlessness comes with real trade-offs (goodbye, footer).</p>
                 </div>
 
                 <h3>How Infinite Scroll Works</h3>
@@ -1996,17 +1869,17 @@ function isNearBottom(threshold: number = 100): boolean {
     // Distance from bottom
     const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
     
-    return distanceFromBottom < threshold;
+    return distanceFromBottom &lt; threshold;
 }
 
 // Method 2: Using Intersection Observer (better!)
-function useInfiniteScroll(callback: () => void) {
+function useInfiniteScroll(callback: () =&gt; void) {
     const observerRef = useRef&lt;IntersectionObserver | null&gt;(null);
     const loadMoreRef = useRef&lt;HTMLDivElement | null&gt;(null);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         observerRef.current = new IntersectionObserver(
-            (entries) => {
+            (entries) =&gt; {
                 // If the sentinel element is visible, load more
                 if (entries[0].isIntersecting) {
                     callback();
@@ -2019,7 +1892,7 @@ function useInfiniteScroll(callback: () => void) {
             observerRef.current.observe(loadMoreRef.current);
         }
 
-        return () => {
+        return () =&gt; {
             if (observerRef.current) {
                 observerRef.current.disconnect();
             }
@@ -2039,21 +1912,21 @@ function useInfiniteScroll(callback: () => void) {
     content: string;
 }
 
-const InfinitePostFeed: React.FC = () => {
+const InfinitePostFeed: React.FC = () =&gt; {
     const [posts, setPosts] = useState&lt;Post[]&gt;([]);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [error, setError] = useState&lt;string | null&gt;(null);
 
-    const loadMorePosts = useCallback(async () => {
+    const loadMorePosts = useCallback(async () =&gt; {
         if (loading || !hasMore) return;
 
         setLoading(true);
         setError(null);
 
         try {
-            const response = await fetch(`/api/posts?page=${page}&limit=20`);
+            const response = await fetch(`/api/posts?page=${page}&amp;limit=20`);
             
             if (!response.ok) {
                 throw new Error('Failed to fetch posts');
@@ -2064,8 +1937,8 @@ const InfinitePostFeed: React.FC = () => {
             if (data.posts.length === 0) {
                 setHasMore(false);
             } else {
-                setPosts(prev => [...prev, ...data.posts]);
-                setPage(prev => prev + 1);
+                setPosts(prev =&gt; [...prev, ...data.posts]);
+                setPage(prev =&gt; prev + 1);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Unknown error');
@@ -2075,17 +1948,17 @@ const InfinitePostFeed: React.FC = () => {
     }, [page, loading, hasMore]);
 
     // Load initial data
-    useEffect(() => {
+    useEffect(() =&gt; {
         loadMorePosts();
     }, []); // Empty deps - only load once on mount
 
     // Intersection Observer for infinite scroll
     const observerTarget = useRef&lt;HTMLDivElement&gt;(null);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && hasMore && !loading) {
+            (entries) =&gt; {
+                if (entries[0].isIntersecting &amp;&amp; hasMore &amp;&amp; !loading) {
                     loadMorePosts();
                 }
             },
@@ -2096,7 +1969,7 @@ const InfinitePostFeed: React.FC = () => {
             observer.observe(observerTarget.current);
         }
 
-        return () => {
+        return () =&gt; {
             if (observerTarget.current) {
                 observer.unobserve(observerTarget.current);
             }
@@ -2109,7 +1982,7 @@ const InfinitePostFeed: React.FC = () => {
 
             {/* Posts */}
             &lt;div&gt;
-                {posts.map(post => (
+                {posts.map(post =&gt; (
                     &lt;article 
                         key={post.id}
                         style={{
@@ -2126,21 +1999,21 @@ const InfinitePostFeed: React.FC = () => {
             &lt;/div&gt;
 
             {/* Loading indicator */}
-            {loading && (
+            {loading &amp;&amp; (
                 &lt;div style={{ textAlign: 'center', padding: '2rem' }}&gt;
                     &lt;p&gt;Loading more posts...&lt;/p&gt;
                 &lt;/div&gt;
             )}
 
             {/* Error message */}
-            {error && (
+            {error &amp;&amp; (
                 &lt;div style={{ color: 'red', textAlign: 'center', padding: '2rem' }}&gt;
                     Error: {error}
                 &lt;/div&gt;
             )}
 
             {/* End of content message */}
-            {!hasMore && (
+            {!hasMore &amp;&amp; (
                 &lt;div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}&gt;
                     &lt;p&gt;🎉 You've reached the end!&lt;/p&gt;
                 &lt;/div&gt;
@@ -2161,7 +2034,7 @@ const InfinitePostFeed: React.FC = () => {
 
                 <div class="card">
                     <pre><code class="language-typescript">interface UseInfiniteScrollOptions&lt;T&gt; {
-    fetchFunction: (page: number) => Promise&lt;T[]&gt;;
+    fetchFunction: (page: number) =&gt; Promise&lt;T[]&gt;;
     initialPage?: number;
     threshold?: number;
 }
@@ -2171,8 +2044,8 @@ interface UseInfiniteScrollReturn&lt;T&gt; {
     loading: boolean;
     error: Error | null;
     hasMore: boolean;
-    loadMore: () => void;
-    reset: () => void;
+    loadMore: () =&gt; void;
+    reset: () =&gt; void;
     observerTarget: React.RefObject&lt;HTMLDivElement&gt;;
 }
 
@@ -2188,7 +2061,7 @@ function useInfiniteScroll&lt;T&gt;(
     const [hasMore, setHasMore] = useState(true);
     const observerTarget = useRef&lt;HTMLDivElement&gt;(null);
 
-    const loadMore = useCallback(async () => {
+    const loadMore = useCallback(async () =&gt; {
         if (loading || !hasMore) return;
 
         setLoading(true);
@@ -2200,8 +2073,8 @@ function useInfiniteScroll&lt;T&gt;(
             if (newItems.length === 0) {
                 setHasMore(false);
             } else {
-                setItems(prev => [...prev, ...newItems]);
-                setPage(prev => prev + 1);
+                setItems(prev =&gt; [...prev, ...newItems]);
+                setPage(prev =&gt; prev + 1);
             }
         } catch (err) {
             setError(err as Error);
@@ -2210,7 +2083,7 @@ function useInfiniteScroll&lt;T&gt;(
         }
     }, [fetchFunction, page, loading, hasMore]);
 
-    const reset = useCallback(() => {
+    const reset = useCallback(() =&gt; {
         setItems([]);
         setPage(initialPage);
         setHasMore(true);
@@ -2218,10 +2091,10 @@ function useInfiniteScroll&lt;T&gt;(
     }, [initialPage]);
 
     // Intersection Observer setup
-    useEffect(() => {
+    useEffect(() =&gt; {
         const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && hasMore && !loading) {
+            (entries) =&gt; {
+                if (entries[0].isIntersecting &amp;&amp; hasMore &amp;&amp; !loading) {
                     loadMore();
                 }
             },
@@ -2233,7 +2106,7 @@ function useInfiniteScroll&lt;T&gt;(
             observer.observe(currentTarget);
         }
 
-        return () => {
+        return () =&gt; {
             if (currentTarget) {
                 observer.unobserve(currentTarget);
             }
@@ -2241,8 +2114,8 @@ function useInfiniteScroll&lt;T&gt;(
     }, [loadMore, hasMore, loading, threshold]);
 
     // Load initial data
-    useEffect(() => {
-        if (items.length === 0 && page === initialPage) {
+    useEffect(() =&gt; {
+        if (items.length === 0 &amp;&amp; page === initialPage) {
             loadMore();
         }
     }, []);
@@ -2259,9 +2132,9 @@ function useInfiniteScroll&lt;T&gt;(
 }
 
 // Usage - Much cleaner!
-const PostFeed: React.FC = () => {
-    const fetchPosts = async (page: number) => {
-        const response = await fetch(`/api/posts?page=${page}&limit=20`);
+const PostFeed: React.FC = () =&gt; {
+    const fetchPosts = async (page: number) =&gt; {
+        const response = await fetch(`/api/posts?page=${page}&amp;limit=20`);
         const data = await response.json();
         return data.posts;
     };
@@ -2276,16 +2149,16 @@ const PostFeed: React.FC = () => {
 
     return (
         &lt;div&gt;
-            {posts.map(post => (
+            {posts.map(post =&gt; (
                 &lt;article key={post.id}&gt;
                     &lt;h2&gt;{post.title}&lt;/h2&gt;
                     &lt;p&gt;{post.content}&lt;/p&gt;
                 &lt;/article&gt;
             ))}
 
-            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
-            {error && &lt;div&gt;Error: {error.message}&lt;/div&gt;}
-            {!hasMore && &lt;div&gt;No more posts!&lt;/div&gt;}
+            {loading &amp;&amp; &lt;div&gt;Loading...&lt;/div&gt;}
+            {error &amp;&amp; &lt;div&gt;Error: {error.message}&lt;/div&gt;}
+            {!hasMore &amp;&amp; &lt;div&gt;No more posts!&lt;/div&gt;}
 
             &lt;div ref={observerTarget} style={{ height: '20px' }} /&gt;
         &lt;/div&gt;
@@ -2297,11 +2170,11 @@ const PostFeed: React.FC = () => {
                 <p>Combine infinite scroll with search or filters:</p>
 
                 <div class="card">
-                    <pre><code class="language-typescript">const SearchablePostFeed: React.FC = () => {
+                    <pre><code class="language-typescript">const SearchablePostFeed: React.FC = () =&gt; {
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedQuery = useDebounce(searchQuery, 500);
 
-    const fetchPosts = useCallback(async (page: number) => {
+    const fetchPosts = useCallback(async (page: number) =&gt; {
         const params = new URLSearchParams({
             page: page.toString(),
             limit: '20',
@@ -2323,7 +2196,7 @@ const PostFeed: React.FC = () => {
     } = useInfiniteScroll&lt;Post&gt;({ fetchFunction: fetchPosts });
 
     // Reset when search query changes
-    useEffect(() => {
+    useEffect(() =&gt; {
         reset();
     }, [debouncedQuery, reset]);
 
@@ -2332,7 +2205,7 @@ const PostFeed: React.FC = () => {
             &lt;input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) =&gt; setSearchQuery(e.target.value)}
                 placeholder="Search posts..."
                 style={{
                     width: '100%',
@@ -2342,20 +2215,20 @@ const PostFeed: React.FC = () => {
                 }}
             /&gt;
 
-            {posts.length === 0 && !loading && (
+            {posts.length === 0 &amp;&amp; !loading &amp;&amp; (
                 &lt;div&gt;No posts found.&lt;/div&gt;
             )}
 
-            {posts.map(post => (
+            {posts.map(post =&gt; (
                 &lt;article key={post.id}&gt;
                     &lt;h2&gt;{post.title}&lt;/h2&gt;
                     &lt;p&gt;{post.content}&lt;/p&gt;
                 &lt;/article&gt;
             ))}
 
-            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
-            {error && &lt;div&gt;Error: {error.message}&lt;/div&gt;}
-            {!hasMore && posts.length > 0 && &lt;div&gt;No more results!&lt;/div&gt;}
+            {loading &amp;&amp; &lt;div&gt;Loading...&lt;/div&gt;}
+            {error &amp;&amp; &lt;div&gt;Error: {error.message}&lt;/div&gt;}
+            {!hasMore &amp;&amp; posts.length &gt; 0 &amp;&amp; &lt;div&gt;No more results!&lt;/div&gt;}
 
             &lt;div ref={observerTarget} style={{ height: '20px' }} /&gt;
         &lt;/div&gt;
@@ -2392,11 +2265,12 @@ const PostFeed: React.FC = () => {
             <!-- Section 6: Client-Side Caching -->
             <section id="section6" class="lesson-section">
                 <h2>💾 Client-Side Caching</h2>
-                <p>Why fetch the same data multiple times? Caching stores fetched data so you can reuse it without making redundant API calls. Let's build a smart caching system!</p>
+                <p>Every network request costs something: time the user waits, bandwidth they pay for, and load on your server. So why pay that cost twice for the exact same answer? Caching keeps a copy of what you already fetched and hands it back instantly the next time it's asked for — turning a 500ms round-trip into a 0ms memory read.</p>
+                <p><strong>Why it matters:</strong> caching is where "fast enough" apps become "instant" apps. But it's also where subtle, dangerous bugs live — showing one user another user's data, or displaying prices that changed an hour ago. A good cache is not just a <code>Map</code>; it has rules about <em>when</em> data expires and <em>how</em> it gets invalidated. Let's build one up from scratch so you understand exactly what libraries like TanStack Query do under the hood.</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Client-Side Caching:</strong> Storing API responses in memory (or browser storage) to avoid redundant network requests. This improves performance, reduces server load, and provides instant data access for frequently accessed resources.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Client-Side Caching:</strong> Keeping a copy of data you already fetched — in memory or in browser storage — so the next request for the same thing can be served instantly instead of hitting the network again. Like keeping milk in your fridge instead of walking to the store every time you want a glass: faster for you, and less traffic for the store (your server).</p>
                 </div>
 
                 <h3>Why Caching Matters</h3>
@@ -2425,14 +2299,14 @@ const PostFeed: React.FC = () => {
 const cache = new Map&lt;string, any&gt;();
 
 function useCachedFetch&lt;T&gt;(url: string) {
-    const [data, setData] = useState&lt;T | null&gt;(() => {
+    const [data, setData] = useState&lt;T | null&gt;(() =&gt; {
         // Check cache first
         return cache.get(url) || null;
     });
     const [loading, setLoading] = useState(!cache.has(url));
     const [error, setError] = useState&lt;Error | null&gt;(null);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         // If data is in cache, don't fetch
         if (cache.has(url)) {
             return;
@@ -2443,28 +2317,28 @@ function useCachedFetch&lt;T&gt;(url: string) {
         setLoading(true);
 
         fetch(url, { signal: controller.signal })
-            .then(res => res.json())
-            .then(result => {
+            .then(res =&gt; res.json())
+            .then(result =&gt; {
                 cache.set(url, result); // Store in cache
                 setData(result);
             })
-            .catch(err => {
+            .catch(err =&gt; {
                 if (err.name !== 'AbortError') {
                     setError(err);
                 }
             })
-            .finally(() => {
+            .finally(() =&gt; {
                 setLoading(false);
             });
 
-        return () => controller.abort();
+        return () =&gt; controller.abort();
     }, [url]);
 
     return { data, loading, error };
 }
 
 // Usage
-const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) =&gt; {
     const { data: user, loading } = useCachedFetch&lt;User&gt;(`/api/users/${userId}`);
 
     // First visit: loading = true, fetches data
@@ -2504,7 +2378,7 @@ class Cache {
         const maxAge = ttl || this.defaultTTL;
 
         // Check if expired
-        if (age > maxAge) {
+        if (age &gt; maxAge) {
             this.cache.delete(key);
             return null;
         }
@@ -2529,11 +2403,11 @@ class Cache {
 const apiCache = new Cache();
 
 function useCachedFetch&lt;T&gt;(url: string, ttl?: number) {
-    const [data, setData] = useState&lt;T | null&gt;(() => apiCache.get&lt;T&gt;(url, ttl));
+    const [data, setData] = useState&lt;T | null&gt;(() =&gt; apiCache.get&lt;T&gt;(url, ttl));
     const [loading, setLoading] = useState(!apiCache.has(url, ttl));
     const [error, setError] = useState&lt;Error | null&gt;(null);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         // Check if valid cache exists
         const cached = apiCache.get&lt;T&gt;(url, ttl);
         if (cached) {
@@ -2547,24 +2421,24 @@ function useCachedFetch&lt;T&gt;(url: string, ttl?: number) {
         setLoading(true);
 
         fetch(url, { signal: controller.signal })
-            .then(res => res.json())
-            .then(result => {
+            .then(res =&gt; res.json())
+            .then(result =&gt; {
                 apiCache.set(url, result, ttl);
                 setData(result);
             })
-            .catch(err => {
+            .catch(err =&gt; {
                 if (err.name !== 'AbortError') {
                     setError(err);
                 }
             })
-            .finally(() => {
+            .finally(() =&gt; {
                 setLoading(false);
             });
 
-        return () => controller.abort();
+        return () =&gt; controller.abort();
     }, [url, ttl]);
 
-    const invalidate = useCallback(() => {
+    const invalidate = useCallback(() =&gt; {
         apiCache.delete(url);
         setData(null);
     }, [url]);
@@ -2573,7 +2447,7 @@ function useCachedFetch&lt;T&gt;(url: string, ttl?: number) {
 }
 
 // Usage
-const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) =&gt; {
     const { 
         data: user, 
         loading, 
@@ -2583,91 +2457,91 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
         2 * 60 * 1000 // 2 minute cache
     );
 
-                <!-- Interactive Cache Visualization -->
-                <div class="card" style="border: 2px solid #667eea; margin: 2rem 0;">
-                    <h4>🎮 Interactive: Cache Hit/Miss Simulator</h4>
-                    <p>Click "Fetch" buttons to see how caching works. First request is a cache miss (slow), subsequent requests are cache hits (instant)!</p>
-                    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-                        <svg class="svg-auto-invert" id="cacheSvg" viewBox="0 0 600 250" style="max-width: 100%; height: auto; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" role="img" aria-label="Cache visualization">
-                            <!-- Client -->
-                            <rect x="30" y="80" width="100" height="60" rx="8" fill="#667eea"/>
-                            <text x="80" y="115" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Client</text>
+                &lt;!-- Interactive Cache Visualization --&gt;
+                &lt;div class="card" style="border: 2px solid #667eea; margin: 2rem 0;"&gt;
+                    &lt;h4&gt;🎮 Interactive: Cache Hit/Miss Simulator&lt;/h4&gt;
+                    &lt;p&gt;Click "Fetch" buttons to see how caching works. First request is a cache miss (slow), subsequent requests are cache hits (instant)!&lt;/p&gt;
+                    &lt;div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;"&gt;
+                        &lt;svg id="cacheSvg" viewBox="0 0 600 250" style="max-width: 100%; height: auto; background: white; border-radius: 8px; border: 1px solid #e0e0e0;" role="img" aria-label="Cache visualization"&gt;
+                            &lt;!-- Client --&gt;
+                            &lt;rect x="30" y="80" width="100" height="60" rx="8" fill="#667eea"/&gt;
+                            &lt;text x="80" y="115" text-anchor="middle" fill="white" font-size="14" font-weight="bold"&gt;Client&lt;/text&gt;
                             
-                            <!-- Cache -->
-                            <rect x="200" y="60" width="120" height="100" rx="8" fill="#4CAF50"/>
-                            <text x="260" y="95" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Cache</text>
-                            <text id="cacheContents" x="260" y="125" text-anchor="middle" fill="white" font-size="10">(empty)</text>
-                            <text id="cacheTtl" x="260" y="145" text-anchor="middle" fill="white" font-size="9" opacity="0.8">TTL: --</text>
+                            &lt;!-- Cache --&gt;
+                            &lt;rect x="200" y="60" width="120" height="100" rx="8" fill="#4CAF50"/&gt;
+                            &lt;text x="260" y="95" text-anchor="middle" fill="white" font-size="14" font-weight="bold"&gt;Cache&lt;/text&gt;
+                            &lt;text id="cacheContents" x="260" y="125" text-anchor="middle" fill="white" font-size="10"&gt;(empty)&lt;/text&gt;
+                            &lt;text id="cacheTtl" x="260" y="145" text-anchor="middle" fill="white" font-size="9" opacity="0.8"&gt;TTL: --&lt;/text&gt;
                             
-                            <!-- Server -->
-                            <rect x="400" y="80" width="100" height="60" rx="8" fill="#764ba2"/>
-                            <text x="450" y="115" text-anchor="middle" fill="white" font-size="14" font-weight="bold">Server</text>
+                            &lt;!-- Server --&gt;
+                            &lt;rect x="400" y="80" width="100" height="60" rx="8" fill="#764ba2"/&gt;
+                            &lt;text x="450" y="115" text-anchor="middle" fill="white" font-size="14" font-weight="bold"&gt;Server&lt;/text&gt;
                             
-                            <!-- Arrows -->
-                            <g id="requestArrow" opacity="0">
-                                <line x1="130" y1="100" x2="190" y2="100" stroke="#667eea" stroke-width="3" marker-end="url(#arrowhead)"/>
-                                <text x="160" y="90" text-anchor="middle" fill="#667eea" font-size="10">request</text>
-                            </g>
-                            <g id="cacheHitArrow" opacity="0">
-                                <line x1="190" y1="120" x2="130" y2="120" stroke="#4CAF50" stroke-width="3" marker-end="url(#arrowheadGreen)"/>
-                                <text x="160" y="140" text-anchor="middle" fill="#4CAF50" font-size="10">HIT! ⚡</text>
-                            </g>
-                            <g id="cacheMissArrow" opacity="0">
-                                <line x1="320" y1="110" x2="390" y2="110" stroke="#ff9800" stroke-width="3" marker-end="url(#arrowheadOrange)"/>
-                                <text x="355" y="100" text-anchor="middle" fill="#ff9800" font-size="10">MISS →</text>
-                            </g>
-                            <g id="serverResponseArrow" opacity="0">
-                                <line x1="390" y1="130" x2="320" y2="130" stroke="#764ba2" stroke-width="3" marker-end="url(#arrowheadPurple)"/>
-                                <text x="355" y="150" text-anchor="middle" fill="#764ba2" font-size="10">response</text>
-                            </g>
+                            &lt;!-- Arrows --&gt;
+                            &lt;g id="requestArrow" opacity="0"&gt;
+                                &lt;line x1="130" y1="100" x2="190" y2="100" stroke="#667eea" stroke-width="3" marker-end="url(#arrowhead)"/&gt;
+                                &lt;text x="160" y="90" text-anchor="middle" fill="#667eea" font-size="10"&gt;request&lt;/text&gt;
+                            &lt;/g&gt;
+                            &lt;g id="cacheHitArrow" opacity="0"&gt;
+                                &lt;line x1="190" y1="120" x2="130" y2="120" stroke="#4CAF50" stroke-width="3" marker-end="url(#arrowheadGreen)"/&gt;
+                                &lt;text x="160" y="140" text-anchor="middle" fill="#4CAF50" font-size="10"&gt;HIT! ⚡&lt;/text&gt;
+                            &lt;/g&gt;
+                            &lt;g id="cacheMissArrow" opacity="0"&gt;
+                                &lt;line x1="320" y1="110" x2="390" y2="110" stroke="#ff9800" stroke-width="3" marker-end="url(#arrowheadOrange)"/&gt;
+                                &lt;text x="355" y="100" text-anchor="middle" fill="#ff9800" font-size="10"&gt;MISS →&lt;/text&gt;
+                            &lt;/g&gt;
+                            &lt;g id="serverResponseArrow" opacity="0"&gt;
+                                &lt;line x1="390" y1="130" x2="320" y2="130" stroke="#764ba2" stroke-width="3" marker-end="url(#arrowheadPurple)"/&gt;
+                                &lt;text x="355" y="150" text-anchor="middle" fill="#764ba2" font-size="10"&gt;response&lt;/text&gt;
+                            &lt;/g&gt;
                             
-                            <!-- Arrow markers -->
-                            <defs>
-                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                                    <polygon points="0 0, 10 3.5, 0 7" fill="#667eea"/>
-                                </marker>
-                                <marker id="arrowheadGreen" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
-                                    <polygon points="10 0, 0 3.5, 10 7" fill="#4CAF50"/>
-                                </marker>
-                                <marker id="arrowheadOrange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                                    <polygon points="0 0, 10 3.5, 0 7" fill="#ff9800"/>
-                                </marker>
-                                <marker id="arrowheadPurple" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
-                                    <polygon points="10 0, 0 3.5, 10 7" fill="#764ba2"/>
-                                </marker>
-                            </defs>
+                            &lt;!-- Arrow markers --&gt;
+                            &lt;defs&gt;
+                                &lt;marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"&gt;
+                                    &lt;polygon points="0 0, 10 3.5, 0 7" fill="#667eea"/&gt;
+                                &lt;/marker&gt;
+                                &lt;marker id="arrowheadGreen" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"&gt;
+                                    &lt;polygon points="10 0, 0 3.5, 10 7" fill="#4CAF50"/&gt;
+                                &lt;/marker&gt;
+                                &lt;marker id="arrowheadOrange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"&gt;
+                                    &lt;polygon points="0 0, 10 3.5, 0 7" fill="#ff9800"/&gt;
+                                &lt;/marker&gt;
+                                &lt;marker id="arrowheadPurple" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"&gt;
+                                    &lt;polygon points="10 0, 0 3.5, 10 7" fill="#764ba2"/&gt;
+                                &lt;/marker&gt;
+                            &lt;/defs&gt;
                             
-                            <!-- Status -->
-                            <text id="cacheStatus" x="300" y="30" text-anchor="middle" fill="#333" font-size="14">Click a fetch button to start</text>
+                            &lt;!-- Status --&gt;
+                            &lt;text id="cacheStatus" x="300" y="30" text-anchor="middle" fill="#333" font-size="14"&gt;Click a fetch button to start&lt;/text&gt;
                             
-                            <!-- Time indicator -->
-                            <text id="cacheTime" x="300" y="220" text-anchor="middle" fill="#666" font-size="12">Response time: --</text>
-                        </svg>
+                            &lt;!-- Time indicator --&gt;
+                            &lt;text id="cacheTime" x="300" y="220" text-anchor="middle" fill="#666" font-size="12"&gt;Response time: --&lt;/text&gt;
+                        &lt;/svg&gt;
                         
-                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;">
-                            <button onclick="fetchUserA()" style="padding: 0.75rem 1.5rem; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;">
+                        &lt;div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;"&gt;
+                            &lt;button onclick="fetchUserA()" style="padding: 0.75rem 1.5rem; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;"&gt;
                                 📡 Fetch User A
-                            </button>
-                            <button onclick="fetchUserB()" style="padding: 0.75rem 1.5rem; background: #764ba2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;">
+                            &lt;/button&gt;
+                            &lt;button onclick="fetchUserB()" style="padding: 0.75rem 1.5rem; background: #764ba2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;"&gt;
                                 📡 Fetch User B
-                            </button>
-                            <button onclick="invalidateCache()" style="padding: 0.75rem 1.5rem; background: #ff6b6b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;">
+                            &lt;/button&gt;
+                            &lt;button onclick="invalidateCache()" style="padding: 0.75rem 1.5rem; background: #ff6b6b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem;"&gt;
                                 🗑️ Clear Cache
-                            </button>
-                        </div>
+                            &lt;/button&gt;
+                        &lt;/div&gt;
                         
-                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; font-size: 0.85rem;">
-                            <div style="padding: 0.5rem 1rem; background: #e8f5e9; border-radius: 6px;">
-                                Cache Hits: <strong id="hitCount">0</strong>
-                            </div>
-                            <div style="padding: 0.5rem 1rem; background: #fff3e0; border-radius: 6px;">
-                                Cache Misses: <strong id="missCount">0</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        &lt;div style="display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; font-size: 0.85rem;"&gt;
+                            &lt;div style="padding: 0.5rem 1rem; background: #e8f5e9; border-radius: 6px;"&gt;
+                                Cache Hits: &lt;strong id="hitCount"&gt;0&lt;/strong&gt;
+                            &lt;/div&gt;
+                            &lt;div style="padding: 0.5rem 1rem; background: #fff3e0; border-radius: 6px;"&gt;
+                                Cache Misses: &lt;strong id="missCount"&gt;0&lt;/strong&gt;
+                            &lt;/div&gt;
+                        &lt;/div&gt;
+                    &lt;/div&gt;
+                &lt;/div&gt;
                 
-                <script>
+                &lt;script&gt;
                     const cacheDemo = new Map();
                     let cacheHits = 0;
                     let cacheMisses = 0;
@@ -2698,7 +2572,7 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                         document.getElementById('requestArrow').setAttribute('opacity', '1');
                         status.textContent = `Checking cache for ${user}...`;
                         
-                        setTimeout(() => {
+                        setTimeout(() =&gt; {
                             if (cacheDemo.has(user)) {
                                 // Cache HIT
                                 cacheHits++;
@@ -2715,7 +2589,7 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                                 status.setAttribute('fill', '#ff9800');
                                 
                                 // Simulate server response
-                                setTimeout(() => {
+                                setTimeout(() =&gt; {
                                     document.getElementById('serverResponseArrow').setAttribute('opacity', '1');
                                     cacheDemo.set(user, { name: user, timestamp: Date.now() });
                                     status.textContent = `✅ ${user} fetched and cached!`;
@@ -2737,13 +2611,13 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                         document.getElementById('cacheTtl').textContent = 'TTL: --';
                         updateCacheDisplay();
                     }
-                </script>
+                &lt;/script&gt;
 
 
     return (
         &lt;div&gt;
-            {loading && &lt;div&gt;Loading...&lt;/div&gt;}
-            {user && (
+            {loading &amp;&amp; &lt;div&gt;Loading...&lt;/div&gt;}
+            {user &amp;&amp; (
                 &lt;div&gt;
                     &lt;h2&gt;{user.name}&lt;/h2&gt;
                     &lt;button onClick={invalidate}&gt;Refresh&lt;/button&gt;
@@ -2772,7 +2646,7 @@ const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
             if (stored) {
                 const data = JSON.parse(stored);
                 // Restore cache from localStorage
-                Object.entries(data).forEach(([key, value]) => {
+                Object.entries(data).forEach(([key, value]) =&gt; {
                     this.cache.set(key, value as CacheEntry&lt;any&gt;);
                 });
             }
@@ -2824,8 +2698,8 @@ const persistentCache = new PersistentCache();</code></pre>
 
                 <div class="card">
                     <pre><code class="language-typescript">// Invalidate on mutation
-const useUpdateUser = () => {
-    const updateUser = async (userId: string, updates: Partial&lt;User&gt;) => {
+const useUpdateUser = () =&gt; {
+    const updateUser = async (userId: string, updates: Partial&lt;User&gt;) =&gt; {
         const response = await fetch(`/api/users/${userId}`, {
             method: 'PUT',
             body: JSON.stringify(updates)
@@ -2871,12 +2745,12 @@ const useUpdateUser = () => {
 
             <!-- Section 7: Introduction to React Query -->
             <section id="section7" class="lesson-section">
-                <h2>🔮 Introduction to React Query</h2>
-                <p>We've built custom hooks for caching, pagination, and infinite scroll. But what if there was a library that handled all of this (and more) out of the box? Meet React Query (TanStack Query)—the most powerful data fetching library for React!</p>
+                <h2>🔮 Introduction to TanStack Query</h2>
+                <p>Look back at everything we just hand-built: race-condition guards, debounced fetches, an <code>AbortController</code> hook, pagination state, infinite scroll, and a TTL cache. That's a lot of careful, easy-to-get-wrong code — and every React team writes some version of it. What if a single library handled all of it, correctly and generically, with first-class TypeScript support? That library is <strong>TanStack Query</strong> (v5, still widely known by its old name, React Query), and it is the production standard for managing server state in React today.</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 What is React Query?</h4>
-                    <p style="color: white;"><strong>React Query (TanStack Query):</strong> A powerful data synchronization library that handles caching, background updates, stale data revalidation, pagination, and more—all with minimal code. It treats server state as fundamentally different from client state and provides tools specifically for managing it.</p>
+                    <h4>📖 What is TanStack Query?</h4>
+                    <p><strong>TanStack Query (v5, formerly "React Query"):</strong> A data-synchronization library that handles caching, deduplication, background revalidation, retries, pagination, and mutations for you — all with a tiny, strongly typed API. Its core insight is that <em>server state</em> is not like <em>client state</em>: it lives on another machine, it can go stale the instant you read it, and many parts of your UI may want the same slice at once. Every custom hook we built in this lesson exists inside TanStack Query already, battle-tested and typed.</p>
                 </div>
 
                 <h3>Why React Query?</h3>
@@ -2930,10 +2804,11 @@ const useUpdateUser = () => {
                     </table>
                 </div>
 
-                <h3>Setup React Query</h3>
+                <h3>Setup TanStack Query</h3>
                 <div class="card">
-                    <pre><code class="language-typescript">// Install
+                    <pre><code class="language-typescript">// Install (v5 is the current major version)
 npm install @tanstack/react-query
+npm install -D @tanstack/react-query-devtools
 
 // Setup in your app
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -2943,10 +2818,11 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            staleTime: 5 * 60 * 1000, // 5 minutes
-            cacheTime: 10 * 60 * 1000, // 10 minutes
-            retry: 3,
-            refetchOnWindowFocus: true,
+            staleTime: 5 * 60 * 1000,   // 5 min: how long data is considered "fresh"
+            gcTime: 10 * 60 * 1000,     // 10 min: how long unused data stays cached
+                                        // (v5 renamed the old `cacheTime` to `gcTime`)
+            retry: 3,                   // retry failed queries 3x with backoff
+            refetchOnWindowFocus: true, // re-check when the tab regains focus
         },
     },
 });
@@ -2967,21 +2843,21 @@ function App() {
 
                 <div class="card card-success">
                     <h4>✅ Before (Custom Hook)</h4>
-                    <pre><code class="language-typescript">const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+                    <pre><code class="language-typescript">const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) =&gt; {
     const [user, setUser] = useState&lt;User | null&gt;(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState&lt;Error | null&gt;(null);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         const controller = new AbortController();
         
         fetch(`/api/users/${userId}`, { signal: controller.signal })
-            .then(res => res.json())
+            .then(res =&gt; res.json())
             .then(setUser)
             .catch(setError)
-            .finally(() => setLoading(false));
+            .finally(() =&gt; setLoading(false));
 
-        return () => controller.abort();
+        return () =&gt; controller.abort();
     }, [userId]);
 
     if (loading) return &lt;div&gt;Loading...&lt;/div&gt;;
@@ -2992,7 +2868,7 @@ function App() {
                     <h4>✅ After (React Query)</h4>
                     <pre><code class="language-typescript">import { useQuery } from '@tanstack/react-query';
 
-const fetchUser = async (userId: string): Promise&lt;User&gt; => {
+const fetchUser = async (userId: string): Promise&lt;User&gt; =&gt; {
     const response = await fetch(`/api/users/${userId}`);
     if (!response.ok) {
         throw new Error('Failed to fetch user');
@@ -3000,10 +2876,10 @@ const fetchUser = async (userId: string): Promise&lt;User&gt; => {
     return response.json();
 };
 
-const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+const UserProfile: React.FC&lt;{ userId: string }&gt; = ({ userId }) =&gt; {
     const { data: user, isLoading, error } = useQuery({
         queryKey: ['user', userId], // Unique key for this query
-        queryFn: () => fetchUser(userId), // Function to fetch data
+        queryFn: () =&gt; fetchUser(userId), // Function to fetch data
     });
 
     if (isLoading) return &lt;div&gt;Loading...&lt;/div&gt;;
@@ -3030,7 +2906,7 @@ interface UpdateUserData {
     email: string;
 }
 
-const updateUser = async (userId: string, data: UpdateUserData): Promise&lt;User&gt; => {
+const updateUser = async (userId: string, data: UpdateUserData): Promise&lt;User&gt; =&gt; {
     const response = await fetch(`/api/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -3044,12 +2920,12 @@ const updateUser = async (userId: string, data: UpdateUserData): Promise&lt;User
     return response.json();
 };
 
-const UserEditForm: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
+const UserEditForm: React.FC&lt;{ userId: string }&gt; = ({ userId }) =&gt; {
     const queryClient = useQueryClient();
     
     const mutation = useMutation({
-        mutationFn: (data: UpdateUserData) => updateUser(userId, data),
-        onSuccess: (updatedUser) => {
+        mutationFn: (data: UpdateUserData) =&gt; updateUser(userId, data),
+        onSuccess: (updatedUser) =&gt; {
             // Invalidate and refetch user query
             queryClient.invalidateQueries({ queryKey: ['user', userId] });
             
@@ -3058,7 +2934,7 @@ const UserEditForm: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
         },
     });
 
-    const handleSubmit = (e: React.FormEvent&lt;HTMLFormElement&gt;) => {
+    const handleSubmit = (e: React.FormEvent&lt;HTMLFormElement&gt;) =&gt; {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         
@@ -3076,13 +2952,13 @@ const UserEditForm: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                 {mutation.isPending ? 'Saving...' : 'Save'}
             &lt;/button&gt;
             
-            {mutation.isError && (
+            {mutation.isError &amp;&amp; (
                 &lt;div style={{ color: 'red' }}&gt;
                     Error: {mutation.error.message}
                 &lt;/div&gt;
             )}
             
-            {mutation.isSuccess && (
+            {mutation.isSuccess &amp;&amp; (
                 &lt;div style={{ color: 'green' }}&gt;
                     User updated successfully!
                 &lt;/div&gt;
@@ -3094,13 +2970,13 @@ const UserEditForm: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
 
                 <h3>Pagination with React Query</h3>
                 <div class="card">
-                    <pre><code class="language-typescript">const ProductList: React.FC = () => {
+                    <pre><code class="language-typescript">const ProductList: React.FC = () =&gt; {
     const [page, setPage] = useState(1);
 
     const { data, isLoading, isPlaceholderData } = useQuery({
         queryKey: ['products', page],
-        queryFn: () => fetchProducts(page),
-        placeholderData: (previousData) => previousData, // Keep old data while loading
+        queryFn: () =&gt; fetchProducts(page),
+        placeholderData: (previousData) =&gt; previousData, // Keep old data while loading
     });
 
     return (
@@ -3109,7 +2985,7 @@ const UserEditForm: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                 &lt;div&gt;Loading...&lt;/div&gt;
             ) : (
                 &lt;div&gt;
-                    {data?.products.map(product => (
+                    {data?.products.map(product =&gt; (
                         &lt;div key={product.id}&gt;{product.name}&lt;/div&gt;
                     ))}
                 &lt;/div&gt;
@@ -3117,7 +2993,7 @@ const UserEditForm: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
 
             &lt;div&gt;
                 &lt;button 
-                    onClick={() => setPage(p => p - 1)}
+                    onClick={() =&gt; setPage(p =&gt; p - 1)}
                     disabled={page === 1}
                 &gt;
                     Previous
@@ -3126,7 +3002,7 @@ const UserEditForm: React.FC&lt;{ userId: string }&gt; = ({ userId }) => {
                 &lt;span&gt;Page {page}&lt;/span&gt;
                 
                 &lt;button
-                    onClick={() => setPage(p => p + 1)}
+                    onClick={() =&gt; setPage(p =&gt; p + 1)}
                     disabled={isPlaceholderData || !data?.hasMore}
                 &gt;
                     Next
@@ -3145,7 +3021,7 @@ interface PageParam {
     pageParam: number;
 }
 
-const PostFeed: React.FC = () => {
+const PostFeed: React.FC = () =&gt; {
     const {
         data,
         fetchNextPage,
@@ -3154,8 +3030,8 @@ const PostFeed: React.FC = () => {
         isLoading,
     } = useInfiniteQuery({
         queryKey: ['posts'],
-        queryFn: ({ pageParam = 1 }) => fetchPosts(pageParam),
-        getNextPageParam: (lastPage, allPages) => {
+        queryFn: ({ pageParam = 1 }) =&gt; fetchPosts(pageParam),
+        getNextPageParam: (lastPage, allPages) =&gt; {
             return lastPage.hasMore ? allPages.length + 1 : undefined;
         },
         initialPageParam: 1,
@@ -3163,10 +3039,10 @@ const PostFeed: React.FC = () => {
 
     const observerTarget = useRef&lt;HTMLDivElement&gt;(null);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+            (entries) =&gt; {
+                if (entries[0].isIntersecting &amp;&amp; hasNextPage &amp;&amp; !isFetchingNextPage) {
                     fetchNextPage();
                 }
             },
@@ -3177,16 +3053,16 @@ const PostFeed: React.FC = () => {
             observer.observe(observerTarget.current);
         }
 
-        return () => observer.disconnect();
+        return () =&gt; observer.disconnect();
     }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
     if (isLoading) return &lt;div&gt;Loading...&lt;/div&gt;;
 
     return (
         &lt;div&gt;
-            {data?.pages.map((page, i) => (
+            {data?.pages.map((page, i) =&gt; (
                 &lt;div key={i}&gt;
-                    {page.posts.map(post => (
+                    {page.posts.map(post =&gt; (
                         &lt;article key={post.id}&gt;
                             &lt;h2&gt;{post.title}&lt;/h2&gt;
                             &lt;p&gt;{post.content}&lt;/p&gt;
@@ -3195,8 +3071,8 @@ const PostFeed: React.FC = () => {
                 &lt;/div&gt;
             ))}
 
-            {isFetchingNextPage && &lt;div&gt;Loading more...&lt;/div&gt;}
-            {!hasNextPage && &lt;div&gt;No more posts!&lt;/div&gt;}
+            {isFetchingNextPage &amp;&amp; &lt;div&gt;Loading more...&lt;/div&gt;}
+            {!hasNextPage &amp;&amp; &lt;div&gt;No more posts!&lt;/div&gt;}
 
             &lt;div ref={observerTarget} style={{ height: '20px' }} /&gt;
         &lt;/div&gt;
@@ -3204,8 +3080,86 @@ const PostFeed: React.FC = () => {
 };</code></pre>
                 </div>
 
+                <h3>Shaping Data with <code>select</code></h3>
+                <p>Often a component only needs one slice of a response — a name, a count, a sorted list. The <code>select</code> option transforms the cached data <em>before</em> it reaches your component, and (bonus) only triggers a re-render when the <em>selected</em> value changes. The raw response still lives in the cache untouched, so other components can read the whole thing.</p>
+                <div class="card">
+                    <pre><code class="language-typescript">const { data: userName } = useQuery({
+    queryKey: ['user', userId],
+    queryFn: () =&gt; fetchUser(userId),
+    // Derive exactly what this component needs. `userName` is typed as string.
+    select: (user) =&gt; user.name,
+});</code></pre>
+                </div>
+
+                <h3>Dependent (Chained) Queries</h3>
+                <p>Sometimes one query can't run until another finishes — you need the user before you can fetch <em>their</em> projects. The <code>enabled</code> flag pauses a query until its prerequisite is ready, so you never fire a request with an <code>undefined</code> id.</p>
+                <div class="card">
+                    <pre><code class="language-typescript">// 1. Fetch the user
+const { data: user } = useQuery({
+    queryKey: ['user', userId],
+    queryFn: () =&gt; fetchUser(userId),
+});
+
+// 2. Fetch their projects — but only once we actually have a user id
+const { data: projects } = useQuery({
+    queryKey: ['projects', user?.id],
+    queryFn: () =&gt; fetchProjects(user!.id),
+    enabled: !!user?.id, // gate the query on its dependency
+});</code></pre>
+                </div>
+
+                <h3>Polling and Retries</h3>
+                <p>For data that changes on the server without any user action — a live price, a job status, a chat thread — <code>refetchInterval</code> turns a query into a poller. And when a request fails, TanStack Query retries it for you with exponential backoff, so a single network blip doesn't surface an error.</p>
+                <div class="card">
+                    <pre><code class="language-typescript">const { data } = useQuery({
+    queryKey: ['job', jobId],
+    queryFn: () =&gt; fetchJobStatus(jobId),
+    refetchInterval: (query) =&gt;
+        // Poll every 3s while running; stop once the job is done.
+        query.state.data?.status === 'complete' ? false : 3000,
+    retry: 3, // default is 3; set to a number, false, or a predicate
+    retryDelay: (attempt) =&gt; Math.min(1000 * 2 ** attempt, 30000),
+});</code></pre>
+                </div>
+
+                <h3>The Cache Lifecycle at a Glance</h3>
+                <p>Understanding <code>staleTime</code> vs <code>gcTime</code> is the key to tuning TanStack Query. Freshly fetched data is <strong>fresh</strong>; after <code>staleTime</code> it becomes <strong>stale</strong> (still shown instantly, but eligible for a background refetch); once no component is using it, it goes <strong>inactive</strong> and is garbage-collected after <code>gcTime</code>.</p>
+                <div class="mermaid">
+flowchart TD
+    A["queryFn resolves → data cached"] --> B["FRESH (within staleTime)"]
+    B -->|"staleTime elapses"| C["STALE (still shown instantly)"]
+    C -->|"mount or window refocus"| D["Background refetch"]
+    D --> B
+    C -->|"no active observers"| E["INACTIVE"]
+    E -->|"gcTime elapses"| F["Garbage-collected"]
+                </div>
+
+                <div class="card card-success">
+                    <h4>🆕 React 19: <code>use()</code>, Suspense, and Server Components</h4>
+                    <p>TanStack Query is the production standard for <em>client-side</em> server-state. But React 19 adds a native, complementary path for reading data — especially useful with Server Components and frameworks like Next.js. A Server Component can start a fetch on the server and hand the <em>promise</em> to a Client Component, which unwraps it with the new <code>use()</code> hook while <code>&lt;Suspense&gt;</code> shows a fallback:</p>
+                    <pre><code class="language-typescript">// ProductsPage.tsx — a Server Component (runs on the server)
+async function ProductsPage() {
+    const productsPromise = fetchProducts(); // note: NOT awaited here
+    return (
+        &lt;Suspense fallback={&lt;p&gt;Loading…&lt;/p&gt;}&gt;
+            &lt;ProductList productsPromise={productsPromise} /&gt;
+        &lt;/Suspense&gt;
+    );
+}
+
+// ProductList.tsx — a Client Component
+'use client';
+import { use } from 'react';
+
+function ProductList({ productsPromise }: { productsPromise: Promise&lt;Product[]&gt; }) {
+    const products = use(productsPromise); // suspends until the promise resolves
+    return &lt;ul&gt;{products.map((p) =&gt; &lt;li key={p.id}&gt;{p.name}&lt;/li&gt;)}&lt;/ul&gt;;
+}</code></pre>
+                    <p><strong>Which do I reach for?</strong> Use <code>use()</code> + Suspense + Server Components for the initial server-rendered load, and TanStack Query for rich client interactions — caching across navigations, background refetching, mutations, optimistic updates, and polling. They coexist happily; many apps use both.</p>
+                </div>
+
                 <div class="card card-info">
-                    <h4>💡 React Query Superpowers</h4>
+                    <h4>💡 TanStack Query Superpowers</h4>
                     <ul>
                         <li><strong>Automatic caching:</strong> No manual cache management needed</li>
                         <li><strong>Background refetching:</strong> Keep data fresh automatically</li>
@@ -3238,8 +3192,8 @@ const PostFeed: React.FC = () => {
                 <p>Why make users wait to see their changes? Optimistic updates instantly show changes in the UI before the server responds, creating a lightning-fast user experience!</p>
 
                 <div class="card card-accent">
-                    <h4 style="color: white;">📖 Definition</h4>
-                    <p style="color: white;"><strong>Optimistic Update:</strong> A UX pattern where the UI is immediately updated to reflect a user's action, assuming the server operation will succeed. If it fails, the UI rolls back to the previous state. This creates the illusion of instant responses.</p>
+                    <h4>📖 Definition</h4>
+                    <p><strong>Optimistic Update:</strong> Update the UI <em>immediately</em>, as if the server had already said yes, then reconcile once it actually responds. If the request succeeds, you were right and nothing flickers. If it fails, you roll the UI back to the snapshot you saved beforehand. It's the difference between a "Like" button that fills in the instant you tap it versus one that spins for 400ms first — the optimistic one simply feels alive.</p>
                 </div>
 
                 <h3>How Optimistic Updates Work</h3>
@@ -3272,19 +3226,19 @@ sequenceDiagram
                     <pre><code class="language-typescript">const LikeButton: React.FC&lt;{ postId: string; initialLikes: number }&gt; = ({
     postId,
     initialLikes
-}) => {
+}) =&gt; {
     const [likes, setLikes] = useState(initialLikes);
     const [isLiked, setIsLiked] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
 
-    const handleLike = async () => {
+    const handleLike = async () =&gt; {
         // Save previous state for rollback
         const previousLikes = likes;
         const previousIsLiked = isLiked;
 
         // Optimistic update - instant UI change!
-        setLikes(prev => isLiked ? prev - 1 : prev + 1);
-        setIsLiked(prev => !prev);
+        setLikes(prev =&gt; isLiked ? prev - 1 : prev + 1);
+        setIsLiked(prev =&gt; !prev);
         setIsUpdating(true);
 
         try {
@@ -3343,11 +3297,11 @@ interface Post {
     isLiked: boolean;
 }
 
-const LikeButton: React.FC&lt;{ post: Post }&gt; = ({ post }) => {
+const LikeButton: React.FC&lt;{ post: Post }&gt; = ({ post }) =&gt; {
     const queryClient = useQueryClient();
 
     const likeMutation = useMutation({
-        mutationFn: async (postId: string) => {
+        mutationFn: async (postId: string) =&gt; {
             const response = await fetch(`/api/posts/${postId}/like`, {
                 method: 'POST',
             });
@@ -3355,7 +3309,7 @@ const LikeButton: React.FC&lt;{ post: Post }&gt; = ({ post }) => {
         },
         
         // Called before mutation
-        onMutate: async (postId) => {
+        onMutate: async (postId) =&gt; {
             // Cancel outgoing queries
             await queryClient.cancelQueries({ queryKey: ['post', postId] });
 
@@ -3363,7 +3317,7 @@ const LikeButton: React.FC&lt;{ post: Post }&gt; = ({ post }) => {
             const previousPost = queryClient.getQueryData&lt;Post&gt;(['post', postId]);
 
             // Optimistically update cache
-            queryClient.setQueryData&lt;Post&gt;(['post', postId], (old) => {
+            queryClient.setQueryData&lt;Post&gt;(['post', postId], (old) =&gt; {
                 if (!old) return old;
                 return {
                     ...old,
@@ -3377,7 +3331,7 @@ const LikeButton: React.FC&lt;{ post: Post }&gt; = ({ post }) => {
         },
 
         // Called on error
-        onError: (err, postId, context) => {
+        onError: (err, postId, context) =&gt; {
             // Rollback to previous value
             if (context?.previousPost) {
                 queryClient.setQueryData(['post', postId], context.previousPost);
@@ -3385,14 +3339,14 @@ const LikeButton: React.FC&lt;{ post: Post }&gt; = ({ post }) => {
         },
 
         // Always refetch after error or success
-        onSettled: (data, error, postId) => {
+        onSettled: (data, error, postId) =&gt; {
             queryClient.invalidateQueries({ queryKey: ['post', postId] });
         },
     });
 
     return (
         &lt;button 
-            onClick={() => likeMutation.mutate(post.id)}
+            onClick={() =&gt; likeMutation.mutate(post.id)}
             disabled={likeMutation.isPending}
             style={{
                 backgroundColor: post.isLiked ? '#667eea' : '#ccc',
@@ -3418,12 +3372,12 @@ const LikeButton: React.FC&lt;{ post: Post }&gt; = ({ post }) => {
     completed: boolean;
 }
 
-const TodoList: React.FC = () => {
+const TodoList: React.FC = () =&gt; {
     const queryClient = useQueryClient();
 
     // Add todo optimistically
     const addMutation = useMutation({
-        mutationFn: async (text: string) => {
+        mutationFn: async (text: string) =&gt; {
             const response = await fetch('/api/todos', {
                 method: 'POST',
                 body: JSON.stringify({ text })
@@ -3431,7 +3385,7 @@ const TodoList: React.FC = () => {
             return response.json();
         },
         
-        onMutate: async (text) => {
+        onMutate: async (text) =&gt; {
             await queryClient.cancelQueries({ queryKey: ['todos'] });
             const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
 
@@ -3443,23 +3397,23 @@ const TodoList: React.FC = () => {
             };
 
             // Add to cache immediately
-            queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old = []) => 
+            queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old = []) =&gt; 
                 [...old, optimisticTodo]
             );
 
             return { previousTodos };
         },
 
-        onError: (err, text, context) => {
+        onError: (err, text, context) =&gt; {
             if (context?.previousTodos) {
                 queryClient.setQueryData(['todos'], context.previousTodos);
             }
         },
 
-        onSuccess: (newTodo) => {
+        onSuccess: (newTodo) =&gt; {
             // Replace temporary todo with real one from server
-            queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old = []) =>
-                old.map(todo => 
+            queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old = []) =&gt;
+                old.map(todo =&gt; 
                     todo.id.startsWith('temp-') ? newTodo : todo
                 )
             );
@@ -3468,23 +3422,23 @@ const TodoList: React.FC = () => {
 
     // Delete todo optimistically
     const deleteMutation = useMutation({
-        mutationFn: async (id: string) => {
+        mutationFn: async (id: string) =&gt; {
             await fetch(`/api/todos/${id}`, { method: 'DELETE' });
         },
         
-        onMutate: async (id) => {
+        onMutate: async (id) =&gt; {
             await queryClient.cancelQueries({ queryKey: ['todos'] });
             const previousTodos = queryClient.getQueryData&lt;Todo[]&gt;(['todos']);
 
             // Remove from cache immediately
-            queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old = []) =>
-                old.filter(todo => todo.id !== id)
+            queryClient.setQueryData&lt;Todo[]&gt;(['todos'], (old = []) =&gt;
+                old.filter(todo =&gt; todo.id !== id)
             );
 
             return { previousTodos };
         },
 
-        onError: (err, id, context) => {
+        onError: (err, id, context) =&gt; {
             if (context?.previousTodos) {
                 queryClient.setQueryData(['todos'], context.previousTodos);
             }
@@ -3498,16 +3452,16 @@ const TodoList: React.FC = () => {
 
     return (
         &lt;div&gt;
-            {todos.map(todo => (
+            {todos.map(todo =&gt; (
                 &lt;div key={todo.id}&gt;
                     &lt;span&gt;{todo.text}&lt;/span&gt;
-                    &lt;button onClick={() => deleteMutation.mutate(todo.id)}&gt;
+                    &lt;button onClick={() =&gt; deleteMutation.mutate(todo.id)}&gt;
                         Delete
                     &lt;/button&gt;
                 &lt;/div&gt;
             ))}
             
-            &lt;button onClick={() => addMutation.mutate('New todo')}&gt;
+            &lt;button onClick={() =&gt; addMutation.mutate('New todo')}&gt;
                 Add Todo
             &lt;/button&gt;
         &lt;/div&gt;
@@ -3579,14 +3533,14 @@ const TodoList: React.FC = () => {
 // Simple cache
 const searchCache = new Map&lt;string, SearchResult[]&gt;();
 
-const SearchComponent: React.FC = () => {
+const SearchComponent: React.FC = () =&gt; {
     const [query, setQuery] = useState('');
     const debouncedQuery = useDebounce(query, 500);
     const [results, setResults] = useState&lt;SearchResult[]&gt;([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState&lt;string | null&gt;(null);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         if (!debouncedQuery) {
             setResults([]);
             return;
@@ -3606,19 +3560,19 @@ const SearchComponent: React.FC = () => {
         fetch(`/api/search?q=${debouncedQuery}`, {
             signal: controller.signal
         })
-            .then(res => res.json())
-            .then(data => {
+            .then(res =&gt; res.json())
+            .then(data =&gt; {
                 searchCache.set(debouncedQuery, data.results);
                 setResults(data.results);
             })
-            .catch(err => {
+            .catch(err =&gt; {
                 if (err.name !== 'AbortError') {
                     setError('Search failed');
                 }
             })
-            .finally(() => setLoading(false));
+            .finally(() =&gt; setLoading(false));
 
-        return () => controller.abort();
+        return () =&gt; controller.abort();
     }, [debouncedQuery]);
 
     return (
@@ -3626,16 +3580,16 @@ const SearchComponent: React.FC = () => {
             &lt;input
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) =&gt; setQuery(e.target.value)}
                 placeholder="Search..."
                 style={{ width: '100%', padding: '0.75rem', fontSize: '1rem' }}
             /&gt;
 
-            {loading && &lt;div&gt;Searching...&lt;/div&gt;}
-            {error && &lt;div style={{ color: 'red' }}&gt;{error}&lt;/div&gt;}
+            {loading &amp;&amp; &lt;div&gt;Searching...&lt;/div&gt;}
+            {error &amp;&amp; &lt;div style={{ color: 'red' }}&gt;{error}&lt;/div&gt;}
 
             &lt;div&gt;
-                {results.map(result => (
+                {results.map(result =&gt; (
                     &lt;div key={result.id} style={{ padding: '1rem', borderBottom: '1px solid #ddd' }}&gt;
                         &lt;h3&gt;{result.title}&lt;/h3&gt;
                         &lt;p&gt;{result.description}&lt;/p&gt;
@@ -3691,7 +3645,7 @@ interface PaginationData {
     totalItems: number;
 }
 
-const ProductCatalog: React.FC = () => {
+const ProductCatalog: React.FC = () =&gt; {
     const [searchParams, setSearchParams] = useSearchParams();
     const currentPage = Number(searchParams.get('page')) || 1;
     
@@ -3699,28 +3653,28 @@ const ProductCatalog: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState&lt;string | null&gt;(null);
 
-    useEffect(() => {
+    useEffect(() =&gt; {
         const controller = new AbortController();
         
         setLoading(true);
         setError(null);
 
-        fetch(`/api/products?page=${currentPage}&limit=12`, {
+        fetch(`/api/products?page=${currentPage}&amp;limit=12`, {
             signal: controller.signal
         })
-            .then(res => res.json())
+            .then(res =&gt; res.json())
             .then(setData)
-            .catch(err => {
+            .catch(err =&gt; {
                 if (err.name !== 'AbortError') {
                     setError('Failed to load products');
                 }
             })
-            .finally(() => setLoading(false));
+            .finally(() =&gt; setLoading(false));
 
-        return () => controller.abort();
+        return () =&gt; controller.abort();
     }, [currentPage]);
 
-    const goToPage = (page: number) => {
+    const goToPage = (page: number) =&gt; {
         setSearchParams({ page: page.toString() });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -3731,9 +3685,9 @@ const ProductCatalog: React.FC = () => {
         &lt;div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}&gt;
             &lt;h1&gt;Product Catalog&lt;/h1&gt;
 
-            {loading && &lt;div&gt;Loading products...&lt;/div&gt;}
+            {loading &amp;&amp; &lt;div&gt;Loading products...&lt;/div&gt;}
 
-            {data && (
+            {data &amp;&amp; (
                 &lt;&gt;
                     &lt;div style={{
                         display: 'grid',
@@ -3741,7 +3695,7 @@ const ProductCatalog: React.FC = () => {
                         gap: '1.5rem',
                         marginBottom: '2rem'
                     }}&gt;
-                        {data.products.map(product => (
+                        {data.products.map(product =&gt; (
                             &lt;div key={product.id} style={{
                                 border: '1px solid #ddd',
                                 borderRadius: '8px',
@@ -3769,7 +3723,7 @@ const ProductCatalog: React.FC = () => {
                         marginTop: '2rem'
                     }}&gt;
                         &lt;button
-                            onClick={() => goToPage(currentPage - 1)}
+                            onClick={() =&gt; goToPage(currentPage - 1)}
                             disabled={currentPage === 1 || loading}
                             style={{
                                 padding: '0.5rem 1rem',
@@ -3784,10 +3738,10 @@ const ProductCatalog: React.FC = () => {
                         &lt;/button&gt;
 
                         &lt;div style={{ display: 'flex', gap: '0.5rem' }}&gt;
-                            {Array.from({ length: data.totalPages }, (_, i) => i + 1).map(page => (
+                            {Array.from({ length: data.totalPages }, (_, i) =&gt; i + 1).map(page =&gt; (
                                 &lt;button
                                     key={page}
-                                    onClick={() => goToPage(page)}
+                                    onClick={() =&gt; goToPage(page)}
                                     disabled={loading}
                                     style={{
                                         padding: '0.5rem 1rem',
@@ -3805,7 +3759,7 @@ const ProductCatalog: React.FC = () => {
                         &lt;/div&gt;
 
                         &lt;button
-                            onClick={() => goToPage(currentPage + 1)}
+                            onClick={() =&gt; goToPage(currentPage + 1)}
                             disabled={currentPage === data.totalPages || loading}
                             style={{
                                 padding: '0.5rem 1rem',
@@ -3864,27 +3818,27 @@ const ProductCatalog: React.FC = () => {
     timestamp: string;
 }
 
-const SocialFeed: React.FC = () => {
+const SocialFeed: React.FC = () =&gt; {
     const [posts, setPosts] = useState&lt;Post[]&gt;([]);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const observerTarget = useRef&lt;HTMLDivElement&gt;(null);
 
-    const loadMorePosts = useCallback(async () => {
+    const loadMorePosts = useCallback(async () =&gt; {
         if (loading || !hasMore) return;
 
         setLoading(true);
 
         try {
-            const response = await fetch(`/api/posts?page=${page}&limit=20`);
+            const response = await fetch(`/api/posts?page=${page}&amp;limit=20`);
             const data = await response.json();
 
             if (data.posts.length === 0) {
                 setHasMore(false);
             } else {
-                setPosts(prev => [...prev, ...data.posts]);
-                setPage(prev => prev + 1);
+                setPosts(prev =&gt; [...prev, ...data.posts]);
+                setPage(prev =&gt; prev + 1);
             }
         } catch (error) {
             console.error('Failed to load posts:', error);
@@ -3894,15 +3848,15 @@ const SocialFeed: React.FC = () => {
     }, [page, loading, hasMore]);
 
     // Load initial posts
-    useEffect(() => {
+    useEffect(() =&gt; {
         loadMorePosts();
     }, []);
 
     // Set up Intersection Observer
-    useEffect(() => {
+    useEffect(() =&gt; {
         const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && hasMore && !loading) {
+            (entries) =&gt; {
+                if (entries[0].isIntersecting &amp;&amp; hasMore &amp;&amp; !loading) {
                     loadMorePosts();
                 }
             },
@@ -3913,7 +3867,7 @@ const SocialFeed: React.FC = () => {
             observer.observe(observerTarget.current);
         }
 
-        return () => {
+        return () =&gt; {
             if (observerTarget.current) {
                 observer.unobserve(observerTarget.current);
             }
@@ -3924,7 +3878,7 @@ const SocialFeed: React.FC = () => {
         &lt;div style={{ maxWidth: '600px', margin: '0 auto', padding: '2rem' }}&gt;
             &lt;h1&gt;Social Feed&lt;/h1&gt;
 
-            {posts.map(post => (
+            {posts.map(post =&gt; (
                 &lt;article 
                     key={post.id}
                     style={{
@@ -3944,13 +3898,13 @@ const SocialFeed: React.FC = () => {
                 &lt;/article&gt;
             ))}
 
-            {loading && (
+            {loading &amp;&amp; (
                 &lt;div style={{ textAlign: 'center', padding: '2rem' }}&gt;
                     &lt;p&gt;Loading more posts...&lt;/p&gt;
                 &lt;/div&gt;
             )}
 
-            {!hasMore && posts.length > 0 && (
+            {!hasMore &amp;&amp; posts.length &gt; 0 &amp;&amp; (
                 &lt;div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}&gt;
                     &lt;p&gt;🎉 You've reached the end!&lt;/p&gt;
                 &lt;/div&gt;
@@ -4207,10 +4161,10 @@ const SocialFeed: React.FC = () => {
                 </div>
 
                 <!-- Encouragement Card -->
-                <div class="card card-accent" style="text-align: center; padding: 2rem; margin-top: 2rem;">
-                    <h3 style="color: white;">🎉 Congratulations!</h3>
-                    <p style="color: white; font-size: 1.1rem;">You've completed Lesson 4.4: Advanced Data Fetching! You now have professional-grade data fetching skills that will serve you throughout your React career.</p>
-                    <p style="color: white; margin-top: 1rem;">You've learned techniques used by major tech companies to build fast, efficient, user-friendly applications. Keep practicing! 🚀</p>
+                <div class="card card-accent" style="text-align: center;">
+                    <h3>🎉 Congratulations!</h3>
+                    <p style="font-size: 1.1rem;">You've completed Lesson 4.4: Advanced Data Fetching! You now have professional-grade data-fetching skills that hold up in real production apps.</p>
+                    <p style="margin-top: 1rem;">Race conditions, debouncing, cancellation, pagination, infinite scroll, caching, TanStack Query, and optimistic updates — these are the exact tools teams at major tech companies reach for every day. Keep practicing! 🚀</p>
                 </div>
             </section>
 
