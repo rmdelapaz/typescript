@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 22</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 22: Interactions, Async, End-to-End and Accessibility Tests</h1>
+    <p class="sub">Answers and reasoning for every Session 22 item: both self-checks, the labs' reference tests, the planted bugs and accessibility bugs they catch, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>22</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>9.2 · Interactions and Async: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Why does every <code class="inline">user.click</code> and <code class="inline">user.type</code> need <code class="inline">await</code>?</div><div class="opts"><div class="opt">A) It slows the test down to a person's speed</div><div class="opt">B) It waits for the API to answer the request the click sends</div><div class="opt correct">C) Each action returns a Promise that resolves once its events have fired and React has updated the page</div><div class="opt">D) Without it, user-event falls back to fireEvent</div></div><div class="why"><b>Why:</b> user-event fires the whole chain of browser events (pointer, mouse, focus, click; key down, input, key up for every letter) one after another; await lets React finish each update, so the next line sees the page after the action. A request the click starts still needs findBy (Lesson 9.2, Common Mistakes: "Unable to find" right after a click).<br><b>A</b> is wrong: Speed has nothing to do with it: the events fire as fast as the test can.<br><b>B</b> is wrong: The click's Promise does not wait for network answers: that is findBy's job.<br><b>D</b> is wrong: There is no fallback; without await the next line simply looks too early.</div></div>
+  <div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt"><code class="inline">renderApp('/events/e08/edit', organizer)</code> has just returned. Which line finds the title field?</div><div class="opts"><div class="opt">A) <code class="inline">screen.getByLabelText('Title (5 to 80 characters)')</code></div><div class="opt correct">B) <code class="inline">await screen.findByLabelText('Title (5 to 80 characters)')</code></div><div class="opt">C) <code class="inline">screen.queryByLabelText('Title (5 to 80 characters)')</code></div><div class="opt">D) <code class="inline">screen.getByTestId('title')</code></div></div><div class="why"><b>Why:</b> Right after render the page shows the first-load placeholder ("Loading Shoreline Crew HQ…") while the loader fetches; findBy keeps looking for up to a second. After the first findBy the page is there and getBy is fine (Lesson 9.2, Common Mistakes).<br><b>A</b> is wrong: getBy looks once, now, and finds the loading placeholder.<br><b>C</b> is wrong: queryBy returns null now and never waits.<br><b>D</b> is wrong: There is no test id, and a label is what a person uses.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">The guard line in editEventLoader was commented out. The guest still ends up on the sign-in page, and the guard test prints this. What went wrong that nobody clicking through would see?</div><pre class="code">AssertionError: expected [ 'GET /api/events/e08', …(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "GET /api/events/e08",
++   "GET /api/sites",</pre><div class="opts"><div class="opt">A) The guest saw the edit form for a moment</div><div class="opt correct">B) The child loader asked the API for the cleanup and the sites before the guest was sent away</div><div class="opt">C) The sign-in page loaded twice</div><div class="opt">D) MSW answered requests it should have refused</div></div><div class="why"><b>Why:</b> The guard route's own loader still redirects, so the screen looks right; but editEventLoader ran at the same time and fetched data a guest may not see. recordRequests() makes the invisible half of the rule testable: expect(requests).toEqual([]) (Lesson 9.2, Step 5).<br><b>A</b> is wrong: The redirect still happens before anything renders.<br><b>C</b> is wrong: One sign-in page; the extra requests are the problem.<br><b>D</b> is wrong: MSW answered exactly what was asked: the asking was the bug.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">A test calls <code class="inline">server.use(...)</code> to make POST /api/photos answer 413. What does the NEXT test get?</div><div class="opts"><div class="opt correct">A) The API's own answer again, because server.resetHandlers() runs after every test</div><div class="opt">B) 413 again until the file ends</div><div class="opt">C) An error: two tests cannot change the same address</div><div class="opt">D) Whatever the slower test set last</div></div><div class="why"><b>Why:</b> server.use puts a handler in front of the API's own for the rest of the test; setup.ts's afterEach calls resetHandlers(). Tests stay independent, in any order (Lesson 9.2, One answer, for one test).<br><b>B</b> is wrong: resetHandlers removes it after each test.<br><b>C</b> is wrong: Overrides stack and are removed; nothing forbids them.<br><b>D</b> is wrong: Tests in a file run one after another, and each starts clean.</div></div>
+  <div class="q" data-sc="5" data-kind="short"><div class="qn">Q5</div><div class="qt">With the retry lines removed from setup.ts, the "page whose data does not load" test fails after about a second with this. The app does show its alert. Why does the test not see it?</div><pre class="code">TestingLibraryElementError: Unable to find role="alert"</pre><div class="opts"><div class="opt correct">The app's cache was still retrying the 500 (with pauses) when findByRole gave up after its 1-second default; tests set retry: false</div></div><div class="why"><b>Why:</b> A test that fails after a round thousand milliseconds, or only on a slow machine, is often waiting for a built-in delay: retries, debouncing, animations. Turn the delay off for tests or control the clock (Lesson 9.2, Common Mistakes; Exercise 1).</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">Lab 9.2's sign-up form must not send anything without a name. Which line in the test proves the "nothing"?</div><div class="opts"><div class="opt">A) <code class="inline">expect(api.signups).toEqual([])</code></div><div class="opt">B) <code class="inline">expect(screen.getByText('Add your name.')).toBeInTheDocument()</code></div><div class="opt">C) <code class="inline">expect(screen.getByRole('button')).toBeEnabled()</code></div><div class="opt correct">D) <code class="inline">expect(requests).toEqual([])</code> after <code class="inline">recordRequests()</code></div></div><div class="why"><b>Why:</b> Only a log of the requests themselves proves none was SENT. api.signups would stay empty also if a request went out and the API refused it; the message proves only the screen. The planted bug in debug_SignUpForm.tsx sends first and checks later: the screen looks right and the request log catches it.<br><b>A</b> is wrong: An empty list of sign-ups does not prove no request was made.<br><b>B</b> is wrong: That proves the message, not the network.<br><b>C</b> is wrong: An enabled button says nothing about requests.</div></div>
+
+  <div class="sec"><h2>9.3 · End-to-End and Accessibility Tests: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Right after <code class="inline">fill('pelican')</code>, a test checks <code class="inline">expect(await page.getByText('Found 3 cleanups').isVisible()).toBe(true)</code> and fails. Why?</div><div class="opts"><div class="opt">A) Playwright cannot read text in main</div><div class="opt">B) The search needs the API restarted</div><div class="opt">C) Strict mode: the text matches several elements</div><div class="opt correct">D) isVisible() checks once, during the search's 300 ms pause; a web-first assertion keeps checking</div></div><div class="why"><b>Why:</b> await expect(locator).toBeVisible() retries for up to 5 seconds until it is true; isVisible() answers "right now". The same goes for waitForTimeout: wait for what you expect to see, never for a number of milliseconds (Lesson 9.3, Common Mistakes).<br><b>A</b> is wrong: Playwright reads any text a person could see.<br><b>B</b> is wrong: Nothing is wrong with the API.<br><b>C</b> is wrong: Strict mode applies to actions and assertions on locators; this one fails with Received: false.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">Why does the HQ's Playwright config say <code class="inline">workers: 1</code>?</div><div class="opts"><div class="opt correct">A) All tests share one real API whose data each test resets and changes; two at once would get in each other's way</div><div class="opt">B) Chromium opens one tab at a time</div><div class="opt">C) One worker is faster</div><div class="opt">D) Playwright's free version allows one worker</div></div><div class="why"><b>Why:</b> A reset in one worker would wipe data another worker's test is using. With one shared server the HQ keeps tests in a line, resets before each and cleans up after the last (globalTeardown). Big teams give each worker its own server or account instead.<br><b>B</b> is wrong: Chromium can run many pages and contexts.<br><b>C</b> is wrong: More workers are usually faster; safety is the reason.<br><b>D</b> is wrong: Playwright is free and open source in full.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">After a CSS change, every light-theme axe test passes and every dark-theme one fails with color-contrast. Which is true?</div><div class="opts"><div class="opt">A) axe is unreliable in dark mode; remove those tests</div><div class="opt">B) tsc or oxlint would have caught it too</div><div class="opt correct">C) Some text in dark mode really is too faint; only a real browser computing the dark colors could find it</div><div class="opt">D) A Vitest test in jsdom would have shown it</div></div><div class="why"><b>Why:</b> Colors are computed by a real browser from your CSS and the color scheme; jsdom computes none, and neither type checker nor linter reads colors. Lab 9.3 shows the same split: the starter's dark --muted fails only the dark scan.<br><b>A</b> is wrong: The tests found a real problem.<br><b>B</b> is wrong: Neither tool reads CSS colors.<br><b>D</b> is wrong: jsdom has no layout and computes no colors.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">New rule: a photo bigger than 5 MB is refused with the API's message. Where does its test belong?</div><div class="opts"><div class="opt">A) An end-to-end test uploading a real 6 MB photo</div><div class="opt">B) An axe scan of the impact report page</div><div class="opt correct">C) A component test with an MSW override that answers 413</div><div class="opt">D) A unit test of the API's core only</div></div><div class="why"><b>Why:</b> Rare error answers are what the component level is for: an override causes the 413 in milliseconds, and the test checks what the person sees. The end-to-end level keeps one good journey with one good photo (Lesson 9.3, What to Test Where).<br><b>A</b> is wrong: Slow, and a big file in the repository for an edge case the level below covers.<br><b>B</b> is wrong: axe checks accessibility, not upload rules.<br><b>D</b> is wrong: That proves the API refuses; not that the HQ shows the message.</div></div>
+  <div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">What does the check-in test's <code class="inline">page.reload()</code> prove that Lesson 9.2's tests could not?</div><div class="opts"><div class="opt correct">The mark came back from the REAL server after the page and its cache were thrown away: the API really saved it</div></div><div class="why"><b>Why:</b> Lesson 9.2's mock API lives inside the test run; a reload in a real browser throws away the page, the cache and the session's memory, so whatever shows afterwards came from shoreline-api itself.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">A learner's first e2e run prints this. What do they run?</div><pre class="code">  ✘  1 e2e/plan.spec.ts:13:1 › an organizer plans a cleanup and finds it in the list (35ms)
+...
+    Error: browserType.launch: Executable doesn't exist at ~/.cache/ms-playwright/chromium_headless_shell-1254/chrome-headless-shell-linux64/chrome-headless-shell</pre><div class="opts"><div class="opt correct"><code class="inline">npx playwright install chromium</code>: the npm package is Playwright's code; the browser is a separate download</div></div><div class="why"><b>Why:</b> About 330 MB, stored once per computer in Playwright's cache folder, not in the project. On Linux, npx playwright install-deps chromium adds missing system libraries; in CI, --with-deps does both (Lesson 10.2).</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output is real: the labs run exactly as <code class="inline">labs/check_labs.py</code> runs them (Node 24, a learner's terminal, a fresh copy of the lab folder; Lab 9.3 with Playwright's Chromium and the lab's own server on port 4322). Test-runner times are left out.</p>
+<div class="blk lab"><div class="h">Lab 9.2: labs/module-22/l9_2-interactions-and-async/starter → solution</div>
+<p>As shipped:</p>
+<pre class="out"> Test Files  1 failed (1)
+      Tests  2 failed (2)</pre><p>The solution's <code class="inline">src/SignUpForm.test.tsx</code> (the first block is given):</p>
+<pre class="code"><span class="k">import</span> { render, screen } <span class="k">from</span> <span class="s">'@testing-library/react'</span>
+<span class="k">import</span> userEvent <span class="k">from</span> <span class="s">'@testing-library/user-event'</span>
+<span class="k">import</span> { http, HttpResponse } <span class="k">from</span> <span class="s">'msw'</span>
+<span class="k">import</span> { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } <span class="k">from</span> <span class="s">'vitest'</span>
+<span class="k">import</span> { SignUpForm } <span class="k">from</span> <span class="s">'./SignUpForm.tsx'</span>
+<span class="k">import</span> { api, API_URL, recordRequests, server, <span class="k">type</span> ApiErrorBody } <span class="k">from</span> <span class="s">'./test/server.ts'</span>
+
+<span class="c">// Given (do not change): the mock API starts once, is fresh for every test, and fails on unanswered requests</span>
+beforeAll(() =&gt; server.listen({ onUnhandledFrame: <span class="s">'error'</span> }))
+beforeEach(() =&gt; api.reset())
+afterEach(() =&gt; {
+  server.resetHandlers()
+  server.events.removeAllListeners()
+})
+afterAll(() =&gt; server.close())
+
+<span class="c">/** The form for Weekend Cove Cleanup, and a user who types and clicks like a person */</span>
+<span class="k">function</span> renderForm() {
+  <span class="k">const</span> user = userEvent.setup()
+  render(&lt;SignUpForm apiUrl={API_URL} eventId=<span class="s">"e08"</span> /&gt;)
+  <span class="k">return</span> { user }
+}
+
+describe(<span class="s">'SignUpForm'</span>, () =&gt; {
+  it(<span class="s">'shows the spots left once the API answers'</span>, <span class="k">async</span> () =&gt; {
+    renderForm()
+    expect(screen.getByText(<span class="s">'Checking the spots…'</span>)).toBeInTheDocument()
+    expect(<span class="k">await</span> screen.findByText(<span class="s">'6 spots left'</span>)).toBeInTheDocument()
+  })
+
+  it(<span class="s">'signs a volunteer up and counts the spot'</span>, <span class="k">async</span> () =&gt; {
+    <span class="k">const</span> { user } = renderForm()
+    <span class="k">await</span> user.type(screen.getByLabelText(<span class="s">'Your name'</span>), <span class="s">'Diego Herrera'</span>)
+    <span class="k">await</span> user.click(screen.getByRole(<span class="s">'button'</span>, { name: <span class="s">'Sign up'</span> }))
+
+    expect(<span class="k">await</span> screen.findByText(<span class="s">'You are on the list, Diego Herrera.'</span>)).toBeInTheDocument()
+    expect(screen.getByText(<span class="s">'5 spots left'</span>)).toBeInTheDocument()
+    expect(api.signups).toEqual([<span class="s">'Diego Herrera'</span>])
+  })
+
+  it(<span class="s">'works with the keyboard alone'</span>, <span class="k">async</span> () =&gt; {
+    <span class="k">const</span> { user } = renderForm()
+    <span class="k">await</span> user.tab()
+    expect(screen.getByLabelText(<span class="s">'Your name'</span>)).toHaveFocus()
+    <span class="k">await</span> user.keyboard(<span class="s">'Ana Lima{Enter}'</span>)
+    expect(<span class="k">await</span> screen.findByText(<span class="s">'You are on the list, Ana Lima.'</span>)).toBeInTheDocument()
+  })
+})
+
+describe(<span class="s">'SignUpForm when something is wrong'</span>, () =&gt; {
+  it(<span class="s">'asks for a name and sends nothing'</span>, <span class="k">async</span> () =&gt; {
+    <span class="k">const</span> { user } = renderForm()
+    <span class="k">await</span> screen.findByText(<span class="s">'6 spots left'</span>)
+    <span class="k">const</span> requests = recordRequests()
+
+    <span class="k">await</span> user.click(screen.getByRole(<span class="s">'button'</span>, { name: <span class="s">'Sign up'</span> }))
+
+    expect(screen.getByText(<span class="s">'Add your name.'</span>)).toBeInTheDocument()
+    expect(screen.getByLabelText(<span class="s">'Your name'</span>)).toHaveAttribute(<span class="s">'aria-invalid'</span>, <span class="s">'true'</span>)
+    expect(requests).toEqual([])
+  })
+
+  it(<span class="s">'shows the API message when the cleanup is full'</span>, <span class="k">async</span> () =&gt; {
+    api.fill()
+    <span class="k">const</span> { user } = renderForm()
+    <span class="k">await</span> user.type(screen.getByLabelText(<span class="s">'Your name'</span>), <span class="s">'Diego Herrera'</span>)
+    <span class="k">await</span> user.click(screen.getByRole(<span class="s">'button'</span>, { name: <span class="s">'Sign up'</span> }))
+
+    expect(<span class="k">await</span> screen.findByRole(<span class="s">'alert'</span>)).toHaveTextContent(<span class="s">'This cleanup is full.'</span>)
+    expect(api.signups).toEqual([])
+  })
+
+  it(<span class="s">'says what went wrong when the server fails'</span>, <span class="k">async</span> () =&gt; {
+    server.use(
+      http.post(<span class="s">`${API_URL}/api/events/:eventId/signups`</span>, () =&gt;
+        HttpResponse.json({ error: <span class="s">'server_error'</span>, message: <span class="s">'The crew database is asleep.'</span> } <span class="k">satisfies</span> ApiErrorBody, {
+          status: <span class="s">500</span>,
+        }),
+      ),
+    )
+    <span class="k">const</span> { user } = renderForm()
+    <span class="k">await</span> user.type(screen.getByLabelText(<span class="s">'Your name'</span>), <span class="s">'Diego Herrera'</span>)
+    <span class="k">await</span> user.click(screen.getByRole(<span class="s">'button'</span>, { name: <span class="s">'Sign up'</span> }))
+
+    expect(<span class="k">await</span> screen.findByRole(<span class="s">'alert'</span>)).toHaveTextContent(<span class="s">'The crew database is asleep.'</span>)
+    expect(screen.getByRole(<span class="s">'button'</span>, { name: <span class="s">'Sign up'</span> })).toBeEnabled()
+  })
+})</pre><p><code class="inline">npm test</code> (and <code class="inline">npm run typecheck</code> prints nothing after its two <code class="inline">&gt;</code> lines):</p>
+<pre class="out"> Test Files  1 passed (1)
+      Tests  6 passed (6)</pre><p>Accept other names and values. What must be there: <code class="inline">userEvent.setup()</code> before render and <code class="inline">await</code> on every action; findBy for the spots and for anything after a click that needs the API; <code class="inline">recordRequests()</code> started after the page loaded; the full cleanup through <code class="inline">api.fill()</code> (the real 409), not an override; the 500 override typed with <code class="inline">satisfies ApiErrorBody</code>.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 9.2 Task 3: the planted bugs</div>
+<p><code class="inline">debug_SignUpForm.tsx</code> checks the name only AFTER sending, and shows a generic message instead of the API's. With the solution's tests:</p>
+<pre class="out">× asks for a name and sends nothing
+× shows the API message when the cleanup is full
+× says what went wrong when the server fails
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)</pre><p>Three tests fail: "sends nothing" (the request log has the POST), "the cleanup is full" (the API's message is gone) and "the server fails" (the override's message is gone). A learner whose suite misses the first one checked only the screen: the message still appears.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 9.3: labs/module-22/l9_3-end-to-end-and-accessibility-tests/starter → solution</div>
+<p>As shipped, two TODO tests fail (<code class="inline">2 failed</code>). The solution's specs and helper:</p>
+<pre class="code"><span class="k">import</span> { expect, test } <span class="k">from</span> <span class="s">'@playwright/test'</span>
+
+test(<span class="s">'a visitor finds a beach by searching'</span>, <span class="k">async</span> ({ page }) =&gt; {
+  <span class="k">await</span> page.goto(<span class="s">'/'</span>)
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'heading'</span>, { level: <span class="s">1</span>, name: <span class="s">'Beach sites'</span> })).toBeVisible()
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'status'</span>)).toHaveText(<span class="s">'Found 6 sites.'</span>)
+
+  <span class="k">await</span> page.getByLabel(<span class="s">'Search sites'</span>).fill(<span class="s">'cove'</span>)
+  <span class="c">// A web-first assertion keeps checking through the search's 300 ms pause</span>
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'status'</span>)).toHaveText(<span class="s">'Found 2 sites.'</span>)
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'listitem'</span>)).toHaveText([/^Driftwood Cove/, /^Seal Rock Cove/])
+  <span class="k">await</span> expect(page).toHaveURL(/\?q=cove$/)
+})
+
+test(<span class="s">'the search survives a reload'</span>, <span class="k">async</span> ({ page }) =&gt; {
+  <span class="k">await</span> page.goto(<span class="s">'/?q=harbor'</span>)
+  <span class="k">await</span> expect(page.getByLabel(<span class="s">'Search sites'</span>)).toHaveValue(<span class="s">'harbor'</span>)
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'status'</span>)).toHaveText(<span class="s">'Found 2 sites.'</span>)
+  <span class="k">await</span> page.reload()
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'listitem'</span>)).toHaveCount(<span class="s">2</span>)
+})
+
+test(<span class="s">'Clear the search shows every site and puts the focus back'</span>, <span class="k">async</span> ({ page }) =&gt; {
+  <span class="k">await</span> page.goto(<span class="s">'/?q=jetty'</span>)
+  <span class="k">const</span> clear = page.getByRole(<span class="s">'button'</span>, { name: <span class="s">'Clear the search'</span> })
+  <span class="k">await</span> expect(clear).toBeVisible()
+  <span class="k">await</span> clear.click()
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'status'</span>)).toHaveText(<span class="s">'Found 6 sites.'</span>)
+  <span class="k">await</span> expect(page.getByLabel(<span class="s">'Search sites'</span>)).toBeFocused()
+})</pre><pre class="code"><span class="k">import</span> AxeBuilder <span class="k">from</span> <span class="s">'@axe-core/playwright'</span>
+<span class="k">import</span> { expect, <span class="k">type</span> Page } <span class="k">from</span> <span class="s">'@playwright/test'</span>
+
+<span class="c">/** Run axe (WCAG 2.0 to 2.2, A and AA) on the page as it is now; fail with one readable line per problem */</span>
+<span class="k">export</span> <span class="k">async</span> <span class="k">function</span> expectNoAxeViolations(page: Page): Promise&lt;<span class="k">void</span>&gt; {
+  <span class="k">const</span> results = <span class="k">await</span> <span class="k">new</span> AxeBuilder({ page })
+    .withTags([<span class="s">'wcag2a'</span>, <span class="s">'wcag2aa'</span>, <span class="s">'wcag21a'</span>, <span class="s">'wcag21aa'</span>, <span class="s">'wcag22aa'</span>])
+    .analyze()
+  <span class="k">const</span> problems = results.violations.map(
+    (violation) =&gt; <span class="s">`${violation.id}: ${violation.help} (${violation.nodes.length})`</span>,
+  )
+  expect(problems).toEqual([])
+}</pre><pre class="code"><span class="k">import</span> { expect, test } <span class="k">from</span> <span class="s">'@playwright/test'</span>
+<span class="k">import</span> { expectNoAxeViolations } <span class="k">from</span> <span class="s">'./helpers.ts'</span>
+
+<span class="k">for</span> (<span class="k">const</span> colorScheme <span class="k">of</span> [<span class="s">'light'</span>, <span class="s">'dark'</span>] <span class="k">as</span> <span class="k">const</span>) {
+  test.describe(<span class="s">`${colorScheme} theme`</span>, () =&gt; {
+    test.use({ colorScheme })
+
+    test(<span class="s">'the beach sites page has no axe violations'</span>, <span class="k">async</span> ({ page }) =&gt; {
+      <span class="k">await</span> page.goto(<span class="s">'/?q=cove'</span>)
+      <span class="c">// Scan the page with its results, not before the script has run</span>
+      <span class="k">await</span> expect(page.getByRole(<span class="s">'status'</span>)).toHaveText(<span class="s">'Found 2 sites.'</span>)
+      <span class="k">await</span> expectNoAxeViolations(page)
+    })
+  })
+}</pre><p>The two fixes in <code class="inline">site/</code>: <code class="inline">aria-label="Clear the search"</code> on the icon button in <code class="inline">index.html</code>, and the dark theme's <code class="inline">--muted: #a9b4c0</code> in <code class="inline">styles.css</code>. Then <code class="inline">npm run test:e2e</code>:</p>
+<pre class="out">Running 5 tests using 1 worker
+  ✓  1 e2e/a11y.spec.ts:8:5 › light theme › the beach sites page has no axe violations
+  ✓  2 e2e/a11y.spec.ts:8:5 › dark theme › the beach sites page has no axe violations
+  ✓  3 e2e/sites.spec.ts:3:1 › a visitor finds a beach by searching
+  ✓  4 e2e/sites.spec.ts:15:1 › the search survives a reload
+  ✓  5 e2e/sites.spec.ts:23:1 › Clear the search shows every site and puts the focus back
+  5 passed</pre><p>The solution's tests on the starter's page (both bugs): the light scan names <code class="inline">button-name</code>, the dark scan both rules, and the Clear journey cannot find its button:</p>
+<pre class="out">+   "button-name: Buttons must have discernible text (1)",
++   "button-name: Buttons must have discernible text (1)",
++   "color-contrast: Elements must meet minimum color contrast ratio thresholds (3)",</pre><p>With only the starter's <code class="inline">styles.css</code> put back, only the dark scan fails:</p>
+<pre class="out">Running 2 tests using 1 worker
+  ✓  1 e2e/a11y.spec.ts:8:5 › light theme › the beach sites page has no axe violations
+  ✘  2 e2e/a11y.spec.ts:8:5 › dark theme › the beach sites page has no axe violations
+  1 failed
+  1 passed</pre><p><code class="inline">npm run typecheck</code> prints nothing after its two <code class="inline">&gt;</code> lines: the e2e files are typed for Node (no DOM library), like the HQ's tsconfig.node.json.</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 9.2 · Interactions and Async</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="9.2">
+  <li><b>B</b> Each action returns a Promise that resolves once its events have fired and React has updated the page: Each action fires a chain of events and lets React finish its updates in between. Its Promise resolves when that is done, so the next line checks the page after the click, not before it.</li>
+  <li><b>D</b> await screen.findByLabelText('Title (5 to 80 characters)'): The page appears only after the loader has fetched the cleanup and the sites. findByLabelText keeps looking (up to a second by default) and resolves when the field is there.</li>
+  <li><b>A</b> The API's own answer again, because server.resetHandlers() runs after every test: setup.ts calls server.resetHandlers() after every test, which removes the overrides and leaves only the API's own handlers, so the next test talks to the real rules again.</li>
+  <li><b>C</b> A child loader could ask the API for data before the guard sends the guest away, while the page still looks right: With the guard call removed from editEventLoader, the guest is still redirected, so the page looks right, but the loader has already asked the API for the cleanup and the sites. Only the request list shows it.</li>
+  <li><b>D</b> The app's cache is still retrying with pauses when findByRole gives up after one second: The app's query client retries a failed request twice with a pause before each try, so the error message is still on its way when findByRole gives up after its default one second.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 9.3 · End-to-End and Accessibility Tests</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="9.3">
+  <li><b>C</b> isVisible() checks once, while the search is still waiting; a web-first assertion would keep checking: isVisible checks once, at that instant, and the search is still in its 300 ms pause. await expect(locator).toBeVisible() keeps checking until the text appears or the timeout ends.</li>
+  <li><b>A</b> All tests share one real API whose data each test resets and changes, so two at once would get in each other's way: All tests share one shoreline-api, and each test resets its data first. Two tests at once would reset or change the data the other one is using, so they run one after another.</li>
+  <li><b>D</b> Some text in dark mode really is too faint, and only a real browser rendering the dark theme could find it: Only a real browser computes the colors each theme produces. In dark mode the text no longer has enough contrast with its background, which is a real problem for people using dark mode, and only the dark scan can see it.</li>
+  <li><b>B</b> A component test with an MSW override that answers 413: It is an error case on one screen: a component test with an MSW override answering 413 (as in Lesson 9.2) checks the message quickly and reliably. End-to-end tests are kept for the main journeys.</li>
+  <li><b>A</b> The mark came back from the real server after the page and its cache were thrown away, so the API really saved it: A reload empties the page and the query cache, so the pressed button that comes back was loaded from shoreline-api. That shows the real server saved the mark, which no in-memory test can show.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Warm-up and Exit Ticket</h2><span class="rule"></span></div>
+<p>The warm-up's answers are in the Facilitator Guide.</p>
+<ol class="steps">
+  <li><b>The API's own code:</b> the tests follow the real rules, status codes and messages, and cannot drift from the API; hand-written answers can.</li>
+  <li><b>Only in a real browser:</b> a real photo upload, CSS colors (dark-mode contrast), layout and overflow, a reload against the real server, the production build itself (any one).</li>
+  <li><b>Where it goes:</b> many cases → unit; one screen, including errors and what must not happen → component with MSW; only works when everything is real together → one end-to-end test for the main path.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 B.</b> Thinks the click waits for the network. Show the missing-await message, then where findBy comes in.</li>
+  <li><b>Q2 A.</b> Has not seen the first-load placeholder. Print <code class="inline">screen.debug()</code> right after renderApp.</li>
+  <li><b>Q3 A.</b> Expects a visible symptom. The point of the request log is the invisible half of a rule.</li>
+  <li><b>Q7 C.</b> Mixes up strict mode and timing. Strict mode errors say "resolved to N elements".</li>
+  <li><b>Q9 A or D.</b> Blames the tool or overestimates jsdom. Run Lab 9.3's dark-only failure.</li>
+  <li><b>Q10 A.</b> Wants every rule end-to-end. Ask what the test costs and what it can see.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 22 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

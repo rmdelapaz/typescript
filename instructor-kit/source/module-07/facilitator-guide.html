@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 7</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 7: Forms and Actions</h1>
+    <p class="sub">How to teach Lesson 3.5: controlled and uncontrolled inputs, React 19's form actions and the reset after every action, FormData read safely without as, useActionState with a typed state union and isPending, and messages people (and screen readers) understand. Two demos, a lab on a volunteer sign-up sheet, and the Plan a cleanup form built together, with its checks shown agreeing with the API's own answer.</p>
+    <div class="meta-row">
+      <span class="chip"><b>1</b> lesson</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lesson <b>3.5</b></span>
+      <span class="chip">Session <b>7</b> of 26 · Part 1</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Session 7 teaches ONE lesson, 3.5, in the usual rhythm: frame → live demo (in two parts) → guided lab (new practice, never the lesson's own project) → the lesson's own project, which gets most of the second half: the "Plan a cleanup" form is long, and typing it together is the best way to see every piece fail on purpose.</li>
+  <li>Type, do not paste. Every command below was run to produce the output printed under it, in a learner's terminal on a copy of the app at the end of Lesson 3.5 (Scratch snippets and the lesson's breaks) or at its start; the API answer comes from a private copy of shoreline-api. Where the lesson shows the same command, the kit's output is the lesson's, word for word. Browser behavior (the reset, the select quirk, the crash) is the lesson's own measurement: show it live in the browser.</li>
+  <li>Keep <code class="inline">lesson_11.html</code> open for the controlled/uncontrolled table, the message table and the version note on selects. Labs live in <code class="inline">labs/module-07/</code>.</li>
+  <li>Teal blocks are hands-on, amber blocks are watch-outs. Session 8 (Lesson 3.6 and the Part 1 project kickoff) follows; this form is the last big piece of Part 1's code.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 7: the project's two long files</div>
+<p><code class="inline">src/utils/eventForm.ts</code> (about 110 lines) and <code class="inline">NewEventForm.tsx</code> (about 140) are the longest files learners have typed so far, and a typo in a field name or a missing <code class="inline">name</code> attribute fails SILENTLY: the form says "Add a title." for a title they typed. <b>In the room:</b> type Step 1's types first and say why (<code class="inline">EventField</code> turns a misspelled name into a compile error); type the form one field at a time and submit after the first two fields, so a mistake shows up early. Anyone more than one step behind copies the step's file from <code class="inline">lesson-11-end</code> and keeps following: understanding the reset and the select key matters more than typing every line. <b>After:</b> Step 5's "break it" list is the self-test.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Code:</b> learners arrive with <code class="inline">shoreline-hq</code> after Lesson 3.4 (search and filters). Bring <code class="inline">lesson-11-start.zip</code> and <code class="inline">lesson-11-end.zip</code> on a USB stick.</li>
+  <li>☐ <b>Files to hand out:</b> <code class="inline">labs/module-07/</code> without <code class="inline">solution/</code> (one lab, three tasks). Same packages as the other React labs.</li>
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-07</code> (4 runs): the starter fails three tests (one crashes exactly like the lesson's <code class="inline">as string</code> demo) while its type check is SILENT (that is the point of Task 1), the solution passes both.</li>
+  <li>☐ <b>Projector machine:</b> API and dev server running, a third terminal; the browser on http://localhost:5173/events/new with the Console open (the <code class="inline">as string</code> crash is a console message), Chrome's device toolbar ready for the phone check.</li>
+  <li>☐ <b>Board:</b> the sign-up sheet and the clipboard; the action's journey (press Publish → FormData → your action → editing or ready → re-render → reset); the three places that check (browser · form · API, the API is the authority).</li>
+</ul>
+<div class="blk warn"><div class="h">Known traps in this session</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>The form says "Add a title." for a title that was typed</td><td>The field has no <code class="inline">name</code>, or a different one</td><td>Check the name first (<code class="inline">fieldProps</code> sets it from <code class="inline">EventField</code>).</td></tr>
+<tr><td>Every field is empty after a submit with mistakes</td><td>No <code class="inline">defaultValue</code> from the submitted values</td><td><code class="inline">defaultValue: values[field]</code> (Exercise 2).</td></tr>
+<tr><td>The site menu jumps back to "Choose a site"</td><td>React 19.3 reads a select's defaultValue only when it creates it</td><td><code class="inline">key={values.siteId}</code> on the select (the version note).</td></tr>
+<tr><td>Console: <code class="inline">Cannot read properties of null (reading 'trim')</code></td><td><code class="inline">formData.get('...') as string</code> with a misspelled name</td><td>Narrow with <code class="inline">typeof value === 'string'</code>.</td></tr>
+<tr><td><code class="inline">No overload matches this call</code> on useActionState</td><td>The action's parameters swapped</td><td><code class="inline">(previous, formData)</code>.</td></tr>
+<tr><td>Chrome's bubble "Value must be less than or equal to 200." and no messages</td><td><code class="inline">noValidate</code> missing</td><td><code class="inline">&lt;form action={formAction} noValidate&gt;</code>.</td></tr>
+<tr><td>A Clear or Show details button submits the form</td><td>A <code class="inline">&lt;button&gt;</code> without a type inside a form is a submit button</td><td><code class="inline">type="button"</code>.</td></tr>
+<tr><td>/events/new shows the events list</td><td>App's CurrentPage checks <code class="inline">/events</code> before <code class="inline">/events/new</code></td><td><code class="inline">/events/new</code> first (Step 4).</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 7 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up: Lessons 3.3 and 3.4, retrieved</td><td>Three questions on Session 6 (useState's types, the 0 trap, where state lives), on paper, then out loud.</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>3.5</b> Frame and mental model</td><td>The sign-up sheet and the clipboard: uncontrolled and controlled; the three places that check.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">25</td><td><b>3.5</b> Live demo: actions and FormData</td><td>Controlled vs uncontrolled, action={fn} and the reset, FormDataEntryValue | null, what as string hides, onSubmit for old code.</td></tr>
+      <tr><td class="t">0:45</td><td class="t">20</td><td><b>3.5</b> Guided lab: Tasks 1 and 2</td><td><code class="inline">labs/module-07/l3_5-forms-and-actions/starter</code>: readSignup without as, validateSignup in the fieldErrors shape.</td></tr>
+      <tr><td class="t">1:05</td><td class="t">15</td><td><b>3.5</b> Live demo: useActionState</td><td>Results as typed state, the parameter order (TS2769), isPending, messages people understand, the API's 400.</td></tr>
+      <tr><td class="t">1:20</td><td class="t">10</td><td>Break</td><td>Learners start both servers; anyone behind opens lesson-11-start.</td></tr>
+      <tr><td class="t">1:30</td><td class="t">45</td><td><b>3.5</b> Start the lesson project: Steps 1 to 3</td><td>Together: eventForm.ts (types, readValues, validateEvent, toNewEvent), FieldError, NewEventForm.</td></tr>
+      <tr><td class="t">2:15</td><td class="t">15</td><td><b>3.5</b> Project Steps 4 and 5</td><td>The page, the link, the styles; Publish with mistakes, a good one, Enter for a draft; two breaks; the build.</td></tr>
+      <tr><td class="t">2:30</td><td class="t">20</td><td><b>3.5</b> Guided lab: Task 3</td><td>SignupForm keeps what was typed and points each field at its message.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 8 (Part 1 project kickoff).</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson page estimates 140 minutes for a learner working alone; the room has 160 after the warm-up, the break and the wrap-up, and spends them on the two ideas that are hard alone (the reset after every action, and typed FormData) and on typing the project together with a submit after every few fields. The lesson's Exercises 1 to 3, quiz and journal go home.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> Whatever is left of the project (most rooms finish Step 5's first two breaks; the phone and keyboard checks and the checklist go home); the lesson's Exercise 1 (QuickNotes: which Hook and why) and Exercise 2 (delete <code class="inline">defaultValue</code> and explain what happens); Exercise 3 (supplies as checkboxes with <code class="inline">getAll</code>) as a stretch; Lab 3.5's stretch (isPending); the Quick Quiz and the journal; the "your own project" paragraph (a form's Values type, result union and three messages for the learner's own app): it feeds the Part 1 project that starts in Session 8.</p>
+<p><b>Protect, in this order:</b> the reset (both demos show it), typed FormData, Project Steps 1 to 3, the lab's Task 1. <b>Cut first:</b> the onSubmit step (it is old code; the lesson explains it), then the API's 400 in demo 2 (keep the form's own output), then the lab's Task 3 (home).</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up: Lessons 3.3 and 3.4, Retrieved</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">The three questions (put them on the slide)</div>
+<ol class="steps">
+  <li>What does tsc say about <code class="inline">useState([])</code> here, and what is the fix? (real output below) <b>Answer:</b> the state is <code class="inline">never[]</code>, so adding <code class="inline">'e08'</code> is "not assignable to type 'never'"; <code class="inline">useState&lt;string[]&gt;([])</code>.</li>
+  <li>Even with that fixed, what does the button show before anything is saved? <b>Answer:</b> a 0 (the 0 trap): <code class="inline">saved.length &gt; 0 &amp;&amp; ...</code>.</li>
+  <li>The search box and the lists are siblings inside EventsPage. Where does the query live? <b>Answer:</b> in EventsPage, the closest common parent; everything else is derived.</li>
+</ol>
+<pre class="code"><span class="k">import</span> { useState } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="k">export</span> <span class="k">function</span> SavedList() {
+  <span class="k">const</span> [saved, setSaved] = useState([])
+  <span class="k">return</span> (
+    &lt;button <span class="k">type</span>=<span class="s">"button"</span> onClick={() =&gt; setSaved([...saved, <span class="s">'e08'</span>])}&gt;
+      {saved.length &amp;&amp; &lt;span&gt;{saved.length} saved&lt;/span&gt;}
+    &lt;/button&gt;
+  )
+}</pre>
+<pre class="out">src/Scratch.tsx:6:52 - error TS2322: Type 'string' is not assignable to type 'never'.
+
+6     &lt;button type="button" onClick={() =&gt; setSaved([...saved, 'e08'])}&gt;
+                                                     ~~~~~~~~
+
+src/Scratch.tsx:6:62 - error TS2322: Type 'string' is not assignable to type 'never'.
+
+6     &lt;button type="button" onClick={() =&gt; setSaved([...saved, 'e08'])}&gt;
+                                                               ~~~~~
+
+
+Found 2 errors in the same file, starting at: src/Scratch.tsx:6</pre></div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">3.5</span><h3>Forms and Actions</h3><span class="dur">160 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Explain the difference between controlled and uncontrolled inputs, and choose the right one for a field</li>
+  <li>Pass a function to a form's action and read the submitted FormData safely, narrowing FormDataEntryValue | null without as</li>
+  <li>Use useActionState to turn each submit into typed state, and isPending to show that a submit is in progress</li>
+  <li>Keep what people typed when a submit fails, and know why React resets a form after an action</li>
+  <li>Write field messages that say how to fix the problem, and connect them to their fields with aria-invalid and aria-describedby</li>
+  <li>Build the HQ's "Plan a cleanup" form, with checks that agree with the API's own rules</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the sign-up sheet and the clipboard; three places that check</td></tr>
+<tr><td class="t">25m</td><td>Live demo 1: controlled vs uncontrolled, action and the reset, typed FormData, as string, onSubmit</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: <code class="inline">l3_5-forms-and-actions/starter</code>, Tasks 1 and 2</td></tr>
+<tr><td class="t">15m</td><td>Live demo 2: useActionState, the parameter order, isPending, messages, the API's answer</td></tr>
+<tr><td class="t">60m</td><td>Lesson project together: Steps 1 to 5</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: Task 3</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>From the lesson: "A controlled input is the organizer's clipboard from Lesson 3.4: every change goes through the organizer, who always knows what it says. An uncontrolled form is a paper sign-up sheet on the welcome table. People write on it by themselves, and the organizer only reads it when the sheet is handed in. Both work; you would not use a clipboard for forty volunteers writing at once, and you would not use a sign-up sheet for a live head count."</p>
+<p>Then the one fact that explains half of today's surprises, written on the board: <b>after an action, React resets the form</b>: every uncontrolled field goes back to its defaultValue. Keep pointing at it: the emptied note, the emptied email, the defaultValue in fieldProps, the select's key.</p>
+<p>And the frame for the messages: three places check a cleanup (the browser's attributes, your form's checks, the API), and only the API is the authority: front-end checks are for people, never for security.</p>
+</div>
+<div class="blk"><div class="h">Live demo 1: actions and FormData (you type, they follow)</div>
+<ol class="steps">
+  <li><b>Controlled, once more (4m).</b> The lesson's MeetingPointField: state holds the text, the count updates on every keystroke. "Your code knows the value at every moment." <code class="inline">npx tsc -b</code>: silent.
+<pre class="code"><span class="k">import</span> { useState } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="c">// Controlled: React state holds the text, and the input shows the state</span>
+<span class="k">export</span> <span class="k">function</span> MeetingPointField() {
+  <span class="k">const</span> [meetingPoint, setMeetingPoint] = useState(<span class="s">''</span>)
+
+  <span class="k">return</span> (
+    &lt;div className=<span class="s">"field"</span>&gt;
+      &lt;label htmlFor=<span class="s">"meeting-point"</span>&gt;Meeting point&lt;/label&gt;
+      &lt;input
+        id=<span class="s">"meeting-point"</span>
+        value={meetingPoint}
+        onChange={(event) =&gt; setMeetingPoint(event.target.value)}
+      /&gt;
+      &lt;p&gt;{meetingPoint.length} <span class="k">of</span> <span class="s">120</span> characters&lt;/p&gt;
+    &lt;/div&gt;
+  )
+}</pre></li>
+  <li><b>Uncontrolled, with an action (5m).</b> The lesson's CrewNote: a <code class="inline">name</code>, a <code class="inline">defaultValue</code>, <code class="inline">action={saveNote}</code> and no state for the text. Type Bring sunscreen, press Save note: the line updates and the field empties itself. "React collected the FormData, stopped the page load, called your function, and RESET the form." The table: who holds the value, what you write, when you read it.</li>
+  <li><b>What formData.get really returns (5m).</b> The lesson's readTitle with <code class="inline">const title: string = formData.get('title')</code>:
+<pre class="out">src/Scratch.tsx:2:9 - error TS2322: Type 'FormDataEntryValue | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+2   const title: string = formData.get('title')
+          ~~~~~
+
+
+Found 1 error in src/Scratch.tsx:2</pre>
+"A string, a File (file inputs, Lesson 8.2) or null (no such field)." Then the narrowing helper from the project, <code class="inline">typeof value === 'string' ? value.trim() : ''</code>.</li>
+  <li><b>What as string hides (5m).</b> The lesson's TitleForm with <code class="inline">formData.get('titel') as string</code>. Run both tools: the kit ran them, <code class="inline">npx tsc -b</code> silent and <code class="inline">npm run lint</code> "Found 0 warnings and 0 errors.". Then in the browser, type a title and press Save; the console shows the lesson's card:
+<pre class="out">Uncaught TypeError: Cannot read properties of null (reading 'trim')</pre>
+"as string is a promise TypeScript cannot check." Lab 3.5's Task 1 is this exact bug.</li>
+  <li><b>The way old code does it (3m).</b> The lesson's CrewNoteClassic: <code class="inline">onSubmit</code>, <code class="inline">SubmitEvent&lt;HTMLFormElement&gt;</code>, <code class="inline">preventDefault()</code>, <code class="inline">new FormData(event.currentTarget)</code>. Still fine (it compiles; the kit checked), and you will meet it everywhere. Differences: no reset, no pending state, more code. FormEvent is deprecated in @types/react 19.3 (Lesson 3.4's FAQ).</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>A field without a name.</b> FormData only collects named fields; the form reports the field as empty. Coach: "Open the Elements panel: does the input have a name?" Neither tool can see it.</li>
+  <li><b><code class="inline">as string</code> on form data.</b> Turns a type error into a crash. Coach: "What are the three things get can return?" Self-check Q2 and Q3, Lab Task 1.</li>
+  <li><b>The action's parameters swapped.</b> A very long TS2769. Coach: "Read it from the bottom: what is your formData parameter receiving?" Self-check Q4.</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>Folder:</b> <code class="inline">labs/module-07/l3_5-forms-and-actions/starter/</code> (task sheet <code class="inline">labs/module-07/l3_5-forms-and-actions/TASKS.md</code>); reference <code class="inline">labs/module-07/l3_5-forms-and-actions/solution/</code>. A volunteer sign-up sheet for one cleanup (name, email, shirt size, note): Task 1 reads FormData without <code class="inline">as</code>, Task 2 writes the messages in the API's fieldErrors shape, Task 3 (after the project) builds the form with <code class="inline">useActionState</code>. Pure functions first, so Tasks 1 and 2 need no browser at all.</p>
+<ul class="tick">
+  <li><b>As shipped (2m):</b> <code class="inline">npm install</code>, <code class="inline">npm test</code>: three of six fail, one with the lesson's crash. Then <code class="inline">npm run typecheck</code>: SILENT. "That is what <code class="inline">as string</code> buys you."</li>
+</ul>
+<pre class="out">   ✓ Task 1: every field is read as trimmed text
+   × Task 1: a missing field reads as empty text instead of crashing
+   ✓ Task 2: a good sheet has nothing to fix
+   × Task 2: one message per problem, under the right field
+   × Task 3: a submit with mistakes keeps what was typed and points each field at its message
+   ✓ Task 3: a good sheet says thank you and empties the form
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)</pre><ul class="tick">
+  <li><b>Task 1 in pairs (7m):</b> one <code class="inline">readText</code> helper with <code class="inline">typeof value === 'string'</code>, used for all four fields.</li>
+  <li><b>Task 2 (9m):</b> the four rules with the exact messages from the TODO; <code class="inline">isShirtSize</code> for the size (no <code class="inline">as</code>). Circulate for messages that blame ("Invalid email!") and for a check that returns <code class="inline">{ email: 'Enter...' }</code> instead of a list.</li>
+  <li><b>Debrief (2m):</b> "Why does the starter's type check pass?" (<code class="inline">as</code> told TypeScript to stop checking). "Why a list of messages per field?" (the API's shape: a field can have several).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Live demo 2: useActionState and messages</div>
+<ol class="steps">
+  <li><b>useActionState: results become state (5m).</b> The lesson's WaitingList: <code class="inline">useActionState(joinWaitingList, { kind: 'idle' })</code> → <code class="inline">[state, formAction]</code>; the action gets the previous state, then the FormData; the state is a union on <code class="inline">kind</code>. Hover the three names. Type maya, press the button: the message appears AND the field is empty (the reset). "Retyping one email is fine; retyping a whole cleanup is not."</li>
+  <li><b>The parameters in the wrong order (3m).</b> Swap them and read the long message from the bottom:
+<pre class="out">src/Scratch.tsx:18:46 - error TS2769: No overload matches this call.
+  …
+Type '{ kind: "idle"; }' is missing the following properties from type 'FormData': append, delete, get, getAll, and 7 more.</pre>
+"No overload matches this call" = none of the Hook's signatures fit.</li>
+  <li><b>isPending (2m).</b> The lesson's BagCountForm: an async action that waits a second; <code class="inline">disabled={isPending}</code> and "Saving…". "You never wrote useState(false) for it."</li>
+  <li><b>Three places that check, and the API's answer (5m).</b> The lesson's diagram (browser → form → API), then the proof that the form agrees with the API. The project's mistakes ("Dune", North Jetty, 09:00 to 08:00, 12 volunteers, no date, no meeting point) through the form's own <code class="inline">validateEvent</code>:
+<pre class="out">{
+  "title": [
+    "Use at least 5 characters for the title."
+  ],
+  "date": [
+    "Pick a date."
+  ],
+  "endTime": [
+    "The end time must be after the start time."
+  ],
+  "meetingPoint": [
+    "Say where volunteers meet (at least 3 characters)."
+  ]
+}</pre>
+and through shoreline-api itself (a POST as an organizer: the API is the authority, because anyone can send it anything):<pre class="out">HTTP/1.1 400 Bad Request
+content-type: application/json; charset=utf-8
+
+{
+  "error": "validation_failed",
+  "message": "Some fields need attention.",
+  "fieldErrors": {
+    "title": [
+      "Use at least 5 characters for the title."
+    ],
+    "date": [
+      "Enter a date as YYYY-MM-DD."
+    ],
+    "endTime": [
+      "The end time must be after the start time."
+    ],
+    "meetingPoint": [
+      "Say where volunteers meet (at least 3 characters)."
+    ]
+  }
+}</pre>Same four fields, same shape; the empty date is the one message reworded for people ("Pick a date."). Then the lesson's wording table and the accessibility trio: <code class="inline">aria-invalid</code>, <code class="inline">aria-describedby</code>, not color alone.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Start the lesson project: Plan a Cleanup</div>
+<p>Steps 1 to 5 together (60 minutes). Type the types first, submit after every few fields, and let the room predict what each break does.</p>
+<ol class="steps">
+  <li><b>Step 1: types for the form, and reading it (12m).</b> <code class="inline">EventField</code> (the eight names, spelled like NewEvent), <code class="inline">EventFormValues</code> (all text, so the form can show it back), <code class="inline">FieldErrors</code> (the API's fieldErrors with checked keys), <code class="inline">readText</code> and <code class="inline">readValues</code>; then <code class="inline">toDateString</code> in format.ts. <code class="inline">npx tsc -b</code> is silent on the start-of-lesson code with just these two files.
+<div class="codefile">shoreline-hq/src/utils/eventForm.ts</div>
+<pre class="code" data-src="shoreline-hq/src/utils/eventForm.ts" data-stage="lesson_11" data-match="excerpt"><span class="k">export</span> <span class="k">type</span> EventField =
+  | <span class="s">'title'</span>
+  | <span class="s">'siteId'</span>
+  | <span class="s">'date'</span>
+  | <span class="s">'startTime'</span>
+  | <span class="s">'endTime'</span>
+  | <span class="s">'capacity'</span>
+  | <span class="s">'meetingPoint'</span>
+  | <span class="s">'description'</span>
+
+<span class="c">// What the person typed, as text, so the form can show it again</span>
+<span class="k">export</span> <span class="k">type</span> EventFormValues = Record&lt;EventField, <span class="k">string</span>&gt;
+
+<span class="c">// The API's fieldErrors shape (field name: messages), with names TypeScript can check</span>
+<span class="k">export</span> <span class="k">type</span> FieldErrors = Partial&lt;Record&lt;EventField, <span class="k">string</span>[]&gt;&gt;</pre></li>
+  <li><b>Step 2: the checks (12m).</b> <code class="inline">validateEvent(values, today)</code> with the API's rules and messages that say how to fix the problem; <code class="inline">toNewEvent</code> returns the API's NewEvent, so TypeScript checks every property. Leave out <code class="inline">meetingPoint</code> on the projector:
+<pre class="out">src/utils/eventForm.ts:96:3 - error TS2741: Property 'meetingPoint' is missing in type '{ title: string; siteId: string; date: string; startTime: string; endTime: string; capacity: number; description: string; status: "draft" | "scheduled"; }' but required in type 'NewEvent'.
+Found 1 error in src/utils/eventForm.ts:96</pre>
+Put it back. "Module 8 replaces these hand-written checks with one Zod schema; today shows what such libraries do for you."</li>
+  <li><b>Step 3: FieldError and NewEventForm (16m).</b> FieldError first (<code class="inline">messages: string[] | undefined</code>, required). Then the form: the FormState union, <code class="inline">planCleanup</code> outside the component, <code class="inline">useActionState</code>, values and errors from the state, <code class="inline">fieldProps</code>, the always-present status line, <code class="inline">noValidate</code>, the select's key, two submit buttons named status.
+<div class="codefile">shoreline-hq/src/components/NewEventForm.tsx</div>
+<pre class="code" data-src="shoreline-hq/src/components/NewEventForm.tsx" data-stage="lesson_11" data-match="excerpt"><span class="k">function</span> planCleanup(_previous: FormState, formData: FormData): FormState {
+  <span class="k">const</span> values = readValues(formData)
+  <span class="k">const</span> errors = validateEvent(values, toDateString(<span class="k">new</span> Date()))
+  <span class="k">if</span> (Object.keys(errors).length &gt; <span class="s">0</span>) {
+    <span class="k">return</span> { kind: <span class="s">'editing'</span>, values, errors }
+  }
+  <span class="c">// The button that submitted the form sends its own name and value</span>
+  <span class="k">const</span> status = formData.get(<span class="s">'status'</span>) === <span class="s">'scheduled'</span> ? <span class="s">'scheduled'</span> : <span class="s">'draft'</span>
+  <span class="k">return</span> { kind: <span class="s">'ready'</span>, event: toNewEvent(values, status) }</pre></li>
+  <li><b>Step 4: a page, a way in, and styles (8m).</b> NewEventPage, <code class="inline">/events/new</code> FIRST in CurrentPage, the Plan a cleanup link, the <code class="inline">--error</code> token with its dark value, the form rules.</li>
+  <li><b>Step 5: try it, check it, break it (12m).</b> Publish with the lesson's mistakes ("Dune", North Jetty, 09:00 to 08:00, 12): four messages, everything kept. Then a good one: the status line says what would be saved. Enter in the meeting point: "as a draft." Then the two breaks: <code class="inline">fieldProps('titel')</code> and the select without its key.
+<pre class="out">src/components/NewEventForm.tsx:66:45 - error TS2345: Argument of type '"titel"' is not assignable to parameter of type 'EventField'.
+
+66           &lt;input type="text" {...fieldProps('titel')} /&gt;
+                                               ~~~~~~~
+
+
+Found 1 error in src/components/NewEventForm.tsx:66</pre>
+The second break passes <code class="inline">npx tsc -b</code> (the kit ran it: silent): the browser shows the site menu back at "Choose a site". Put the key back; <code class="inline">npx tsc -b</code>, <code class="inline">npm run lint</code>, <code class="inline">npm run build</code> (41 modules).</li>
+</ol>
+<figure class="shot"><img src="../../../images/lesson_11/11-form-errors.png" alt="The Plan a cleanup page after pressing Publish. The title field still says Dune and is outlined in red, with the message Use at least 5 characters for the title. under it. Beach site keeps North Jetty. Date is empty with Pick a date. The start time says 09:00, the end time 08:00 with The end time must be after the start time. Volunteers needed keeps 12. The empty meeting point says Say where volunteers meet (at least 3 characters)."><figcaption>After a submit with mistakes, every field keeps what was typed, and each problem has a message right under its field that says how to fix it.</figcaption></figure><p><b>Done in the room</b> = /events/new keeps what was typed after a submit with mistakes, shows a message under each field, and says "Ready to save" for a good one; the checks pass. <b>Goes home:</b> the phone and keyboard checks, the checklist, the "your own project" paragraph. This is the code Session 8 restyles with CSS Modules: the finished version is <code class="inline">lesson-11-end</code>.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab: Task 3</div>
+<p><b>Task 3 (20m), in pairs:</b> <code class="inline">SignupForm</code> keeps what was typed (<code class="inline">defaultValue</code> from the state and a key on the select) and connects each field to its message (<code class="inline">aria-invalid</code>, <code class="inline">aria-describedby</code>, an <code class="inline">id</code> on the message). It is the project's <code class="inline">fieldProps</code> idea on a new form, so learners who copied the project's form without understanding it get stuck here: that is the point. Expected when everything is done:</p>
+<pre class="out"> ✓ src/lab.test.tsx (6 tests)
+   ✓ Task 1: every field is read as trimmed text
+   ✓ Task 1: a missing field reads as empty text instead of crashing
+   ✓ Task 2: a good sheet has nothing to fix
+   ✓ Task 2: one message per problem, under the right field
+   ✓ Task 3: a submit with mistakes keeps what was typed and points each field at its message
+   ✓ Task 3: a good sheet says thank you and empties the form
+ Test Files  1 passed (1)
+      Tests  6 passed (6)</pre></div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these out loud:</p>
+<ul class="tick">
+  <li>What does React do to a form after an action finishes? <b>Answer:</b> resets it: uncontrolled fields go back to their defaultValue.</li>
+  <li>What can <code class="inline">formData.get('title')</code> return? <b>Answer:</b> a string, a File, or null.</li>
+  <li>In which order does an action for useActionState get its arguments? <b>Answer:</b> the previous state, then the FormData.</li>
+  <li>Why does the API check everything again? <b>Answer:</b> anyone can send it a request without the form; it never trusts what arrives.</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q12:</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">C) The description, when a live "N of 2000 characters" count sits under it</span>; <b>Q2</b> <span data-sc="2">A) typeof value === 'string' ? value.trim() : '' (narrow it)</span>; <b>Q3</b> <span data-sc="3">Both tools pass it; the action crashes in the browser: <code class="inline">Uncaught TypeError: Cannot read properties of null (reading 'trim')</code></span>; <b>Q4</b> <span data-sc="4">B) The action's parameters are in the wrong order: previous state first, then the FormData</span>; <b>Q5</b> <span data-sc="5">D) The messages appear, and every field is empty again: React resets the form after every action</span>; <b>Q6</b> <span data-sc="6">A) formData.get('status') holds the value of the button that submitted the form</span>; <b>Q7</b> <span data-sc="7">Every spread property is still type-checked against what the element accepts: aria-invalid takes a boolean or "true"/"false" (and grammar, spelling), not 'yes'</span>; <b>Q8</b> <span data-sc="8">B) Chrome blocks the submit and shows its own bubble; the action never runs</span>; <b>Q9</b> <span data-sc="9">B) So that in Lesson 7.2 the API's answer can be shown with the same FieldError component, field by field</span>; <b>Q10</b> <span data-sc="10">D) aria-invalid="true" on the field and aria-describedby pointing at the message's id</span>; <b>Q11</b> <span data-sc="11">fieldProps takes an EventField, a union of the eight field names, so a misspelled name is not a valid argument (TS2345)</span>; <b>Q12</b> <span data-sc="12">C) isPending, the third value of useActionState: true until the action's promise settles</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> the action's journey as a numbered card (1 press → 2 FormData → 3 your action → 4 editing or ready → 5 re-render → 6 reset → 7 defaultValue puts the typed values back). Learners who lose the thread in Step 3 copy <code class="inline">NewEventForm.tsx</code> from <code class="inline">lesson-11-end</code> and annotate each block with the card's numbers.</p>
+<p><b>Stretch:</b> Lab 3.5's stretch (an async action and <code class="inline">isPending</code>); the lesson's Exercise 3 (supplies with <code class="inline">getAll</code> and <code class="inline">defaultChecked</code>) and the Bonus Challenge (a live character count in a form that resets).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<ol class="steps">
+  <li>Why does a field lose its text after a submit with mistakes, and what puts it back? <b>Answer:</b> React resets the form after every action; <code class="inline">defaultValue</code> from the submitted values (kept in the action's state).</li>
+  <li>Write the safe way to read a text field from FormData. <b>Answer:</b> <code class="inline">const value = formData.get('title'); return typeof value === 'string' ? value.trim() : ''</code>.</li>
+  <li>Name the two attributes that connect a field to its message. <b>Answer:</b> <code class="inline">aria-invalid</code> and <code class="inline">aria-describedby</code> (pointing at the message's id).</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish the lesson project</b> (Step 5's checks, the completion checklist) and write the "your own project" paragraph: your app's most important form, its Values type, its result union and three messages that help.</li>
+  <li><b>Lesson exercises:</b> Exercise 1 (QuickNotes: which Hook, and why not useActionState?) and Exercise 2 (delete defaultValue and explain); Exercise 3 is a stretch.</li>
+  <li><b>The Quick Quiz</b> and the workbook's self-check Q1 to Q12 and predict items P1 to P3.</li>
+  <li><b>Lab 3.5:</b> Task 3 if not finished, then the stretch.</li>
+  <li><b>Journal:</b> the lesson's prompt (one press of Publish with mistakes, start to finish; then rewrite the worst error message you have seen).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 8</div>
+<ul class="tick">
+  <li><code class="inline">shoreline-hq</code> at the end of Lesson 3.5 (the Plan a cleanup form working), or <code class="inline">lesson-12-start</code> from the course downloads.</li>
+  <li>Session 8 is Lesson 3.6 (CSS Modules, focus styles, an accessibility check) and the Part 1 project kickoff: bring your own-project notes from Lessons 3.2 to 3.5 (a type, a card tree, a status union, a state list, a form).</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the reset, typed FormData, Project Steps 1 to 3, the lab's Task 1.</li>
+  <li><b>Cut first (saves 3m):</b> the onSubmit step.</li>
+  <li><b>Cut second (saves 5m):</b> the API's answer in demo 2 (show the form's output and the lesson's table).</li>
+  <li><b>Cut third (saves 20m):</b> the lab's Task 3 goes home.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>Exercise 2 live: delete <code class="inline">defaultValue</code>, submit with mistakes, and let the room explain why every field is empty while the messages still show.</li>
+  <li>Exercise 3 together: supplies as checkboxes with <code class="inline">getAll</code> and <code class="inline">defaultChecked</code>; why only the select needed a key.</li>
+  <li>Predict-then-check P1 to P3 on the projector.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 7 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

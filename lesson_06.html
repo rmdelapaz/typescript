@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Bring real data into Shoreline Crew HQ safely: share types between files with export and import type, check unknown API data with type predicates, build types from types with utility types, read the tsconfig Vite writes, add noUncheckedIndexedAccess and type your first .env variable. React + TypeScript: Build a Modern Web App Lesson 2.4.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Typing Real Data - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>🌊 Lesson 2.4: Typing Real Data</h1>
+                <p class="lead">Until now every value TypeScript checked was one you typed yourself. Real apps live on data that arrives from somewhere else: an API, a form, a settings file. TypeScript cannot see that data before it arrives, so today you build the door it comes through. You will share types between files instead of copying them, give Shoreline Crew HQ the API's real types, read the settings Vite chose for your project line by line, and write the client that fetches cleanups from shoreline-api and refuses anything that does not match. By the end, the HQ holds its first real data, and every line of it has been checked.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Share types between files with <code>export</code> and <code>import type</code>, and explain what <code>verbatimModuleSyntax</code> asks of you</li>
+                        <li>Write type predicates (<code>value is EventStatus</code>) that turn <code>unknown</code> data into checked, typed data</li>
+                        <li>Build new types from existing ones with <code>Pick</code>, <code>Omit</code>, <code>Partial</code> and <code>Record</code>, and read them in the API's real types</li>
+                        <li>Read every line of the <code>tsconfig</code> files Vite created, and switch on <code>noUncheckedIndexedAccess</code></li>
+                        <li>Configure and type an environment variable (<code>VITE_API_URL</code>) and explain why front-end variables are never secret</li>
+                        <li>Fetch cleanups from shoreline-api through a reusable, generic, checked client</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 155 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_05.html">Lesson 2.3: Functions and Generics</a> (your <code>ts-lab</code> with <code>shapes.ts</code> and <code>functions.ts</code>)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> Shoreline Crew HQ's data layer: the API's types in <code>src/api/types.ts</code>, a typed <code>.env</code> setting, and <code>src/api/client.ts</code>, which fetches cleanups and checks them before the app uses them</li>
+                    <li><span class="meta-label">🧩 Stack</span> TypeScript 7.0, Vite 8.3, Node.js 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> VS Code with your <code>shoreline</code> folder open; a terminal in <code>ts-lab</code> for the first half, then shoreline-api and the HQ's dev server in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-06-start.zip">lesson-06-start.zip</a> · Finished code: <a href="downloads/lesson-06-end.zip">lesson-06-end.zip</a>. Each folder has a README with the commands to run it. The finished code adds <code>src/api/</code>, <code>src/vite-env.d.ts</code> and <code>.env.example</code> to <code>shoreline-hq</code>; copy <code>.env.example</code> to <code>.env.local</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#modules" class="toc-link">Modules: One Definition, Shared</a></li>
+                        <li><a href="#type-predicates" class="toc-link">Checking Data at the Door</a></li>
+                        <li><a href="#utility-types" class="toc-link">Utility Types: Types from Types</a></li>
+                        <li><a href="#tsconfig" class="toc-link">The tsconfig Vite Wrote</a></li>
+                        <li><a href="#env" class="toc-link">Environment Variables</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The HQ Meets Its Data</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="modules" class="lesson-section">
+                <h2>📦 Modules: One Definition, Shared</h2>
+                <p>In Lesson 2.3 you copied <code>CleanupEvent</code> and <code>Volunteer</code> from <code>shapes.ts</code> into <code>functions.ts</code>. Copies drift: fix a property in one file, forget the other, and the two files quietly disagree about what a cleanup is. JavaScript already has the cure, and you have used it from the other side: <code>import</code> and <code>export</code>. Every file in <code>ts-lab</code> is a <strong>module</strong> (the <code>moduleDetection</code> setting from Lesson 2.1), and a module shares only what it exports.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: one roster on the board</h4>
+                    <p>On cleanup day the crew pins one roster to the board at the meeting point. Team leads read it; nobody keeps a private copy that goes stale when someone signs up late. A type that is exported once and imported everywhere is that roster: change it in one place, and every file that reads it sees the change, with TypeScript pointing at any code the change breaks.</p>
+                </div>
+
+                <h3>Export from shapes.ts</h3>
+                <p>Open <code>ts-lab/shapes.ts</code> and put <code>export</code> in front of every type and interface (<code>Terrain</code>, <code>EventStatus</code>, <code>Site</code>, <code>CleanupEvent</code>, <code>CleanupEventDetail</code>, <code>Volunteer</code>, <code>LoadState</code>), and update the comment on line 1:</p>
+                <div class="code-file">
+                    <div class="code-filename">ts-lab/shapes.ts</div>
+                    <pre data-src="ts-lab/shapes.ts" data-match="excerpt"><code class="language-ts">// Shoreline Crew data shapes (Lesson 2.2): a first draft of the API's types, exported in Lesson 2.4
+
+// Unions of literal types: exactly one of these words
+export type Terrain = 'sand' | 'rocky' | 'marsh' | 'mixed'
+export type EventStatus = 'draft' | 'scheduled' | 'completed' | 'cancelled'
+
+export interface Site {
+  id: string
+  name: string
+  town: string
+  terrain: Terrain
+  accessible: boolean
+  image: { url: string; alt: string; width: number; height: number }
+}
+
+export interface CleanupEvent {
+// ...
+export interface CleanupEventDetail extends CleanupEvent {
+// ...
+export interface Volunteer {
+// ...
+export type LoadState =
+// ...</code></pre>
+                </div>
+
+                <h3>Import into functions.ts</h3>
+                <p>In <code>ts-lab/functions.ts</code>, delete the copied <code>EventStatus</code>, <code>CleanupEvent</code> and <code>Volunteer</code> (and the comment above them) and import the two types the file actually uses:</p>
+                <div class="code-file">
+                    <div class="code-filename">ts-lab/functions.ts</div>
+                    <pre data-src="ts-lab/functions.ts" data-match="excerpt"><code class="language-ts">// Shoreline Crew functions (Lesson 2.3): typed functions, function types and generics
+
+// The types come from shapes.ts (Lesson 2.4): one definition, shared
+import type { CleanupEvent, Volunteer } from './shapes.ts'
+
+const events: CleanupEvent[] = [
+// ...</code></pre>
+                </div>
+                <pre class="terminal"><code class="language-bash">npm run check
+node functions.ts</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node functions.ts, the first lines)</h4>
+                    <pre><code>All cleanups:
+- Weekend Cove Cleanup: full
+- Boardwalk and Mudflats: 1 spot left
+...</code></pre>
+                </div>
+                <p>The check is silent and the program prints the same twenty lines as before, now with one definition of each type. Three details in that import line matter:</p>
+                <ul>
+                    <li><strong><code>import type</code></strong> says "only types come from here". Types disappear before the code runs (Lesson 1.1), so Node removes the whole line: <code>shapes.ts</code> never runs, and its eight lines of output do not appear.</li>
+                    <li><strong><code>'./shapes.ts'</code></strong> keeps the <code>.ts</code> extension. Node runs your files as they are, so the path must name the real file. (The HQ's own <code>main.tsx</code> imports <code>./App.tsx</code> the same way.)</li>
+                    <li>The names are in braces: these are <strong>named exports</strong>. <code>App.tsx</code> uses the other kind, <code>export default App</code>, imported without braces. The course uses named exports for everything it adds, because a named import must use the real name and your editor can rename it everywhere at once.</li>
+                </ul>
+
+                <h3>What happens without <code>type</code></h3>
+                <p>Change <code>import type {</code> to <code>import {</code> and run <code>npm run check</code>:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+functions.ts:4:10 - error TS1484: 'CleanupEvent' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.
+
+4 import { CleanupEvent, Volunteer } from './shapes.ts'
+           ~~~~~~~~~~~~
+
+functions.ts:4:24 - error TS1484: 'Volunteer' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.
+
+4 import { CleanupEvent, Volunteer } from './shapes.ts'
+                         ~~~~~~~~~
+
+functions.ts:4:41 - error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.
+
+4 import { CleanupEvent, Volunteer } from './shapes.ts'
+                                          ~~~~~~~~~~~~~
+
+
+Found 3 errors in the same file, starting at: functions.ts:4</code></pre>
+                </div>
+                <p>Two questions. <strong>TS1484</strong> comes from <code>verbatimModuleSyntax</code>, a setting both your <code>ts-lab</code> and the HQ have: imports stay exactly as you write them, so anything that is only a type must say <code>import type</code>, and the tools that strip types know they can delete it. <strong>TS5097</strong> says that importing <em>values</em> from a <code>.ts</code> path needs a setting <code>ts-lab</code> does not have (the HQ has it; you will read it in a moment). Now run <code>node functions.ts</code> anyway:</p>
+                <div class="card card-output">
+                    <h4>Expected output (node functions.ts)</h4>
+                    <pre><code>file:///Users/you/shoreline/ts-lab/functions.ts:4
+import { CleanupEvent, Volunteer } from './shapes.ts'
+         ^^^^^^^^^^^^
+SyntaxError: The requested module './shapes.ts' does not provide an export named 'CleanupEvent'
+...</code></pre>
+                </div>
+                <p>That is the reason for TS1484. Node stripped the types out of <code>shapes.ts</code>, so at run time there is no <code>CleanupEvent</code> to import, and a plain <code>import</code> asks for one. The check caught a crash before it happened. Put <code>type</code> back.</p>
+            </section>
+
+            <section id="type-predicates" class="lesson-section">
+                <h2>🚪 Checking Data at the Door: Type Predicates</h2>
+                <p>In Lesson 2.1 you learned the rule: outside data is <code>unknown</code> until checked. In Lesson 2.2 you checked an object's properties by hand. Real code needs those checks again and again, so they belong in functions. There is a catch, and it is the subject of this section. Put this in <code>scratch.ts</code> (it imports from your <code>shapes.ts</code>) and run <code>npm run check</code>:</p>
+                <pre data-snippet><code class="language-ts">import type { EventStatus } from './shapes.ts'
+
+const eventStatuses: EventStatus[] = ['draft', 'scheduled', 'completed', 'cancelled']
+
+function isEventStatus(value: unknown): boolean {
+  return eventStatuses.some((status) =&gt; status === value)
+}
+
+function describeStatus(value: unknown): string {
+  if (isEventStatus(value)) {
+    return `a status: ${value.toUpperCase()}`
+  }
+  return `not a status: ${String(value)}`
+}
+
+for (const text of ['"scheduled"', '"finished"', '42']) {
+  console.log(describeStatus(JSON.parse(text)))
+}
+console.log(['draft', 'finished', 'scheduled'].filter(isEventStatus))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:11:25 - error TS18046: 'value' is of type 'unknown'.
+
+11     return `a status: ${value.toUpperCase()}`
+                           ~~~~~
+
+
+Found 1 error in scratch.ts:11</code></pre>
+                </div>
+                <p><code>isEventStatus</code> does its job at run time, yet inside the <code>if</code>, <code>value</code> is still <code>unknown</code>. A function that returns <code>boolean</code> tells TypeScript "yes or no", but not what "yes" <em>means</em>. TypeScript does not read function bodies to find out.</p>
+
+                <h3>A type predicate says what "true" means</h3>
+                <p>Change only the return type to <code>value is EventStatus</code>:</p>
+                <pre data-snippet><code class="language-ts">function isEventStatus(value: unknown): value is EventStatus {</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts; npm run check is silent)</h4>
+                    <pre><code>a status: SCHEDULED
+not a status: finished
+not a status: 42
+[ 'draft', 'scheduled' ]</code></pre>
+                </div>
+                <p>A return type of the form <code>parameter is Type</code> is a <strong>type predicate</strong>. The function still returns a boolean, and the predicate adds a promise: "when I return <code>true</code>, the argument is an <code>EventStatus</code>". A function with one is called a <strong>type guard</strong>, and TypeScript narrows with it exactly like with <code>typeof</code>:</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_06/06-hover-predicate.png" alt="The TypeScript Playground editor showing isEventStatus(value: unknown): value is EventStatus and a describeStatus function. Inside if (isEventStatus(value)), a hover pop-up over value in value.toUpperCase() reads: (parameter) value: EventStatus." width="900" height="290" loading="lazy">
+                    <figcaption>Inside <code>if (isEventStatus(value))</code>, the same <code>value</code> that came in as <code>unknown</code> is an <code>EventStatus</code>: the type predicate told TypeScript what a <code>true</code> answer means. VS Code shows the same pop-up.</figcaption>
+                </figure>
+                <p>Look at the last line of output too. <code>['draft', 'finished', 'scheduled'].filter(isEventStatus)</code> kept the real statuses, and its type is <code>EventStatus[]</code>, not <code>string[]</code>. Remember the <code>find</code> overload with <code>value is S</code> from Lesson 2.3? <code>filter</code> has one too: pass a type guard and the result is narrowed as well. The <code>'finished'</code> is a nod to Lesson 1.2, where the API rejected <code>?status=finished</code>: now the HQ can reject it as well.</p>
+
+                <h3>Guarding an object</h3>
+                <p>Most API data is objects. A guard for an object first proves it <em>is</em> an object, then checks each property it promises. The first step is so common that it gets its own small guard:</p>
+                <pre data-snippet><code class="language-ts">import type { Volunteer } from './shapes.ts'
+
+// An object (not null, not an array), so its properties can be read
+function isRecord(value: unknown): value is Record&lt;string, unknown&gt; {
+  return typeof value === 'object' &amp;&amp; value !== null &amp;&amp; !Array.isArray(value)
+}
+
+function isVolunteer(value: unknown): value is Volunteer {
+  return (
+    isRecord(value) &amp;&amp;
+    typeof value.id === 'string' &amp;&amp;
+    typeof value.name === 'string' &amp;&amp;
+    (typeof value.phone === 'string' || value.phone === null)
+  )
+}
+
+const replies = [
+  '{ "id": "v03", "name": "Hannah Becker", "phone": null }',
+  '{ "id": "v04", "name": "Theo Nakamura" }',
+  '[ "v05", "Amara Diallo" ]',
+]
+for (const text of replies) {
+  const data: unknown = JSON.parse(text)
+  if (isVolunteer(data)) {
+    console.log(`${data.name}: ${data.phone ?? 'no phone on file'}`)
+  } else {
+    console.log(`Rejected: ${text}`)
+  }
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts; npm run check is silent)</h4>
+                    <pre><code>Hannah Becker: no phone on file
+Rejected: { "id": "v04", "name": "Theo Nakamura" }
+Rejected: [ "v05", "Amara Diallo" ]</code></pre>
+                </div>
+                <ul>
+                    <li><code>isRecord</code> narrows <code>unknown</code> to <code>Record&lt;string, unknown&gt;</code>: "an object whose properties you may read, each of them still unknown". (<code>Record</code> is one of the utility types in the next section.) Arrays are objects too, so it rules them out.</li>
+                    <li>After <code>isRecord(value) &amp;&amp;</code>, every <code>typeof value.x</code> check narrows one more property. Chaining with <code>&amp;&amp;</code> means the first failed check stops the rest.</li>
+                    <li>Theo's reply has no <code>phone</code> at all, and it is rejected: a missing property is <code>undefined</code>, which is neither a <code>string</code> nor <code>null</code>. The type said <code>string | null</code>, and the guard holds the data to it.</li>
+                </ul>
+                <div class="mermaid">
+graph TD
+    A["JSON from outside"] --> B["unknown"]
+    B --> C{"type guard: true?"}
+    C -->|yes| D["typed: Volunteer"]
+    C -->|no| E["reject: never used"]
+                </div>
+                <div class="card card-danger">
+                    <h4>🛑 A type predicate is a promise TypeScript cannot check</h4>
+                    <p>TypeScript trusts the body of a type guard completely. A guard that returns <code>value !== undefined</code> while promising <code>value is number</code> compiles without a word, and every value that passes it is "a number" to TypeScript, even the string <code>'twelve'</code>. So a guard deserves the same care as the code that uses it: check every property the type promises, and test it with good and bad data, as the three replies above do. Module 8 hands this job to Zod, which writes the checks and the type from one description.</p>
+                </div>
+            </section>
+
+            <section id="utility-types" class="lesson-section">
+                <h2>🧰 Utility Types: Types from Types</h2>
+                <p>Apps need many variations of one type. The volunteers list shows only a name and a phone. A "new cleanup" form sends everything except the id and the sign-up count, which the API decides. An edit sends whatever changed. Writing each variation by hand brings back the copying you just removed. Instead, TypeScript ships generic types that build new types from old ones, called <strong>utility types</strong>. You know enough generics from Lesson 2.3 to read them:</p>
+                <pre data-snippet><code class="language-ts">import type { CleanupEvent, EventStatus, Volunteer } from './shapes.ts'
+
+// Pick: only these properties
+type Contact = Pick&lt;Volunteer, 'name' | 'phone'&gt;
+// Omit: every property except these
+type EventDraft = Omit&lt;CleanupEvent, 'id' | 'spotsTaken'&gt;
+// Partial: every property optional
+type EventEdit = Partial&lt;CleanupEvent&gt;
+// Record: an object with exactly these keys, each holding this type
+type StatusCounts = Record&lt;EventStatus, number&gt;
+
+const hannah: Contact = { name: 'Hannah Becker', phone: null }
+const draft: EventDraft = {
+  title: 'Harbor Kayak Cleanup',
+  siteId: 'north-jetty',
+  status: 'draft',
+  startTime: '09:00',
+  capacity: 8,
+}
+const edit: EventEdit = { capacity: 10 }
+const counts: StatusCounts = { draft: 2, scheduled: 8, completed: 6, cancelled: 1 }
+
+console.log(hannah.name, draft.title, edit.capacity, counts.scheduled)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts; npm run check is silent)</h4>
+                    <pre><code>Hannah Becker Harbor Kayak Cleanup 10 8</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Utility type</th><th>Gives you</th><th>Shoreline example</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>Pick&lt;T, Keys&gt;</code></td><td>only the listed properties</td><td>a contact line: <code>Pick&lt;Volunteer, 'name' | 'phone'&gt;</code></td></tr>
+                            <tr><td><code>Omit&lt;T, Keys&gt;</code></td><td>every property except the listed ones</td><td>what a form sends: no <code>id</code>, no <code>spotsTaken</code></td></tr>
+                            <tr><td><code>Partial&lt;T&gt;</code></td><td>every property optional</td><td>an edit: send only what changed</td></tr>
+                            <tr><td><code>Record&lt;Keys, V&gt;</code></td><td>an object with exactly those keys, each a <code>V</code></td><td>a count for every status</td></tr>
+                            <tr><td><code>Required&lt;T&gt;</code>, <code>Readonly&lt;T&gt;</code></td><td>every property required / read-only</td><td>less common; you will recognize them</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The <code>Keys</code> are a union of property names, and they are checked: <code>Pick&lt;Volunteer, 'phon'&gt;</code> is an error. The new types are checked like any other. Add these three lines at the end of the example:</p>
+                <pre data-snippet><code class="language-ts">const theo: Contact = { id: 'v04', name: 'Theo Nakamura', phone: null }
+const bigger: EventEdit = { capacity: '20' }
+const lastYear: StatusCounts = { draft: 0, scheduled: 0, completed: 9 }</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:25:25 - error TS2353: Object literal may only specify known properties, and 'id' does not exist in type 'Contact'.
+
+25 const theo: Contact = { id: 'v04', name: 'Theo Nakamura', phone: null }
+                           ~~
+
+scratch.ts:26:29 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+26 const bigger: EventEdit = { capacity: '20' }
+                               ~~~~~~~~
+
+  shapes.ts:22:3 - The expected type comes from property 'capacity' which is declared here on type 'Partial&lt;CleanupEvent&gt;'
+    22   capacity: number
+         ~~~~~~~~
+
+scratch.ts:27:7 - error TS2741: Property 'cancelled' is missing in type '{ draft: number; scheduled: number; completed: number; }' but required in type 'StatusCounts'.
+
+27 const lastYear: StatusCounts = { draft: 0, scheduled: 0, completed: 9 }
+         ~~~~~~~~
+
+
+Found 3 errors in the same file, starting at: scratch.ts:25</code></pre>
+                </div>
+                <p>A <code>Contact</code> has no <code>id</code> (TS2353, Lesson 2.2's extra property). <code>Partial</code> made <code>capacity</code> optional, not looser: if it is there, it is a number, and the follow-up line shows TypeScript tracing the property back to <code>shapes.ts</code>. And a <code>Record</code> over a union insists on every key, so a year without cancellations still needs <code>cancelled: 0</code>. That last property makes <code>Record</code> a favorite for lookup tables: Lesson 3.3 uses one to give every status a label, and adding a fifth status later makes TypeScript list every table that needs it.</p>
+            </section>
+
+            <section id="tsconfig" class="lesson-section">
+                <h2>⚙️ The tsconfig Vite Wrote</h2>
+                <p>Lesson 1.2 promised a full reading of the HQ's TypeScript settings. Vite's template splits them over three files, because the project holds two kinds of code that run in different places:</p>
+                <div class="mermaid">
+graph TD
+    R["tsconfig.json"] --> A["tsconfig.app.json"]
+    R --> N["tsconfig.node.json"]
+    A --> S["src: runs in the browser"]
+    N --> V["vite.config.ts: runs in Node"]
+                </div>
+                <p><code>tsconfig.json</code> holds no settings of its own: <code>"files": []</code> and two <code>references</code>. That is what <code>tsc -b</code> ("build mode") follows: it checks each referenced project with its own settings. <code>tsconfig.node.json</code> covers <code>vite.config.ts</code> with Node's types (<code>"types": ["node"]</code>, no DOM). The one you will live in is <code>tsconfig.app.json</code>, as Vite created it:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/tsconfig.app.json</div>
+                    <pre data-src="shoreline-hq/tsconfig.app.json" data-stage="start"><code class="language-json">{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "types": ["vite/client"],
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Setting</th><th>What it means for you</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>tsBuildInfoFile</code></td><td>where <code>tsc -b</code> keeps notes, so it can skip files that have not changed</td></tr>
+                            <tr><td><code>target</code>, <code>lib</code></td><td>which JavaScript you write (ES2023) and which built-in objects exist: the language's, plus the browser's <code>DOM</code> (<code>document</code>, <code>fetch</code>)</td></tr>
+                            <tr><td><code>module</code></td><td><code>import</code>/<code>export</code> stay as modern modules; Vite handles them</td></tr>
+                            <tr><td><code>types</code></td><td>global types to load: <code>vite/client</code> describes Vite's extras, such as <code>import.meta.env</code> (next section)</td></tr>
+                            <tr><td><code>allowArbitraryExtensions</code></td><td>lets you import other file types when a matching declaration file describes them</td></tr>
+                            <tr><td><code>skipLibCheck</code></td><td>do not re-check the declaration files inside <code>node_modules</code> (faster; their authors did)</td></tr>
+                            <tr><td><code>moduleResolution: "bundler"</code></td><td>find imports the way Vite does, including packages' <code>exports</code> maps</td></tr>
+                            <tr><td><code>allowImportingTsExtensions</code></td><td>imports may name <code>.ts</code>/<code>.tsx</code> files (the TS5097 from earlier; allowed because of <code>noEmit</code>)</td></tr>
+                            <tr><td><code>verbatimModuleSyntax</code></td><td>imports stay as written, so type-only imports must say <code>import type</code> (TS1484)</td></tr>
+                            <tr><td><code>moduleDetection: "force"</code></td><td>every file is a module (Lesson 2.1)</td></tr>
+                            <tr><td><code>noEmit</code></td><td>TypeScript only checks; Vite turns your code into what the browser runs</td></tr>
+                            <tr><td><code>jsx: "react-jsx"</code></td><td>TSX becomes React function calls without an <code>import React</code> in every file (Module 3)</td></tr>
+                            <tr><td><code>noUnusedLocals</code>, <code>noUnusedParameters</code></td><td>unused variables and parameters are errors (TS6133, Lesson 1.2)</td></tr>
+                            <tr><td><code>erasableSyntaxOnly</code></td><td>only TypeScript that can simply be deleted: no <code>enum</code> or <code>namespace</code> (TS1294, Lesson 2.2)</td></tr>
+                            <tr><td><code>noFallthroughCasesInSwitch</code></td><td>a <code>case</code> that runs into the next one without <code>break</code> or <code>return</code> is an error</td></tr>
+                            <tr><td><code>include: ["src"]</code></td><td>which files belong to the app: everything under <code>src</code>, including the <code>.d.ts</code> file you add today</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>One setting is missing from the file and still on: <strong><code>strict</code></strong>. In TypeScript 7 it is the default, so every check you have relied on since Lesson 2.1 (no implicit <code>any</code>, strict <code>null</code>) is active. Older projects list <code>"strict": true</code> explicitly, which does no harm.</p>
+
+                <h3>The setting that makes <code>items[0]</code> honest</h3>
+                <p>Lesson 2.3 asked why <code>first&lt;T&gt;</code> returns <code>T | undefined</code>, and promised the setting that makes TypeScript insist. Here it is. Put this in <code>scratch.ts</code> and run <code>npm run check</code>: silent.</p>
+                <pre data-snippet><code class="language-ts">const siteIds = ['pelican-point', 'driftwood-cove', 'sandpiper-flats']
+
+function first&lt;T&gt;(items: T[]): T {
+  return items[0]
+}
+
+console.log(siteIds[0].toUpperCase())
+console.log(first([]))</code></pre>
+                <p>Now open <code>ts-lab/tsconfig.json</code>. When you created it in Lesson 2.1, <code>tsc --init</code> wrote a "Stricter Typechecking Options" block that you removed so the lab would check like the HQ. Bring back its first setting, after <code>declarationMap</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">ts-lab/tsconfig.json</div>
+                    <pre data-src="ts-lab/tsconfig.json" data-match="diff"><code class="language-diff-json">     "declarationMap": true,
+
++    // Stricter Typechecking Options
++    "noUncheckedIndexedAccess": true,
++
+     // Style Options</code></pre>
+                </div>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:4:3 - error TS2322: Type 'T | undefined' is not assignable to type 'T'.
+  'T' could be instantiated with an arbitrary type which could be unrelated to 'T | undefined'.
+
+4   return items[0]
+    ~~~~~~
+
+scratch.ts:7:13 - error TS2532: Object is possibly 'undefined'.
+
+7 console.log(siteIds[0].toUpperCase())
+              ~~~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: scratch.ts:4</code></pre>
+                </div>
+                <p>With <strong><code>noUncheckedIndexedAccess</code></strong>, reading an array by index (or an object by a key it may not have) gives <code>T | undefined</code>, because nothing guarantees there is an item at that position. Run <code>node scratch.ts</code> and you see why that is right: <code>first([])</code> "returned a <code>T</code>" and printed <code>undefined</code>. The fixes are the null toolkit from Lesson 2.2: <code>siteIds[0]?.toUpperCase()</code>, a check, or an honest <code>T | undefined</code> return type. Loops like <code>for (const id of siteIds)</code> are not affected: every item there exists. Your three <code>ts-lab</code> files pass unchanged, and the HQ gets the same setting in today's project.</p>
+                <p><code>tsc --init</code>'s block had a second setting, <code>exactOptionalPropertyTypes</code>. It makes <code>phone?: string</code> mean "may be missing, but never <code>undefined</code> when present". That is precise, but it clashes with how many libraries (React among them) pass optional values, so the course leaves it off, as Vite's template does.</p>
+            </section>
+
+            <section id="env" class="lesson-section">
+                <h2>🔐 Environment Variables</h2>
+                <p>The HQ needs to know where shoreline-api runs. On your computer that is <code>http://localhost:4000</code>; on the deployed site in Lesson 10.2 it will be something else. A value that changes between places but not in the code is a job for an <strong>environment variable</strong>, and Vite reads them from <code>.env</code> files in the project folder:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>File</th><th>Loaded</th><th>In Git?</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>.env.example</code></td><td>never (it is documentation)</td><td>yes: shows which variables the app needs</td></tr>
+                            <tr><td><code>.env</code></td><td>always</td><td>if it holds nothing personal</td></tr>
+                            <tr><td><code>.env.local</code></td><td>always, overrides <code>.env</code></td><td>no: your machine's values (the template's <code>.gitignore</code> already lists <code>*.local</code>)</td></tr>
+                            <tr><td><code>.env.production</code>, <code>.env.development</code></td><td>only in that mode (<code>npm run build</code> / <code>npm run dev</code>)</td><td>usually</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The code reads them as <code>import.meta.env.VITE_API_URL</code>. Two Vite rules decide what gets there:</p>
+                <ul>
+                    <li><strong>Only names that start with <code>VITE_</code></strong> reach your code. Everything else in those files stays out, so a stray value is not exposed by accident.</li>
+                    <li><strong>Values are copied into the JavaScript when Vite builds.</strong> After <code>npm run build</code>, the text <code>http://localhost:4000</code> sits in the built file in <code>dist/assets/</code>; the variable's name is gone. Change <code>.env.local</code> and you rebuild. (The dev server notices a changed <code>.env</code> file and restarts itself.)</li>
+                </ul>
+                <div class="card card-danger">
+                    <h4>🛑 Nothing in the front end is secret</h4>
+                    <p>Every visitor downloads the built JavaScript, and anyone can read it in the browser's DevTools. So a <code>VITE_</code> variable is public, whatever file it came from: an API address is fine, a password, a private API key or a database URL never is. Keeping a secret out of Git (<code>.env.local</code>) does not keep it out of the bundle. Secrets live on a server, which uses them on the app's behalf; shoreline-api plays that part for the crew.</p>
+                </div>
+                <p>And the type? <code>vite/client</code> describes <code>import.meta.env</code> with <code>MODE</code>, <code>DEV</code>, <code>PROD</code> and a few more, plus a catch-all: any other name is <code>any</code>. That means <code>import.meta.env.VITE_API_ULR</code>, typo included, passes the check. In the project you will switch the catch-all off and describe <code>VITE_API_URL</code> yourself, so the variable is typed and a typo is an error.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Using as instead of a check</h4>
+                    <p>Tutorials often write <code>(await response.json()) as CleanupEvent[]</code>. <code>as</code> is a <strong>type assertion</strong>: you tell TypeScript what the data is, and nothing checks it.</p>
+                    <pre data-snippet><code class="language-ts">import type { Volunteer } from './shapes.ts'
+
+// "as" tells TypeScript what the data is. Nothing checks it.
+const person = JSON.parse('{ "id": "v04" }') as Volunteer
+console.log(person.name.toUpperCase())</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (node scratch.ts; npm run check is silent)</h4>
+                        <pre><code>file:///Users/you/shoreline/ts-lab/scratch.ts:5
+console.log(person.name.toUpperCase())
+                        ^
+
+TypeError: Cannot read properties of undefined (reading 'toUpperCase')
+...</code></pre>
+                    </div>
+                    <p>The crash happens far from the line that lied, which is the worst place to debug it. Check data from outside with a type guard; keep <code>as</code> for the rare case where you know more than TypeScript and can say why.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ tsconfig settings from old tutorials</h4>
+                    <p>TypeScript 7 removed settings that older posts still recommend. They are now errors, and each message says what to do:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b with "baseUrl": "." added)</h4>
+                        <pre><code>tsconfig.app.json:10:5 - error TS5102: Option 'baseUrl' has been removed. Please remove it from your configuration.
+  Use '"paths": {"*": ["./*"]}' instead.
+
+10     "baseUrl": ".",
+       ~~~~~~~~~
+
+
+Found 1 error in tsconfig.app.json:10</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b with "moduleResolution": "node")</h4>
+                        <pre><code>tsconfig.app.json:12:25 - error TS5108: Option 'moduleResolution=node10' has been removed. Please remove it from your configuration.
+
+12     "moduleResolution": "node",
+                           ~~~~~~
+
+
+Found 1 error in tsconfig.app.json:12</code></pre>
+                    </div>
+                    <p><code>"target": "es5"</code> gets the same TS5108. For a Vite app, keep the template's <code>bundler</code> and <code>es2023</code>; <a href="troubleshooting.html#ts5102">Troubleshooting</a> has the <code>paths</code> replacement for <code>baseUrl</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ A secret in a VITE_ variable</h4>
+                    <p>No error message warns you: the build succeeds and the secret ships to every visitor. If a value would hurt in a stranger's hands, it does not belong in the front end at all.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Editing the copied types</h4>
+                    <p><code>src/api/types.ts</code> describes what shoreline-api sends; changing it in the HQ does not change the API, it only makes the HQ believe something false. If the API changes, copy the file again. Types the HQ needs on top (such as a <code>Pick</code> for a card) go in the HQ's own files.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The HQ Meets Its Data</h2>
+                <p>Time to move from the workbench into Shoreline Crew HQ. You will give the app the API's real types, a stricter setting and a typed address for the API, then write <code>src/api/client.ts</code>: the one place where data from shoreline-api enters the app, and where it is checked. Module 4 builds screens on top of this client, Module 7 hands its caching to TanStack Query, and Module 8 replaces the hand-written checks with Zod, but the idea stays: <strong>nothing unchecked gets in</strong>.</p>
+                <p>Delete <code>ts-lab/scratch.ts</code> first. You are done with the lab for this module; it keeps <code>types.ts</code>, <code>shapes.ts</code> and <code>functions.ts</code>.</p>
+
+                <div class="card">
+                    <h3>Step 1: The real types, and your draft <span class="step-time">(10 min)</span></h3>
+                    <p>In a terminal in <code>shoreline-hq</code>, make a folder for the API code and copy the API's types into it (the same two commands work in PowerShell):</p>
+                    <pre class="terminal"><code class="language-bash">mkdir src/api
+cp ../shoreline-api/core/types.ts src/api/types.ts
+npx tsc -b</code></pre>
+                    <p>The check is silent: the file is plain TypeScript with exports, written for apps like yours. Open it next to your <code>ts-lab/shapes.ts</code> and compare. Your Lesson 2.2 draft got the structure right; the real contract has more of everything:</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Type</th><th>Your draft</th><th>The API's</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>EventStatus</code>, <code>Terrain</code></td><td>the same four words each</td><td>the same, so your unions were right</td></tr>
+                                <tr><td><code>Site</code></td><td>6 properties</td><td>10: adds <code>latitude</code>, <code>longitude</code>, <code>parking</code>, <code>description</code></td></tr>
+                                <tr><td><code>CleanupEvent</code></td><td>7 properties</td><td>15: adds <code>date</code>, <code>endTime</code>, <code>meetingPoint</code>, <code>description</code>, <code>suppliesProvided</code>, <code>leadOrganizerId</code>, <code>createdAt</code>, <code>updatedAt</code>; <code>startTime</code> is a <code>TimeString</code></td></tr>
+                                <tr><td><code>CleanupEventDetail</code></td><td><code>extends CleanupEvent</code> + <code>site</code> + <code>checkInCode?</code></td><td>exactly the same</td></tr>
+                                <tr><td><code>Volunteer</code></td><td><code>id</code>, <code>name</code>, <code>phone: string | null</code></td><td>adds <code>email</code>, <code>role</code>, <code>skills</code>, <code>joinedOn</code>, <code>hoursLogged</code></td></tr>
+                                <tr><td><code>LoadState</code></td><td>yours</td><td>not there: it describes a screen, not data, so it belongs to the app (Module 4)</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p><code>TimeString</code> and <code>DateString</code> are aliases for <code>string</code> with a <code>/** */</code> comment saying the format: they document, but do not check. Now find today's utility types in the real file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/types.ts</div>
+                        <pre data-src="shoreline-hq/src/api/types.ts" data-match="excerpt"><code class="language-ts">// ...
+/** A sign-up with the volunteer's name, as an event roster lists it (organizers only). */
+export interface RosterEntry extends Signup {
+  volunteer: Pick&lt;Volunteer, 'id' | 'name' | 'email' | 'phone' | 'skills'&gt;
+}
+// ...
+export interface ImpactTotals {
+  from: DateString | null
+  to: DateString | null
+  events: number
+  volunteerHours: number
+  volunteersAttended: number
+  bags: number
+  weightKg: number
+  byCategory: Record&lt;DebrisCategory, number&gt;
+// ...
+/** PATCH /api/events/:id (organizers): any subset of the editable fields. */
+export type EventChanges = Partial&lt;Omit&lt;NewEvent, 'status'&gt;&gt; &amp; { status?: EventStatus }
+// ...
+/** Every error response has this body. fieldErrors only on 400 validation_failed. */
+export interface ApiErrorBody {
+  error: ErrorCode
+  message: string
+  fieldErrors?: Record&lt;string, string[]&gt;
+}</code></pre>
+                    </div>
+                    <p>Read each aloud. A roster entry is a sign-up plus a cut-down volunteer (<code>Pick</code>: organizers see the email, not the hours). The impact totals hold a count for every debris category (<code>Record</code> over a union). An edit is "any of the new-event fields except <code>status</code>, all optional" plus a <code>status</code> that may be any of the four (<code>Partial&lt;Omit&lt;…&gt;&gt;</code> joined with <code>&amp;</code>, the intersection from Lesson 2.2). And an error's <code>fieldErrors</code> maps field names to messages (<code>Record&lt;string, string[]&gt;</code>): the shape you saw in Lesson 1.2 when the API rejected <code>finished</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: A stricter check and a typed setting <span class="step-time">(12 min)</span></h3>
+                    <p>First the setting from this lesson. In <code>tsconfig.app.json</code>, add it at the end of the linting group (note the comma on the line before):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/tsconfig.app.json</div>
+                        <pre data-src="shoreline-hq/tsconfig.app.json" data-match="diff"><code class="language-diff-json">     "erasableSyntaxOnly": true,
+-    "noFallthroughCasesInSwitch": true
++    "noFallthroughCasesInSwitch": true,
++    "noUncheckedIndexedAccess": true
+   },</code></pre>
+                    </div>
+                    <p>Then the API's address. Create <code>.env.example</code> in <code>shoreline-hq</code> (next to <code>package.json</code>, not in <code>src</code>):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/.env.example</div>
+                        <pre data-src="shoreline-hq/.env.example"><code class="language-ini">VITE_API_URL=http://localhost:4000</code></pre>
+                    </div>
+                    <p>and copy it to the file Vite actually loads on your machine (again the same command in PowerShell):</p>
+                    <pre class="terminal"><code class="language-bash">cp .env.example .env.local</code></pre>
+                    <p><code>.env.example</code> is for the next person who downloads the project (or for you on another computer): it says which variables exist. <code>.env.local</code> holds your values and stays out of Git. No spaces around <code>=</code>, and no quotes needed.</p>
+                    <p>Now the type. Create <code>src/vite-env.d.ts</code>. A <code>.d.ts</code> file is a <strong>declaration file</strong>: types only, no code, like the library files you read with <kbd>F12</kbd> in Lesson 2.3. Because it has no <code>import</code> or <code>export</code>, its interfaces join the global ones from <code>vite/client</code> (the interface merging from Lesson 2.2):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/vite-env.d.ts</div>
+                        <pre data-src="shoreline-hq/src/vite-env.d.ts"><code class="language-ts">// Types for Vite's import.meta.env (Lesson 2.4)
+
+// Unknown VITE_ names become errors instead of any
+interface ViteTypeOptions {
+  strictImportMetaEnv: unknown
+}
+
+// The variables this app reads from .env files
+interface ImportMetaEnv {
+  /** Where shoreline-api runs, such as http://localhost:4000 */
+  readonly VITE_API_URL?: string
+}</code></pre>
+                    </div>
+                    <p><code>strictImportMetaEnv</code> is Vite's switch for the catch-all from the Environment Variables section: with it, a name you have not described is an error instead of <code>any</code>. <code>VITE_API_URL</code> is <strong>optional</strong> on purpose: if someone forgets <code>.env.local</code>, the variable really is missing, and the type should say so. The client will deal with that case. Run <code>npx tsc -b</code>: silent.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: The checks <span class="step-time">(12 min)</span></h3>
+                    <p>Create <code>src/api/client.ts</code> and start with the guards. They are today's predicates, applied to the real <code>CleanupEvent</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">// Shoreline Crew HQ's API client (Lesson 2.4).
+// Data from the API is unknown until a check proves its shape.
+import type { CleanupEvent, EventStatus } from './types.ts'
+
+// ---------------------------------------------------------------- checking data
+
+/** An object (not null, not an array), so its properties can be read */
+function isRecord(value: unknown): value is Record&lt;string, unknown&gt; {
+  return typeof value === 'object' &amp;&amp; value !== null &amp;&amp; !Array.isArray(value)
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) &amp;&amp; value.every((item) =&gt; typeof item === 'string')
+}
+
+const eventStatuses: EventStatus[] = ['draft', 'scheduled', 'completed', 'cancelled']
+
+export function isEventStatus(value: unknown): value is EventStatus {
+  return eventStatuses.some((status) =&gt; status === value)
+}
+
+// The CleanupEvent properties that hold text
+const eventTextFields: (keyof CleanupEvent)[] = [
+  'id', 'title', 'siteId', 'date', 'startTime', 'endTime',
+  'meetingPoint', 'description', 'leadOrganizerId', 'createdAt', 'updatedAt',
+]
+
+export function isCleanupEvent(value: unknown): value is CleanupEvent {
+  return (
+    isRecord(value) &amp;&amp;
+    eventTextFields.every((key) =&gt; typeof value[key] === 'string') &amp;&amp;
+    isEventStatus(value.status) &amp;&amp;
+    typeof value.capacity === 'number' &amp;&amp;
+    typeof value.spotsTaken === 'number' &amp;&amp;
+    isStringArray(value.suppliesProvided)
+  )
+}
+
+function isCleanupEventList(value: unknown): value is CleanupEvent[] {
+  return Array.isArray(value) &amp;&amp; value.every(isCleanupEvent)
+}
+// ...</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>import type</code> from <code>./types.ts</code>: the HQ allows the extension (<code>allowImportingTsExtensions</code>), and the import disappears from the built app.</li>
+                        <li><code>eventTextFields</code> is typed <code>(keyof CleanupEvent)[]</code>: "a list of <code>CleanupEvent</code>'s property names" (<code>keyof</code> from Lesson 2.3). Eleven properties are strings, so one <code>every</code> checks them all, and a misspelled name in the list is an error, as you will see in Step 5.</li>
+                        <li><code>isCleanupEvent</code> covers all fifteen properties: eleven texts, the status, two numbers and the supplies list. It does not check that <code>date</code> looks like a date; types do not say that either.</li>
+                        <li><code>isCleanupEventList</code> reuses <code>isCleanupEvent</code> through <code>every</code>, the narrowing <code>every</code> overload you just met with <code>filter</code>.</li>
+                        <li>Only two guards are exported: the rest are helpers of this file. Lesson 3.4 uses <code>isEventStatus</code> for a status filter.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Fetch, check, return <span class="step-time">(10 min)</span></h3>
+                    <p>Add the part that talks to the API at the end of <code>client.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">// ...
+// ---------------------------------------------------------------- talking to the API
+
+function apiBaseUrl(): string {
+  const url = import.meta.env.VITE_API_URL
+  if (url === undefined || url === '') {
+    throw new Error('VITE_API_URL is not set: copy .env.example to .env.local')
+  }
+  return url
+}
+
+/** GET a path under /api and return the JSON body, unchecked */
+export async function apiFetch(path: string): Promise&lt;unknown&gt; {
+  const response = await fetch(`${apiBaseUrl()}/api${path}`)
+  if (!response.ok) {
+    throw new Error(`GET /api${path} failed: HTTP ${response.status}`)
+  }
+  return response.json()
+}
+
+/** GET a path and check the JSON with a type predicate before anyone uses it */
+export async function getJSON&lt;T&gt;(path: string, isT: (value: unknown) =&gt; value is T): Promise&lt;T&gt; {
+  const data = await apiFetch(path)
+  if (!isT(data)) {
+    throw new Error(`Unexpected data from GET /api${path}`)
+  }
+  return data
+}
+
+export function getEvents(): Promise&lt;CleanupEvent[]&gt; {
+  return getJSON('/events', isCleanupEventList)
+}</code></pre>
+                    </div>
+                    <p>Follow one request through it:</p>
+                    <ol>
+                        <li><code>apiBaseUrl</code> reads the variable. Its type is <code>string | undefined</code> (you made it optional), so TypeScript requires the check, and the error message tells the person who forgot <code>.env.local</code> exactly what to do.</li>
+                        <li><code>apiFetch</code> is <code>async</code>, so it returns a <code>Promise&lt;unknown&gt;</code>: "an <code>unknown</code>, later" (Lesson 2.3 named <code>Promise&lt;T&gt;</code>; Module 4 uses it every day). <code>response.json()</code> is typed <code>Promise&lt;any&gt;</code> by the DOM library, and the written return type turns that <code>any</code> into <code>unknown</code> at the door. A failed HTTP status becomes an error instead of an error page parsed as data.</li>
+                        <li><code>getJSON&lt;T&gt;</code> is the reusable part: any path, any type, as long as you hand it a type guard for that type. Its second parameter is a function type with a type predicate, <code>(value: unknown) =&gt; value is T</code>, so <code>T</code> is inferred from the guard you pass.</li>
+                        <li><code>getEvents</code> passes <code>isCleanupEventList</code>, so <code>T</code> is <code>CleanupEvent[]</code>, and its callers get typed cleanups or an error. Never unchecked data.</li>
+                    </ol>
+                    <div class="card card-info">
+                        <h4>💡 Mental model: the sign-in table</h4>
+                        <p>Volunteers do not walk straight onto the beach. They stop at the sign-in table, where an organizer checks each name against the roster before handing out gloves and grabbers. <code>getJSON</code> is the table, each type guard is a roster, and everything past the table can trust that whoever made it through was checked. One table, many rosters: that is why the guard is a parameter.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: See real data arrive, then break it <span class="step-time">(12 min)</span></h3>
+                    <p>The app has no screens that show data yet (Module 3 builds them), so for now a temporary line in <code>src/main.tsx</code> calls the client and writes to the browser's console. Change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/main.tsx</div>
+                        <pre data-src="shoreline-hq/src/main.tsx" data-match="diff"><code class="language-diff-tsx"> import App from './App.tsx'
++import { getEvents } from './api/client.ts'
+
+ createRoot(document.getElementById('root')!).render(
+   &lt;StrictMode&gt;
+     &lt;App /&gt;
+   &lt;/StrictMode&gt;,
+ )
++
++// Temporary (Lesson 2.4): prove the typed client works. Lesson 4.1 moves fetching into components.
++getEvents()
++  .then((events) =&gt; {
++    console.log(`Loaded ${events.length} cleanups. First: ${events[0]?.title ?? 'none'}`)
++  })
++  .catch((error: unknown) =&gt; {
++    console.error(error)
++  })</code></pre>
+                    </div>
+                    <p>Hover over <code>events</code>: <code>CleanupEvent[]</code>, with no annotation, all the way from <code>getEvents</code>. The <code>?.</code> and <code>??</code> are there because of <code>noUncheckedIndexedAccess</code>. The <code>error: unknown</code> is the same rule as always: a <code>catch</code> can receive anything.</p>
+                    <p>Start both servers, as in Lesson 1.2: in one terminal, in <code>shoreline-api</code>, <code>node server.ts</code>; in another, in <code>shoreline-hq</code>, <code>npm run dev</code>. Open <code>http://localhost:5173</code>, then the browser's console: <kbd>F12</kbd> and the <strong>Console</strong> tab (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>J</kbd> in Chrome, <kbd>⌘ Cmd</kbd>+<kbd>⌥ Option</kbd>+<kbd>J</kbd> on a Mac). Reload the page:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (the browser console)</h4>
+                        <pre><code>Loaded 10 cleanups. First: Storm Debris Sweep</code></pre>
+                    </div>
+                    <p>Real cleanups, fetched, checked and typed. Ten, not all fifteen, because the API sends lists in pages of ten (its <code>X-Total-Count</code> header says 15; Lesson 4.1 reads the headers into a <code>Page&lt;T&gt;</code> like yours). The first is the oldest, because events come sorted by date. The API's terminal logged the request.</p>
+                    <p>Now stop the API (<kbd>Ctrl</kbd>+<kbd>C</kbd> in its terminal) and reload the page:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (the browser console, API stopped)</h4>
+                        <pre><code>Failed to load resource: net::ERR_CONNECTION_REFUSED
+TypeError: Failed to fetch</code></pre>
+                    </div>
+                    <p>The browser reports the refused connection, then your <code>catch</code> logs the error, followed by lines naming <code>apiFetch</code>, <code>getJSON</code> and <code>getEvents</code>: the path the request took. "Failed to fetch" almost always means the API is not running or the address is wrong (see <a href="troubleshooting.html#failed-to-fetch">Troubleshooting</a>). Start the API again. Then break the code three ways, one at a time, and run <code>npx tsc -b</code> after each (undo each with <kbd>Ctrl</kbd>+<kbd>Z</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>Z</kbd> on a Mac):</p>
+                    <ol>
+                        <li><strong>Trust the first item:</strong> in <code>main.tsx</code>, change <code>${events[0]?.title ?? 'none'}</code> to <code>${events[0].title}</code>.</li>
+                        <li><strong>Forget to describe the variable:</strong> in <code>vite-env.d.ts</code>, delete the <code>readonly VITE_API_URL?: string</code> line.</li>
+                        <li><strong>Misspell a property:</strong> in <code>client.ts</code>, change <code>'meetingPoint'</code> in <code>eventTextFields</code> to <code>'meetingPlace'</code>.</li>
+                    </ol>
+                    <figure class="screenshot">
+                        <img src="images/lesson_06/06-index-error.png" alt="A terminal in shoreline-hq. npx tsc -b reports src/main.tsx line 16 error TS2532: Object is possibly undefined, underlining events[0] in the console.log line that prints the first cleanup&#x27;s title. Found 1 error in src/main.tsx." width="767" height="239" loading="lazy">
+                        <figcaption>With <code>noUncheckedIndexedAccess</code> on, <code>events[0]</code> is a <code>CleanupEvent | undefined</code>: the list could be empty, and TypeScript asks you to say what happens then.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (2: the variable not described)</h4>
+                        <pre><code>src/api/client.ts:46:31 - error TS2339: Property 'VITE_API_URL' does not exist on type 'ImportMetaEnv'.
+
+46   const url = import.meta.env.VITE_API_URL
+                                 ~~~~~~~~~~~~
+
+
+Found 1 error in src/api/client.ts:46</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (3: a misspelled property)</h4>
+                        <pre><code>src/api/client.ts:25:3 - error TS2322: Type '"meetingPlace"' is not assignable to type 'keyof CleanupEvent'.
+
+25   'meetingPlace', 'description', 'leadOrganizerId', 'createdAt', 'updatedAt',
+     ~~~~~~~~~~~~~~
+
+
+Found 1 error in src/api/client.ts:25</code></pre>
+                    </div>
+                    <p>Mistake 1 is the empty-list question; a day with no cleanups would have crashed the page. Mistake 2 is <code>strictImportMetaEnv</code> at work: without it, the line would be an <code>any</code> and the check silent. Mistake 3 shows why the field list is typed: <code>keyof CleanupEvent</code> knows every real property name, so a typo cannot quietly skip a check. Undo all three.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Check everything <span class="step-time">(5 min)</span></h3>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 8ms on 6 files with 116 rules using 20 threads.</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run build)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 17 modules transformed.
+computing gzip size...
+dist/index.html                   0.46 kB │ gzip:  0.30 kB
+dist/assets/index-DzE5JpJi.css    0.27 kB │ gzip:  0.18 kB
+dist/assets/index-DrgY2BC2.js   220.67 kB │ gzip: 69.09 kB
+
+✓ built in 96ms</code></pre>
+                    </div>
+                    <p><code>tsc -b</code> is silent, the linter finds nothing, and the build transforms 17 modules instead of Lesson 1.2's 16: the new one is <code>client.ts</code>. <code>types.ts</code> and <code>vite-env.d.ts</code> hold only types, so they add nothing to the build. (Times, sizes and hashes will differ.) The page itself still shows the heading and tagline: the data is in the console, ready for Module 3's components.</p>
+                    <p><strong>Your own project:</strong> for the app you are planning for Lesson 11.1, write down where its data comes from (an API, a file, a form), the two or three types it needs, which utility type would give you the "new item" and "edit" versions, and any setting it would need in <code>.env</code>, marked public or secret.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>ts-lab/shapes.ts</code> exports its types, <code>functions.ts</code> imports them with <code>import type</code>, and the lab's <code>tsconfig.json</code> has <code>noUncheckedIndexedAccess</code></li>
+                        <li>☐ <code>shoreline-hq/src/api/types.ts</code> is an unchanged copy of the API's <code>core/types.ts</code>, and I can name what my draft was missing</li>
+                        <li>☐ <code>.env.example</code> and <code>.env.local</code> hold <code>VITE_API_URL</code>, and <code>src/vite-env.d.ts</code> types it</li>
+                        <li>☐ <code>src/api/client.ts</code> has the guards, <code>apiFetch</code>, <code>getJSON&lt;T&gt;</code> and <code>getEvents</code></li>
+                        <li>☐ The browser console says "Loaded 10 cleanups" with the API running, and shows an error without it</li>
+                        <li>☐ I produced TS2532, TS2339 and TS2322 in the HQ and can say what each one protects</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> all pass</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time). Do them in <code>ts-lab/scratch.ts</code> and delete the file afterwards. Exercise 1 needs shoreline-api running.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Check the sites</h3>
+                    <p>Node 24 has <code>fetch</code> built in, so a lab file can call the API too. Write <code>isSite</code>, a guard for your draft <code>Site</code> from <code>shapes.ts</code> (including the <code>Terrain</code> union and the nested <code>image</code> object), fetch <code>http://localhost:4000/api/sites</code>, and print each site's name, town and terrain, or a message if the data does not match.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Reuse <code>isRecord</code>, and write <code>isTerrain</code> like <code>isEventStatus</code>. For the image, <code>isRecord(value.image)</code> narrows the property itself, so the next checks can read <code>value.image.url</code>. A lab file can use <code>await</code> at the top level, because it is a module.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">import type { Site, Terrain } from './shapes.ts'
+
+function isRecord(value: unknown): value is Record&lt;string, unknown&gt; {
+  return typeof value === 'object' &amp;&amp; value !== null &amp;&amp; !Array.isArray(value)
+}
+
+const terrains: Terrain[] = ['sand', 'rocky', 'marsh', 'mixed']
+
+function isTerrain(value: unknown): value is Terrain {
+  return terrains.some((terrain) =&gt; terrain === value)
+}
+
+function isSite(value: unknown): value is Site {
+  return (
+    isRecord(value) &amp;&amp;
+    typeof value.id === 'string' &amp;&amp;
+    typeof value.name === 'string' &amp;&amp;
+    typeof value.town === 'string' &amp;&amp;
+    isTerrain(value.terrain) &amp;&amp;
+    typeof value.accessible === 'boolean' &amp;&amp;
+    isRecord(value.image) &amp;&amp;
+    typeof value.image.url === 'string' &amp;&amp;
+    typeof value.image.alt === 'string' &amp;&amp;
+    typeof value.image.width === 'number' &amp;&amp;
+    typeof value.image.height === 'number'
+  )
+}
+
+const response = await fetch('http://localhost:4000/api/sites')
+const data: unknown = await response.json()
+if (Array.isArray(data) &amp;&amp; data.every(isSite)) {
+  for (const site of data) {
+    console.log(`${site.name} (${site.town}): ${site.terrain}`)
+  }
+} else {
+  console.log('The sites do not match the Site type')
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>Pelican Point Beach (Port Marisol): sand
+Driftwood Cove (Port Marisol): mixed
+Sandpiper Flats (Calder Bay): marsh
+North Jetty (Calder Bay): rocky
+Otter Creek Mouth (Seal Rock): mixed
+Long Strand Beach (Seal Rock): sand</code></pre>
+                        </div>
+                        <p>The API sends four more properties than your draft <code>Site</code> describes, and the guard does not mind: like <code>extends</code>, a type means "has at least these". If the API is not running, the <code>fetch</code> line fails with <code>fetch failed</code>.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Three types the HQ will need</h3>
+                    <p>Using utility types and the types in <code>shapes.ts</code> (do not write any property by hand), define <code>SiteCardData</code> (a site's <code>id</code>, <code>name</code>, <code>town</code> and <code>image</code>), <code>VolunteerUpdate</code> (any of a volunteer's properties except <code>id</code>, all optional) and <code>TerrainLabels</code> (one label for each terrain). Then add these lines; the check must be silent:</p>
+                    <pre data-snippet><code class="language-ts">// These lines must pass the check
+const card: SiteCardData = {
+  id: 'otter-creek',
+  name: 'Otter Creek Mouth',
+  town: 'Seal Rock',
+  image: { url: '/images/sites/otter-creek.jpg', alt: 'A creek meeting the sea.', width: 1200, height: 675 },
+}
+const newPhone: VolunteerUpdate = { phone: '(831) 555-0103' }
+const labels: TerrainLabels = { sand: 'Sandy beach', rocky: 'Rocky shore', marsh: 'Salt marsh', mixed: 'Mixed' }
+
+// These lines must be errors
+// @ts-expect-error: an update cannot change the id
+const badUpdate: VolunteerUpdate = { id: 'v99' }
+// @ts-expect-error: every terrain needs a label
+const fewLabels: TerrainLabels = { sand: 'Sandy beach' }</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>One <code>Pick</code>, one <code>Record</code>, and one combination of <code>Partial</code> and <code>Omit</code>, as in the API's <code>EventChanges</code>. <code>// @ts-expect-error</code> is new: it tells TypeScript "the next line must be an error", and the check fails if it is not. It is how you test that a type rejects what it should.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">import type { Site, Terrain, Volunteer } from './shapes.ts'
+
+type SiteCardData = Pick&lt;Site, 'id' | 'name' | 'town' | 'image'&gt;
+type VolunteerUpdate = Partial&lt;Omit&lt;Volunteer, 'id'&gt;&gt;
+type TerrainLabels = Record&lt;Terrain, string&gt;
+
+// These lines must pass the check
+const card: SiteCardData = {
+  id: 'otter-creek',
+  name: 'Otter Creek Mouth',
+  town: 'Seal Rock',
+  image: { url: '/images/sites/otter-creek.jpg', alt: 'A creek meeting the sea.', width: 1200, height: 675 },
+}
+const newPhone: VolunteerUpdate = { phone: '(831) 555-0103' }
+const labels: TerrainLabels = { sand: 'Sandy beach', rocky: 'Rocky shore', marsh: 'Salt marsh', mixed: 'Mixed' }
+
+// These lines must be errors
+// @ts-expect-error: an update cannot change the id
+const badUpdate: VolunteerUpdate = { id: 'v99' }
+// @ts-expect-error: every terrain needs a label
+const fewLabels: TerrainLabels = { sand: 'Sandy beach' }
+
+console.log(card.name, newPhone.phone, labels.marsh)</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts; npm run check is silent)</h4>
+                            <pre><code>Otter Creek Mouth (831) 555-0103 Salt marsh</code></pre>
+                        </div>
+                        <p><code>Omit&lt;Partial&lt;Volunteer&gt;, 'id'&gt;</code> works just as well. If a <code>@ts-expect-error</code> line passes the check, TypeScript reports "Unused '@ts-expect-error' directive": your type let through something it should not.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A guard that makes guards (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 15 minutes).</em></p>
+                    <p><code>isCleanupEventList</code> is a one-line wrapper you would write again for sites, volunteers and sign-ups. Write a generic <code>isListOf</code> that takes a guard for one item and <em>returns</em> a guard for a list of them, so that <code>const isCrew = isListOf(isVolunteer)</code> works and <code>isCrew(data)</code> narrows <code>data</code> to <code>Volunteer[]</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The parameter is <code>(value: unknown) =&gt; value is T</code>, like <code>getJSON</code>'s. The return type is the same kind of function type, with <code>value is T[]</code>. Inside, return an arrow function.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">import type { Volunteer } from './shapes.ts'
+
+function isRecord(value: unknown): value is Record&lt;string, unknown&gt; {
+  return typeof value === 'object' &amp;&amp; value !== null &amp;&amp; !Array.isArray(value)
+}
+
+function isVolunteer(value: unknown): value is Volunteer {
+  return (
+    isRecord(value) &amp;&amp;
+    typeof value.id === 'string' &amp;&amp;
+    typeof value.name === 'string' &amp;&amp;
+    (typeof value.phone === 'string' || value.phone === null)
+  )
+}
+
+// Takes a check for one item, returns a check for a list of them
+function isListOf&lt;T&gt;(isItem: (value: unknown) =&gt; value is T): (value: unknown) =&gt; value is T[] {
+  return (value: unknown): value is T[] =&gt; Array.isArray(value) &amp;&amp; value.every(isItem)
+}
+
+const isCrew = isListOf(isVolunteer)
+const data: unknown = JSON.parse('[{ "id": "v01", "name": "Maya Okafor", "phone": null }]')
+if (isCrew(data)) {
+  console.log(`${data.length} volunteer: ${data.map((person) =&gt; person.name).join(', ')}`)
+}
+console.log(isCrew([{ id: 'v02' }]), isCrew('v03'))</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>1 volunteer: Maya Okafor
+false false</code></pre>
+                        </div>
+                        <p>A function that returns a function, fully typed: <code>T</code> is inferred from <code>isVolunteer</code>, and the returned guard narrows to <code>Volunteer[]</code>. In the HQ, <code>getJSON('/events', isListOf(isCleanupEvent))</code> would replace <code>isCleanupEventList</code>.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>functions.ts</code> starts with <code>import type { CleanupEvent } from './shapes.ts'</code>. What happens to that line when you run <code>node functions.ts</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="If shapes.ts ran first, its own console.log lines would appear. Did they?">
+                                A) Node runs <code>shapes.ts</code> first, then <code>functions.ts</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Node strips types; it never checks them. What does it do with a line that only brings in types?">
+                                B) Node checks that <code>CleanupEvent</code> matches the data
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A type-only import is removed with the other types, so shapes.ts never runs. With a plain import, Node would ask shapes.ts for a CleanupEvent at run time and fail, which is what TS1484 warns about.">
+                                C) Node removes it with the other types, so <code>shapes.ts</code> never runs
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is what the plain import did. Which form does Node remove completely?">
+                                D) Node fails: <code>shapes.ts</code> does not provide an export named <code>CleanupEvent</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> What does the return type <code>value is Volunteer</code> add to <code>function isVolunteer(value: unknown)</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Types disappear before the code runs. Who writes the actual checks in a type guard?">
+                                A) TypeScript checks the value's properties at run time
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The function still returns a boolean. The predicate is a promise: after a true answer, TypeScript treats the argument as a Volunteer. TypeScript trusts it, so the body must really check.">
+                                B) When the function returns true, TypeScript treats the argument as a <code>Volunteer</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The function still returns true or false. What does TypeScript learn from a true answer?">
+                                C) The function returns the value converted to a <code>Volunteer</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> With <code>noUncheckedIndexedAccess</code> on and <code>events</code> typed <code>CleanupEvent[]</code>, what is the type of <code>events[0]</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That is the answer without the setting. What could be at position 0 of an empty list?">
+                                A) <code>CleanupEvent</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Strict settings never introduce any. What is added to the item's type?">
+                                B) <code>any</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Indexing gives one item, not the list. Which single-item type allows for an empty list?">
+                                C) <code>CleanupEvent[] | undefined</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Nothing guarantees an item at a given position, so indexing adds undefined. That is the TS2532 on events[0].title, fixed with ?. and ??.">
+                                D) <code>CleanupEvent | undefined</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> The crew wants a map from a paid service that needs a private API key. Where should the key go?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Vite copies every VITE_ variable into the JavaScript that every visitor downloads, so the front end cannot keep a secret. A server (like shoreline-api) keeps the key and calls the map service on the app's behalf.">
+                                A) On a server that calls the map service for the app, never in the front end
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Keeping a file out of Git does not keep its value out of the built JavaScript. Who downloads that JavaScript?">
+                                B) In <code>VITE_MAP_KEY</code> in <code>.env.local</code>, because that file is not committed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Without the VITE_ prefix the app cannot read it at all. And with the prefix, where does the value end up?">
+                                C) In <code>MAP_KEY</code> without the <code>VITE_</code> prefix, so Vite keeps it hidden
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Which type describes "changes to a cleanup: any of its properties, all optional, but never the <code>id</code>"?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Pick keeps only the listed properties. Is the id what you want to keep?">
+                                A) <code>Pick&lt;CleanupEvent, 'id'&gt;</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This makes every property optional, but the id is still allowed. What removes it?">
+                                B) <code>Partial&lt;CleanupEvent&gt;</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Omit removes the id, and Partial makes everything that is left optional. The API's EventChanges type is built the same way from NewEvent.">
+                                C) <code>Partial&lt;Omit&lt;CleanupEvent, 'id'&gt;&gt;</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Record builds an object from a set of keys. Which utility types remove a property and make the rest optional?">
+                                D) <code>Record&lt;'id', CleanupEvent&gt;</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why copy <code>types.ts</code> instead of importing it from <code>../shoreline-api</code>?</summary>
+                    <p>The HQ must build on its own: on a hosting service in Lesson 10.2, or on a teammate's computer, there may be no shoreline-api folder next to it. A copy makes the contract part of the app. The volunteers' phone app in the React Native course copies the same file. On a larger team the shared types would live in a package that both sides install; the idea is the same, the delivery is fancier.</p>
+                </details>
+                <details>
+                    <summary>Do I have to write a type guard for every type?</summary>
+                    <p>For every type that arrives from outside, something must check it. By hand, that is a lot of careful code, and a hand-written guard can drift from its type when someone adds a property. That is exactly the problem Zod solves in Lesson 8.1: one schema produces both the check and the type. Until then, the HQ checks events, and later lessons add guards for what they fetch.</p>
+                </details>
+                <details>
+                    <summary>I have seen <code>import { type Site, getSites }</code>. Is that different?</summary>
+                    <p>It is the inline form: <code>type</code> in front of one name marks only that name as type-only, so one line can import a type and a value from the same file. <code>verbatimModuleSyntax</code> accepts both forms. When everything you import from a file is a type, <code>import type { … }</code> says it once.</p>
+                </details>
+                <details>
+                    <summary>Why is <code>VITE_API_URL</code> optional in the type, when <code>.env.local</code> sets it?</summary>
+                    <p>Because the type should describe what can really happen, and a fresh download has no <code>.env.local</code> until someone copies it. Optional forces the code to handle "not set" with a clear message. Declaring it as a plain <code>string</code> would be a small lie, like <code>as</code>: the check would pass and the app would request <code>undefined/api/events</code>.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Give the client a second function, <code>getEvent(id: string): Promise&lt;CleanupEventDetail&gt;</code>, for <code>GET /api/events/:id</code>. You need a guard for <code>CleanupEventDetail</code>: reuse <code>isCleanupEvent</code> for the part it <code>extends</code>, then check <code>site</code> (your Exercise 1 guard, extended to the real <code>Site</code>) and the optional <code>checkInCode</code> (missing, or a string). Try it with <code>e08</code> and with <code>e99</code>: what does the API answer for an id that does not exist, and what does your client do with it?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Draw the path of one cleanup from the API's memory to the <code>console.log</code> in <code>main.tsx</code>, as boxes and arrows. Mark the point where its type changes from <code>unknown</code> to <code>CleanupEvent</code>, and write next to it what would happen to bad data there. Then write one sentence on how this module changed the way you think about data you did not create.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Share types with <code>export</code> and <strong><code>import type</code></strong>: one definition, no copies. Type-only imports are removed before the code runs (<code>verbatimModuleSyntax</code>, TS1484)</li>
+                        <li>A <strong>type predicate</strong> (<code>value is T</code>) turns a boolean check into narrowing; guards check every promised property, because TypeScript trusts them. <code>as</code> checks nothing</li>
+                        <li><strong>Utility types</strong> build variations: <code>Pick</code>, <code>Omit</code>, <code>Partial</code>, <code>Record</code>; the API's own types use all four</li>
+                        <li>Vite's tsconfig is split into app and node projects; <code>strict</code> is the TypeScript 7 default, and <code>noUncheckedIndexedAccess</code> makes indexing honest (<code>T | undefined</code>)</li>
+                        <li><code>VITE_</code> variables come from <code>.env</code> files, are typed in <code>vite-env.d.ts</code>, and are copied into the public JavaScript: never secrets</li>
+                        <li>The HQ's client fetches <code>unknown</code>, checks it with a guard passed to the generic <code>getJSON&lt;T&gt;</code>, and returns typed data or an error</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up a type or pattern quickly</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>See every endpoint and type of shoreline-api</td><td><a href="api.html">The Shoreline Crew API</a></td></tr>
+                            <tr><td>Read the official chapter on narrowing and type predicates</td><td><a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html" target="_blank" rel="noopener">TypeScript Handbook: Narrowing</a></td></tr>
+                            <tr><td>Read the list of utility types</td><td><a href="https://www.typescriptlang.org/docs/handbook/utility-types.html" target="_blank" rel="noopener">TypeScript Handbook: Utility Types</a></td></tr>
+                            <tr><td>Read how Vite handles .env files</td><td><a href="https://vite.dev/guide/env-and-mode" target="_blank" rel="noopener">Vite: Env Variables and Modes</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You ended the copying in <code>ts-lab</code> with exports and type-only imports, and saw why Node needs the <code>type</code></li>
+                        <li>You wrote type guards that turn <code>unknown</code> into checked data and rejected bad replies</li>
+                        <li>You built types from types and read the API's real contract, comparing it with your own draft</li>
+                        <li>You read every setting in the HQ's tsconfig and made indexing honest</li>
+                        <li>You gave the HQ a typed environment variable and its first real data from shoreline-api</li>
+                        <li>You finished Module 2: TypeScript's foundations, from inference to a checked API client</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Module 3 starts React. In <a href="lesson_07.html"><strong>Lesson 3.1: Components and TSX</strong></a> you learn how React draws a page from data, write your first components as typed functions, and give Shoreline Crew HQ its shell: header, logo, footer and the crew's colors. Everything from this module comes along: components are functions with typed parameters, the data they show has the types in <code>src/api/types.ts</code>, and in Module 4 the client you wrote today feeds them.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code> and <code>npm run build</code> pass in <code>shoreline-hq</code>, and that the console shows "Loaded 10 cleanups" with the API running</li>
+                    <li>Delete <code>ts-lab/scratch.ts</code>; keep your <code>.env.local</code> (it is not in the downloads)</li>
+                    <li>Keep your notes on your own project's data and types: Lesson 11.1 starts from them</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>This lesson asked a lot: modules, predicates, utility types, a config file full of new words and the first code that talks to a server. If some of it is still blurry, that is the right amount of blurry for the end of a foundations module. You will use every piece again in the next lessons, in context, and each use makes it clearer. Look at what you can already do: you read a real API contract, compared it with your own draft, and wrote the code that refuses bad data before it can hurt anyone. That is professional work, and you did it.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_05.html" class="prev-lesson">← Previous: Functions and Generics</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_07.html" class="next-lesson">Next: Components and TSX →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 19</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 19: Mutations and Client State</h1>
+    <p class="sub">Answers and reasoning for every Session 19 item: the warm-up, both self-checks, the predict-then-check items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>19</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li>**W1.** 7.1's homework: you pressed Publish on the planning form. What did the HQ say, and what did shoreline-api receive? **Answer:** "Ready to save", and nothing: no request. Today it sends the POST.</li>
+  <li>**W2.** Write the key of the events list for Maya searching "pelican". Which short key reaches it and every other cleanup entry? **Answer:** <code class="inline">['events', 'list', 'q=pelican&amp;perPage=50', 'v01']</code> (the search string as the page builds it); <code class="inline">['events']</code> reaches it by prefix.</li>
+  <li>**W3.** Name three pieces of state in the HQ that are NOT server state (7.2's Before the Next Lesson asks for them). **Answer:** For example the search text (URL), a card's Show details (component), the confirm dialog (component), the desk's undo history (reducer), the session (session store).</li>
+</ol>
+
+  <div class="sec"><h2>7.2 · Mutations: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which of these is true of a mutation and NOT of a query?</div><div class="opts"><div class="opt correct">A) It runs only when you call mutate or mutateAsync</div><div class="opt">B) Its answer is kept in the cache under a key</div><div class="opt">C) It is retried three times by default</div><div class="opt">D) It runs again when the window regains focus</div></div><div class="why"><b>Why:</b> "Create a cleanup" must happen once, when the organizer presses Publish, not whenever a component mounts. A mutation's answer is not cached and, by default, not retried: a retried POST could create the cleanup twice.<br><b>B</b> is wrong: Queries are cached; a mutation leaves behind a cache that is out of date, and cleaning it up is your job.<br><b>C</b> is wrong: Queries retry by default; mutations do not (retry 0).<br><b>D</b> is wrong: Window-focus refetching is a query's behavior.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">The lesson hands <code class="inline">useMutation(cancelEventMutation())</code>'s parts to functions that want a number. From tsc's answer: what does <code class="inline">mutate</code> take, and what is <code class="inline">data</code>?</div><pre class="code">src/Scratch.tsx:10:17 - error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+src/Scratch.tsx:11:15 - error TS2345: Argument of type 'CleanupEvent | undefined' is not assignable to parameter of type 'number'.
+src/Scratch.tsx:12:15 - error TS2345: Argument of type 'Error | null' is not assignable to parameter of type 'number'.
+Found 3 errors in the same file, starting at: src/Scratch.tsx:10</pre><div class="opts"><div class="opt correct"><code class="inline">mutate</code> takes the cleanup's id, a <code class="inline">string</code>; <code class="inline">data</code> is <code class="inline">CleanupEvent | undefined</code> (and <code class="inline">error</code> is <code class="inline">Error | null</code>)</div></div><div class="why"><b>Why:</b> Every type comes from the factory: the variables from the mutation function's parameter, the data from its promise. No type arguments anywhere.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">An organizer marks Diego as checked in. Which keys does the HQ invalidate afterwards?</div><div class="opts"><div class="opt">A) <code class="inline">['events', 'roster', 'e17', 'v01']</code> only</div><div class="opt">B) <code class="inline">['events']</code> only</div><div class="opt correct">C) <code class="inline">['events']</code> and <code class="inline">['volunteers']</code></div><div class="opt">D) Every key in the cache</div></div><div class="why"><b>Why:</b> "What could this change have changed?" The roster and the spots left (all under ['events']: a no-show frees a spot), and a volunteer's hours, which the Volunteer type says come from attended cleanups. Code to the contract.<br><b>A</b> is wrong: Misses the cleanup's spots line, the lists and the volunteers' hours.<br><b>B</b> is wrong: Misses the volunteers' hoursLogged.<br><b>D</b> is wrong: Works, but refetches the sites and the impact totals for nothing.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Which change in the HQ is a good fit for an optimistic update?</div><div class="opts"><div class="opt">A) Publishing a new cleanup</div><div class="opt">B) Cancelling a scheduled cleanup</div><div class="opt">C) Deleting a draft</div><div class="opt correct">D) A check-in mark at the desk</div></div><div class="why"><b>Why:</b> Small, frequent, easy to undo, and the answer holds nothing you need: show it at once, roll back if the API says no. The others are big or need the API's answer (a new id).<br><b>A</b> is wrong: The new cleanup's id comes from the API: you cannot show its page before it answers.<br><b>B</b> is wrong: Telling 18 volunteers their Saturday is off must only happen when it is true.<br><b>C</b> is wrong: Hard to take back; wait for the API.</div></div>
+  <div class="q" data-sc="5" data-kind="short"><div class="qn">Q5</div><div class="qt">The rollback in markMutation's <code class="inline">onError</code> was written as <code class="inline">setStatus(signupId, saved.before)</code>. Why does tsc refuse it, and what is the fix?</div><pre class="code">src/api/mutations.ts:68:27 - error TS18048: 'saved' is possibly 'undefined'.
+src/api/mutations.ts:68:27 - error TS2345: Argument of type 'SignupStatus | undefined' is not assignable to parameter of type 'SignupStatus'.
+Found 2 errors in the same file, starting at: src/api/mutations.ts:68</pre><div class="opts"><div class="opt correct"><code class="inline">saved</code> is undefined when onMutate itself failed, and <code class="inline">before</code> is undefined when the sign-up was not in the cache; check <code class="inline">saved?.before !== undefined</code> first</div></div><div class="why"><b>Why:</b> onError can run without onMutate's result, so TypeScript types the third parameter <code class="inline">{ before } | undefined</code>. The check is not ceremony: rolling back to undefined would break the desk.</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">markMutation's onMutate does not call cancelQueries. The API is slow; Maya checks in Diego, then Grace a second later. What can happen to Grace's badge?</div><div class="opts"><div class="opt">A) Nothing: optimistic updates cannot conflict</div><div class="opt correct">B) It flips Checked in → Expected → Checked in, when a refetch started by Diego's save lands</div><div class="opt">C) It stays Expected until the API answers</div><div class="opt">D) The second PATCH is cancelled</div></div><div class="why"><b>Why:</b> Diego's onSettled refetched the roster; that answer was asked before Grace's change reached the API, so it overwrote her optimistic mark (measured in the lesson: two flips). cancelQueries in onMutate stops refetches already on their way.<br><b>A</b> is wrong: Every refetch can bring an older answer back.<br><b>C</b> is wrong: That is a waiting mutation, not an optimistic one.<br><b>D</b> is wrong: cancelQueries cancels queries (refetches), never mutations.</div></div>
+
+  <div class="sec"><h2>7.2 · Mutations: predict, then check</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">With the planning form's local checks turned off, an organizer publishes this. Predict the status code and how many fields get a message.</div><pre class="code">POST http://localhost:4000/api/events
+{"title": "Dune", "siteId": "north-jetty", "date": "", "startTime": "",
+ "endTime": "", "capacity": 500, "meetingPoint": "", ...}</pre><div class="opts"><div class="opt correct"><pre class="out">HTTP/1.1 400 Bad Request
+content-type: application/json; charset=utf-8
+
+{
+  "error": "validation_failed",
+  "message": "Some fields need attention.",
+  "fieldErrors": {
+    "title": [
+      "Use at least 5 characters for the title."
+    ],
+    "date": [
+      "Enter a date as YYYY-MM-DD."
+    ],
+    "startTime": [
+      "Enter a time as HH:MM (24-hour clock)."
+    ],
+    "endTime": [
+      "Enter a time as HH:MM (24-hour clock)."
+    ],
+    "capacity": [
+      "Capacity must be a whole number from 1 to 200."
+    ],
+    "meetingPoint": [
+      "Say where volunteers meet (at least 3 characters)."
+    ]
+  }
+}</pre></div></div><div class="why"><b>Why:</b> 400 and 6 messages (with the site chosen; the lesson's form, with no site, got 7). The API is the lock on the door: it checks again even when the form does, and its fieldErrors use the form's names.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">patchSignup's path gets <code class="inline">?_status=500</code>. Predict the API's answer, the badge right after the tap, and the badge two seconds later.</div><pre class="code">PATCH http://localhost:4000/api/signups/s088?_status=500   {"status": "attended"}</pre><div class="opts"><div class="opt correct"><pre class="out">HTTP/1.1 500 Internal Server Error
+content-type: application/json; charset=utf-8
+
+{
+  "error": "server_error",
+  "message": "Simulated 500 response (the _status parameter)."
+}</pre></div></div><div class="why"><b>Why:</b> 500 with the API's message; the badge says Checked in at once (onMutate), then Expected again (onError rolled back), with the alert naming the person. The sign-up stayed confirmed: the kit read the roster afterwards.</div></div>
+
+  <div class="sec"><h2>7.3 · Client State: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Maya wants the HQ light on her tablet, whatever the tablet says. Where does that choice live?</div><div class="opts"><div class="opt">A) In TanStack Query's cache</div><div class="opt">B) In the URL's search params</div><div class="opt correct">C) In a Zustand store, persisted to localStorage</div><div class="opt">D) In sessionStorage, next to the session</div></div><div class="why"><b>Why:</b> Not the API's business, read by components far apart, and it should outlive the tab: the last row of the lesson's table. The HQ's display store keeps it under shoreline-hq-ui.<br><b>A</b> is wrong: There is nothing to fetch: the server never hears about it.<br><b>B</b> is wrong: A link should not change someone's theme; it is a preference, not a place.<br><b>D</b> is wrong: sessionStorage ends with the tab; that is right for the session token, wrong for a preference.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">A teammate wrote <code class="inline">create&lt;UiState&gt;(persist(…))</code>. tsc starts like this. What is missing?</div><pre class="code">src/Scratch.ts:10:3 - error TS2345: Argument of type 'StateCreator&lt;UiState, [], [["zustand/persist", UiState]]&gt;' is not assignable to parameter of type 'StateCreator&lt;UiState, [], []&gt;'.
+  Type 'StateCreator&lt;UiState, [], [["zustand/persist", UiState]]&gt;' is not assignable to type '{ $$storeMutators?: [] | undefined; }'.
+    Types of property '$$storeMutators' are incompatible.
+      Type '[["zustand/persist", UiState]] | undefined' is not assignable to type '[] | undefined'.
+        Type '[["zustand/persist", UiState]]' is not assignable to type '[]'.
+          Source has 1 element(s) but target allows only 0.</pre><div class="opts"><div class="opt correct">The empty pair of parentheses: <code class="inline">create&lt;UiState&gt;()(persist(…))</code></div></div><div class="why"><b>Why:</b> TypeScript cannot take some type arguments from you and infer others in one call. The first call takes UiState; the second infers persist's own types. The last line says it plainly: the middleware's types were not expected ("Source has 1 element(s) but target allows only 0").</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">EventCard reads the density with <code class="inline">const { density } = useUiStore()</code> (no selector). Fifteen cards are on screen and the person chooses Dark. How many cards re-render?</div><div class="opts"><div class="opt correct">A) 15</div><div class="opt">B) 0</div><div class="opt">C) 1</div><div class="opt">D) Only the cards whose density changed</div></div><div class="why"><b>Why:</b> Without a selector the component subscribes to the whole state, so every set re-renders it. Measured in the lesson: 15 cards on every theme change, against 0 with the selector state.density === 'compact'.<br><b>B</b> is wrong: That is the selector version.<br><b>C</b> is wrong: Every card subscribes on its own.<br><b>D</b> is wrong: Nobody's density changed: all 15 re-render anyway, for nothing.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">DisplaySettings reads both values with one selector that builds an object. What happens on the dev server?</div><pre class="code"><span class="k">const</span> { theme, density } = useUiStore((state) =&gt; ({ theme: state.theme, density: state.density }))</pre><div class="opts"><div class="opt">A) It works, one re-render per change</div><div class="opt">B) tsc refuses the destructuring</div><div class="opt">C) Only the first value updates</div><div class="opt correct">D) React keeps re-rendering and gives up: Maximum update depth exceeded</div></div><div class="why"><b>Why:</b> A new object on every call is a different answer every time (Object.is), so React never sees a stable snapshot (the console says "The result of getSnapshot should be cached"). One selector per value, or useShallow.<br><b>A</b> is wrong: That is what useShallow gives you.<br><b>B</b> is wrong: It type-checks and lints cleanly: only running shows it.<br><b>C</b> is wrong: Neither value ever settles.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Someone stores <code class="inline">{oops</code> (not JSON at all) under shoreline-hq-ui and reloads. What does the HQ start with?</div><div class="opts"><div class="opt">A) A crash on the first render</div><div class="opt correct">B) Match my device and Roomy, with no error in the console</div><div class="opt">C) The last valid choices, kept somewhere else</div><div class="opt">D) A purple theme</div></div><div class="why"><b>Why:</b> persist catches a failed parse itself and keeps the store's defaults (measured in the lesson); merge then checks each field of anything that does parse. Data from outside is unknown until a check proves its shape.<br><b>A</b> is wrong: persist does not throw on bad JSON.<br><b>C</b> is wrong: There is only one saved copy.<br><b>D</b> is wrong: There is no purple here; and merge would refuse it.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">Which is a good reason to reach for Redux Toolkit instead of Zustand?</div><div class="opts"><div class="opt correct">A) The codebase already uses it, or the team wants every change named and replayable</div><div class="opt">B) It has persistence built in</div><div class="opt">C) It adds fewer packages</div><div class="opt">D) It makes server data easier to cache</div></div><div class="why"><b>Why:</b> Named actions, middleware and DevTools time travel are its strength on a large team; an existing codebase is the strongest reason of all. For the HQ's two display values Zustand was 1 package and +4.7 kB against 10 packages and +25.0 kB.<br><b>B</b> is wrong: RTK has none: teams write it by hand or add a library such as redux-persist.<br><b>C</b> is wrong: 10 packages against 1.<br><b>D</b> is wrong: Server data belongs in a server-state cache (TanStack Query, or RTK Query), not in a client store.</div></div>
+
+  <div class="sec"><h2>7.3 · Client State: predict, then check</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">A first visit to the HQ: is there a <code class="inline">shoreline-hq-ui</code> key in localStorage? After choosing Dark, what JSON is stored under it?</div><div class="opts"><div class="opt correct"><pre class="out">{"state":{"theme":"dark","density":"roomy"},"version":0}</pre></div></div><div class="why"><b>Why:</b> No key on a first visit (persist writes only after the first change), so the store's defaults are what a new person sees. After Dark, the lesson measured this JSON: the actions are left out (JSON cannot hold functions), and version 0 is persist's default.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Fifteen event cards, each with <code class="inline">useUiStore((state) =&gt; state.density === 'compact')</code>. How many re-render when the person chooses Dark? And Compact?</div><div class="opts"><div class="opt correct">Dark: 0. Compact: all 15.</div></div><div class="why"><b>Why:</b> The lesson measured it with a Profiler around each card: the boolean selector's answer does not change on a theme change; every card's answer changes on a density change, which is right.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the labs run exactly as <code class="inline">labs/check_labs.py</code> runs them (Node 24, a terminal like a learner's, a fresh copy of the lab folder). Test durations are left out.</p>
+<div class="blk lab"><div class="h">Lab 7.2: the volunteer's side (labs/module-19/l7_2-mutations/starter → solution)</div>
+<p>As shipped, and the solution (<code class="inline">npm run typecheck</code> prints nothing after its two <code class="inline">&gt;</code> lines):</p>
+<pre class="out">Tests  7 failed (7)
+Tests  7 passed (7)</pre><p>The solution's factories:</p>
+<pre class="code"><span class="k">export</span> <span class="k">function</span> signUpMutation() {
+  <span class="k">return</span> mutationOptions({
+    mutationFn: (eventId: <span class="k">string</span>) =&gt; postSignup(eventId),
+    onSuccess: () =&gt;
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: [<span class="s">'events'</span>] }),
+        queryClient.invalidateQueries({ queryKey: [<span class="s">'me'</span>] }),
+      ]),
+  })
+}</pre><ul class="tick">
+  <li><b>Task 1:</b> <code class="inline">useMutation(signUpMutation())</code>; inside <code class="inline">signUp.isSuccess &amp;&amp; …</code>, <code class="inline">signUp.data.status</code> is typed (<code class="inline">'waitlisted'</code> → the waiting-list sentence); <code class="inline">signUp.error instanceof ApiError</code> gives the API's 409 message, <code class="inline">You are already signed up for this cleanup.</code></li>
+  <li><b>Task 2:</b> a sign-up changes the cleanup's spots (<code class="inline">['events', 'detail', id]</code>) and Theo's own list (<code class="inline">['me', 'signups']</code>): <code class="inline">['events']</code> and <code class="inline">['me']</code>. With <code class="inline">staleTime: Infinity</code>, nothing else would ever refresh them.</li>
+  <li><b>Task 3:</b> the solution's <code class="inline">cancelSignupMutation</code> is the desk's pattern on Theo's list: <code class="inline">onMutate</code> awaits <code class="inline">cancelQueries</code>, reads the old status with <code class="inline">getQueryData</code>, writes <code class="inline">'cancelled'</code> with <code class="inline">setQueryData</code> and returns <code class="inline">{ before }</code>; <code class="inline">onError</code> checks <code class="inline">saved?.before !== undefined</code> before rolling back; <code class="inline">onSettled</code> invalidates <code class="inline">['me']</code> and <code class="inline">['events']</code>. The tests hold the PATCH until they have seen "Cancelled", then let it fail with the API's real 500 body.</li>
+  <li><b>Stretch answer:</b> signing up should wait: the API decides confirmed or waitlisted, so the screen cannot know the answer in advance.</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Lab 7.3: pinned sites (labs/module-19/l7_3-client-state/starter → solution)</div>
+<p>As shipped (tests, then the type check's errors), and the solution:</p>
+<pre class="out">Tests  7 failed (7)
+
+src/lab.test.tsx:39:21 - error TS2339: Property 'persist' does not exist on type 'UseBoundStore&lt;StoreApi&lt;PinState&gt;&gt;'.
+src/lab.test.tsx:45:21 - error TS2339: Property 'persist' does not exist on type 'UseBoundStore&lt;StoreApi&lt;PinState&gt;&gt;'.
+Found 2 errors in the same file, starting at: src/lab.test.tsx:39
+
+Tests  7 passed (7)</pre><p>The solution's store and button:</p>
+<pre class="code">togglePin: (siteId) =&gt;
+  set((state) =&gt; ({
+    pinned: state.pinned.includes(siteId)
+      ? state.pinned.filter((id) =&gt; id !== siteId)
+      : [...state.pinned, siteId],
+  })),
+
+<span class="c">// in PinButton</span>
+<span class="k">const</span> pinned = usePinStore((state) =&gt; state.pinned.includes(siteId))
+<span class="k">const</span> togglePin = usePinStore((state) =&gt; state.togglePin)</pre><ul class="tick">
+  <li><b>Task 1:</b> a new array every time; <code class="inline">push</code> would change the old one (the test keeps it and checks).</li>
+  <li><b>Task 2:</b> <code class="inline">create&lt;PinState&gt;()(persist(…, { name: 'shoreline-pins', merge }))</code>; the merge returns <code class="inline">current</code> unless <code class="inline">saved</code> is an object with an array <code class="inline">pinned</code>, then keeps <code class="inline">pinned.filter(isSiteId)</code> without duplicates. The saved JSON is <code class="inline">{"state":{"pinned":["long-strand"]},"version":0}</code>.</li>
+  <li><b>Task 3:</b> with <code class="inline">const { pinned, togglePin } = usePinStore()</code> all six buttons re-render on every pin; with the boolean selector only the clicked one.</li>
+  <li><b>Stretch answer:</b> <code class="inline">usePinStore((state) =&gt; state.pinned.length)</code> (a number); an object selector gives a new object on every call, and Zustand 5 makes React re-render until it gives up.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 7.2 · Mutations</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="7.2">
+  <li><b>D</b> onSuccess invalidated ['events']: createEventMutation's onSuccess invalidates every key starting with events, so the list's entry is stale and is fetched again when the page shows it. Without it, the measured list still said 17.</li>
+  <li><b>B</b> { before: SignupStatus | undefined } | undefined: The type is inferred from what onMutate returns, plus undefined, because the mutation can fail before onMutate finished. That is why the rollback checks saved?.before.</li>
+  <li><b>A</b> It is a big change that is hard to take back, so the screen should say "Cancelled" only when it is true: Optimistic updates suit small, frequent, easy-to-undo changes. Cancelling affects 18 volunteers; showing it as done before it is true would mislead the organizer if the request failed.</li>
+  <li><b>C</b> The desk sends a second PATCH with his old status, then the reducer forgets that history entry: Undo is one more save: markMutation sends Diego's mark from before (confirmed), and when the API accepts it the reducer drops that history entry. Measured: two PATCH requests for s088.</li>
+  <li><b>B</b> Shows "Not saved. The server had a problem (500)…" in the form's status line and keeps what she typed: Mutations do not retry by default (a repeated POST could create the cleanup twice). mutateAsync rejects, the action's catch has no fieldErrors to show, and describeError's sentence goes in the status line; the fields keep what Maya typed.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 7.3 · Client State</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="7.3">
+  <li><b>C</b> In the URL's search params: A search that a link or Back should reproduce belongs in the URL's search params, where the HQ has kept it since Lesson 6.2. The query key then includes it, so the cache follows the URL.</li>
+  <li><b>B</b> 0: The selector still answers false, the same value as before, so Object.is says nothing changed and no card re-renders. Measured: 0, against 15 when a card read the whole store.</li>
+  <li><b>D</b> So you can give UiState while TypeScript still infers the middleware's types: TypeScript cannot take some type arguments from you and infer others in the same call. The first call takes UiState; the second infers the middleware's types. Without it, tsc reports TS2345 about the persist mutator.</li>
+  <li><b>A</b> Match my device and Compact: merge checks each saved value on its own: purple fails isTheme and falls back to the default, compact passes isDensity and is kept.</li>
+  <li><b>B</b> Add it to a slice the way the team does, with an action and the typed Hooks: The codebase already uses Redux Toolkit, which is the strongest reason to use it: a field and a reducer in a slice, read with the team's typed useAppSelector, keep one way of doing things.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Wait and optimistic:</b> cancel waits (big, hard to take back, 18 volunteers are told); a check-in mark is optimistic (small, frequent, easy to undo).</li>
+  <li><b>After a mark:</b> <code class="inline">['events']</code> (roster, spots, lists) and <code class="inline">['volunteers']</code> (hours come from attended cleanups).</li>
+  <li><b>Compact selector:</b> <code class="inline">useUiStore((state) =&gt; state.density === 'compact')</code>.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Item 1 B or C.</b> Mixes up queries and mutations. Compare <code class="inline">useQuery</code> (runs on mount, cached, retried) and <code class="inline">useMutation</code> (runs when called) side by side.</li>
+  <li><b>Item 3 A.</b> Invalidates only what is on screen. Ask what else a mark changes (spots, hours).</li>
+  <li><b>Item 4 B.</b> Thinks optimistic means "faster, so better". Ask what a failure would have told 18 people.</li>
+  <li><b>Item 9 B.</b> Believes React only re-renders what changed. Without a selector, the component subscribed to everything.</li>
+  <li><b>Item 12 B.</b> Expects Redux Toolkit to persist by itself. It does not: Zustand's persist was the difference.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 19 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

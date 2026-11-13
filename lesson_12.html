@@ -1,0 +1,1716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Give every component its own CSS Module, typed by TypeScript, add the crew's font and visible focus rings, and check Shoreline Crew HQ for accessibility with the linter, the browser and your own keyboard. React + TypeScript: Build a Modern Web App Lesson 3.6.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Styling and Accessible Components - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>🎨 Lesson 3.6: Styling and Accessible Components</h1>
+                <p class="lead">Shoreline Crew HQ has grown to three pages, a dozen components and one global stylesheet of more than 300 lines that every component reaches into. Today each component gets its own stylesheet, with class names nobody else can clash with and types TypeScript can read. The app gets the crew's font and a focus ring you can always see, and then you check it the way real teams do: with the linter, with the browser's audits, and with your own hands on the keyboard. Module 3 ends with an app that is tidy inside and works for everyone outside.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain why one global stylesheet stops scaling, and how CSS Modules scope class names to a component</li>
+                        <li>Import a CSS Module in a typed component, combine classes, pick a variant from a union-typed prop, and read the <code>string | undefined</code> type TypeScript gives each class</li>
+                        <li>Use inline <code>style</code> objects typed as <code>CSSProperties</code> for values that come from data, and know when not to</li>
+                        <li>Self-host a font, keep design tokens global, and give every focusable element a visible focus ring</li>
+                        <li>Check components for accessibility with the linter's <code>jsx-a11y</code> rules, the browser's audits, and a keyboard pass, and fix what only a person notices</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 155 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_11.html">Lesson 3.5: Forms and Actions</a> (your <code>shoreline-hq</code> with the "Plan a cleanup" form)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A CSS Module for every component, the Outfit font, brand-colored focus rings, accessibility rules in the linter, and button names that make sense out of context</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-12-start.zip">lesson-12-start.zip</a> · Finished code: <a href="downloads/lesson-12-end.zip">lesson-12-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#where" class="toc-link">Where Styles Live</a></li>
+                        <li><a href="#modules" class="toc-link">CSS Modules in TypeScript</a></li>
+                        <li><a href="#inline" class="toc-link">Inline Styles and CSSProperties</a></li>
+                        <li><a href="#fonts-layout" class="toc-link">Fonts, Tokens and Layout</a></li>
+                        <li><a href="#accessible" class="toc-link">Accessible Components</a></li>
+                        <li><a href="#checking" class="toc-link">Checking Accessibility</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: A Styled, Accessible HQ</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="where" class="lesson-section">
+                <h2>🗂️ Where Styles Live</h2>
+                <p>Open <code>src/index.css</code>. Since Lesson 3.1 every component's styles have gone into this one file: <code>.site-header</code>, <code>.card</code>, <code>.badge-info</code>, <code>.field</code>, <code>.button-primary</code>, more than 300 lines. That worked while the app was small. Look at what it costs now:</p>
+                <ul>
+                    <li><strong>One namespace for everything.</strong> Every class name in the file applies to the whole app. If a new component also calls something <code>.card</code> or <code>.lead</code>, the two rules mix, and nothing warns you. A rule like <code>.card h3</code> from Lesson 3.3 reaches into any <code>h3</code> inside any element with that class, wherever it is.</li>
+                    <li><strong>No link between a component and its styles.</strong> Delete <code>SpotsLine.tsx</code> and <code>.spots-full</code> stays in <code>index.css</code> forever, because nobody can be sure no other component uses it.</li>
+                    <li><strong>Strings TypeScript cannot check.</strong> <code>className="badge-sucess"</code> compiles. The badge is simply unstyled.</li>
+                </ul>
+                <p>React itself has no opinion about styling, so teams pick one of a handful of approaches. You will meet all of them:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Approach</th><th>What it looks like</th><th>Trade-offs</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Global CSS</td><td><code>className="card"</code>, rules in one file</td><td>Nothing to learn; clashes and leftovers as the app grows</td></tr>
+                            <tr><td><strong>CSS Modules</strong></td><td><code>className={styles.card}</code>, a <code>Card.module.css</code> next to the component</td><td>Plain CSS, scoped automatically, built into Vite, nothing extra in the browser</td></tr>
+                            <tr><td>Inline styles</td><td><code>style={{ width: '40%' }}</code></td><td>Typed and dynamic, but no <code>:hover</code>, <code>:focus-visible</code> or media queries</td></tr>
+                            <tr><td>Utility classes (Tailwind)</td><td><code>className="p-4 rounded-lg bg-white"</code></td><td>Fast once learned, a build plugin and a vocabulary to learn, long class lists</td></tr>
+                            <tr><td>CSS-in-JS (styled-components, Emotion)</td><td>Styles written in JavaScript template strings</td><td>Dynamic and colocated; most libraries add work in the browser at run time</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>This course uses <strong>CSS Modules</strong>: you keep writing the CSS you know, Vite supports them with no install, and the browser receives an ordinary stylesheet. Everything you learn about scoping, tokens and focus carries over to whichever approach your next team uses.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: crews with the same job titles</h4>
+                    <p>At a big cleanup day every beach has a "lead" and a "sweeper". Shout "lead!" on a shared radio channel and three people answer. So the radio says "Driftwood lead" and "Jetty lead": same job titles, never confused. CSS Modules do this for class names. You write <code>.card</code> in <code>Card.module.css</code>; the build turns it into a name that includes the file it came from, so no other <code>.card</code> anywhere can answer.</p>
+                </div>
+            </section>
+
+            <section id="modules" class="lesson-section">
+                <h2>📦 CSS Modules in TypeScript</h2>
+                <h3>A module, step by step</h3>
+                <p>Any CSS file whose name ends in <code>.module.css</code> is a CSS Module. Try one in <code>shoreline-hq</code>: create <code>src/Scratch.module.css</code> (your experiment files for this lesson):</p>
+                <pre data-snippet><code class="language-css">.note {
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--sunrise);
+  background: var(--surface);
+}
+
+.title {
+  margin: 0;
+  font-weight: 600;
+}</code></pre>
+                <p>and <code>src/Scratch.tsx</code>:</p>
+                <pre data-snippet><code class="language-tsx">import styles from './Scratch.module.css'
+
+// A tide warning for the top of an event page
+export function TideNote() {
+  return (
+    &lt;aside className={styles.note}&gt;
+      &lt;p className={styles.title}&gt;High tide at 11:40&lt;/p&gt;
+      &lt;p&gt;Finish the lower beach first.&lt;/p&gt;
+    &lt;/aside&gt;
+  )
+}</code></pre>
+                <p>To see it, import <code>TideNote</code> in <code>App.tsx</code> and temporarily make <code>return &lt;TideNote /&gt;</code> the first line of <code>CurrentPage</code>. With the dev server running, inspect the note in the browser (right-click, <strong>Inspect</strong>). The Elements panel shows:</p>
+                <div class="card card-output">
+                    <h4>The HTML React rendered (dev server)</h4>
+                    <pre><code>&lt;aside class="_note_1pozh_1"&gt;
+  &lt;p class="_title_1pozh_7"&gt;High tide at 11:40&lt;/p&gt;
+  &lt;p&gt;Finish the lower beach first.&lt;/p&gt;
+&lt;/aside&gt;</code></pre>
+                </div>
+                <p>Three things happened:</p>
+                <ul>
+                    <li><code>import styles from './Scratch.module.css'</code> gave you an object. Its keys are the class names you wrote, its values are the names the browser actually gets: <code>styles.note</code> is <code>"_note_1pozh_1"</code>.</li>
+                    <li>Vite rewrote every class in the file the same way: an underscore, your name, a short code made from the file, and the line number. Your hash will differ; the shape is the same in the production build.</li>
+                    <li>The CSS itself is unchanged apart from the names, so <code>var(--sunrise)</code> and <code>var(--surface)</code> still come from <code>index.css</code>. Custom properties are inherited through the page, not scoped: the design tokens stay global and every module can use them.</li>
+                </ul>
+                <div class="mermaid">
+graph TD
+    A["Card.module.css: .card"] --> B["Vite renames the class"]
+    B --> C["styles.card: the new name"]
+    B --> D["The rule: the new name"]
+    C --> E["className on the element"]
+    D --> F["One CSS file in the build"]
+</div>
+                <h3>What TypeScript knows about <code>styles</code></h3>
+                <p>TypeScript cannot read CSS files. The type comes from <code>vite/client</code> (the <code>types</code> entry in <code>tsconfig.app.json</code> you read in Lesson 2.4), which says every <code>*.module.css</code> file exports a <code>CSSModuleClasses</code>:</p>
+                <pre data-snippet><code class="language-ts">type CSSModuleClasses = { readonly [key: string]: string }</code></pre>
+                <p>That is an <strong>index signature</strong>: "any string key, string values". And since Lesson 2.4 the HQ has <code>noUncheckedIndexedAccess</code> on, so TypeScript treats <code>styles.note</code>, and every other class, as <code>string | undefined</code>. That is the honest answer: it does not know whether the class exists. Two consequences:</p>
+                <ul>
+                    <li><code>className</code> accepts <code>string | undefined</code>, so <code>className={styles.note}</code> compiles. Where a plain <code>string</code> is required, you get an error:</li>
+                </ul>
+                <pre data-snippet><code class="language-tsx">import styles from './Scratch.module.css'
+
+// A helper that promises to return a string
+function noteClass(): string {
+  return styles.note
+}
+
+export function TideNote() {
+  return &lt;aside className={noteClass()}&gt;High tide at 11:40&lt;/aside&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:5:3 - error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+
+5   return styles.note
+    ~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:5</code></pre>
+                </div>
+                <ul>
+                    <li>A misspelled class is <em>not</em> an error. Change <code>styles.note</code> to <code>styles.ntoe</code> in <code>TideNote</code>: <code>npx tsc -b</code> and <code>npm run lint</code> both pass, the note loses its border, and the Elements panel shows why:</li>
+                </ul>
+                <div class="card card-output">
+                    <h4>The HTML React rendered (dev server)</h4>
+                    <pre><code>&lt;aside&gt;
+  &lt;p class="_title_1pozh_7"&gt;High tide at 11:40&lt;/p&gt;
+  &lt;p&gt;Finish the lower beach first.&lt;/p&gt;
+&lt;/aside&gt;</code></pre>
+                </div>
+                <p><code>styles.ntoe</code> is <code>undefined</code>, and React leaves out a <code>className</code> that is <code>undefined</code>. In other words, CSS Modules make clashes impossible, but they do not make typos impossible. You catch those by looking at the page, and Exercise 3 shows how to let TypeScript catch them too.</p>
+                <h3>Names, combinations and variants</h3>
+                <ul>
+                    <li><strong>Use camelCase class names</strong> in modules: <code>.skipLink</code>, not <code>.skip-link</code>. <code>styles.skip-link</code> is "<code>styles.skip</code> minus <code>link</code>" to JavaScript (Common Mistakes shows the four errors).</li>
+                    <li><strong>Name classes by their job inside the component</strong>: <code>.picture</code>, <code>.parking</code>, <code>.full</code>. The file already says which component they belong to, so prefixes like <code>site-</code> are no longer needed.</li>
+                    <li><strong>Combine classes</strong> with a template literal: <code>className={`${styles.badge} ${styles[tone]}`}</code>.</li>
+                    <li><strong>Pick a variant with a typed prop.</strong> <code>Badge</code>'s <code>tone</code> is the union <code>'info' | 'success' | 'neutral' | 'danger'</code>, and <code>Badge.module.css</code> has one class per member, so <code>styles[tone]</code> is a lookup, like the <code>Record</code> tables of Lesson 3.3.</li>
+                    <li><strong>Element selectors inside a class still work</strong>: <code>.card h2</code> means "any <code>h2</code> inside this module's <code>.card</code>". Plain element rules (<code>h1</code>, <code>a</code>) belong in <code>index.css</code>, because they are about the whole page.</li>
+                    <li><strong>Sharing is importing.</strong> A CSS Module is a module: when <code>EventCard</code> needs the card look, it imports <code>Card.module.css</code> under a different name, <code>cardStyles</code>. A module that several components share, such as the project's <code>Form.module.css</code>, is named for what it styles.</li>
+                </ul>
+            </section>
+
+            <section id="inline" class="lesson-section">
+                <h2>✏️ Inline Styles and CSSProperties</h2>
+                <p>The <code>style</code> prop takes an object, not a string, and React's types describe it as <code>CSSProperties</code>: every CSS property in camelCase, with its allowed values. Numbers for lengths become pixels. Inline styles are the right tool when a value comes from data at run time, such as a bar as wide as the share of spots already taken:</p>
+                <pre data-snippet><code class="language-tsx">import type { CSSProperties } from 'react'
+
+interface SpotsBarProps {
+  taken: number
+  capacity: number
+}
+
+// The width comes from data, so it belongs in a style object, not in a class
+export function SpotsBar({ taken, capacity }: SpotsBarProps) {
+  const fill: CSSProperties = {
+    width: `${Math.round((taken / capacity) * 100)}%`,
+    height: 8,
+    backgroundColor: 'var(--kelp)',
+  }
+  return &lt;div style={fill} /&gt;
+}</code></pre>
+                <p><code>height: 8</code> becomes <code>8px</code>, and a token still works as a value. Annotating the object with <code>CSSProperties</code> makes TypeScript check it before it reaches the <code>style</code> prop. Write a property the CSS way:</p>
+                <pre data-snippet><code class="language-tsx">import type { CSSProperties } from 'react'
+
+const fill: CSSProperties = {
+  'background-color': 'var(--kelp)',
+}
+
+export function SpotsBar() {
+  return &lt;div style={fill} /&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:4:3 - error TS2353: Object literal may only specify known properties, and ''background-color'' does not exist in type 'Properties&lt;string | number, string &amp; {}&gt;'.
+
+4   'background-color': 'var(--kelp)',
+    ~~~~~~~~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:4</code></pre>
+                </div>
+                <p>TS2353 is the excess property check from Lesson 2.2: <code>CSSProperties</code> knows <code>backgroundColor</code>, not <code>'background-color'</code>. Use inline styles for values computed from data; use a class for everything else. A <code>style</code> object cannot express <code>:hover</code>, <code>:focus-visible</code>, dark mode or a media query, and a page full of inline styles is as hard to change as one big stylesheet.</p>
+            </section>
+
+            <section id="fonts-layout" class="lesson-section">
+                <h2>🔤 Fonts, Tokens and Layout</h2>
+                <h3>The crew's font, self-hosted</h3>
+                <p>Shoreline Crew's headings use <strong>Outfit</strong>, a free font (SIL Open Font License). The usual way to add a web font is a <code>&lt;link&gt;</code> to a font service, which means every visitor's browser contacts that service. The <strong>Fontsource</strong> packages put the font files in your project instead: one <code>npm install</code>, one import, and Vite copies the files into your build. Your app works offline, nobody else sees your visitors, and the font's version is in your lockfile like any other dependency.</p>
+                <p>The package's own CSS declares the font as <code>'Outfit Variable'</code>, a variable font: one file covers every weight from 100 to 900. It also says <code>font-display: swap</code>, so text appears at once in the fallback font and switches when Outfit arrives. You add the import in Step 1 of the project.</p>
+                <h3>Tokens stay global</h3>
+                <p>Moving component styles into modules does not mean everything moves. <code>index.css</code> keeps what is about the whole page: the brand colors and role tokens (<code>--page</code>, <code>--text</code>, <code>--link</code>, and their dark-mode values), the base font, plain element rules, and one rule every component needs: the focus ring. Because custom properties are inherited, a module can also <em>set</em> a token for everything inside it. The header does that in Step 2, so focus rings on its dark background are orange instead of teal.</p>
+                <h3>Layout: the two tools the HQ uses</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Job in the HQ</th><th>Tool</th><th>Why it works on a phone</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Header: logo left, links right; filters; form rows; buttons</td><td>Flexbox with <code>flex-wrap: wrap</code> and <code>gap</code></td><td>Items move to the next line when there is no room</td></tr>
+                            <tr><td>Cards on the home, sites and events pages</td><td>Grid with <code>repeat(auto-fill, minmax(16rem, 1fr))</code></td><td>As many 16rem columns as fit: one on a phone, three on a laptop</td></tr>
+                            <tr><td>The page column</td><td><code>max-width: 60rem</code> + <code>margin: 0 auto</code></td><td>Lines stay readable on wide screens, full width on small ones</td></tr>
+                            <tr><td>The whole app: footer at the bottom</td><td><code>#root</code> as a flex column, <code>main</code> with <code>flex: 1</code></td><td>Short pages still push the footer down</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>None of these needs a media query: the layouts adapt to the space they get. Reach for <code>@media (width &lt; 40rem)</code> when something must <em>change</em> at a size, not just wrap.</p>
+            </section>
+
+            <section id="accessible" class="lesson-section">
+                <h2>♿ Accessible Components</h2>
+                <p>An accessible component works for people who use it differently from you: with a keyboard instead of a mouse, with a screen reader that speaks the page, zoomed to 200%, in bright sunlight on a beach, with one hand while holding a bag of rubbish. Accessibility is part of quality, like types and tests, and in many countries public and commercial sites are legally required to meet the Web Content Accessibility Guidelines (WCAG). It is also simply more users: an organizer who cannot plan a cleanup in the HQ is an organizer the crew loses.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the step-free route</h4>
+                    <p>Every site in the API has an <code>accessible</code> flag: is there a step-free route to the beach? A ramp built with the stairs costs little; one added after the stairs are poured costs a lot. And everyone uses the ramp: strollers, wheelbarrows, the volunteer with the heavy cooler. Accessible components are the same. Built in from the start, they cost a <code>&lt;button&gt;</code> instead of a <code>&lt;div&gt;</code> and a label instead of a placeholder. Retrofitted, they cost a rewrite.</p>
+                </div>
+                <p>The HQ has followed most of these habits since Lesson 3.1. Here they are as a checklist, so you can apply them on purpose:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Habit</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>The right element first.</strong> Actions are <code>&lt;button&gt;</code>, navigation is <code>&lt;a href&gt;</code>, form controls are real inputs. They are focusable and work with <kbd>Enter</kbd> and <kbd>Space</kbd> for free.</td><td>"Show details" and "Clear filters" are buttons; the header links are links</td></tr>
+                            <tr><td><strong>Landmarks and headings.</strong> <code>header</code>, <code>nav</code>, <code>main</code>, <code>search</code>, <code>footer</code>; one <code>h1</code> per page, no skipped levels. Screen reader users jump by these.</td><td>Every page: h1, h2 groups, h3 per event card</td></tr>
+                            <tr><td><strong>Every control has a name.</strong> Inputs get a <code>&lt;label htmlFor&gt;</code>, buttons get visible text. Names should make sense out of context: screen readers can list all buttons on a page.</td><td>Labels on every field (3.4, 3.5); the 15 "Show details" buttons are fixed in Step 6</td></tr>
+                            <tr><td><strong>Images: describe or hide.</strong> An image that carries information gets <code>alt</code> text that says what it shows. A decorative one, or one whose meaning is already in the text next to it, gets <code>alt=""</code>. Never "image of".</td><td>The logo next to "Shoreline Crew HQ" has <code>alt=""</code>; site pictures use the API's <code>image.alt</code></td></tr>
+                            <tr><td><strong>Focus you can see.</strong> Never <code>outline: none</code> without a replacement. Tab order follows the order in the HTML; <code>tabIndex</code> is only ever <code>0</code> or <code>-1</code>.</td><td>A skip link (3.1); a brand focus ring in Step 1</td></tr>
+                            <tr><td><strong>Contrast and not color alone.</strong> Text at least 4.5:1 against its background, focus rings and field borders at least 3:1. Errors say so in words, not only in red.</td><td>Brand tokens chosen for contrast; field errors are text plus a thicker border (3.5)</td></tr>
+                            <tr><td><strong>State in the markup.</strong> <code>aria-expanded</code>, <code>aria-invalid</code>, <code>aria-describedby</code>, <code>role="status"</code> tell assistive technology what the screen shows.</td><td>Details toggle (3.4), form errors and status line (3.5)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>About ARIA, the attributes in the last row: they change what assistive technology is <em>told</em>, never what the element <em>does</em>. <code>role="button"</code> on a <code>&lt;div&gt;</code> does not make it focusable or respond to <kbd>Enter</kbd>. The first rule of ARIA, from the W3C itself, is not to use it when a native HTML element already does the job. No ARIA is better than wrong ARIA.</p>
+                <p>And focus, in CSS: <code>:focus</code> matches whenever an element has focus, including right after a mouse click. <code>:focus-visible</code> matches when the browser judges a focus ring helpful: always for keyboard focus and text fields, usually not after clicking a button. Use <code>:focus-visible</code> for the ring, as the project does.</p>
+            </section>
+
+            <section id="checking" class="lesson-section">
+                <h2>🔍 Checking Accessibility</h2>
+                <p>Accessibility problems are checked in layers, from cheap and automatic to slow and human:</p>
+                <div class="mermaid">
+graph TD
+    A["The linter, as you type"] --> B["The browser's audits"]
+    B --> C["You: keyboard and screen reader"]
+    C --> D["Automated tests (Lesson 9.3)"]
+</div>
+                <h3>1. The linter</h3>
+                <p>oxlint, the linter Vite set up in Lesson 1.2, has a plugin called <code>jsx-a11y</code> ("a11y" is short for accessibility: a, 11 letters, y). It reads your TSX and knows the rules for HTML elements and ARIA. You switch it on in Step 6. Here is what it says about a component that many tutorials would call fine:</p>
+                <pre data-snippet><code class="language-tsx">interface SiteTileProps {
+  name: string
+  imageUrl: string
+  onOpen: () =&gt; void
+}
+
+// Fine with a mouse. With a keyboard or a screen reader, it is a dead end.
+export function SiteTile({ name, imageUrl, onOpen }: SiteTileProps) {
+  return (
+    &lt;div onClick={onOpen}&gt;
+      &lt;img src={imageUrl} /&gt;
+      &lt;span&gt;{name}&lt;/span&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run lint, with the plugin on)</h4>
+                    <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  ⚠ jsx-a11y(click-events-have-key-events): Enforce a clickable non-interactive element has at least one keyboard event listener.
+    ╭─[src/Scratch.tsx:10:5]
+  9 │   return (
+ 10 │     &lt;div onClick={onOpen}&gt;
+    ·     ──────────────────────
+ 11 │       &lt;img src={imageUrl} /&gt;
+    ╰────
+  help: Visible, non-interactive elements with click handlers must have one of `keyup`, `keydown`, or `keypress` listener.
+
+  ⚠ jsx-a11y(no-static-element-interactions): Static HTML elements with event handlers require a role.
+    ╭─[src/Scratch.tsx:10:6]
+  9 │   return (
+ 10 │     &lt;div onClick={onOpen}&gt;
+    ·      ───
+ 11 │       &lt;img src={imageUrl} /&gt;
+    ╰────
+  help: Add a role attribute to this element, or use a semantic HTML element instead.
+
+  ⚠ jsx-a11y(alt-text): Missing `alt` attribute.
+    ╭─[src/Scratch.tsx:11:7]
+ 10 │     &lt;div onClick={onOpen}&gt;
+ 11 │       &lt;img src={imageUrl} /&gt;
+    ·       ──────────────────────
+ 12 │       &lt;span&gt;{name}&lt;/span&gt;
+    ╰────
+  help: Must have `alt` prop, either with meaningful text, or an empty string for decorative images.
+
+Found 3 warnings and 0 errors.
+Finished in 12ms on 31 files with 150 rules using 20 threads.</code></pre>
+                </div>
+                <p>Three warnings, and <code>npx tsc -b</code> has nothing to say: the types are fine. A <code>&lt;div&gt;</code> with <code>onClick</code> cannot be reached with <kbd>Tab</kbd> and does not respond to <kbd>Enter</kbd>, and a screen reader does not announce it as something you can press. The image has no <code>alt</code>, so a screen reader may read out its file name. The fix is not three attributes; it is the right element:</p>
+                <pre data-snippet><code class="language-tsx">interface SiteTileProps {
+  name: string
+  imageUrl: string
+  onOpen: () =&gt; void
+}
+
+// A real button: focusable, works with Enter and Space, and its name is the site's name
+export function SiteTile({ name, imageUrl, onOpen }: SiteTileProps) {
+  return (
+    &lt;button type="button" onClick={onOpen}&gt;
+      &lt;img src={imageUrl} alt="" /&gt;
+      {name}
+    &lt;/button&gt;
+  )
+}</code></pre>
+                <p>Now <code>npm run lint</code> says <code>Found 0 warnings and 0 errors.</code> The button is focusable, works with <kbd>Enter</kbd> and <kbd>Space</kbd>, and its name is the site's name. The image is <code>alt=""</code> because the name is already there in text.</p>
+                <h3>2. The browser's audits</h3>
+                <p>Browsers can check a running page, which the linter cannot: colors, contrast, what is actually focusable. Two free tools are worth knowing; screenshots of DevTools are not possible in this course, so follow the steps in your own browser:</p>
+                <ul>
+                    <li><strong>Lighthouse</strong>, built into Chrome and Edge DevTools: open DevTools (<kbd>F12</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>Option</kbd>+<kbd>I</kbd> on a Mac), choose the <strong>Lighthouse</strong> tab, tick only <strong>Accessibility</strong>, and press <strong>Analyze page load</strong>. You get a score and a list of failed checks, each with the elements involved and a "learn more" link.</li>
+                    <li><strong>axe DevTools</strong>, a free browser extension from Deque (Chrome, Edge and Firefox), adds an <strong>axe DevTools</strong> tab that scans the page and explains each issue. It uses axe-core, the same engine you will run in automated tests in Lesson 9.3. A paid version adds guided tests; the free scan is all this course needs.</li>
+                </ul>
+                <p>DevTools also shows the <strong>accessibility tree</strong>, the version of the page that screen readers get: in Chrome's Elements panel, select an element and open the <strong>Accessibility</strong> pane next to Styles to see its role and its computed name. Its color picker shows the contrast ratio of a text color against its background.</p>
+                <h3>3. You</h3>
+                <p>Automated tools are a floor, not a ceiling. They find problems that can be decided by a rule (a missing label, low contrast), and only some of all problems. They cannot tell whether an <code>alt</code> text describes the picture, whether the order of things makes sense, or whether 15 buttons with the same name are usable. Two quick human checks find most of the rest:</p>
+                <ul>
+                    <li><strong>A keyboard pass.</strong> Put the mouse aside. <kbd>Tab</kbd> through the page, <kbd>Shift</kbd>+<kbd>Tab</kbd> back, <kbd>Enter</kbd> and <kbd>Space</kbd> to activate. Can you always see where you are? Can you reach and use everything? Is the order sensible?</li>
+                    <li><strong>A screen reader, for one task.</strong> NVDA is free on Windows; VoiceOver is built into macOS (<kbd>⌘ Cmd</kbd>+<kbd>F5</kbd> turns it on and off). Ten minutes of planning a cleanup with your eyes closed teaches more than any checklist.</li>
+                </ul>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Accessibility work shows up in job descriptions, design reviews and, for public organizations and many businesses, legal requirements. Developers who can say "I checked it with the keyboard and a screen reader, here is what I fixed" are rare and valued. And the habits are cheap once they are habits: the HQ needed almost no changes today because it has used the right elements since Lesson 3.1.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Moving the CSS but not the <code>className</code></h4>
+                    <p>During the move, you cut a rule from <code>index.css</code> into a module and forget to change the component. <code>className="badge badge-info"</code> is still a valid string, so <code>npx tsc -b</code> and <code>npm run lint</code> both pass, and the browser renders <code>&lt;span class="badge badge-info"&gt;Port Marisol&lt;/span&gt;</code>: a class with no rule behind it, so the badge has no background at all. After the move, search the project for <code>className="</code> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>, <kbd>⌘ Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> on a Mac): no results means nothing was missed.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Dashes in a module's class names</h4>
+                    <p>Keep <code>.skip-link</code> in a module and write <code>className={styles.skip-link}</code>:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b, trimmed)</h4>
+                        <pre><code>13       &lt;a className={styles.skip-link} href="#main"&gt;
+                       ~~~~~~~~~~~
+
+src/components/AppLayout.tsx:13:21 - error TS18048: 'styles.skip' is possibly 'undefined'.
+
+13       &lt;a className={styles.skip-link} href="#main"&gt;
+                       ~~~~~~~~~~~
+
+src/components/AppLayout.tsx:13:33 - error TS2304: Cannot find name 'link'.
+
+13       &lt;a className={styles.skip-link} href="#main"&gt;
+                                   ~~~~
+
+
+Found 4 errors in the same file, starting at: src/components/AppLayout.tsx:13</code></pre>
+                    </div>
+                    <p>Four errors from one line, because JavaScript read it as <code>styles.skip - link</code>: a subtraction, a variable called <code>link</code> that does not exist, and a number where <code>className</code> wants a string. <code>styles['skip-link']</code> would work, but camelCase names (<code>.skipLink</code>) keep the dot.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Forgetting <code>.module</code> in the file name</h4>
+                    <p>Only files named <code>*.module.css</code> are CSS Modules. Name the file <code>Card.css</code> and import it the same way, and TypeScript notices:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/components/Card.tsx:11:32 - error TS2339: Property 'card' does not exist on type 'typeof import("*.css")'.
+
+11     &lt;section className={styles.card}&gt;
+                                  ~~~~
+
+
+Found 1 error in src/components/Card.tsx:11</code></pre>
+                    </div>
+                    <p>A plain <code>.css</code> import is global CSS with no class names to hand back. Rename the file to <code>Card.module.css</code> and fix the import.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ <code>outline: none</code></h4>
+                    <p>A focus ring can look out of place in a design, and <code>outline: none</code> makes it go away for everyone, including the keyboard users who navigate by it. Neither tool warns you. If a ring looks wrong, restyle it (color, offset, thickness); never remove it.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: A Styled, Accessible HQ</h2>
+                <p>Today's project changes how the HQ is built more than what it shows: at the end, <code>index.css</code> holds only tokens and page-wide rules, every component imports its own module, headings use Outfit, focus is always visible, and the linter checks accessibility on every run. Then you check the app as a keyboard user would and fix the one problem the tools miss.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>) and delete <code>src/Scratch.tsx</code> and <code>src/Scratch.module.css</code> (and the <code>TideNote</code> lines in <code>App.tsx</code>) if you still have them. The pattern for every component is the same, so after the first two it goes quickly:</p>
+                <ol>
+                    <li>Create <code>Name.module.css</code> next to <code>Name.tsx</code>.</li>
+                    <li><strong>Cut</strong> the component's rules out of <code>index.css</code> and paste them in, renaming each class to a short camelCase name.</li>
+                    <li>In the component, <code>import styles from './Name.module.css'</code> and change each <code>className="…"</code> to <code>className={styles.…}</code>.</li>
+                    <li>Look at the page: it should look exactly as before.</li>
+                </ol>
+
+                <div class="card">
+                    <h3>Step 1: The crew's font and one focus ring <span class="step-time">(8 min)</span></h3>
+                    <p>Install the font package in <code>shoreline-hq</code> (this course was checked with version 5.3.0):</p>
+                    <pre class="terminal"><code class="language-bash">npm install @fontsource-variable/outfit</code></pre>
+                    <p>It is added to <code>dependencies</code> in <code>package.json</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/package.json</div>
+                        <pre data-src="shoreline-hq/package.json" data-match="diff"><code class="language-diff-json">   "dependencies": {
++    "@fontsource-variable/outfit": "^5.3.0",
+     "react": "^19.3.1",</code></pre>
+                    </div>
+                    <p>Import it once, in <code>src/main.tsx</code>, before your own CSS. Change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/main.tsx</div>
+                        <pre data-src="shoreline-hq/src/main.tsx" data-match="diff"><code class="language-diff-tsx"> import { createRoot } from 'react-dom/client'
++import '@fontsource-variable/outfit'
+ import './index.css'</code></pre>
+                    </div>
+                    <p>An import with no names is a <strong>side-effect import</strong>: it runs a file for what it does (here, adding the <code>@font-face</code> rules) rather than for what it exports. The package ships its own small type declaration, so TypeScript accepts it. Now two page-wide rules in <code>src/index.css</code>. A focus token next to the other role tokens in <code>:root</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css">   --error: var(--coral);
++  --focus: var(--link);</code></pre>
+                    </div>
+                    <p>And after the <code>a</code> rule, the headings' font and the focus ring:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css"> a {
+   color: var(--link);
+ }
++
++h1,
++h2,
++h3 {
++  font-family: 'Outfit Variable', system-ui, sans-serif;
++  line-height: 1.2;
++}
++
++/* One focus ring for everything you can reach with the keyboard */
++:focus-visible {
++  outline: 3px solid var(--focus);
++  outline-offset: 2px;
++}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>--focus: var(--link)</code> follows the link color, so it is Sea Teal on the light page and light teal in dark mode with no extra line: the dark-mode block already changes <code>--link</code>.</li>
+                        <li>The ring is 3 pixels with a 2-pixel gap, so it never sits on top of the element's own border. Sea Teal on Sand is 5.26:1, comfortably above the 3:1 a focus indicator needs.</li>
+                        <li><code>system-ui, sans-serif</code> after Outfit are the fallbacks used until the font has loaded.</li>
+                    </ul>
+                    <p>Save and look at the home page: the headings change shape. Press <kbd>Tab</kbd> a few times and the ring appears on each link.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The shell: layout, header, footer <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>src/components/AppLayout.module.css</code> and move the <code>.skip-link</code> and <code>.page</code> rules into it (cut them from <code>index.css</code>), renaming <code>.skip-link</code> to <code>.skipLink</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.module.css"><code class="language-css">/* Hidden until a keyboard user tabs to it */
+.skipLink {
+  position: absolute;
+  top: -4rem;
+  left: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--sunrise);
+  color: var(--ink);
+}
+
+.skipLink:focus {
+  top: 1rem;
+}
+
+.page {
+  flex: 1;
+  width: 100%;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  box-sizing: border-box;
+}</code></pre>
+                    </div>
+                    <p>Then use it in <code>src/components/AppLayout.tsx</code>. Change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.tsx" data-match="diff"><code class="language-diff-tsx"> import type { ReactNode } from 'react'
++import styles from './AppLayout.module.css'
+ import { Footer } from './Footer.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;a className="skip-link" href="#main"&gt;
++      &lt;a className={styles.skipLink} href="#main"&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;main id="main" className="page"&gt;
++      &lt;main id="main" className={styles.page}&gt;</code></pre>
+                    </div>
+                    <p>The <code>id="main"</code> stays: the skip link points at it, and an <code>id</code> is not a class, so modules never rename it. Next the header. Create <code>src/components/Header.module.css</code> from the <code>.site-header</code>, <code>.brand</code> and <code>.site-nav</code> rules, with two additions marked by the first comment and the <code>font-family</code> line:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Header.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Header.module.css"><code class="language-css">.header {
+  /* Teal would vanish on Deep Tide: inside the header, the focus ring is Sunrise */
+  --focus: var(--sunrise);
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--deep-tide);
+  color: var(--white);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: inherit;
+  font-family: 'Outfit Variable', system-ui, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav a {
+  color: var(--white);
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Header.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Header.tsx"><code class="language-tsx">import logoUrl from '../assets/logo.svg'
+import styles from './Header.module.css'
+
+export function Header() {
+  return (
+    &lt;header className={styles.header}&gt;
+      &lt;a className={styles.brand} href="/"&gt;
+        &lt;img src={logoUrl} alt="" width={40} height={40} /&gt;
+        &lt;span&gt;Shoreline Crew HQ&lt;/span&gt;
+      &lt;/a&gt;
+      &lt;nav className={styles.nav} aria-label="Main"&gt;
+        &lt;ul&gt;
+          &lt;li&gt;&lt;a href="/events"&gt;Events&lt;/a&gt;&lt;/li&gt;
+          &lt;li&gt;&lt;a href="/sites"&gt;Sites&lt;/a&gt;&lt;/li&gt;
+          &lt;li&gt;&lt;a href="/volunteers"&gt;Volunteers&lt;/a&gt;&lt;/li&gt;
+          &lt;li&gt;&lt;a href="/impact"&gt;Impact&lt;/a&gt;&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/nav&gt;
+    &lt;/header&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong><code>--focus: var(--sunrise)</code> on <code>.header</code></strong>: Sea Teal on Deep Tide would be nearly invisible. Setting the token on the header changes it for every element inside, and the global <code>:focus-visible</code> rule picks it up. No second focus rule needed.</li>
+                        <li>The wordmark is not a heading, so it gets Outfit by name.</li>
+                        <li><code>.nav ul</code> and <code>.nav a</code> style plain elements inside the module's class: the list and links need no classes of their own.</li>
+                    </ul>
+                    <p>And the footer: <code>src/components/Footer.module.css</code> from <code>.site-footer</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Footer.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Footer.module.css"><code class="language-css">.footer {
+  padding: 1.5rem;
+  background: var(--deep-tide);
+  color: var(--white);
+  text-align: center;
+}
+
+.footer p {
+  margin: 0.25rem 0;
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Footer.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Footer.tsx" data-match="diff"><code class="language-diff-tsx">+import styles from './Footer.module.css'
++
+ // Read once, when the app loads: rendering itself stays pure</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Footer.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Footer.tsx" data-match="diff"><code class="language-diff-tsx">-    &lt;footer className="site-footer"&gt;
++    &lt;footer className={styles.footer}&gt;</code></pre>
+                    </div>
+                    <p>Press <kbd>Tab</kbd> four times on the home page: skip link, logo, Events, Sites.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_12/12-focus-header.png" alt="The top of the HQ home page after pressing Tab four times. In the dark blue header, the Sites link has a thick orange outline around it, with a small gap between the outline and the text." width="1100" height="55" loading="lazy">
+                        <figcaption>Inside the header the focus ring is Sunrise orange: the header module sets <code>--focus</code> for everything inside it.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Pages, cards and badges <span class="step-time">(14 min)</span></h3>
+                    <p>Four pages use <code>.lead</code>, and two use <code>.card-grid</code>. Styles shared by the page components get one module in their folder, <code>src/pages/Page.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/Page.module.css</div>
+                        <pre data-src="shoreline-hq/src/pages/Page.module.css"><code class="language-css">/* Shared by the page components */
+.lead {
+  color: var(--text-muted);
+  font-size: 1.25rem;
+}
+
+/* As many 16rem columns as fit: one on a phone, three on a laptop */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1.5rem;
+}</code></pre>
+                    </div>
+                    <p>In each of the four pages, import it and replace the class names. <code>HomePage.tsx</code> shows the pattern:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx"> import { formatDate } from '../utils/format.ts'
++import styles from './Page.module.css'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;p className="lead"&gt;{tagline}&lt;/p&gt;
++      &lt;p className={styles.lead}&gt;{tagline}&lt;/p&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;div className="card-grid"&gt;
++      &lt;div className={styles.grid}&gt;</code></pre>
+                    </div>
+                    <p>Do the same in <code>SitesPage.tsx</code> (<code>.lead</code> and <code>.card-grid</code>), <code>NewEventPage.tsx</code> (<code>.lead</code>) and <code>EventsPage.tsx</code>, where the status line keeps its role:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;p className="lead" role="status"&gt;
++      &lt;p className={styles.lead} role="status"&gt;</code></pre>
+                    </div>
+                    <p>Next the card. <code>src/components/Card.module.css</code> takes <code>.card</code>, <code>.card h2</code> and <code>.card h3</code> (the event cards use <code>h3</code> and will import this module too, in Step 4):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Card.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Card.module.css"><code class="language-css">.card {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.card h2,
+.card h3 {
+  margin-top: 0;
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Card.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Card.tsx"><code class="language-tsx">import type { ReactNode } from 'react'
+import styles from './Card.module.css'
+
+interface CardProps {
+  title: string
+  children: ReactNode
+}
+
+export function Card({ title, children }: CardProps) {
+  return (
+    &lt;section className={styles.card}&gt;
+      &lt;h2&gt;{title}&lt;/h2&gt;
+      {children}
+    &lt;/section&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The badge is where TypeScript helps. <code>src/components/Badge.module.css</code> gets one class per tone, named exactly like the members of <code>BadgeTone</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Badge.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Badge.module.css"><code class="language-css">.badge {
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* One class per BadgeTone */
+.info {
+  background: var(--seafoam);
+  color: var(--ink);
+}
+
+.success {
+  background: var(--kelp);
+  color: var(--white);
+}
+
+.neutral {
+  border: 1px solid var(--text-muted);
+  color: var(--text);
+}
+
+.danger {
+  background: var(--coral);
+  color: var(--white);
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Badge.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Badge.tsx"><code class="language-tsx">import styles from './Badge.module.css'
+
+export type BadgeTone = 'info' | 'success' | 'neutral' | 'danger'
+
+interface BadgeProps {
+  label: string
+  tone?: BadgeTone
+}
+
+export function Badge({ label, tone = 'info' }: BadgeProps) {
+  return &lt;span className={`${styles.badge} ${styles[tone]}`}&gt;{label}&lt;/span&gt;
+}</code></pre>
+                    </div>
+                    <p><code>styles[tone]</code> reads the class whose name is the tone. The old code built a string, <code>`badge-${tone}`</code>; now the tone itself is the key. Inspect a badge on the sites page and you see both classes, in the dev server and in the production build alike:</p>
+                    <div class="card card-output">
+                        <h4>The HTML React rendered (dev server and npm run preview)</h4>
+                        <pre><code>&lt;span class="_badge_1nzko_1 _info_1nzko_9"&gt;Port Marisol&lt;/span&gt;</code></pre>
+                    </div>
+                    <p>The picture and the site card follow the pattern. Note the new names: inside <code>SiteCard.module.css</code>, the muted parking line is <code>.parking</code>, because a module names things by their job:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SitePicture.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/SitePicture.module.css"><code class="language-css">.picture {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SitePicture.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SitePicture.tsx" data-match="diff"><code class="language-diff-tsx"> import type { Site } from '../api/types.ts'
++import styles from './SitePicture.module.css'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SitePicture.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SitePicture.tsx" data-match="diff"><code class="language-diff-tsx">-      className="site-picture"
++      className={styles.picture}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SiteCard.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/SiteCard.module.css"><code class="language-css">.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.parking {
+  color: var(--text-muted);
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SiteCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SiteCard.tsx" data-match="diff"><code class="language-diff-tsx"> import { Card } from './Card.tsx'
++import styles from './SiteCard.module.css'
+ import { SitePicture } from './SitePicture.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SiteCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SiteCard.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;p className="badges"&gt;
++      &lt;p className={styles.badges}&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SiteCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SiteCard.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;p className="muted"&gt;Parking: {site.parking}&lt;/p&gt;
++      &lt;p className={styles.parking}&gt;Parking: {site.parking}&lt;/p&gt;</code></pre>
+                    </div>
+                    <p>Check the home and sites pages: they should look exactly as before, except for the font.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_12/12-home-outfit.png" alt="The Shoreline Crew HQ home page. The heading Shoreline Crew HQ, the card titles Next cleanup and Our beach sites, and the name in the dark blue header are set in Outfit, a rounded geometric typeface; the body text stays in the system font. Below the tagline the two cards sit side by side." width="1100" height="688" loading="lazy">
+                        <figcaption>The page looks as it did, plus the crew's font for headings. Everything else is the same CSS, now living next to the components that use it.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The events list <span class="step-time">(10 min)</span></h3>
+                    <p><code>src/components/EventList.module.css</code> takes <code>.event-list</code> and <code>.empty-state</code>, renamed <code>.list</code> and <code>.empty</code>; <code>src/components/SpotsLine.module.css</code> takes <code>.spots-full</code> as <code>.full</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventList.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/EventList.module.css"><code class="language-css">.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1.5rem;
+  margin: 0 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.empty {
+  margin: 0 0 2rem;
+  padding: 1rem 1.25rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.75rem;
+  color: var(--text-muted);
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventList.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventList.tsx"><code class="language-tsx">import type { CleanupEvent } from '../api/types.ts'
+import { EventCard } from './EventCard.tsx'
+import styles from './EventList.module.css'
+
+interface EventListProps {
+  events: CleanupEvent[]
+  emptyMessage: string
+}
+
+export function EventList({ events, emptyMessage }: EventListProps) {
+  if (events.length === 0) {
+    return &lt;p className={styles.empty}&gt;{emptyMessage}&lt;/p&gt;
+  }
+
+  return (
+    &lt;ul className={styles.list}&gt;
+      {events.map((event) =&gt; (
+        &lt;li key={event.id}&gt;
+          &lt;EventCard event={event} /&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SpotsLine.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/SpotsLine.module.css"><code class="language-css">.full {
+  font-weight: 600;
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SpotsLine.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SpotsLine.tsx" data-match="diff"><code class="language-diff-tsx"> import type { Availability } from '../utils/availability.ts'
++import styles from './SpotsLine.module.css'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SpotsLine.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SpotsLine.tsx" data-match="diff"><code class="language-diff-tsx">-      return &lt;p className="spots-full"&gt;Full: new sign-ups join the waiting list&lt;/p&gt;
++      return &lt;p className={styles.full}&gt;Full: new sign-ups join the waiting list&lt;/p&gt;</code></pre>
+                    </div>
+                    <p>The event card is an <code>&lt;article&gt;</code> with an <code>h3</code>, not the <code>Card</code> component, but it should look like one. So it imports <code>Card.module.css</code> as <code>cardStyles</code>, and its own module, <code>src/components/EventCard.module.css</code>, holds what only it needs: the badges row, the supplies line (<code>.muted</code> before) and the details toggle (<code>.button-link</code> before):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.module.css"><code class="language-css">.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.supplies {
+  color: var(--text-muted);
+}
+
+/* A button that looks like a link: it shows and hides, it does not go anywhere */
+.toggle {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx"> import { formatDate } from '../utils/format.ts'
++import cardStyles from './Card.module.css'
++import styles from './EventCard.module.css'
+ import { SpotsLine } from './SpotsLine.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx">-    &lt;article className="card event-card"&gt;
++    &lt;article className={cardStyles.card}&gt;
+       &lt;h3&gt;{event.title}&lt;/h3&gt;
+-      &lt;p className="badges"&gt;
++      &lt;p className={styles.badges}&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx">-        &lt;p className="muted"&gt;We bring: {event.suppliesProvided.join(', ')}&lt;/p&gt;
++        &lt;p className={styles.supplies}&gt;We bring: {event.suppliesProvided.join(', ')}&lt;/p&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx">-        className="button-link"
++        className={styles.toggle}</code></pre>
+                    </div>
+                    <p>The <code>event-card</code> class had no rule at all, so it simply goes. Yes, <code>.badges</code> now exists in two modules (<code>SiteCard</code> and <code>EventCard</code>): three lines repeated is the price of components you can change one at a time. When a shared piece grows, it deserves its own component or module.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Forms and buttons <span class="step-time">(10 min)</span></h3>
+                    <p>The fields, rows and error messages are shared by both forms, and the two button looks by both forms too. They get shared modules named for what they style. <code>src/components/Form.module.css</code> collects <code>.event-form</code> (now <code>.form</code>), <code>.field</code> and its input rules, <code>.form-row</code>, <code>.field-error</code>, <code>.form-actions</code> and <code>.form-status</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Form.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Form.module.css"><code class="language-css">/* Shared by every form: the events filters and the Plan a cleanup form */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 40rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.field input,
+.field select,
+.field textarea {
+  min-width: 14rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--text-muted);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.field [aria-invalid='true'] {
+  border: 2px solid var(--error);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem 1.5rem;
+}
+
+.row .field input {
+  min-width: 10rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--error);
+  font-weight: 400;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.status {
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--link);
+  background: var(--surface);
+}
+
+/* Kept in the page while empty, so screen readers notice when a message arrives */
+.status:empty {
+  padding: 0;
+  border: 0;
+}</code></pre>
+                    </div>
+                    <p><code>src/components/Button.module.css</code> takes <code>.button-primary</code> and <code>.button-secondary</code>, with their shared declarations written once (Lesson 5.4 turns this into a <code>Button</code> component):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Button.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Button.module.css"><code class="language-css">/* The app's two button looks */
+.primary,
+.secondary {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--link);
+  border-radius: 0.5rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--link);
+  color: var(--page);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--link);
+}</code></pre>
+                    </div>
+                    <p>And <code>src/components/EventFilters.module.css</code> keeps the filter bar's own layout:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventFilters.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/EventFilters.module.css"><code class="language-css">.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1rem;
+}</code></pre>
+                    </div>
+                    <p><code>EventFilters</code> uses all three. Change its imports and class names:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventFilters.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventFilters.tsx" data-match="diff"><code class="language-diff-tsx"> import type { EventStatus } from '../api/types.ts'
++import buttonStyles from './Button.module.css'
++import styles from './EventFilters.module.css'
++import formStyles from './Form.module.css'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventFilters.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventFilters.tsx" data-match="diff"><code class="language-diff-tsx">-    &lt;search className="filters"&gt;
+-      &lt;div className="field"&gt;
++    &lt;search className={styles.filters}&gt;
++      &lt;div className={formStyles.field}&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventFilters.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventFilters.tsx" data-match="diff"><code class="language-diff-tsx">-        &lt;button type="button" className="button-secondary" onClick={onClear}&gt;
++        &lt;button type="button" className={buttonStyles.secondary} onClick={onClear}&gt;</code></pre>
+                    </div>
+                    <p>(The second <code>className="field"</code> changes the same way.) <code>FieldError</code> imports the shared module:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/FieldError.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/FieldError.tsx"><code class="language-tsx">import formStyles from './Form.module.css'
+
+interface FieldErrorProps {
+  id: string
+  messages: string[] | undefined
+}
+
+// The message under a field. The field points at it with aria-describedby.
+export function FieldError({ id, messages }: FieldErrorProps) {
+  if (messages === undefined) {
+    return null
+  }
+  return (
+    &lt;p id={id} className={formStyles.error}&gt;
+      {messages.join(' ')}
+    &lt;/p&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>And <code>NewEventForm.tsx</code>. Its eight <code>className="field"</code> are a job for find and replace (<kbd>Ctrl</kbd>+<kbd>H</kbd>, <kbd>⌘ Cmd</kbd>+<kbd>Option</kbd>+<kbd>F</kbd> on a Mac): replace <code>className="field"</code> with <code>className={formStyles.field}</code>. The rest by hand:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx"> import { formatDate, toDateString } from '../utils/format.ts'
++import buttonStyles from './Button.module.css'
+ import { FieldError } from './FieldError.tsx'
++import formStyles from './Form.module.css'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;p role="status" className="form-status"&gt;
++      &lt;p role="status" className={formStyles.status}&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;form action={formAction} noValidate className="event-form"&gt;
++      &lt;form action={formAction} noValidate className={formStyles.form}&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx">-        &lt;div className="form-row"&gt;
++        &lt;div className={formStyles.row}&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx">-        &lt;div className="form-actions"&gt;
++        &lt;div className={formStyles.actions}&gt;</code></pre>
+                    </div>
+                    <p>And in the two buttons, <code>className="button-secondary"</code> becomes <code>className={buttonStyles.secondary}</code> and <code>className="button-primary"</code> becomes <code>className={buttonStyles.primary}</code>. Now <code>index.css</code> should hold nothing but tokens and page-wide rules. Update its first comment, and compare it with this, the whole file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css"><code class="language-css">/* Shoreline Crew HQ: the crew's colors and base styles (Lesson 3.1).
+   Since Lesson 3.6 each component's own styles live in its CSS Module. */
+
+:root {
+  /* Brand colors */
+  --deep-tide: #0b3954;
+  --sea-teal: #1f6f8b;
+  --sunrise: #f4a259;
+  --sand: #fbf6ec;
+  --seafoam: #bfe3df;
+  --kelp: #2d6a4f;
+  --coral: #b23a22;
+  --ink: #1f2a37;
+  --muted: #5b6573;
+  --white: #ffffff;
+
+  /* What the page uses: these change in dark mode */
+  --page: var(--sand);
+  --text: var(--ink);
+  --text-muted: var(--muted);
+  --link: var(--sea-teal);
+  --surface: var(--white);
+  --border: #e4dccb;
+  --error: var(--coral);
+  --focus: var(--link);
+
+  color-scheme: light dark;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--page);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0f1b26;
+    --text: #e9eef3;
+    --text-muted: #a9b4c0;
+    --link: #7cc6d6;
+    --surface: #16283a;
+    --border: #2b4257;
+    --error: #ff9b85;
+  }
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--link);
+}
+
+h1,
+h2,
+h3 {
+  font-family: 'Outfit Variable', system-ui, sans-serif;
+  line-height: 1.2;
+}
+
+/* One focus ring for everything you can reach with the keyboard */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}</code></pre>
+                    </div>
+                    <p>From 324 lines to 71. Search the project for <code>className="</code>: there should be no results. Click through every page in light and dark mode, and use the "Plan a cleanup" form once with mistakes, to see the error styles.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Check it like a keyboard user <span class="step-time">(12 min)</span></h3>
+                    <p><strong>The linter.</strong> Switch on the accessibility plugin in <code>.oxlintrc.json</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/.oxlintrc.json</div>
+                        <pre data-src="shoreline-hq/.oxlintrc.json" data-match="diff"><code class="language-diff-json">-  "plugins": ["react", "typescript", "oxc"],
++  "plugins": ["react", "typescript", "oxc", "jsx-a11y"],</code></pre>
+                    </div>
+                    <p>and run <code>npm run lint</code>:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_12/12-lint-a11y.png" alt="A terminal in shoreline-hq. npm run lint now reports two warnings named jsx-a11y(prefer-tag-over-role): Prefer output over role attribute status, one in src/pages/EventsPage.tsx and one in src/components/NewEventForm.tsx, each with the role attribute underlined. The summary says Found 2 warnings and 0 errors." width="984" height="608" loading="lazy">
+                        <figcaption>The linter's accessibility rules looked at every component and found two places to think about: the two status lines from Lessons 3.4 and 3.5.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  ⚠ jsx-a11y(prefer-tag-over-role): Prefer `output` over `role` attribute `status`.
+    ╭─[src/pages/EventsPage.tsx:47:34]
+ 46 │       /&gt;
+ 47 │       &lt;p className={styles.lead} role="status"&gt;
+    ·                                  ─────────────
+ 48 │         Showing {visible.length} of {events.length}: {upcoming.length} coming up,{' '}
+    ╰────
+  help: Replace HTML elements with `role` attribute `status` to corresponding semantic HTML tag `output`.
+
+  ⚠ jsx-a11y(prefer-tag-over-role): Prefer `output` over `role` attribute `status`.
+    ╭─[src/components/NewEventForm.tsx:56:10]
+ 55 │     &lt;&gt;
+ 56 │       &lt;p role="status" className={formStyles.status}&gt;
+    ·          ─────────────
+ 57 │         {state.kind === 'ready' &amp;&amp; (
+    ╰────
+  help: Replace HTML elements with `role` attribute `status` to corresponding semantic HTML tag `output`.
+
+Found 2 warnings and 0 errors.
+Finished in 11ms on 29 files with 151 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>The last line's rule count went from 116 to 151: 35 accessibility rules are now on, and they found the two status lines from Lessons 3.4 and 3.5. The rule's advice is sound in general: <code>&lt;output&gt;</code> is an HTML element whose built-in role is <code>status</code>, and native elements beat ARIA. Here we keep <code>role="status"</code> on a <code>&lt;p&gt;</code> anyway: it is the long-established pattern for a status message, screen readers have supported it the longest, and <code>&lt;output&gt;</code> is meant for the result of a calculation. A lint rule is advice from people who thought hard about a problem; when you have a reason to disagree, turn it off <em>and write the reason down</em>. oxlint allows comments in its config:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/.oxlintrc.json</div>
+                        <pre data-src="shoreline-hq/.oxlintrc.json"><code class="language-json">{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "oxc", "jsx-a11y"],
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+    // We keep role="status" on a &lt;p&gt;: the pattern screen readers have supported longest
+    "jsx-a11y/prefer-tag-over-role": "off"
+  }
+}</code></pre>
+                    </div>
+                    <p><code>npm run lint</code> is back to <code>Found 0 warnings and 0 errors.</code>, and from now on every lint run checks accessibility, in the terminal and in VS Code if you use the Oxc extension.</p>
+                    <p><strong>The keyboard pass.</strong> On the home page, put the mouse aside and press <kbd>Tab</kbd> repeatedly. Focus goes: skip link, the logo link, Events, Sites, Volunteers, Impact, then the two card links. The ring is orange in the header and teal on the page. On <code>/events</code>, keep pressing <kbd>Tab</kbd> through the filters and into the cards:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_12/12-focus-details.png" alt="The first event card on the events page, Tide Pool Morning Cleanup. Its Show details button, which looks like an underlined link, has a thick teal outline around it because it has keyboard focus." width="312" height="380" loading="lazy">
+                        <figcaption>On the page itself the ring is Sea Teal. Keyboard users always see where they are; mouse clicks on the button do not draw it.</figcaption>
+                    </figure>
+                    <p>Everything is reachable and visible. But imagine hearing the page instead of seeing it. Screen readers can list every button on a page, and this one would read: "Show details, Show details, Show details", fifteen times. Each button only makes sense next to its card's heading. No tool flagged this, because each button <em>has</em> a name; it is just not a useful one. The fix is text that screen readers read but that takes no room on screen. Create <code>src/components/VisuallyHidden.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/VisuallyHidden.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/VisuallyHidden.module.css"><code class="language-css">/* In the page for screen readers, but not drawn on screen */
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}</code></pre>
+                    </div>
+                    <p>and a small component to use it, <code>src/components/VisuallyHidden.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/VisuallyHidden.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/VisuallyHidden.tsx"><code class="language-tsx">import type { ReactNode } from 'react'
+import styles from './VisuallyHidden.module.css'
+
+interface VisuallyHiddenProps {
+  children: ReactNode
+}
+
+// Text that screen readers read out, but that takes no room on screen
+export function VisuallyHidden({ children }: VisuallyHiddenProps) {
+  return &lt;span className={styles.hidden}&gt;{children}&lt;/span&gt;
+}</code></pre>
+                    </div>
+                    <p>The text is still in the page (so it is in the accessibility tree), squeezed into a clipped 1 by 1 pixel box. <code>display: none</code> would not work: that hides text from screen readers too. Use it in <code>EventCard.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx"> import { StatusBadge } from './StatusBadge.tsx'
++import { VisuallyHidden } from './VisuallyHidden.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx">         {showDetails ? 'Hide details' : 'Show details'}
++        &lt;VisuallyHidden&gt; for {event.title}&lt;/VisuallyHidden&gt;
+       &lt;/button&gt;</code></pre>
+                    </div>
+                    <p>The card looks exactly the same. Select a "Show details" button in the Elements panel and open the <strong>Accessibility</strong> pane: its name is now <strong>Show details for Tide Pool Morning Cleanup</strong>, and every one of the fifteen names is different. The visible words still come first, so someone using voice control can still say "click Show details".</p>
+                    <p><strong>The browser's audit.</strong> Run Lighthouse's Accessibility check (or an axe DevTools scan) on the home, events, sites and "Plan a cleanup" pages, in light and dark mode. The course's own checks run axe-core on every page of the HQ and find no serious or critical problems; if your tool reports something, read its explanation, fix it, and run it again.</p>
+                    <p><strong>The build.</strong> Finally:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run build)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 58 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:  0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-B3WlSEuu.css                             5.24 kB │ gzip:  1.90 kB
+dist/assets/index-D-nxy1wm.js                            245.00 kB │ gzip: 75.95 kB
+
+✓ built in 122ms</code></pre>
+                    </div>
+                    <p>Two new files: the Outfit font in two pieces (the <code>latin</code> file is used for English text, <code>latin-ext</code> only for accented letters beyond it), copied from the package with a hash in the name. All the modules became one CSS file, as before. (Times, sizes and hashes will differ.)</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_12/12-events-phone-dark.png" alt="The events page on a phone-sized screen in dark mode. The header wraps onto two lines, the heading Cleanup events is in Outfit, the search box and status menu stack, and the first event card shows its badge and details in light text on a dark blue card." width="390" height="900" loading="lazy">
+                        <figcaption>Every module uses the same tokens from <code>index.css</code>, so dark mode and the phone layout carried over without a single change.</figcaption>
+                    </figure>
+                    <p><strong>Your own project:</strong> for your Lesson 11.1 app, choose a styling approach and write one sentence on why. List its design tokens (four to eight colors with their roles), and write a five-line accessibility checklist you will run before you call a screen finished.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>src/index.css</code> holds only tokens, dark-mode values and page-wide rules, including the <code>:focus-visible</code> ring</li>
+                        <li>☐ Every component that has styles imports its own module (or a shared one: <code>Page</code>, <code>Card</code>, <code>Form</code>, <code>Button</code>), and searching for <code>className="</code> finds nothing</li>
+                        <li>☐ Headings use Outfit, installed from npm, and every page looks as it did in light and dark mode</li>
+                        <li>☐ <kbd>Tab</kbd> shows an orange ring in the header and a teal one on the page, on every link, field and button</li>
+                        <li>☐ <code>npm run lint</code> runs the <code>jsx-a11y</code> rules, with the one rule turned off and the reason written next to it</li>
+                        <li>☐ Each "Show details" button has its own name, with the event's title in visually hidden text</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and <code>src/Scratch.*</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: You are here</h3>
+                    <p>Make the header show which page you are on, for everyone. Screen readers announce <code>aria-current="page"</code> on a link as "current page"; style the same attribute so sighted users see it too (bolder, with a thick underline). <code>Header</code> needs to know the address: read it once at module level, as <code>App.tsx</code> does. Then check <code>/sites</code> and <code>/events/new</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Turn the four links into an array of <code>{ href, label }</code> objects and <code>map</code> over it (Lesson 3.3), so the comparison is written once. React leaves out an attribute whose value is <code>undefined</code>. In the module, <code>.nav a[aria-current='page']</code> selects it, like the <code>[aria-invalid='true']</code> rule in Lesson 3.5.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/Header.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import logoUrl from '../assets/logo.svg'
+import styles from './Header.module.css'
+
+// Temporary, like the page switch in App.tsx: React Router's NavLink does this for you in Lesson 6.1
+const path = window.location.pathname
+
+const links = [
+  { href: '/events', label: 'Events' },
+  { href: '/sites', label: 'Sites' },
+  { href: '/volunteers', label: 'Volunteers' },
+  { href: '/impact', label: 'Impact' },
+]
+
+export function Header() {
+  return (
+    &lt;header className={styles.header}&gt;
+      &lt;a className={styles.brand} href="/"&gt;
+        &lt;img src={logoUrl} alt="" width={40} height={40} /&gt;
+        &lt;span&gt;Shoreline Crew HQ&lt;/span&gt;
+      &lt;/a&gt;
+      &lt;nav className={styles.nav} aria-label="Main"&gt;
+        &lt;ul&gt;
+          {links.map((link) =&gt; (
+            &lt;li key={link.href}&gt;
+              &lt;a href={link.href} aria-current={path === link.href ? 'page' : undefined}&gt;
+                {link.label}
+              &lt;/a&gt;
+            &lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      &lt;/nav&gt;
+    &lt;/header&gt;
+  )
+}</code></pre>
+                        </div>
+                        <p>And at the end of <code>Header.module.css</code>:</p>
+                        <pre data-snippet><code class="language-css">/* The link to the page you are on: bolder, with a thick underline */
+.nav a[aria-current='page'] {
+  font-weight: 700;
+  text-decoration-thickness: 3px;
+}</code></pre>
+                        <p>On <code>/sites</code>, one link has <code>aria-current="page"</code>: <strong>Sites</strong>, in bold with a 3-pixel underline. On <code>/events/new</code> none does, because that address is not one of the four (you could decide that Events should count; React Router's <code>NavLink</code> in Lesson 6.1 does that kind of matching for you). Styling an ARIA attribute instead of adding a class keeps what people see and what screen readers hear in step. The course's own code continues without this change; Lesson 6.1 gets it from React Router.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: The class that is not there</h3>
+                    <p>In <code>Badge.tsx</code>, misspell one class: <code>styles.badeg</code> instead of <code>styles.badge</code>. Before you look, predict: what do <code>npx tsc -b</code> and <code>npm run lint</code> say, what happens to the badges on <code>/sites</code>, and what does the Elements panel show as the badge's <code>class</code>? Then check, explain it, and put the name back.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>What is the type of <code>styles.badeg</code>, and what does a template literal do with <code>undefined</code>?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Both tools pass: <code>CSSModuleClasses</code> allows any key, so <code>styles.badeg</code> is a perfectly typed <code>string | undefined</code>, and a template literal accepts it. In the browser the badges lose their rounded pill shape and padding but keep their colors, because the tone class still works. The class attribute shows why:</p>
+                        <div class="card card-output">
+                            <h4>The badge's class attribute (dev server)</h4>
+                            <pre><code>class="undefined _info_1nzko_9"</code></pre>
+                        </div>
+                        <p>A template literal turns <code>undefined</code> into the text <code>"undefined"</code>. Unlike <code>className={styles.ntoe}</code> earlier, where React dropped the attribute, this one stays and quietly matches nothing. If you ever see <code>undefined</code> in a class attribute, look for a misspelled module class. Exercise 3 makes TypeScript catch it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A typed CSS Module (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 15 minutes).</em></p>
+                    <p>The HQ's <code>tsconfig.app.json</code> has <code>"allowArbitraryExtensions": true</code> (the Vite template set it). With it, TypeScript looks for a declaration file named <code>Badge.module.d.css.ts</code> when you import <code>./Badge.module.css</code>, and uses it instead of the general <code>CSSModuleClasses</code> type. Write that file for <code>Badge.module.css</code>, then repeat Exercise 2's typo. What does <code>npx tsc -b</code> say now, and what does this file cost you?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A declaration file describes a module's exports without code: <code>declare const styles: { readonly badge: string; … }</code> and <code>export default styles</code>. List the five classes in the module.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/Badge.module.d.css.ts</div>
+                            <pre data-snippet><code class="language-ts">// What Badge.module.css exports. TypeScript reads this file instead of guessing.
+declare const styles: {
+  readonly badge: string
+  readonly info: string
+  readonly success: string
+  readonly neutral: string
+  readonly danger: string
+}
+export default styles</code></pre>
+                        </div>
+                        <p>Without the typo, <code>npx tsc -b</code> passes, and <code>styles.badge</code> is now <code>string</code>, not <code>string | undefined</code>. With it:</p>
+                        <div class="card card-output">
+                            <h4>Expected output (npx tsc -b)</h4>
+                            <pre><code>src/components/Badge.tsx:11:37 - error TS2551: Property 'badeg' does not exist on type '{ readonly badge: string; readonly info: string; readonly success: string; readonly neutral: string; readonly danger: string; }'. Did you mean 'badge'?
+
+11   return &lt;span className={`${styles.badeg} ${styles[tone]}`}&gt;{label}&lt;/span&gt;
+                                       ~~~~~
+
+  src/components/Badge.module.d.css.ts:3:12 - 'badge' is declared here.
+    3   readonly badge: string
+                 ~~~~~
+
+
+Found 1 error in src/components/Badge.tsx:11</code></pre>
+                        </div>
+                        <p>A real error, with "Did you mean" and a link to the declaration. <code>styles[tone]</code> is checked too: all four tones must exist. The cost: the file must be kept in step with the CSS by hand. Rename a class in the CSS and forget the declaration, and TypeScript is confidently wrong. Teams that want this everywhere generate the declarations with a tool instead of writing them. The course's own code does not keep this file: delete it when you are done.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>Card.module.css</code> has a <code>.card</code> rule, and <code>Card.tsx</code> renders <code>&lt;section className={styles.card}&gt;</code>. What class does the browser see on the section?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That would be global CSS. What does Vite do to every class in a file named something.module.css?">
+                                A) <code>card</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="styles is an object of class names, and styles.card is one of its values, a string. Look at the Elements panel output in the lesson.">
+                                B) <code>styles.card</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The file name is not used as a prefix like that. Which parts make up a generated class name?">
+                                C) <code>Card-module-card</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Vite renames each class to an underscore, the name you wrote, a short code made from the file and the line number. No other file can produce the same name, so the rule cannot clash.">
+                                D) A generated name that starts with <code>_card_</code>, unique to that file
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> In the HQ, what is the type of <code>styles.card</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript cannot read CSS files. Where does the type of a module import come from?">
+                                A) <code>'_card_1unuq_1'</code>, the exact generated name
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="vite/client types every CSS Module as an index signature of strings, and noUncheckedIndexedAccess adds undefined to every read, because TypeScript cannot know whether the class exists.">
+                                B) <code>string | undefined</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That would be true without one tsconfig option the HQ turned on in Lesson 2.4. Which one?">
+                                C) <code>string</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> The header shows the crew's logo right next to the text "Shoreline Crew HQ", both inside one link. What should the logo's <code>alt</code> be?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Then a screen reader would say the name twice. What does the link's text already say?">
+                                A) <code>"Shoreline Crew HQ"</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Screen readers already announce that it is an image. Does image of add anything, or does the text next to it already carry the meaning?">
+                                B) <code>"Image of the Shoreline Crew logo"</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The text next to it already names the link, so the logo is decorative here. An empty alt tells screen readers to skip it, and the link is announced once as Shoreline Crew HQ.">
+                                C) An empty string, <code>alt=""</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Without alt, some screen readers read the file name instead. What does an empty alt tell them?">
+                                D) Leave <code>alt</code> out
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> A designer finds the focus ring on clicked buttons distracting. What is the right change?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="focus-visible shows the ring for keyboard focus and usually not after a mouse click, so the designer gets what they asked for and keyboard users keep the ring they navigate by.">
+                                A) Style the ring with <code>:focus-visible</code> instead of <code>:focus</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That removes the ring for keyboard users too. Who depends on it?">
+                                B) <code>button:focus { outline: none; }</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="tabIndex controls whether and in what order something is reachable, not how focus looks. What would -1 do to keyboard users?">
+                                C) Give the buttons <code>tabIndex={-1}</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> The linter's <code>jsx-a11y</code> rules pass and an axe scan finds nothing. What do you know?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Both passed before Step 6 too. What did the keyboard and screen reader thinking find that neither tool did?">
+                                A) The app is accessible
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Automated tools catch problems a rule can decide, and only some of all problems. Fifteen buttons named Show details passed both; a keyboard pass and a screen reader find what rules cannot judge.">
+                                B) The problems a rule can find are fixed; a keyboard pass and a screen reader check are still needed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Lighthouse uses the same kind of automated rules. Can any rule decide whether alt text describes the picture?">
+                                C) Only Lighthouse is left to run
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should I learn Tailwind instead?</summary>
+                    <p>Learn it when a team or project uses it; many do. Tailwind solves the same problem as CSS Modules (no global clashes, styles next to markup) with a different trade-off: you learn its class vocabulary and add its build plugin, and you rarely write a CSS file. Everything in this lesson still applies: tokens become Tailwind's theme, and focus rings, contrast and the keyboard pass are the same work in any styling approach.</p>
+                </details>
+                <details>
+                    <summary>I read about <code>composes</code>. Why didn't we use it?</summary>
+                    <p>CSS Modules let one class include another with <code>composes: card from './Card.module.css'</code>, and Vite supports it. In Vite 8.3, which this course was checked with, composing from <em>another file</em> makes <code>npm run build</code> print a warning about a PostCSS plugin and its <code>from</code> option. The build still works, but a warning you are told to ignore trains you to ignore warnings. Importing the other module, as <code>EventCard</code> does with <code>cardStyles</code>, is plain TypeScript and needs no special syntax.</p>
+                </details>
+                <details>
+                    <summary>Can a module style something global, such as the <code>body</code>?</summary>
+                    <p>Element selectors in a module are not renamed, so <code>body { }</code> in a module would affect the whole page, from a file that looks local. CSS Modules also have <code>:global(.some-class)</code> for styling a class that a library adds. Both are escape hatches: page-wide rules belong in <code>index.css</code>, where everyone looks for them.</p>
+                </details>
+                <details>
+                    <summary>Do I really need to try a screen reader?</summary>
+                    <p>Once, for ten minutes, yes. You do not need to become an expert user: turn on NVDA (Windows, free) or VoiceOver (macOS, <kbd>⌘ Cmd</kbd>+<kbd>F5</kbd>), open the events page, and move through it with the arrow keys and <kbd>Tab</kbd>. You will hear the headings, the landmarks, the status line and the button names you worked on today, and what you hear will change how you write labels for good. Screen readers sound robotic and fast at first; that is normal.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Give the cards a gentle lift when the pointer is over them or when something inside has keyboard focus: a small <code>translate</code> and a soft shadow, with a short <code>transition</code>. Use <code>:hover</code> and <code>:focus-within</code> in <code>Card.module.css</code>. Then respect people who get dizzy from motion: wrap the movement in <code>@media (prefers-reduced-motion: no-preference)</code> so it only runs for those who have not asked their system to reduce motion. Turn on "reduce motion" in your operating system's accessibility settings (or emulate it in DevTools) and check that the lift is gone but the shadow stays.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Explain to a teammate who has only used one global stylesheet what <code>import styles from './Badge.module.css'</code> gives them, what the browser ends up seeing, and why TypeScript says <code>string | undefined</code>. Then describe your keyboard pass through the HQ: one thing that worked well and one thing you would not have noticed with a mouse.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A <code>Name.module.css</code> file is scoped: Vite renames every class to something unique, and <code>import styles</code> gives you an object from your names to the real ones</li>
+                        <li>TypeScript types every CSS Module as <code>CSSModuleClasses</code>; with <code>noUncheckedIndexedAccess</code> each class is <code>string | undefined</code>, and a misspelled class compiles, so check the page (or add a declaration file)</li>
+                        <li>Use camelCase class names, combine them with a template literal, and pick variants with a union-typed prop: <code>styles[tone]</code></li>
+                        <li>Tokens and page-wide rules stay in <code>index.css</code>; custom properties cross module boundaries, and a module can set one for everything inside it</li>
+                        <li><code>style</code> objects are typed as <code>CSSProperties</code>; keep them for values that come from data</li>
+                        <li>Accessible components start with the right element, real labels, honest <code>alt</code> text and a visible <code>:focus-visible</code> ring; check them with the linter, the browser's audits and your own keyboard, because tools find only part of the problems</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Read Vite's reference for CSS Modules</td><td><a href="https://vite.dev/guide/features.html#css-modules" target="_blank" rel="noopener">Vite: CSS Modules</a></td></tr>
+                            <tr><td>See the accessibility rules the linter checks</td><td><a href="https://oxc.rs/docs/guide/usage/linter/rules.html" target="_blank" rel="noopener">oxlint: rules (filter by jsx_a11y)</a></td></tr>
+                            <tr><td>Learn the WCAG basics with examples</td><td><a href="https://www.w3.org/WAI/fundamentals/accessibility-intro/" target="_blank" rel="noopener">W3C WAI: Introduction to Web Accessibility</a></td></tr>
+                            <tr><td>Read the rules for using ARIA</td><td><a href="https://www.w3.org/TR/using-aria/" target="_blank" rel="noopener">W3C: Using ARIA</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You moved a whole app from one global stylesheet to CSS Modules without changing how it looks</li>
+                        <li>You read what TypeScript knows about CSS Modules, and what it cannot know</li>
+                        <li>You added a self-hosted font and a focus ring that adapts to its background through a token</li>
+                        <li>You turned on accessibility linting, made a reasoned decision about a rule, and fixed a problem only a person could find</li>
+                        <li>Module 3 is done: Shoreline Crew HQ has typed components, lists, state, a form, and styles that belong to their components</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The HQ still reads its events and sites from files you pasted in Lessons 3.2 and 3.3. In <a href="lesson_13.html"><strong>Lesson 4.1: Effects and Fetching</strong></a> it starts talking to shoreline-api for real: <code>useEffect</code>, typed fetching, loading, error and empty states (the status line you kept today will announce them), cancelling requests, and why React runs effects twice in development.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and that <code>src/Scratch.*</code> and any Exercise 3 declaration file are gone</li>
+                    <li>Do one keyboard pass through the "Plan a cleanup" form, submitting it once with mistakes</li>
+                    <li>Keep your own app's styling choice, tokens and checklist for Lesson 11.1</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today was a refactor: lots of careful moving, and at the end the app looks almost the same. That is what good refactoring looks like, and it is a real professional skill: changing how something is built while keeping what it does. If the cut-paste-rename rhythm felt tedious, notice that by the last component you did it without thinking. And the keyboard pass you just did is something many working developers have never tried. You finish Module 3 knowing how to build components that are typed, tidy and usable by everyone. That is a strong foundation for everything that follows.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_11.html" class="prev-lesson">← Previous: Forms and Actions</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_13.html" class="next-lesson">Next: Effects and Fetching →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

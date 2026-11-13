@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 11</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 11: Custom Hooks, Refs and the DOM</h1>
+    <p class="sub">Your workbook for Session 11: a warm-up, then for Lessons 4.2 and 4.3 the key ideas, a worked example, the guided lab, predict-then-check practice, the project checklist, a self-check and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>4.2–4.3</b></span>
+      <span class="chip">Session <b>11</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Extract repeated Hook logic into a custom Hook, and explain why two components that call it never share its state.</li>
+  <li>Follow the Rules of Hooks inside your own Hooks, and type what a Hook returns (nothing, a value, a tuple with <code class="inline">as const</code>, an object with an interface).</li>
+  <li>Explain why a function in a dependency array can flood a server, and how <code class="inline">useApi(key, load)</code> with <code class="inline">useEffectEvent</code> avoids it.</li>
+  <li>Choose between state and a ref, type refs to elements, use callback refs and pass a ref as a prop (React 19).</li>
+  <li>Decide where the focus goes when something disappears, a form finds problems, or a dialog opens and closes.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up</h2><span class="rule"></span></div>
+<p>Three questions on Lesson 4.1. Circle your answers; the class reveals them.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">An effect reads <code class="inline">siteId</code>. What goes in its dependency array, and who tells you if you forget?</div><div class="opts"><div class="opt">A) <code class="inline">[siteId]</code>; oxlint's exhaustive-deps</div><div class="opt">B) <code class="inline">[]</code>; tsc</div><div class="opt">C) Nothing; React finds it</div><div class="opt">D) <code class="inline">[siteId]</code>; tsc</div></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">The sites page's effect ends with <code class="inline">return () =&gt; controller.abort()</code>. When does React call that function?</div><div class="opts"><div class="opt">A) Only when the page closes the browser tab</div><div class="opt">B) Before the effect runs again, and when the component goes away</div><div class="opt">C) Right after the request answers</div><div class="opt">D) Never in production</div></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">Four pages hold the same dozen lines of effect, with a different request each. What does today's first lesson do with them?</div><div class="opts"><div class="opt">A) Copies them into App.tsx</div><div class="opt">B) Moves them into one custom Hook, useApi(key, load), with Try again built in</div><div class="opt">C) Replaces them with a library</div><div class="opt">D) Deletes the loading state</div></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">4.2</span><h3>Custom Hooks</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain what a custom Hook is, when a plain function is the better choice, and why two components that call the same Hook do not share its state</li>
+  <li>Follow the Rules of Hooks inside your own Hooks, and read the linter's rules-of-hooks errors</li>
+  <li>Type what a Hook returns: nothing, one value, a tuple with as const, or an object with an interface</li>
+  <li>Write generic Hooks (useDebouncedValue&lt;T&gt;, useApi&lt;T&gt;) whose types follow the arguments you pass</li>
+  <li>Pass a function into a Hook safely with useEffectEvent, and explain what a data library like TanStack Query adds on top of a Hook like useApi</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Custom Hook:</b> a function whose name starts with <code class="inline">use</code> and calls Hooks. It shares logic between components, never state: two callers, two states, two requests.</li>
+  <li><b>Rules of Hooks inside your Hook:</b> top level only, never after an early return; only from components and Hooks. The linter finds Hooks by name (rules-of-hooks is an error; tsc is silent).</li>
+  <li><b>Return shapes:</b> nothing (<code class="inline">void</code>), one value, a tuple (<code class="inline">as const</code>, or every name gets the union), an object (an exported interface in the return annotation).</li>
+  <li><b>Generic Hooks</b> take T from the arguments: <code class="inline">useDebouncedValue(query, 300)</code> is a string; <code class="inline">useApi('/sites', getSites)</code> is <code class="inline">ApiResult&lt;Site[]&gt;</code>.</li>
+  <li><b>Key and load:</b> a function made during render is new every render; in a dependency array it floods the API. The key decides when; <code class="inline">useEffectEvent</code> reads the latest load without triggering.</li>
+  <li><b>What useApi lacks</b> (cache, retries, refetch on focus, invalidation) is why TanStack Query replaces it in Lesson 7.1.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: useApi, read in four moves</div>
+<p>The Hook every data page uses after this lesson (the finished Lesson 4.2 code):</p>
+<div class="codefile">shoreline-hq/src/hooks/useApi.ts</div>
+<pre class="code" data-src="shoreline-hq/src/hooks/useApi.ts" data-stage="lesson_14" data-match="excerpt"><span class="k">export</span> <span class="k">function</span> useApi&lt;T&gt;(key: <span class="k">string</span>, load: (signal: AbortSignal) =&gt; Promise&lt;T&gt;): ApiResult&lt;T&gt; {
+  <span class="k">const</span> [state, setState] = useState&lt;LoadState&lt;T&gt;&gt;({ kind: <span class="s">'loading'</span> })
+  <span class="k">const</span> [attempt, setAttempt] = useState(<span class="s">0</span>)
+  <span class="c">// The latest load function, without making the effect run again when it changes</span>
+  <span class="k">const</span> loadLatest = useEffectEvent(load)
+
+  useEffect(() =&gt; {
+    <span class="k">const</span> controller = <span class="k">new</span> AbortController()
+    loadLatest(controller.signal)
+      .then((data) =&gt; setState({ kind: <span class="s">'ready'</span>, data }))
+      .catch((error: <span class="k">unknown</span>) =&gt; {
+        <span class="k">if</span> (controller.signal.aborted) <span class="k">return</span>
+        console.error(error)
+        setState({ kind: <span class="s">'failed'</span>, message: describeError(error) })
+      })
+    <span class="k">return</span> () =&gt; controller.abort()
+  }, [key, attempt])
+
+  <span class="k">function</span> reload() {
+    setState({ kind: <span class="s">'loading'</span> })
+    setAttempt((count) =&gt; count + <span class="s">1</span>)
+  }
+
+  <span class="k">return</span> { state, reload }
+}</pre><p>Read it in four moves. <b>Same pattern as 4.1:</b> LoadState, AbortController, the aborted check, describeError. <b>Key = WHAT:</b> a string; the same key on every render means "nothing changed", so it is in the array (with <code class="inline">attempt</code>). <b>Load = HOW:</b> a new function on every render is fine, because the effect calls <code class="inline">loadLatest</code>, the useEffectEvent copy that always sees the latest load without triggering anything. <b>Try again for free:</b> <code class="inline">reload</code> shows loading and counts one more attempt in the same click.</p>
+<p>A page then needs one line: <code class="inline">const sites = useApi('/sites', getSites)</code>; TypeScript infers <code class="inline">ApiResult&lt;Site[]&gt;</code> from getSites.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-11/l4_2-custom-hooks/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code> (six failures) and <code class="inline">npm run typecheck</code>.</li>
+  <li>Task 1: <code class="inline">useBagCount</code> returns a tuple: make <code class="inline">reset</code> work, then make the types right (two words).</li>
+  <li>Task 3: <code class="inline">useLoadedCount</code>: read how many requests the starter sends for one key; make it one.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>How many requests did the starter send for one key? Why?</td><td></td></tr>
+<tr><td>What decides when your Hook loads again now?</td><td></td></tr>
+<tr><td>Task 2: what type does useRotatingTip return for a list of strings?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write your prediction, then check it in your shoreline-hq with <code class="inline">src/Scratch.tsx</code> (delete it afterwards).</p>
+<div class="q"><div class="qn">P1</div><div class="qt">The toggle Hook now ends with <code class="inline">return [on, toggle] as const</code>. What does <code class="inline">npx tsc -b</code> print?</div><pre class="code"><span class="k">import</span> { useState } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="k">function</span> useToggle(initial: <span class="k">boolean</span>) {
+  <span class="k">const</span> [on, setOn] = useState(initial)
+  <span class="k">const</span> toggle = () =&gt; setOn((current) =&gt; !current)
+  <span class="k">return</span> [on, toggle] <span class="k">as</span> <span class="k">const</span>
+}
+
+<span class="k">export</span> <span class="k">function</span> DetailsButton() {
+  <span class="k">const</span> [open, toggle] = useToggle(<span class="k">false</span>)
+  <span class="k">return</span> (
+    &lt;button <span class="k">type</span>=<span class="s">"button"</span> aria-expanded={open} onClick={toggle}&gt;
+      Details
+    &lt;/button&gt;
+  )
+}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">A Hook returns early when the title is empty. What does <code class="inline">npm run lint</code> say?</div><pre class="code"><span class="k">import</span> { useEffect } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="k">export</span> <span class="k">function</span> useTabTitle(title: <span class="k">string</span>) {
+  <span class="k">if</span> (title === <span class="s">''</span>) <span class="k">return</span>
+  useEffect(() =&gt; {
+    document.title = title
+  }, [title])
+}</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Three Hooks for the HQ</b> (lesson page). In class: Steps 1 to 4. At home: Steps 5 and 6.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">useDocumentTitle(title): void</code> with a cleanup that restores the old title</li>
+  <li>☐ Step 2: <code class="inline">useApi&lt;T&gt;(key, load)</code> returns <code class="inline">ApiResult&lt;T&gt;</code>; useEffectEvent; <code class="inline">[key, attempt]</code></li>
+  <li>☐ Step 3: LoadStatus shows Try again when it gets <code class="inline">onRetry</code></li>
+  <li>☐ Step 4: the sites, "Plan a cleanup" and home pages on useApi; tab titles</li>
+  <li>☐ Step 5: the events page searches through the API once the typing pauses (<code class="inline">pelican</code> finds three, one request)</li>
+  <li>☐ Step 6: checks pass; <code class="inline">--latency=1500</code> keeps the previous list until the new one arrives; Try again works with the API stopped</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which of these should be a custom Hook?</div><div class="opts"><div class="opt">A) <code class="inline">formatDate(date)</code>: it turns a date string into words</div><div class="opt">B) <code class="inline">LoadStatus</code>: it returns the loading or error message</div><div class="opt">C) Code that calls <code class="inline">useState</code> and <code class="inline">useEffect</code> and returns a value to the component</div><div class="opt">D) The list of the six beach sites</div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt"><code class="inline">npm run lint</code> prints this (first lines). Which tool is it, how serious is it, and what is the fix?</div><pre class="code">  × react-hooks(rules-of-hooks): React Hook "useEffect" is called in function "setTabTitle" that is neither a React function component nor a custom React Hook function. …
+   ╭─[src/Scratch.tsx:5:3]</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">A toggle Hook ends with <code class="inline">return [on, toggle]</code>. tsc reports this. Which change fixes it?</div><pre class="code">src/Scratch.tsx:12:48 - error TS2322: Type 'boolean | (() =&gt; void) | undefined' is not assignable to type 'MouseEventHandler&lt;HTMLButtonElement&gt; | undefined'.
+Found 1 error in src/Scratch.tsx:12</pre><div class="opts"><div class="opt">A) <code class="inline">return [on, toggle] as const</code></div><div class="opt">B) Annotate the caller: <code class="inline">const [open, toggle]: boolean[] = useToggle(false)</code></div><div class="opt">C) Write <code class="inline">onClick={toggle!}</code></div><div class="opt">D) Use <code class="inline">useState&lt;boolean&gt;(initial)</code> inside the Hook</div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">The first try at useApi had <code class="inline">load</code> in its dependency array, and a page passed <code class="inline">(signal) =&gt; getEvents(…)</code>. What happened?</div><div class="opts"><div class="opt">A) npx tsc -b reported the function in the array</div><div class="opt">B) npm run lint reported an error</div><div class="opt">C) React warned in the console and stopped</div><div class="opt">D) Hundreds of requests, with both tools quiet: every render made a new function</div></div></div>
+<div class="q" data-sc="5" data-kind="short"><div class="qn">Q5</div><div class="qt">You type "pelican" in the events search with <code class="inline">useDebouncedValue(query.trim(), 300)</code>. How many requests go out? And with the delay set to 0?</div><div class="write"></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">oxlint prints this for useApi. What do you change?</div><pre class="code">  ⚠ react-hooks(exhaustive-deps): Functions returned from `useEffectEvent` must not be included in the dependency array.
+    ╭─[src/hooks/useApi.ts:32:21]
+ 31 │     return () =&gt; controller.abort()
+ 32 │   }, [key, attempt, loadLatest])
+    ·                     ──────────
+ 33 │
+    ╰────</pre><div class="opts"><div class="opt">A) Wrap loadLatest in useCallback</div><div class="opt">B) Remove loadLatest from the array: only the key and attempt decide when to load</div><div class="opt">C) Remove the array completely</div><div class="opt">D) Add load to the array as well</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: the difference between useApi's key and its load function, and what went wrong in the first try. Then sketch one Hook your own app would need: name, typed parameters, return shape and why.</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">4.3</span><h3>Refs and the DOM</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain what a ref is, when to choose a ref over state, and why reading a ref while rendering is a mistake</li>
+  <li>Type refs to values and to DOM elements (useRef&lt;HTMLInputElement&gt;(null)), and read the errors TypeScript gives for null, the wrong element and React 19's required argument</li>
+  <li>Use callback refs, including React 19's cleanup function, and avoid the arrow-function return that React 19's types reject</li>
+  <li>Pass a ref to your own component as an ordinary prop, the React 19 way</li>
+  <li>Manage focus on purpose: a keyboard shortcut, the first invalid field, and a modal dialog rendered through a portal that gives the focus back when it closes</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A ref</b> is an object with <code class="inline">current</code> that survives renders; changing it renders nothing. If the screen should change when it changes, it is state; otherwise it can be a ref. Never read <code class="inline">ref.current</code> during render.</li>
+  <li><b>DOM refs:</b> <code class="inline">useRef&lt;HTMLInputElement&gt;(null)</code> → <code class="inline">current</code> is <code class="inline">HTMLInputElement | null</code>; use <code class="inline">?.</code>. The type argument names the element (a div's ref on an input is TS2322).</li>
+  <li><b>Callback refs:</b> <code class="inline">ref={(el) =&gt; { … }}</code> runs when the element arrives; in React 19 it may return a cleanup, which must return nothing (braces!).</li>
+  <li><b>Ref as a prop (React 19):</b> <code class="inline">ref?: Ref&lt;HTMLInputElement&gt;</code> in a component's props; the component chooses which element a parent reaches. forwardRef is the old way.</li>
+  <li><b>Focus management:</b> an element disappears → somewhere useful; a form finds problems → the first field to fix; a dialog opens → inside it; closes → back to its opener. Document listeners live in an effect (the browser's KeyboardEvent).</li>
+  <li><b>Portals and <code class="inline">&lt;dialog&gt;</code>:</b> <code class="inline">createPortal</code> renders into body while staying in React's tree; <code class="inline">showModal()</code> gives the top layer, an inert page, Escape and initial focus.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: the HQ's Dialog</div>
+<p>The dialog every confirmation in the HQ uses (the finished Lesson 4.3 code):</p>
+<div class="codefile">shoreline-hq/src/components/Dialog.tsx</div>
+<pre class="code" data-src="shoreline-hq/src/components/Dialog.tsx" data-stage="lesson_15" data-match="excerpt"><span class="k">export</span> <span class="k">function</span> Dialog({ title, onClose, children }: DialogProps) {
+  <span class="k">const</span> dialogRef = useRef&lt;HTMLDialogElement&gt;(<span class="k">null</span>)
+  <span class="k">const</span> openerRef = useRef&lt;Element | <span class="k">null</span>&gt;(<span class="k">null</span>)
+  <span class="k">const</span> titleId = useId()
+
+  useEffect(() =&gt; {
+    <span class="k">const</span> dialog = dialogRef.current
+    <span class="k">if</span> (dialog === <span class="k">null</span>) <span class="k">return</span>
+    <span class="k">if</span> (!dialog.open) {
+      openerRef.current = document.activeElement <span class="c">// remember where the focus was</span>
+      dialog.showModal() <span class="c">// focus moves into the dialog, the page behind it goes inert</span>
+    }
+    <span class="k">return</span> () =&gt; {
+      <span class="c">// Closing: give the focus back to the control that opened the dialog</span>
+      <span class="k">const</span> opener = openerRef.current
+      <span class="k">if</span> (opener <span class="k">instanceof</span> HTMLElement) opener.focus()
+    }
+  }, [])
+
+  <span class="k">return</span> createPortal(
+    &lt;dialog ref={dialogRef} aria-labelledby={titleId} className={styles.dialog} onClose={onClose}&gt;
+      &lt;h2 id={titleId}&gt;{title}&lt;/h2&gt;
+      {children}
+    &lt;/dialog&gt;,
+    document.body,</pre><p>Two refs, two jobs: <code class="inline">dialogRef</code> holds the element so the effect can call <code class="inline">showModal()</code>; <code class="inline">openerRef</code> holds a plain value nobody sees (where the focus was), so the cleanup can give the focus back. The <code class="inline">!dialog.open</code> check keeps Strict Mode's second run from remembering the wrong opener. <code class="inline">createPortal</code> puts the <code class="inline">&lt;dialog&gt;</code> in body, while it stays inside EventCard in React's tree (its props, state and events).</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-11/l4_3-refs-and-the-dom/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code> (four failures) and <code class="inline">npm run typecheck</code>.</li>
+  <li>Task 1: a DOM ref that focuses and selects. Task 2: a ref as a prop, and the focus kept when Clear disappears.</li>
+  <li>Task 3 (at home or if you finish early): callback refs in a Map, with a cleanup.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Why does <code class="inline">select()</code> need a ref, while the field's value does not?</td><td></td></tr>
+<tr><td>Where would the focus go after Clear without your fix?</td><td></td></tr>
+<tr><td>What did tsc say about the old tutorial ref line, in your words?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write your prediction, then check it with <code class="inline">src/Scratch.tsx</code> and <code class="inline">npx tsc -b</code> (delete the file afterwards).</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Older code writes a ref without a starting value. What does <code class="inline">npx tsc -b</code> print?</div><pre class="code"><span class="k">import</span> { useRef } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="k">export</span> <span class="k">function</span> OldTimer() {
+  <span class="k">const</span> timerRef = useRef&lt;<span class="k">number</span>&gt;()
+  <span class="k">return</span> &lt;p&gt;{<span class="k">typeof</span> timerRef}&lt;/p&gt;
+}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">A component takes <code class="inline">ref</code> as an ordinary prop (React 19). What does <code class="inline">npx tsc -b</code> print?</div><pre class="code"><span class="k">import</span> { useRef, <span class="k">type</span> Ref } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="k">interface</span> TextFieldProps {
+  id: <span class="k">string</span>
+  label: <span class="k">string</span>
+  <span class="c">/** React 19: ref is an ordinary prop */</span>
+  ref?: Ref&lt;HTMLInputElement&gt;
+}
+
+<span class="k">export</span> <span class="k">function</span> TextField({ id, label, ref }: TextFieldProps) {
+  <span class="k">return</span> (
+    &lt;div&gt;
+      &lt;label htmlFor={id}&gt;{label}&lt;/label&gt;
+      &lt;input id={id} ref={ref} /&gt;
+    &lt;/div&gt;
+  )
+}
+
+<span class="k">export</span> <span class="k">function</span> MeetingPointForm() {
+  <span class="k">const</span> meetingRef = useRef&lt;HTMLInputElement&gt;(<span class="k">null</span>)
+
+  <span class="k">return</span> (
+    &lt;&gt;
+      &lt;TextField id=<span class="s">"meeting"</span> label=<span class="s">"Meeting point"</span> ref={meetingRef} /&gt;
+      &lt;button <span class="k">type</span>=<span class="s">"button"</span> onClick={() =&gt; meetingRef.current?.focus()}&gt;
+        Edit the meeting point
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Focus Where It Belongs</b> (lesson page). In class: Steps 1 and 3, Step 4 started. At home: Step 2 (after 4.2's Step 5), Steps 4 to 6.</p>
+<ul class="tick">
+  <li>☐ Step 1: EventFilters takes <code class="inline">ref?: Ref&lt;HTMLInputElement&gt;</code> and gives it to the search input</li>
+  <li>☐ Step 2: <code class="inline">/</code> focuses the search (not in a field); Clear filters keeps the focus in the search box</li>
+  <li>☐ Step 3: Publish moves the focus to the first field to fix</li>
+  <li>☐ Step 4: Dialog (portal, showModal, focus return, the Strict Mode guard)</li>
+  <li>☐ Step 5: ConfirmDialog and Cancel cleanup on scheduled cards (Keep it first; Escape keeps it)</li>
+  <li>☐ Step 6: the keyboard pass: Tab, Enter, Escape, Tab around the dialog; checks pass</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">A Stop button needs the id of the running interval. Nothing on the screen shows it. Where do you keep it?</div><div class="opts"><div class="opt">A) In useState, so React knows about it</div><div class="opt">B) In useRef: it survives renders and changing it renders nothing</div><div class="opt">C) In a module-level variable</div><div class="opt">D) In a prop from the parent</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">tsc reports this for a click handler. What is the smallest fix, and why is TypeScript right to ask?</div><pre class="code">src/Scratch.tsx:7:5 - error TS18047: 'noteRef.current' is possibly 'null'.
+Found 1 error in src/Scratch.tsx:7</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">tsc rejects this callback ref (first lines). Why?</div><pre class="code">src/Scratch.tsx:18:11 - error TS2322: Type '(el: HTMLButtonElement | null) =&gt; () =&gt; boolean' is not assignable to type 'Ref&lt;HTMLButtonElement&gt; | undefined'.
+  Type '(el: HTMLButtonElement | null) =&gt; () =&gt; boolean' is not assignable to type '(instance: HTMLButtonElement | null) =&gt; void | (() =&gt; VoidOrUndefinedOnly)'.
+    Type '() =&gt; boolean' is not assignable to type 'void | (() =&gt; VoidOrUndefinedOnly)'.
+      Type '() =&gt; boolean' is not assignable to type '() =&gt; VoidOrUndefinedOnly'.
+        Type 'boolean' is not assignable to type 'VoidOrUndefinedOnly'.</pre><div class="opts"><div class="opt">A) A Map cannot hold buttons</div><div class="opt">B) Callback refs were removed in React 19</div><div class="opt">C) The ref must be created with useRef</div><div class="opt">D) The cleanup arrow returns delete's boolean; a ref cleanup must return nothing</div></div></div>
+<div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt">TextField renders a div, a label and an input, and takes a ref prop. Which element should the ref reach, who decides, and how is the prop typed?</div><div class="write"></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">On /events (before this lesson's fix), you type pelican, Tab to Clear filters and press Enter. The button disappears. Where is the focus?</div><div class="opts"><div class="opt">A) On the page's body: the next Tab starts again at the skip link</div><div class="opt">B) On the search box</div><div class="opt">C) On the first cleanup card</div><div class="opt">D) Still on the button, which React keeps hidden</div></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">The HQ's Dialog calls showModal() in an effect and focuses the opener in the cleanup. Which statement is true?</div><div class="opts"><div class="opt">A) The cleanup is only for Strict Mode</div><div class="opt">B) The portal is what makes the page behind inert</div><div class="opt">C) Escape: the browser returns the focus itself; a button that removes the dialog: only the cleanup returns it</div><div class="opt">D) showModal() can be called during rendering</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: one place in today's work where the focus would have been lost without you, and where you sent it instead. Then, for your own app: "When…, the focus goes to…" for each screen that removes, opens or checks something.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Two pages call <code class="inline">useApi('/sites', getSites)</code> at once. How many requests, and do they share the result?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">In <code class="inline">useApi(key, load)</code>, what does the key decide, and why is <code class="inline">load</code> not in the dependency array?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Name one value you would keep in a ref and one you would keep in state, from today's code.</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Lesson 4.2 project Steps 5 and 6 and the checklist (before Lesson 4.3's Step 2)</li>
+  <li>☐ Lesson 4.2 Exercises 1 and 2, the Quick Quiz, the journal</li>
+  <li>☐ Lesson 4.3 project Step 2, Steps 4 to 6 and the checklist</li>
+  <li>☐ Lesson 4.3 Exercises 1 and 2, the Quick Quiz, the journal</li>
+  <li>☐ Labs: 4.2 Task 2; 4.3 Task 3</li>
+  <li>☐ Self-check Q1 to Q12</li>
+  <li>☐ Bring to Session 12: Lesson 4.3 finished (or <code class="inline">lesson-16-start</code>), this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>custom Hook</td><td>A function named use… that calls Hooks; shares logic between components, never state</td></tr>
+<tr><td>Rules of Hooks</td><td>Hooks at the top level of components and Hooks, same order on every render</td></tr>
+<tr><td>tuple / <code class="inline">as const</code></td><td>An array with a fixed type per position; <code class="inline">as const</code> makes a returned array one (readonly)</td></tr>
+<tr><td><code class="inline">useDebouncedValue</code></td><td>The value, but only once it has stopped changing for a delay</td></tr>
+<tr><td><code class="inline">useEffectEvent</code></td><td>Wraps a function so an effect can call the latest version without listing it as a dependency</td></tr>
+<tr><td>key (useApi)</td><td>A string naming what is loaded; a new key loads again</td></tr>
+<tr><td><code class="inline">ApiResult&lt;T&gt;</code></td><td>What useApi returns: <code class="inline">state</code> (LoadState) and <code class="inline">reload</code></td></tr>
+<tr><td>ref / <code class="inline">useRef</code></td><td>An object with <code class="inline">current</code> that survives renders; changing it renders nothing</td></tr>
+<tr><td>DOM ref</td><td>A ref React fills with an element (<code class="inline">RefObject&lt;HTMLInputElement | null&gt;</code>)</td></tr>
+<tr><td>callback ref</td><td>A function in the <code class="inline">ref</code> attribute, called with the element; may return a cleanup (React 19)</td></tr>
+<tr><td><code class="inline">Ref&lt;T&gt;</code></td><td>React's type for anything that fits a ref attribute: a ref object or a callback</td></tr>
+<tr><td>focus management</td><td>Deciding where the keyboard focus goes when the screen changes</td></tr>
+<tr><td>portal / <code class="inline">createPortal</code></td><td>Renders into another DOM element (body) while staying in place in React's tree</td></tr>
+<tr><td><code class="inline">&lt;dialog&gt;</code> / <code class="inline">showModal()</code></td><td>The browser's modal dialog: top layer, inert page, Escape, initial focus</td></tr>
+<tr><td><code class="inline">aria-keyshortcuts</code></td><td>Tells assistive technology a keyboard shortcut exists</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 11 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

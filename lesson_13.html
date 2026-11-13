@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Load Shoreline Crew HQ's sites and cleanups from the API with useEffect: typed fetching, loading, error and empty states, canceling requests with AbortController, and why Strict Mode runs effects twice in development. React + TypeScript: Build a Modern Web App Lesson 4.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Effects and Fetching - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>📡 Lesson 4.1: Effects and Fetching</h1>
+                <p class="lead">Until today, Shoreline Crew HQ has shown a snapshot: sites and cleanups you pasted into two files. The real data lives in shoreline-api, and it changes: organizers add cleanups, volunteers fill spots. In this lesson the HQ starts asking the API for its data, every time a page opens. You will learn the one Hook that lets a component reach outside React, <code>useEffect</code>, and everything a real request needs: types for data that arrives later, a loading state, an error message people can act on, and a way to cancel a request nobody is waiting for any more. Module 4 begins with the app talking to its server for real.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain what a side effect is, why it does not belong in rendering, and when you do not need an effect at all</li>
+                        <li>Write <code>useEffect</code> with the right dependency array and a cleanup function, and explain why Strict Mode runs effects twice in development</li>
+                        <li>Fetch typed data in an effect, reading <code>Promise&lt;T&gt;</code>, <code>Response</code> and <code>AbortSignal</code> in TypeScript's messages</li>
+                        <li>Model loading, error and ready states with a generic discriminated union, and turn API errors into messages people understand</li>
+                        <li>Cancel requests with <code>AbortController</code>, and practice slow and failing answers with the API's <code>--latency</code> and <code>?_status</code> switches</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 155 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_12.html">Lesson 3.6: Styling and Accessible Components</a> (your <code>shoreline-hq</code> with CSS Modules)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> An API client with typed errors and pages, a loading and error message component, and the home, events, sites and "Plan a cleanup" pages loading their data from shoreline-api</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-13-start.zip">lesson-13-start.zip</a> · Finished code: <a href="downloads/lesson-13-end.zip">lesson-13-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#effects" class="toc-link">Side Effects and useEffect</a></li>
+                        <li><a href="#dependencies" class="toc-link">Dependencies and Strict Mode</a></li>
+                        <li><a href="#fetching" class="toc-link">Fetching in an Effect</a></li>
+                        <li><a href="#states" class="toc-link">Loading, Error and Empty</a></li>
+                        <li><a href="#canceling" class="toc-link">Canceling Requests</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The HQ Talks to the API</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="effects" class="lesson-section">
+                <h2>🌊 Side Effects and useEffect</h2>
+                <p>Since Lesson 3.1 every component has been <strong>pure</strong>: given the same props and state, it returns the same elements and changes nothing else. The linter even warned you when <code>new Date()</code> crept into the footer's render. Purity is what lets React call your components whenever it likes, as often as it likes.</p>
+                <p>But an app has to touch the world outside React: ask a server for data, start a timer, set the browser tab's title, listen to the window. Anything like that is a <strong>side effect</strong>: something a function does besides returning its result. Side effects cannot happen <em>during</em> rendering, because rendering may run many times or be thrown away. React gives them their own place: <code>useEffect</code>, code that runs <em>after</em> React has put the component on the screen.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the radio check-in</h4>
+                    <p>A cleanup crew posts its plan on the board first: who is where, which beach. That is rendering, a description of what should be. Once the plan is up, the lead picks up the radio and checks in with the harbor office: that is the effect, talking to something outside the crew. And when the crew packs up, the lead radios "signing off", so the office stops expecting calls: that is the cleanup. Plan first, then the radio, and always sign off.</p>
+                </div>
+                <p>Here is a complete effect. Try it in <code>shoreline-hq</code> as <code>src/Scratch.tsx</code> (your experiment file for this lesson), showing it by temporarily making <code>return &lt;TideClock /&gt;</code> the first line of <code>CurrentPage</code> in <code>App.tsx</code>:</p>
+                <pre data-snippet><code class="language-tsx">import { useEffect, useState } from 'react'
+
+export function TideClock() {
+  const [now, setNow] = useState(() =&gt; new Date())
+
+  useEffect(() =&gt; {
+    // Start a timer when the clock appears on the screen...
+    const timer = setInterval(() =&gt; setNow(new Date()), 1000)
+    // ...and stop it when the clock goes away
+    return () =&gt; clearInterval(timer)
+  }, [])
+
+  return &lt;p&gt;Crew time: {now.toLocaleTimeString('en-US')}&lt;/p&gt;
+}</code></pre>
+                <p>The clock ticks every second. Read <code>useEffect</code>'s two arguments:</p>
+                <ul>
+                    <li><strong>The effect function.</strong> React calls it after the component appears on the screen. It starts a timer, which is the outside world: the browser's timer keeps running whatever React does.</li>
+                    <li><strong>What it returns: the cleanup function.</strong> React calls it when the component goes away (and before running the effect again). It stops the timer. Without it, every <code>TideClock</code> that ever appeared would keep a timer running forever.</li>
+                    <li><strong>The dependency array, <code>[]</code>.</strong> The values the effect reads from the component. An empty array means "nothing from the component", so React runs the effect once, after the first render.</li>
+                </ul>
+                <p>And the types: <code>useEffect</code>'s first parameter has the type <code>EffectCallback</code>, a function that returns either nothing (<code>void</code>) or a cleanup function (React calls it a <code>Destructor</code>). That is all TypeScript allows an effect to return, which matters in a moment. The state needs no annotation: <code>useState(() =&gt; new Date())</code> infers <code>Date</code> from the function, and passing a function means <code>new Date()</code> runs only once, for the first render, instead of on every render.</p>
+                <div class="mermaid">
+graph TD
+    A["React calls the component"] --> B["The screen is updated"]
+    B --> C["React runs the effect"]
+    C --> D["setState when an answer comes"]
+    D --> A
+    B --> E["Component removed: cleanup"]
+</div>
+                <h3>You might not need an effect</h3>
+                <p>Effects are for <em>synchronizing with something outside React</em>. Before you write one, ask whether there is an outside system at all:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want to…</th><th>Use</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Work out a value from props or state</td><td>A plain calculation during render (Lesson 3.4)</td><td>The filtered event lists and the "Showing 2 of 15" line</td></tr>
+                            <tr><td>Respond to a click, a key, a submit</td><td>The event handler or the form action</td><td>"Clear filters", "Show details", the "Plan a cleanup" form</td></tr>
+                            <tr><td>Keep something outside React in step with what is on the screen</td><td><code>useEffect</code></td><td>Loading the page's data from the API (today), a timer, the tab title (Exercise 2)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Fetching the data a page shows is the classic effect: the server is outside React, and the request should follow the page being on the screen.</p>
+            </section>
+
+            <section id="dependencies" class="lesson-section">
+                <h2>🔁 Dependencies and Strict Mode</h2>
+                <h3>When an effect runs</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Second argument</th><th>The effect runs…</th><th>Typical use</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>[]</code></td><td>after the first render only</td><td>Load a page's data, start a timer</td></tr>
+                            <tr><td><code>[siteId]</code></td><td>after the first render, and after every render where <code>siteId</code> changed</td><td>Load the data for whatever is selected</td></tr>
+                            <tr><td>nothing at all</td><td>after <em>every</em> render</td><td>Almost never what you want (Common Mistakes)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>React compares each dependency with its value from the last render, with <code>Object.is</code> (the same check <code>useState</code> uses). Before running the effect again, it runs the previous run's cleanup. The rule for what goes in the array is simple: <strong>every value from the component that the effect reads</strong>: props, state, and anything calculated from them. You do not choose dependencies; your code does. The linter checks it for you: its <code>react-hooks(exhaustive-deps)</code> rule is on in the Vite template's oxlint, and Common Mistakes shows what it says.</p>
+                <h3>Why everything runs twice in development</h3>
+                <p>Make <code>src/Scratch.tsx</code> log what happens:</p>
+                <pre data-snippet><code class="language-tsx">import { useEffect } from 'react'
+
+export function EffectLog() {
+  useEffect(() =&gt; {
+    console.log('effect: start')
+    return () =&gt; console.log('effect: clean up')
+  }, [])
+
+  return &lt;p&gt;Open the console.&lt;/p&gt;
+}</code></pre>
+                <p>Show <code>&lt;EffectLog /&gt;</code> the same way, open the browser's console (<kbd>F12</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>Option</kbd>+<kbd>J</kbd> on a Mac) and reload:</p>
+                <div class="card card-output">
+                    <h4>Console (dev server)</h4>
+                    <pre><code>effect: start
+effect: clean up
+effect: start</code></pre>
+                </div>
+                <p>Start, clean up, start. That is not a bug: it is the <code>&lt;StrictMode&gt;</code> wrapper in <code>main.tsx</code> (there since Lesson 1.2). In development only, React puts each component on the screen, takes it off, and puts it back, to prove that your cleanup really undoes your effect. An effect with a proper cleanup survives this without anyone noticing; one without (a timer that is never stopped, a request whose answer arrives twice) shows its bug at once, on your machine, instead of later for users. The production build (<code>npm run build</code>) runs each effect once. Do not remove <code>&lt;StrictMode&gt;</code> to make the double run go away; fix the cleanup.</p>
+            </section>
+
+            <section id="fetching" class="lesson-section">
+                <h2>📥 Fetching in an Effect</h2>
+                <p>Since Lesson 2.4 the HQ has a typed client in <code>src/api/client.ts</code>, and <code>getEvents()</code> already ran once, in a temporary <code>console.log</code> in <code>main.tsx</code>. Now a component asks for data. The simplest version that works, in <code>src/Scratch.tsx</code>:</p>
+                <pre data-snippet><code class="language-tsx">import { useEffect, useState } from 'react'
+import { getSites } from './api/client.ts'
+import type { Site } from './api/types.ts'
+
+export function SiteNames() {
+  const [sites, setSites] = useState&lt;Site[]&gt;([])
+
+  useEffect(() =&gt; {
+    getSites().then((loaded) =&gt; setSites(loaded))
+  }, [])
+
+  return (
+    &lt;ul&gt;
+      {sites.map((site) =&gt; (
+        &lt;li key={site.id}&gt;{site.name}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}</code></pre>
+                <p>Show it, and the six site names appear a moment after the empty list. Follow the types:</p>
+                <ul>
+                    <li><code>getSites()</code> returns <code>Promise&lt;Site[]&gt;</code>: a promise is an answer that is not here yet, and the type parameter says what it will hold when it is. Hover over <code>getSites</code> in VS Code to see it.</li>
+                    <li><code>.then((loaded) =&gt; …)</code> runs when the answer arrives, and TypeScript knows <code>loaded</code> is <code>Site[]</code>, the <code>T</code> from <code>Promise&lt;T&gt;</code>. No annotation needed.</li>
+                    <li><code>useState&lt;Site[]&gt;([])</code> is annotated because an empty array alone would be <code>never[]</code> (Lesson 3.4).</li>
+                    <li><code>setSites</code> starts a new render with the sites. The effect does not run again: its array is <code>[]</code>.</li>
+                </ul>
+                <h3>Why not <code>async</code> straight away?</h3>
+                <p>With <code>await</code> you would write <code>useEffect(async () =&gt; { … })</code>. TypeScript stops you:</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_13/13-async-effect.png" alt="A terminal in shoreline-hq. npx tsc -b reports error TS2345 in src/Scratch.tsx: Argument of type () =&gt; Promise&lt;void&gt; is not assignable to parameter of type EffectCallback, because Type Promise&lt;void&gt; is not assignable to type void | Destructor. The async arrow function is underlined." width="1100" height="233" loading="lazy">
+                    <figcaption>An async function always returns a promise, and an effect may only return nothing or a cleanup function. TypeScript says so before the code ever runs.</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:8:13 - error TS2345: Argument of type '() =&gt; Promise&lt;void&gt;' is not assignable to parameter of type 'EffectCallback'.
+  Type 'Promise&lt;void&gt;' is not assignable to type 'void | Destructor'.
+
+8   useEffect(async () =&gt; {
+              ~~~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:8</code></pre>
+                </div>
+                <p>An <code>async</code> function always returns a promise, and an effect may only return nothing or a cleanup function, the <code>void | Destructor</code> you met above. React would wait for a cleanup function and get a promise. The linter adds <code>Effect callbacks are synchronous to prevent race conditions.</code> If you prefer <code>await</code>, put an async function <em>inside</em> the effect and call it:</p>
+                <pre data-snippet><code class="language-tsx">import { useEffect, useState } from 'react'
+import { getSites } from './api/client.ts'
+import type { Site } from './api/types.ts'
+
+export function SiteNames() {
+  const [sites, setSites] = useState&lt;Site[]&gt;([])
+
+  useEffect(() =&gt; {
+    async function load() {
+      setSites(await getSites())
+    }
+    load()
+  }, [])
+
+  return &lt;p&gt;{sites.length} sites&lt;/p&gt;
+}</code></pre>
+                <p>Both styles are fine. The project uses <code>.then</code> and <code>.catch</code>, which keeps each effect short.</p>
+                <h3>What the first version gets wrong</h3>
+                <p>It works on your machine, on a good day. Now imagine the beach: one bar of signal, the server restarting. The first version shows an empty page while waiting (is it loading, or are there no sites?), shows the same empty page forever if the request fails, and keeps going if the page is gone before the answer arrives. The next two sections fix each of these, and the project applies the fixes to every page.</p>
+                <p>One more thing to know about <code>fetch</code> itself: it rejects its promise only when <em>no answer</em> arrives (the server is down, the network is gone). An answer with an error status still resolves. Try it in the browser's console on the HQ's dev server page:</p>
+                <pre data-snippet><code class="language-js">const response = await fetch('http://localhost:4000/api/events?_status=500')
+response.ok
+response.status
+await response.json()</code></pre>
+                <p><code>response.ok</code> is <code>false</code>, <code>response.status</code> is <code>500</code>, and the body is the API's error object: <code>{"error": "server_error", "message": "Simulated 500 response (the _status parameter)."}</code>. Your code has to check <code>ok</code>, as <code>client.ts</code> has done since Lesson 2.4. (<code>?_status=500</code> is one of shoreline-api's practice switches: it makes that one request fail on purpose.)</p>
+            </section>
+
+            <section id="states" class="lesson-section">
+                <h2>🚦 Loading, Error and Empty</h2>
+                <p>A page that loads data is always in one of three situations: waiting, failed, or showing the data. You modeled exactly this in Lesson 2.2 as <code>LoadState</code>, a discriminated union on <code>kind</code>. The HQ gets a generic version, so one type works for sites, cleanups or anything else:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/utils/loadState.ts</div>
+                    <pre data-src="shoreline-hq/src/utils/loadState.ts"><code class="language-ts">// What a screen that loads data can be doing (the LoadState of Lesson 2.2, for any kind of data)
+export type LoadState&lt;T&gt; =
+  | { kind: 'loading' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'ready'; data: T }</code></pre>
+                </div>
+                <p><code>LoadState&lt;Site[]&gt;</code> has <code>data: Site[]</code> in its <code>ready</code> member. And only there: <code>state.data</code> is an error until you have checked <code>state.kind === 'ready'</code>. TypeScript makes "show the data before it has arrived" impossible to write. After <code>if (state.kind !== 'ready') return …</code>, TypeScript narrows <code>state</code> to the other two members, <code>{ kind: "loading"; } | { kind: "failed"; message: string; }</code>, and below that line <code>state.data</code> is simply <code>Site[]</code>.</p>
+                <div class="mermaid">
+graph TD
+    A["loading"] --> B{"The request"}
+    B -->|"checked data"| C["ready: data"]
+    B -->|"error or bad data"| D["failed: message"]
+</div>
+                <ul>
+                    <li><strong>Loading</strong> is where every page starts: <code>useState&lt;LoadState&lt;Site[]&gt;&gt;({ kind: 'loading' })</code>. Say what is loading ("Loading the beach sites…"), so a slow screen never looks like an empty one.</li>
+                    <li><strong>Failed</strong> holds a message for people. Say what could not be done and what to try; keep the technical details for the console.</li>
+                    <li><strong>Empty</strong> is not a fourth kind: it is <code>ready</code> with zero items. Your <code>EventList</code> has handled that since Lesson 3.3 ("No drafts waiting to be published.").</li>
+                </ul>
+                <h3>Errors you can tell apart</h3>
+                <p>Two very different things can go wrong. Either the API answered with an error status (a 500, a 404), or no answer arrived at all. The project's client throws its own error class for the first case:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                    <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">
+/** The API answered, but with an error status (404, 500, ...) */
+export class ApiError extends Error {
+  readonly status: number
+  readonly code: ErrorCode
+  readonly fieldErrors: Record&lt;string, string[]&gt; | undefined
+
+  constructor(status: number, body: ApiErrorBody) {
+    super(body.message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = body.error
+    this.fieldErrors = body.fieldErrors
+  }</code></pre>
+                </div>
+                <p>A class is a type <em>and</em> a value, so <code>error instanceof ApiError</code> narrows an <code>unknown</code> error to <code>ApiError</code>, with <code>status</code> and <code>code</code> typed (<code>code</code> is the API's <code>ErrorCode</code> union, copied in <code>src/api/types.ts</code>). The fields are written out instead of using constructor shortcuts, because the template's <code>erasableSyntaxOnly</code> setting forbids TypeScript-only syntax that changes the JavaScript output. And when no answer arrives, the browser's <code>fetch</code> rejects with a <code>TypeError</code>. Two errors, two messages:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>What happened</th><th>What the HQ shows</th><th>What the console shows</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>The API answered 500</td><td>Could not load the beach sites. The server had a problem (500). Try again in a moment.</td><td><code>ApiError: Simulated 500 response (the _status parameter).</code></td></tr>
+                            <tr><td>shoreline-api is not running</td><td>Could not load the beach sites. Could not reach the server. Check that shoreline-api is running, then try again.</td><td><code>TypeError: Failed to fetch</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Note the type of the error in <code>.catch((error: unknown) =&gt; …)</code>. Without the annotation, a promise's rejection value is <code>any</code>, and <code>error.no.such.thing</code> compiles. Writing <code>unknown</code> makes you check before you use it, exactly what <code>describeError</code> does.</p>
+                <h3>Numbers in the headers</h3>
+                <p>Lists from shoreline-api come one page at a time, ten items unless you ask for more (<code>perPage</code>, up to 50). The body is only the items; how many there are in all travels in response headers, <code>X-Total-Count</code> and <code>X-Total-Pages</code>. The project's <code>readPage</code> reads both into the <code>Page&lt;T&gt;</code> shape you wrote in Lesson 2.3: <code>{ items: T[]; page: PageInfo }</code>. A page on another origin (<code>localhost:5173</code> asking <code>localhost:4000</code>) can only read a header the server lists in <code>Access-Control-Expose-Headers</code>; shoreline-api lists these, so <code>response.headers.get('X-Total-Count')</code> returns <code>"15"</code> for the events. Without that header, it would return <code>null</code> although the browser received the value.</p>
+            </section>
+
+            <section id="canceling" class="lesson-section">
+                <h2>✋ Canceling Requests</h2>
+                <p>A request takes time, and the world moves on while it is out. The page may be gone before the answer arrives, or, for an effect with dependencies, the dependency may have changed: picture a list that loads the cleanups for the selected site. Select Pelican Point, then quickly Long Strand. Two requests are out. If Pelican Point's answer happens to arrive last, it overwrites Long Strand's, and the screen shows the wrong site's cleanups under the right heading. This is a <strong>race condition</strong>, and it is why the linter said effects should stay synchronous.</p>
+                <p>The fix is the cleanup function. The browser has a built-in way to cancel a <code>fetch</code>: an <code>AbortController</code>. Create one in the effect, give its <code>signal</code> (typed <code>AbortSignal</code>) to <code>fetch</code>, and abort it in the cleanup:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/SitesPage.tsx" data-match="excerpt"><code class="language-tsx">// After the first render: ask the API for the sites, and cancel the request if the page goes away
+useEffect(() =&gt; {
+  const controller = new AbortController()
+  getSites(controller.signal)
+    .then((sites) =&gt; setState({ kind: 'ready', data: sites }))
+    .catch((error: unknown) =&gt; {
+      if (controller.signal.aborted) return
+      console.error(error)
+      setState({ kind: 'failed', message: describeError(error) })
+    })
+  return () =&gt; controller.abort()
+}, [])</code></pre>
+                </div>
+                <ul>
+                    <li><code>controller.abort()</code> cancels the request if it is still out. The browser stops waiting, and the promise rejects with an <code>AbortError</code>.</li>
+                    <li>The <code>catch</code> checks <code>controller.signal.aborted</code> first: a request <em>we</em> canceled is not a failure to show anyone, so it returns quietly.</li>
+                    <li>An answer that already arrived is not a problem either: after the cleanup, nobody calls <code>setState</code> for that run any more. The latest run always wins.</li>
+                </ul>
+                <p>Strict Mode shows this working. In the browser's DevTools, open the <strong>Network</strong> tab, filter by <strong>Fetch/XHR</strong>, and reload <code>/sites</code> on the dev server: there are two requests for <code>sites</code>. The first was canceled by Strict Mode's cleanup, the second delivered the sites. Measured on this course's setup: on the dev server the first request ended with <code>net::ERR_ABORTED</code> and the second succeeded; after <code>npm run build</code>, <code>npm run preview</code> sent exactly one.</p>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Loading, error and canceled states are where real apps feel solid or flaky. Users notice a spinner that never ends, a blank page after an error, an old result flashing in. In code reviews and interviews, "what happens if the request is slow, fails, or comes back late?" is a standard question, and you can now answer it for every page you build.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ A dependency the array forgets</h4>
+                    <p>This component shows how many cleanups a site has. The effect reads <code>siteId</code>, but the array is empty:</p>
+                    <pre data-snippet><code class="language-tsx">import { useEffect, useState } from 'react'
+import { getEvents } from './api/client.ts'
+
+interface SiteEventCountProps {
+  siteId: string
+}
+
+export function SiteEventCount({ siteId }: SiteEventCountProps) {
+  const [count, setCount] = useState&lt;number | null&gt;(null)
+
+  useEffect(() =&gt; {
+    getEvents(`siteId=${siteId}`).then((found) =&gt; setCount(found.page.total))
+  }, [])
+
+  return &lt;p&gt;Cleanups at this site: {count ?? '…'}&lt;/p&gt;
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  ⚠ react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'siteId'
+    ╭─[src/Scratch.tsx:13:6]
+ 11 │   useEffect(() =&gt; {
+ 12 │     getEvents(`siteId=${siteId}`).then((found) =&gt; setCount(found.page.total))
+    ·                         ───┬──
+    ·                            ╰── useEffect uses `siteId` here
+ 13 │   }, [])
+    ·      ──
+ 14 │
+    ╰────
+  help: Either include it or remove the dependency array.
+
+Found 1 warning and 0 errors.
+Finished in 15ms on 31 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>TypeScript has no complaint. But when the parent passes a different <code>siteId</code>, the effect never runs again, and the count stays the first site's. Put <code>siteId</code> in the array (<code>[siteId]</code>), and take the warning seriously every time: the linter reads the effect more carefully than a tired human does.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ No dependency array at all</h4>
+                    <p>Leave out the second argument and the effect runs after <em>every</em> render:</p>
+                    <pre data-snippet><code class="language-tsx">import { useEffect, useState } from 'react'
+import { getSites } from './api/client.ts'
+import type { Site } from './api/types.ts'
+
+export function SiteNames() {
+  const [sites, setSites] = useState&lt;Site[]&gt;([])
+
+  useEffect(() =&gt; {
+    getSites().then((loaded) =&gt; setSites(loaded))
+  })
+
+  return &lt;p&gt;{sites.length} sites&lt;/p&gt;
+}</code></pre>
+                    <p>The effect fetches, the answer sets state, the new state renders, the render runs the effect, which fetches again… The page looks fine ("6 sites"), <code>npx tsc -b</code> and <code>npm run lint</code> both pass, and the Network tab fills up: on this course's machine, more than 700 requests in two seconds. Every effect gets an array, even if it is <code>[]</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Setting state at the top of an effect</h4>
+                    <p>It is tempting to start an effect with <code>setState({ kind: 'loading' })</code>. The linter objects:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint, trimmed)</h4>
+                        <pre><code>
+  ⚠ react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+    ╭─[src/pages/SitesPage.tsx:16:5]
+ 14 │
+ 15 │   useEffect(() =&gt; {
+    ·   ────┬────
+    ·       ╰── This is the containing effect
+ 16 │     setState({ kind: 'loading' })
+    ·     ────┬───
+    ·         ╰── Avoid calling setState() directly within an effect
+ 17 │     const controller = new AbortController()
+    ╰────</code></pre>
+                    </div>
+                    <p>Setting state right away in an effect renders the component a second time for nothing. Start in the right state instead (<code>useState({ kind: 'loading' })</code>), and when a click should show "loading" again, set it in that click's handler. Exercise 1 does exactly that. Setting state <em>later</em>, in <code>.then</code> or <code>.catch</code>, is what effects are for, and the rule does not mind.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The HQ Talks to the API</h2>
+                <p>At the end of this project, every page that shows data loads it from shoreline-api when it opens: the home page's next cleanup, the events page, the sites page and the site menu of "Plan a cleanup". Each one shows a loading message, an error message when something goes wrong, and cancels its request when it is no longer needed. <code>src/data/</code>, with the sites and cleanups you pasted in Lessons 3.2 and 3.3, is deleted, and TypeScript guides you to every file that still used it.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>) and delete <code>src/Scratch.tsx</code> (and the line you added to <code>CurrentPage</code>) if you still have them.</p>
+
+                <div class="card">
+                    <h3>Step 1: A client that knows about errors and pages <span class="step-time">(14 min)</span></h3>
+                    <p>Replace <code>src/api/client.ts</code> with this version. The checks from Lesson 2.4 are still there; what is new is marked by the comments and listed below:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts"><code class="language-ts">// Shoreline Crew HQ's API client (Lessons 2.4 and 4.1).
+// Data from the API is unknown until a check proves its shape.
+import type {
+  ApiErrorBody,
+  CleanupEvent,
+  ErrorCode,
+  EventStatus,
+  PageInfo,
+  Site,
+  Terrain,
+} from './types.ts'
+
+// ---------------------------------------------------------------- checking data
+
+/** An object (not null, not an array), so its properties can be read */
+function isRecord(value: unknown): value is Record&lt;string, unknown&gt; {
+  return typeof value === 'object' &amp;&amp; value !== null &amp;&amp; !Array.isArray(value)
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) &amp;&amp; value.every((item) =&gt; typeof item === 'string')
+}
+
+const eventStatuses: EventStatus[] = ['draft', 'scheduled', 'completed', 'cancelled']
+
+export function isEventStatus(value: unknown): value is EventStatus {
+  return eventStatuses.some((status) =&gt; status === value)
+}
+
+// The CleanupEvent properties that hold text
+const eventTextFields: (keyof CleanupEvent)[] = [
+  'id', 'title', 'siteId', 'date', 'startTime', 'endTime',
+  'meetingPoint', 'description', 'leadOrganizerId', 'createdAt', 'updatedAt',
+]
+
+export function isCleanupEvent(value: unknown): value is CleanupEvent {
+  return (
+    isRecord(value) &amp;&amp;
+    eventTextFields.every((key) =&gt; typeof value[key] === 'string') &amp;&amp;
+    isEventStatus(value.status) &amp;&amp;
+    typeof value.capacity === 'number' &amp;&amp;
+    typeof value.spotsTaken === 'number' &amp;&amp;
+    isStringArray(value.suppliesProvided)
+  )
+}
+
+const terrains: Terrain[] = ['sand', 'rocky', 'marsh', 'mixed']
+const siteTextFields: (keyof Site)[] = ['id', 'name', 'town', 'parking', 'description']
+
+export function isSite(value: unknown): value is Site {
+  return (
+    isRecord(value) &amp;&amp;
+    siteTextFields.every((key) =&gt; typeof value[key] === 'string') &amp;&amp;
+    terrains.some((terrain) =&gt; terrain === value.terrain) &amp;&amp;
+    typeof value.accessible === 'boolean' &amp;&amp;
+    typeof value.latitude === 'number' &amp;&amp;
+    typeof value.longitude === 'number' &amp;&amp;
+    isRecord(value.image) &amp;&amp;
+    typeof value.image.url === 'string' &amp;&amp;
+    typeof value.image.alt === 'string' &amp;&amp;
+    typeof value.image.width === 'number' &amp;&amp;
+    typeof value.image.height === 'number'
+  )
+}
+
+/** A check for one item becomes a check for a list of them */
+function isListOf&lt;T&gt;(isT: (value: unknown) =&gt; value is T) {
+  return (value: unknown): value is T[] =&gt; Array.isArray(value) &amp;&amp; value.every(isT)
+}
+
+function isApiErrorBody(value: unknown): value is ApiErrorBody {
+  return isRecord(value) &amp;&amp; typeof value.error === 'string' &amp;&amp; typeof value.message === 'string'
+}
+
+// ---------------------------------------------------------------- errors
+
+/** The API answered, but with an error status (404, 500, ...) */
+export class ApiError extends Error {
+  readonly status: number
+  readonly code: ErrorCode
+  readonly fieldErrors: Record&lt;string, string[]&gt; | undefined
+
+  constructor(status: number, body: ApiErrorBody) {
+    super(body.message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = body.error
+    this.fieldErrors = body.fieldErrors
+  }
+}
+
+/** What to tell people when a request failed */
+export function describeError(error: unknown): string {
+  if (error instanceof ApiError) {
+    return `The server had a problem (${error.status}). Try again in a moment.`
+  }
+  if (error instanceof TypeError) {
+    return 'Could not reach the server. Check that shoreline-api is running, then try again.'
+  }
+  return 'Something unexpected went wrong. Try again in a moment.'
+}
+
+// ---------------------------------------------------------------- talking to the API
+
+function apiBaseUrl(): string {
+  const url = import.meta.env.VITE_API_URL
+  if (url === undefined || url === '') {
+    throw new Error('VITE_API_URL is not set: copy .env.example to .env.local')
+  }
+  return url
+}
+
+/** GET a path under /api. Throws ApiError when the API answers with an error status. */
+async function request(path: string, signal?: AbortSignal): Promise&lt;Response&gt; {
+  const response = await fetch(`${apiBaseUrl()}/api${path}`, { signal })
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() =&gt; null)
+    throw new ApiError(
+      response.status,
+      isApiErrorBody(body) ? body : { error: 'server_error', message: `HTTP ${response.status}` },
+    )
+  }
+  return response
+}
+
+/** GET a path under /api and return the JSON body, unchecked */
+export async function apiFetch(path: string, signal?: AbortSignal): Promise&lt;unknown&gt; {
+  const response = await request(path, signal)
+  return response.json()
+}
+
+/** GET a path and check the JSON with a type predicate before anyone uses it */
+export async function getJSON&lt;T&gt;(
+  path: string,
+  isT: (value: unknown) =&gt; value is T,
+  signal?: AbortSignal,
+): Promise&lt;T&gt; {
+  const data = await apiFetch(path, signal)
+  if (!isT(data)) {
+    throw new Error(`Unexpected data from GET /api${path}`)
+  }
+  return data
+}
+
+/** One page of a list, and where it sits in the whole list */
+export interface Page&lt;T&gt; {
+  items: T[]
+  page: PageInfo
+}
+
+/** GET a list: the items are in the body, the page numbers in the response headers */
+export async function readPage&lt;T&gt;(
+  path: string,
+  isItem: (value: unknown) =&gt; value is T,
+  signal?: AbortSignal,
+): Promise&lt;Page&lt;T&gt;&gt; {
+  const response = await request(path, signal)
+  const items: unknown = await response.json()
+  if (!isListOf(isItem)(items)) {
+    throw new Error(`Unexpected data from GET /api${path}`)
+  }
+  // page and perPage are what we asked for (or the API's defaults, 1 and 10)
+  const url = new URL(response.url)
+  return {
+    items,
+    page: {
+      page: Number(url.searchParams.get('page') ?? '1'),
+      perPage: Number(url.searchParams.get('perPage') ?? '10'),
+      total: Number(response.headers.get('X-Total-Count')),
+      totalPages: Number(response.headers.get('X-Total-Pages')),
+    },
+  }
+}
+
+export function getSites(signal?: AbortSignal): Promise&lt;Site[]&gt; {
+  return getJSON('/sites', isListOf(isSite), signal)
+}
+
+/** Cleanups; query is a search string such as 'status=scheduled&amp;perPage=50' */
+export function getEvents(query: string, signal?: AbortSignal): Promise&lt;Page&lt;CleanupEvent&gt;&gt; {
+  return readPage(`/events?${query}`, isCleanupEvent, signal)
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong><code>isSite</code></strong> checks a site the way <code>isCleanupEvent</code> checks an event, including the nested <code>image</code> object (after <code>isRecord(value.image)</code>, TypeScript lets you read its properties).</li>
+                        <li><strong><code>isListOf</code></strong> is a generic function that <em>returns</em> a type predicate: give it a check for one <code>T</code> and you get a check for <code>T[]</code>. It replaces the separate list check of Lesson 2.4.</li>
+                        <li><strong><code>ApiError</code></strong> and <strong><code>describeError</code></strong> are the two error cases from the lesson. The <code>request</code> function reads the API's error body (or makes one up if the body is not the API's shape) and throws an <code>ApiError</code>.</li>
+                        <li><strong>Every function takes an optional <code>signal?: AbortSignal</code></strong> and passes it down to <code>fetch</code>. Optional, so code that does not need canceling simply leaves it out.</li>
+                        <li><strong><code>readPage</code></strong> returns a <code>Page&lt;T&gt;</code>: the items from the body, the totals from the headers. <code>response.url</code> is the address that was requested, so the page numbers are the ones you asked for.</li>
+                        <li><strong><code>getEvents(query, signal)</code></strong> now takes a query string and returns a whole <code>Page&lt;CleanupEvent&gt;</code>; <strong><code>getSites</code></strong> is new.</li>
+                    </ul>
+                    <p>Save and run <code>npx tsc -b</code>. Changing what a function takes and returns is a change for everyone who calls it, and TypeScript finds the one caller left over from Lesson 2.4:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/main.tsx:15:1 - error TS2554: Expected 1-2 arguments, but got 0.
+
+15 getEvents()
+   ~~~~~~~~~
+
+  src/api/client.ts:180:27 - An argument for 'query' was not provided.
+    180 export function getEvents(query: string, signal?: AbortSignal): Promise&lt;Page&lt;CleanupEvent&gt;&gt; {
+                                  ~~~~~~~~~~~~~
+
+src/main.tsx:17:34 - error TS2339: Property 'length' does not exist on type 'Page&lt;CleanupEvent&gt;'.
+
+17     console.log(`Loaded ${events.length} cleanups. First: ${events[0]?.title ?? 'none'}`)
+                                    ~~~~~~
+
+src/main.tsx:17:61 - error TS7053: Element implicitly has an 'any' type because expression of type '0' can't be used to index type 'Page&lt;CleanupEvent&gt;'.
+  Property '0' does not exist on type 'Page&lt;CleanupEvent&gt;'.
+
+17     console.log(`Loaded ${events.length} cleanups. First: ${events[0]?.title ?? 'none'}`)
+                                                               ~~~~~~~~~
+
+
+Found 3 errors in the same file, starting at: src/main.tsx:15</code></pre>
+                    </div>
+                    <p>That is the temporary log in <code>main.tsx</code>. Its job is done: remove its import and the whole block. Change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/main.tsx</div>
+                        <pre data-src="shoreline-hq/src/main.tsx" data-match="diff"><code class="language-diff-tsx"> import { App } from './App.tsx'
+-import { getEvents } from './api/client.ts'
+ </code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/main.tsx</div>
+                        <pre data-src="shoreline-hq/src/main.tsx" data-match="diff"><code class="language-diff-tsx">   &lt;/StrictMode&gt;,
+ )
+-
+-// Temporary (Lesson 2.4): prove the typed client works. Lesson 4.1 moves fetching into components.
+-getEvents()
+-  .then((events) =&gt; {
+-    console.log(`Loaded ${events.length} cleanups. First: ${events[0]?.title ?? 'none'}`)
+-  })
+-  .catch((error: unknown) =&gt; {
+-    console.error(error)
+-  })</code></pre>
+                    </div>
+                    <p><code>npx tsc -b</code> is quiet again.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: One component for loading and errors <span class="step-time">(6 min)</span></h3>
+                    <p>Four pages will need the same two messages, so they get a component. Create <code>src/utils/loadState.ts</code> with the <code>LoadState&lt;T&gt;</code> type from the lesson, then <code>src/components/LoadStatus.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/LoadStatus.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/LoadStatus.module.css"><code class="language-css">.loading,
+.failed {
+  margin: 0 0 2rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.loading {
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+}
+
+.failed {
+  border: 2px solid var(--error);
+}</code></pre>
+                    </div>
+                    <p>and <code>src/components/LoadStatus.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/LoadStatus.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/LoadStatus.tsx"><code class="language-tsx">import type { LoadState } from '../utils/loadState.ts'
+import styles from './LoadStatus.module.css'
+
+interface LoadStatusProps {
+  state: LoadState&lt;unknown&gt;
+  /** What is loading, for the messages: "the beach sites" */
+  what: string
+}
+
+// The message to show while data is on its way, or when it could not be loaded
+export function LoadStatus({ state, what }: LoadStatusProps) {
+  if (state.kind === 'loading') {
+    return (
+      &lt;p role="status" className={styles.loading}&gt;
+        Loading {what}…
+      &lt;/p&gt;
+    )
+  }
+  if (state.kind === 'failed') {
+    return (
+      &lt;p role="alert" className={styles.failed}&gt;
+        Could not load {what}. {state.message}
+      &lt;/p&gt;
+    )
+  }
+  return null
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>state: LoadState&lt;unknown&gt;</code> accepts the state of any page: a <code>LoadState&lt;Site[]&gt;</code> fits, because <code>Site[]</code> can go wherever <code>unknown</code> is expected. The component never reads <code>data</code>, so it does not need to know its type.</li>
+                        <li>The loading message is a <code>role="status"</code> region, like the status lines of Module 3. The error is <code>role="alert"</code>: screen readers announce it right away, because it changes what the person can do. It says it in words, with a red border as a second signal, never color alone.</li>
+                        <li>For a <code>ready</code> state it renders nothing: the page shows its data instead.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: The sites page loads its sites <span class="step-time">(14 min)</span></h3>
+                    <p>Replace <code>src/pages/SitesPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/SitesPage.tsx"><code class="language-tsx">import { useEffect, useState } from 'react'
+import { describeError, getSites } from '../api/client.ts'
+import type { Site } from '../api/types.ts'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { SiteCard } from '../components/SiteCard.tsx'
+import type { LoadState } from '../utils/loadState.ts'
+import styles from './Page.module.css'
+
+export function SitesPage() {
+  const [state, setState] = useState&lt;LoadState&lt;Site[]&gt;&gt;({ kind: 'loading' })
+
+  // After the first render: ask the API for the sites, and cancel the request if the page goes away
+  useEffect(() =&gt; {
+    const controller = new AbortController()
+    getSites(controller.signal)
+      .then((sites) =&gt; setState({ kind: 'ready', data: sites }))
+      .catch((error: unknown) =&gt; {
+        if (controller.signal.aborted) return
+        console.error(error)
+        setState({ kind: 'failed', message: describeError(error) })
+      })
+    return () =&gt; controller.abort()
+  }, [])
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Beach sites&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;Six stretches of coast the crew looks after.&lt;/p&gt;
+      {state.kind === 'ready' ? (
+        &lt;div className={styles.grid}&gt;
+          {state.data.map((site) =&gt; (
+            &lt;SiteCard key={site.id} site={site} /&gt;
+          ))}
+        &lt;/div&gt;
+      ) : (
+        &lt;LoadStatus state={state} what="the beach sites" /&gt;
+      )}
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Everything from the lesson in one place: the page starts as <code>loading</code>, the effect runs once (<code>[]</code>), the answer becomes <code>ready</code> or <code>failed</code>, a canceled request is ignored, and the cleanup cancels. The heading and the lead sentence show at once; only the part that needs data waits. <code>console.error(error)</code> keeps the details for you, the developer, in the console.</p>
+                    <p>Open <code>/sites</code>: it looks exactly as before, because the API answers in a few milliseconds. Time to practice the other states. shoreline-api has switches for this; stop it (<kbd>Ctrl</kbd>+<kbd>C</kbd>) and start it slow:</p>
+                    <pre class="terminal"><code class="language-bash">node server.ts --latency=4000</code></pre>
+                    <p>Every answer now takes four seconds. Reload <code>/sites</code>:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_13/13-sites-loading.png" alt="The Beach sites page while shoreline-api is slow. Under the heading and the lead sentence, a box with a dashed border says Loading the beach sites… and no site cards are shown yet." width="984" height="652" loading="lazy">
+                        <figcaption>With <code>node server.ts --latency=4000</code> every answer takes four seconds, long enough to see the loading state.</figcaption>
+                    </figure>
+                    <p>Next, a failing answer. For one request, add <code>?_status=500</code> to its path: in <code>client.ts</code>, temporarily change <code>getJSON('/sites', …)</code> to <code>getJSON('/sites?_status=500', …)</code>. (Restart the API without <code>--latency</code> first if you are impatient.)</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_13/13-sites-error.png" alt="The Beach sites page after the API answered with an error. A box with a red border says Could not load the beach sites. The server had a problem (500). Try again in a moment." width="984" height="652" loading="lazy">
+                        <figcaption><code>?_status=500</code> made the API fail on purpose. The page says what happened in words; the details went to the browser's console.</figcaption>
+                    </figure>
+                    <p>The console has the details:</p>
+                    <div class="card card-output">
+                        <h4>Console (dev server, first lines)</h4>
+                        <pre><code>Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+ApiError: Simulated 500 response (the _status parameter).</code></pre>
+                    </div>
+                    <p>Put the path back to <code>'/sites'</code>. Last, the server is gone: stop shoreline-api and reload. The page says: <strong>Could not load the beach sites. Could not reach the server. Check that shoreline-api is running, then try again.</strong> The console:</p>
+                    <div class="card card-output">
+                        <h4>Console (dev server, first lines)</h4>
+                        <pre><code>Failed to load resource: net::ERR_CONNECTION_REFUSED
+TypeError: Failed to fetch</code></pre>
+                    </div>
+                    <p>Start shoreline-api again (<code>node server.ts</code>). Other switches for later: <code>--fail-rate=0.2</code> makes about one request in five fail, and <code>?_delay=2000</code> slows one request. You will see this page's two requests in the Network tab as described in the lesson: the first canceled by Strict Mode, the second answered.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The events page loads cleanups and sites together <span class="step-time">(14 min)</span></h3>
+                    <p>Each event card shows its site's name, and until now it found the site in <code>data/sites.ts</code>. From now on the card is <em>given</em> its site. In <code>src/components/EventCard.tsx</code>, change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx"> import { useState } from 'react'
+-import type { CleanupEvent } from '../api/types.ts'
+-import { sites } from '../data/sites.ts'
++import type { CleanupEvent, Site } from '../api/types.ts'
+ import { getAvailability } from '../utils/availability.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx"> interface EventCardProps {
+   event: CleanupEvent
++  /** undefined when the event's site is not in the list */
++  site: Site | undefined
+ }
+
+-export function EventCard({ event }: EventCardProps) {
++export function EventCard({ event, site }: EventCardProps) {
+   const [showDetails, setShowDetails] = useState(false)
+-  const site = sites.find((s) =&gt; s.id === event.siteId)</code></pre>
+                    </div>
+                    <p>The rest of the card already reads <code>site</code>, so nothing else changes. The prop is required but may be <code>undefined</code>: a caller must decide, and the "Site to be confirmed" text still covers a missing site. Run <code>npx tsc -b</code> and TypeScript tells you who must pass it:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/components/EventList.tsx:19:12 - error TS2741: Property 'site' is missing in type '{ event: CleanupEvent; }' but required in type 'EventCardProps'.
+
+19           &lt;EventCard event={event} /&gt;
+              ~~~~~~~~~
+
+  src/components/EventCard.tsx:14:3 - 'site' is declared here.
+    14   site: Site | undefined
+         ~~~~
+
+
+Found 1 error in src/components/EventList.tsx:19</code></pre>
+                    </div>
+                    <p><code>EventList</code> gets the sites as a prop and finds each card's site. Replace <code>src/components/EventList.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventList.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventList.tsx"><code class="language-tsx">import type { CleanupEvent, Site } from '../api/types.ts'
+import { EventCard } from './EventCard.tsx'
+import styles from './EventList.module.css'
+
+interface EventListProps {
+  events: CleanupEvent[]
+  sites: Site[]
+  emptyMessage: string
+}
+
+export function EventList({ events, sites, emptyMessage }: EventListProps) {
+  if (events.length === 0) {
+    return &lt;p className={styles.empty}&gt;{emptyMessage}&lt;/p&gt;
+  }
+
+  return (
+    &lt;ul className={styles.list}&gt;
+      {events.map((event) =&gt; (
+        &lt;li key={event.id}&gt;
+          &lt;EventCard event={event} site={sites.find((site) =&gt; site.id === event.siteId)} /&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Now the page. It needs two lists from the API, and it should show either both or an error. <code>Promise.all</code> starts both requests at once and waits for both; if either fails, the whole thing fails. Replace <code>src/pages/EventsPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx"><code class="language-tsx">import { useEffect, useState } from 'react'
+import { describeError, getEvents, getSites } from '../api/client.ts'
+import type { CleanupEvent, Site } from '../api/types.ts'
+import { EventFilters, type StatusFilter } from '../components/EventFilters.tsx'
+import { EventList } from '../components/EventList.tsx'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import type { LoadState } from '../utils/loadState.ts'
+import styles from './Page.module.css'
+
+// Everything this page needs from the API, loaded together
+interface EventsData {
+  events: CleanupEvent[]
+  sites: Site[]
+}
+
+function matchesFilters(event: CleanupEvent, search: string, status: StatusFilter): boolean {
+  const statusMatches = status === 'all' || event.status === status
+  const text = `${event.title} ${event.description}`.toLowerCase()
+  return statusMatches &amp;&amp; text.includes(search)
+}
+
+export function EventsPage() {
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState&lt;StatusFilter&gt;('all')
+  const [state, setState] = useState&lt;LoadState&lt;EventsData&gt;&gt;({ kind: 'loading' })
+
+  // Two requests at once; the page is ready when both have answered
+  useEffect(() =&gt; {
+    const controller = new AbortController()
+    Promise.all([getEvents('perPage=50', controller.signal), getSites(controller.signal)])
+      .then(([eventsPage, sites]) =&gt; {
+        setState({ kind: 'ready', data: { events: eventsPage.items, sites } })
+      })
+      .catch((error: unknown) =&gt; {
+        if (controller.signal.aborted) return
+        console.error(error)
+        setState({ kind: 'failed', message: describeError(error) })
+      })
+    return () =&gt; controller.abort()
+  }, [])
+
+  if (state.kind !== 'ready') {
+    return (
+      &lt;&gt;
+        &lt;h1&gt;Cleanup events&lt;/h1&gt;
+        &lt;LoadStatus state={state} what="the cleanups" /&gt;
+      &lt;/&gt;
+    )
+  }
+
+  // Derived values: worked out from state on every render, never stored
+  const { events, sites } = state.data
+  const search = query.trim().toLowerCase()
+  const visible = events.filter((event) =&gt; matchesFilters(event, search, status))
+  const upcoming = visible.filter((event) =&gt; event.status === 'scheduled')
+  const drafts = visible.filter((event) =&gt; event.status === 'draft')
+  const past = visible
+    .filter((event) =&gt; event.status === 'completed' || event.status === 'cancelled')
+    .toReversed()
+  const filtering = search !== '' || status !== 'all'
+  const noMatches = 'No cleanups here match your filters.'
+
+  function clearFilters() {
+    setQuery('')
+    setStatus('all')
+  }
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Cleanup events&lt;/h1&gt;
+      &lt;p&gt;
+        &lt;a href="/events/new"&gt;Plan a cleanup&lt;/a&gt;
+      &lt;/p&gt;
+      &lt;EventFilters
+        query={query}
+        status={status}
+        onQueryChange={setQuery}
+        onStatusChange={setStatus}
+        onClear={clearFilters}
+      /&gt;
+      &lt;p className={styles.lead} role="status"&gt;
+        Showing {visible.length} of {events.length}: {upcoming.length} coming up,{' '}
+        {past.length} in the log.
+      &lt;/p&gt;
+      &lt;h2&gt;Coming up&lt;/h2&gt;
+      &lt;EventList
+        events={upcoming}
+        sites={sites}
+        emptyMessage={filtering ? noMatches : 'Nothing scheduled yet.'}
+      /&gt;
+      &lt;h2&gt;Drafts&lt;/h2&gt;
+      &lt;EventList
+        events={drafts}
+        sites={sites}
+        emptyMessage={filtering ? noMatches : 'No drafts waiting to be published.'}
+      /&gt;
+      &lt;h2&gt;Past cleanups&lt;/h2&gt;
+      &lt;EventList
+        events={past}
+        sites={sites}
+        emptyMessage={filtering ? noMatches : 'No cleanups in the log yet.'}
+      /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>EventsData</code> names what the page needs. TypeScript types the <code>Promise.all</code> as <code>Promise&lt;[Page&lt;CleanupEvent&gt;, Site[]]&gt;</code>, a <strong>tuple</strong>: an array with a known type at each position, so <code>([eventsPage, sites])</code> destructures with the right type for each.</li>
+                        <li>One <code>AbortController</code> cancels both requests: they share the signal.</li>
+                        <li><code>perPage=50</code> asks for all fifteen public cleanups at once, because the filters from Lesson 3.4 still work on the whole list in the browser. (Lesson 6.2 moves the filters into the address; the API can filter too.)</li>
+                        <li>The early return comes <em>after</em> all three Hooks. The Rules of Hooks from Lesson 3.4 still hold: Hooks first, in the same order on every render, then any <code>return</code>.</li>
+                        <li>Below the early return, <code>state.data</code> is <code>EventsData</code>, and everything you wrote in Lesson 3.4 runs unchanged on the loaded events.</li>
+                    </ul>
+                    <p>Open <code>/events</code>: the same fifteen cleanups, now from the API. Try the filters; they work exactly as before.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The home page's next cleanup <span class="step-time">(7 min)</span></h3>
+                    <p>The home page needs only one cleanup: the first scheduled one from today on. The API can find it (<code>status=scheduled&amp;when=upcoming&amp;perPage=1</code>), and the <code>X-Total-Count</code> header says how many there are in all. Replace <code>src/pages/HomePage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx"><code class="language-tsx">import { useEffect, useState } from 'react'
+import { describeError, getEvents, type Page } from '../api/client.ts'
+import type { CleanupEvent } from '../api/types.ts'
+import { Card } from '../components/Card.tsx'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { formatDate } from '../utils/format.ts'
+import type { LoadState } from '../utils/loadState.ts'
+import styles from './Page.module.css'
+
+const crewName = 'Shoreline Crew'
+const tagline = 'Many hands, cleaner sands.'
+const towns = ['Port Marisol', 'Calder Bay', 'Seal Rock']
+
+interface NextCleanupProps {
+  upcoming: Page&lt;CleanupEvent&gt;
+}
+
+// The first upcoming cleanup, and how many there are in all (from the X-Total-Count header)
+function NextCleanup({ upcoming }: NextCleanupProps) {
+  const next = upcoming.items[0]
+  if (next === undefined) {
+    return &lt;p&gt;Nothing scheduled yet.&lt;/p&gt;
+  }
+  return (
+    &lt;p&gt;
+      {next.title}, &lt;time dateTime={next.date}&gt;{formatDate(next.date)}&lt;/time&gt; at{' '}
+      {next.startTime}. Cleanups coming up: {upcoming.page.total}.
+    &lt;/p&gt;
+  )
+}
+
+export function HomePage() {
+  const [state, setState] = useState&lt;LoadState&lt;Page&lt;CleanupEvent&gt;&gt;&gt;({ kind: 'loading' })
+
+  // One cleanup is enough: the first scheduled one from today on
+  useEffect(() =&gt; {
+    const controller = new AbortController()
+    getEvents('status=scheduled&amp;when=upcoming&amp;perPage=1', controller.signal)
+      .then((upcoming) =&gt; setState({ kind: 'ready', data: upcoming }))
+      .catch((error: unknown) =&gt; {
+        if (controller.signal.aborted) return
+        console.error(error)
+        setState({ kind: 'failed', message: describeError(error) })
+      })
+    return () =&gt; controller.abort()
+  }, [])
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;{crewName} HQ&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;{tagline}&lt;/p&gt;
+      &lt;p&gt;
+        Plan cleanups, sign up volunteers and count what comes off the beaches of{' '}
+        {towns.join(', ')}.
+      &lt;/p&gt;
+      &lt;div className={styles.grid}&gt;
+        &lt;Card title="Next cleanup"&gt;
+          {state.kind === 'ready' ? (
+            &lt;NextCleanup upcoming={state.data} /&gt;
+          ) : (
+            &lt;LoadStatus state={state} what="the next cleanup" /&gt;
+          )}
+          &lt;a href="/events"&gt;See all cleanups&lt;/a&gt;
+        &lt;/Card&gt;
+        &lt;Card title="Our beach sites"&gt;
+          &lt;p&gt;Six stretches of coast, from sandy beaches to a tidal marsh.&lt;/p&gt;
+          &lt;a href="/sites"&gt;See all six sites&lt;/a&gt;
+        &lt;/Card&gt;
+      &lt;/div&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p><code>NextCleanup</code> is a small component in the same file, not exported: it is only this page's business. <code>upcoming.items[0]</code> is <code>CleanupEvent | undefined</code> (the <code>noUncheckedIndexedAccess</code> setting from Lesson 2.4), so the <code>undefined</code> check is required, and it gives you the honest "Nothing scheduled yet." for an empty list. Only the card waits for the API; the heading and the sites card show at once.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_13/13-home-next.png" alt="The Shoreline Crew HQ home page. The Next cleanup card shows Tide Pool Morning Cleanup with today&#x27;s date and start time, followed by Cleanups coming up: 8, and a See all cleanups link. Next to it is the Our beach sites card." width="984" height="652" loading="lazy">
+                        <figcaption>The first upcoming cleanup came from the API's body; the number 8 came from its <code>X-Total-Count</code> header.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Delete the pasted data <span class="step-time">(12 min)</span></h3>
+                    <p>Two files still import <code>src/data/sites.ts</code>, but you do not need to remember which. Delete the whole <code>src/data</code> folder and ask TypeScript:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/components/NewEventForm.tsx:3:23 - error TS2307: Cannot find module '../data/sites.ts' or its corresponding type declarations.
+
+3 import { sites } from '../data/sites.ts'
+                        ~~~~~~~~~~~~~~~~~~
+
+src/components/NewEventForm.tsx:77:25 - error TS7006: Parameter 'site' implicitly has an 'any' type.
+
+77             {sites.map((site) =&gt; (
+                           ~~~~
+
+src/utils/eventForm.ts:4:23 - error TS2307: Cannot find module '../data/sites.ts' or its corresponding type declarations.
+
+4 import { sites } from '../data/sites.ts'
+                        ~~~~~~~~~~~~~~~~~~
+
+src/utils/eventForm.ts:64:20 - error TS7006: Parameter 'site' implicitly has an 'any' type.
+
+64   if (!sites.some((site) =&gt; site.id === values.siteId)) {
+                      ~~~~
+
+
+Found 4 errors in 2 files.
+
+Errors  Files
+     2  src/components/NewEventForm.tsx:3
+     2  src/utils/eventForm.ts:4</code></pre>
+                    </div>
+                    <p>Deleting something and letting the compiler list what depended on it is one of the most useful habits TypeScript gives you. Both files need the sites, so they will get them from the page. In <code>src/utils/eventForm.ts</code>, the check takes the sites as a parameter (like <code>today</code>, so it stays a pure function that is easy to test in Module 9). Change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/eventForm.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/eventForm.ts" data-match="diff"><code class="language-diff-ts">-import type { DateString, NewEvent } from '../api/types.ts'
+-import { sites } from '../data/sites.ts'
++import type { DateString, NewEvent, Site } from '../api/types.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/eventForm.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/eventForm.ts" data-match="diff"><code class="language-diff-ts"> // The API's rules for a new cleanup, with messages that say how to fix the problem
+-export function validateEvent(values: EventFormValues, today: DateString): FieldErrors {
++export function validateEvent(
++  values: EventFormValues,
++  today: DateString,
++  sites: Site[],
++): FieldErrors {</code></pre>
+                    </div>
+                    <p>In <code>src/components/NewEventForm.tsx</code>, the form receives the sites as a prop. The form's action needs them too, so it moves <em>inside</em> the component, where it can read the prop. Change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx"> import { useActionState } from 'react'
+-import type { NewEvent } from '../api/types.ts'
+-import { sites } from '../data/sites.ts'
++import type { NewEvent, Site } from '../api/types.ts'
+ import {</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx"> const initialState: FormState = { kind: 'editing', values: emptyValues, errors: {} }
+
+-// The form's action: React calls it with the previous state and the submitted FormData
+-function planCleanup(_previous: FormState, formData: FormData): FormState {
+-  const values = readValues(formData)
+-  const errors = validateEvent(values, toDateString(new Date()))
+-  if (Object.keys(errors).length &gt; 0) {
+-    return { kind: 'editing', values, errors }
+-  }
+-  // The button that submitted the form sends its own name and value
+-  const status = formData.get('status') === 'scheduled' ? 'scheduled' : 'draft'
+-  return { kind: 'ready', event: toNewEvent(values, status) }
+-}
+-
+-export function NewEventForm() {
++interface NewEventFormProps {
++  /** The beach sites to choose from (loaded from the API by the page) */
++  sites: Site[]
++}
++
++export function NewEventForm({ sites }: NewEventFormProps) {
++  // The form's action: React calls it with the previous state and the submitted FormData.
++  // It is inside the component because it checks the site against the sites prop.
++  function planCleanup(_previous: FormState, formData: FormData): FormState {
++    const values = readValues(formData)
++    const errors = validateEvent(values, toDateString(new Date()), sites)
++    if (Object.keys(errors).length &gt; 0) {
++      return { kind: 'editing', values, errors }
++    }
++    // The button that submitted the form sends its own name and value
++    const status = formData.get('status') === 'scheduled' ? 'scheduled' : 'draft'
++    return { kind: 'ready', event: toNewEvent(values, status) }
++  }
++
+   const [state, formAction, isPending] = useActionState(planCleanup, initialState)</code></pre>
+                    </div>
+                    <p>The site menu's <code>sites.map(…)</code> further down now reads the prop, unchanged. The page loads the sites and renders the form only when they are ready. Replace <code>src/pages/NewEventPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/NewEventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/NewEventPage.tsx"><code class="language-tsx">import { useEffect, useState } from 'react'
+import { describeError, getSites } from '../api/client.ts'
+import type { Site } from '../api/types.ts'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { NewEventForm } from '../components/NewEventForm.tsx'
+import type { LoadState } from '../utils/loadState.ts'
+import styles from './Page.module.css'
+
+export function NewEventPage() {
+  const [state, setState] = useState&lt;LoadState&lt;Site[]&gt;&gt;({ kind: 'loading' })
+
+  // The form needs the sites for its menu and its checks
+  useEffect(() =&gt; {
+    const controller = new AbortController()
+    getSites(controller.signal)
+      .then((sites) =&gt; setState({ kind: 'ready', data: sites }))
+      .catch((error: unknown) =&gt; {
+        if (controller.signal.aborted) return
+        console.error(error)
+        setState({ kind: 'failed', message: describeError(error) })
+      })
+    return () =&gt; controller.abort()
+  }, [])
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Plan a cleanup&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;
+        Fill in the basics. Save it as a draft to finish later, or publish it so volunteers can
+        sign up.
+      &lt;/p&gt;
+      {state.kind === 'ready' ? (
+        &lt;NewEventForm sites={state.data} /&gt;
+      ) : (
+        &lt;LoadStatus state={state} what="the beach sites" /&gt;
+      )}
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Rendering the form only once the sites are there means the form never has to think about a missing site list. Check everything:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 13ms on 30 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>Then click through every page, and submit "Plan a cleanup" once with mistakes and once filled in: the site menu lists the six sites from the API, and the messages work as in Lesson 3.5. The HQ now shows whatever shoreline-api says. Restart the API and the sample data is fresh again; change it (Module 7) and the HQ will show the change.</p>
+                    <p>Notice how similar the four effects are: the same dozen lines, with a different request each time. Writing it four times was deliberate; in Lesson 4.2 you turn it into one Hook of your own.</p>
+                    <p><strong>Your own project:</strong> for your Lesson 11.1 app, list the data each screen needs from a server, and for each one write the three messages: what it says while loading, when it fails, and when the list is empty.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>client.ts</code> has <code>ApiError</code>, <code>describeError</code>, <code>readPage</code>, <code>getSites</code> and <code>getEvents(query, signal)</code>, and the temporary log in <code>main.tsx</code> is gone</li>
+                        <li>☐ <code>LoadStatus</code> shows "Loading …" as a status and errors as an alert</li>
+                        <li>☐ The home, events, sites and "Plan a cleanup" pages load their data in an effect with an <code>AbortController</code> and a cleanup</li>
+                        <li>☐ With <code>--latency=4000</code> you saw the loading message; with <code>?_status=500</code> and a stopped API you saw the two error messages</li>
+                        <li>☐ <code>src/data/</code> is deleted and nothing imports it</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Try again</h3>
+                    <p>When the sites fail to load, the only way out is reloading the page. Add a <strong>Try again</strong> button under the error on the sites page that loads the sites again. Test it: stop shoreline-api, open <code>/sites</code>, start the API, press the button.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>An effect runs again when a dependency changes. Add a piece of state that exists only to change: a number of attempts. The button increases it. Should the button also show "Loading" again? Then set that in the click handler, not at the top of the effect (Common Mistakes says why).</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import { useEffect, useState } from 'react'
+import { describeError, getSites } from '../api/client.ts'
+import type { Site } from '../api/types.ts'
+import buttonStyles from '../components/Button.module.css'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { SiteCard } from '../components/SiteCard.tsx'
+import type { LoadState } from '../utils/loadState.ts'
+import styles from './Page.module.css'
+
+export function SitesPage() {
+  const [state, setState] = useState&lt;LoadState&lt;Site[]&gt;&gt;({ kind: 'loading' })
+  // Counts the tries: a new number runs the effect again
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() =&gt; {
+    const controller = new AbortController()
+    getSites(controller.signal)
+      .then((sites) =&gt; setState({ kind: 'ready', data: sites }))
+      .catch((error: unknown) =&gt; {
+        if (controller.signal.aborted) return
+        console.error(error)
+        setState({ kind: 'failed', message: describeError(error) })
+      })
+    return () =&gt; controller.abort()
+  }, [attempt])
+
+  function tryAgain() {
+    setState({ kind: 'loading' })
+    setAttempt((n) =&gt; n + 1)
+  }
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Beach sites&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;Six stretches of coast the crew looks after.&lt;/p&gt;
+      {state.kind === 'ready' ? (
+        &lt;div className={styles.grid}&gt;
+          {state.data.map((site) =&gt; (
+            &lt;SiteCard key={site.id} site={site} /&gt;
+          ))}
+        &lt;/div&gt;
+      ) : (
+        &lt;LoadStatus state={state} what="the beach sites" /&gt;
+      )}
+      {state.kind === 'failed' &amp;&amp; (
+        &lt;button type="button" className={buttonStyles.secondary} onClick={tryAgain}&gt;
+          Try again
+        &lt;/button&gt;
+      )}
+    &lt;/&gt;
+  )
+}</code></pre>
+                        </div>
+                        <p><code>attempt</code> is never read inside the effect, but it is in the array, so a new number runs the effect again (and the previous run's cleanup first). <code>tryAgain</code> shows the loading message and bumps the number in the same click; React renders once for both. With the API started, one press brings back all six sites and the button disappears with the error. The course's own code continues without this change; Lesson 4.2's Hook gets a <code>reload</code> of its own.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: The tab says where you are</h3>
+                    <p>Make the browser tab say <strong>Beach sites · Shoreline Crew HQ</strong> while the sites page is open, and give the old title back when the page goes away. <code>document.title</code> is outside React: an effect's job. Where in <code>SitesPage</code> does the new effect go, and what is its dependency array?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Remember the title before you change it, and put it back in the cleanup. The title never depends on props or state here.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Add it above the loading effect (any place before a <code>return</code> works, since Hooks must all run on every render):</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">// While this page is on the screen, the browser tab says so
+useEffect(() =&gt; {
+  const previous = document.title
+  document.title = 'Beach sites · Shoreline Crew HQ'
+  return () =&gt; {
+    document.title = previous
+  }
+}, [])</code></pre>
+                        </div>
+                        <p>The array is <code>[]</code>, because the effect reads nothing from the component. On <code>/sites</code> the tab says <code>Beach sites · Shoreline Crew HQ</code>; on <code>/events</code> it is still <code>Shoreline Crew HQ</code>. Strict Mode's start, clean up, start does no harm, because the cleanup puts back exactly what the effect changed. Two effects in one component are normal: one per outside thing to keep in step. Lesson 4.2 turns this into a reusable <code>useDocumentTitle</code> Hook; the course's code does not keep it here.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: "This is taking a while" (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 15 minutes).</em></p>
+                    <p>Some days the beach Wi-Fi is slow. Make <code>LoadStatus</code> add a sentence when loading takes more than three seconds: <strong>This is taking longer than usual. Is shoreline-api slow today?</strong> Test with <code>node server.ts --latency=5000</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A <code>setTimeout</code> is outside React, like the clock's <code>setInterval</code>. Start it in an effect only while the state is <code>loading</code>, clear it in the cleanup, and let it set a <code>slow</code> state. Which value from props does the effect read?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/LoadStatus.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import { useEffect, useState } from 'react'
+import type { LoadState } from '../utils/loadState.ts'
+import styles from './LoadStatus.module.css'
+
+interface LoadStatusProps {
+  state: LoadState&lt;unknown&gt;
+  /** What is loading, for the messages: "the beach sites" */
+  what: string
+}
+
+// The message to show while data is on its way, or when it could not be loaded
+export function LoadStatus({ state, what }: LoadStatusProps) {
+  const [slow, setSlow] = useState(false)
+
+  // Three seconds of loading: say so. A new kind (or leaving the page) stops the timer.
+  useEffect(() =&gt; {
+    if (state.kind !== 'loading') return
+    const timer = setTimeout(() =&gt; setSlow(true), 3000)
+    return () =&gt; clearTimeout(timer)
+  }, [state.kind])
+
+  if (state.kind === 'loading') {
+    return (
+      &lt;p role="status" className={styles.loading}&gt;
+        Loading {what}…{slow &amp;&amp; ' This is taking longer than usual. Is shoreline-api slow today?'}
+      &lt;/p&gt;
+    )
+  }
+  if (state.kind === 'failed') {
+    return (
+      &lt;p role="alert" className={styles.failed}&gt;
+        Could not load {what}. {state.message}
+      &lt;/p&gt;
+    )
+  }
+  return null
+}</code></pre>
+                        </div>
+                        <p>The effect reads <code>state.kind</code>, so that is its dependency (the linter agrees). When the data arrives, the kind changes, the cleanup clears the timer, and the message disappears with the loading state. With five seconds of latency, the status says <strong>Loading the beach sites…</strong> at first and <strong>Loading the beach sites… This is taking longer than usual. Is shoreline-api slow today?</strong> a few seconds later. The <code>useState</code> and <code>useEffect</code> calls come before the first <code>if</code>: Hooks first, then returns.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>SitesPage</code> calls <code>useEffect(() =&gt; { … }, [])</code>. When does React run that effect in a production build?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Effects never run during rendering; that is the point of them. When does React call the effect function?">
+                                A) While <code>SitesPage</code> renders, before it returns its elements
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="An effect runs after React has updated the screen, and an empty dependency array means only after the first render. The start, clean up, start sequence is Strict Mode, and only in development.">
+                                B) Once, after the page has first appeared on the screen
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is what happens with no dependency array at all. What does an empty one mean?">
+                                C) After every render of <code>SitesPage</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is the development-only Strict Mode check. Does the production build use it?">
+                                D) Twice: start, clean up, start
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> You write <code>useEffect(async () =&gt; { setSites(await getSites()) }, [])</code>. What does <code>npx tsc -b</code> say?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Look at the terminal card in Fetching in an Effect. What does an async function return?">
+                                A) Nothing: async effects are fine
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="getSites does return a promise, and await is allowed inside an async function. The problem is what the effect function itself returns.">
+                                B) An error that <code>await</code> cannot be used with <code>getSites</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That would be the linter's exhaustive-deps rule, and the array here is complete. What is wrong with the function's type?">
+                                C) A warning that a dependency is missing
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="An async function returns a promise, and EffectCallback may only return nothing or a cleanup function. Put an async function inside the effect and call it, or use then and catch.">
+                                D) TS2345: <code>Promise&lt;void&gt;</code> is not assignable to <code>void | Destructor</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> shoreline-api answers a request with status 500. What does the browser's <code>fetch</code> do?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="fetch rejects only when no answer arrives. A 500 is an answer, so the promise resolves with ok false and the error body. The HQ's request function checks ok and throws an ApiError.">
+                                A) It resolves with a <code>Response</code> whose <code>ok</code> is <code>false</code> and <code>status</code> is 500
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That happens when no answer arrives at all, for example when the API is stopped. Did an answer arrive here?">
+                                B) It rejects with <code>TypeError: Failed to fetch</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="ApiError is the HQ's own class. Who throws it, fetch or client.ts?">
+                                C) It throws an <code>ApiError</code> by itself
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> On the dev server, the Network tab shows two requests for <code>/api/sites</code> when <code>/sites</code> opens, and the first is canceled. Why?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The array is empty, so the effect does not depend on renders. What runs every effect twice, but only in development?">
+                                A) The effect is missing its dependency array
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The second request succeeded, and the API does not cancel requests. Who called abort on the first?">
+                                B) The API rejected the first request
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="In development, StrictMode runs the effect, its cleanup and the effect again. The cleanup aborts the first request, the second one delivers the sites, and the production build sends only one.">
+                                C) Strict Mode ran the effect, its cleanup (which aborted the request), and the effect again
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> <code>SiteEventCount</code> fetches with <code>siteId=${siteId}</code> in an effect whose array is <code>[]</code>. The parent switches it from Pelican Point to Long Strand. What does the page show?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The effect runs only when something in its array changes. Is siteId in the array?">
+                                A) Long Strand's count, a moment later
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="With an empty array the effect never runs again, so the count stays Pelican Point's. The linter's exhaustive-deps rule warns about exactly this; the fix is the array siteId.">
+                                B) Still Pelican Point's count, and the linter warned about the missing <code>siteId</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing in this code fails; it just does not run again. What does the effect read that the array leaves out?">
+                                C) An error message, because the request is canceled
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript checks types, not which values an effect reads. Which tool checks dependency arrays?">
+                                D) Nothing: <code>npx tsc -b</code> refuses to compile it
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why not load the data in an event handler, or once at the top of a file?</summary>
+                    <p>An event handler runs when someone does something; the sites should load because the page is <em>on the screen</em>, with nobody clicking. A request at the top of a module runs once when the app starts, for every page whether it is shown or not, and never again (that was the temporary log in <code>main.tsx</code>). An effect ties the request to the component being there, and the cleanup ties canceling to it going away.</p>
+                </details>
+                <details>
+                    <summary>Do real teams write a fetch effect in every page?</summary>
+                    <p>Not for long. The pattern is worth knowing by heart, because every data library is built on it and you will debug it in older code. But teams usually wrap it: in a custom Hook (Lesson 4.2), in Suspense with React's <code>use</code> (Lesson 4.4), in a router's loaders (Lesson 6.3), or in a data library such as TanStack Query (Lesson 7.1), which adds caching, retries and refetching. React's own documentation recommends a framework or library for data fetching in larger apps. Each of those lessons replaces some of today's code, and each makes more sense because you wrote it by hand first.</p>
+                </details>
+                <details>
+                    <summary>Is the double run in Strict Mode slowing my app down?</summary>
+                    <p>Only in development, on purpose, and only for effects and some rendering checks. <code>npm run build</code> leaves <code>&lt;StrictMode&gt;</code> in the code, but its checks do nothing in a production build: this lesson's measurement saw one request in the preview. If a double run breaks something, the effect's cleanup is missing or incomplete, and that bug would have hit users in other ways.</p>
+                </details>
+                <details>
+                    <summary>Why is <code>getEvents</code>' query a plain string?</summary>
+                    <p>It keeps today's client small, and the HQ only has two queries. A typo in a query string is not caught by TypeScript, but shoreline-api checks the values: <code>status=finished</code> gets a 400 answer whose <code>fieldErrors</code> say "status must be one of: draft, scheduled, completed, cancelled.", and <code>LoadStatus</code> would show the error. When the filters move into the address bar in Lesson 6.2, the queries get more structure.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Give each site card on <code>/sites</code> a line "Cleanups here: N". Write a small <code>SiteEventCount</code> component (like the one in Common Mistakes, but with its dependency array right and an <code>AbortController</code>) that asks for <code>siteId=…&amp;perPage=1</code> and shows <code>page.total</code>. That is six requests when the page opens: watch them in the Network tab. Then add <code>&amp;_delay=</code> with a random number of milliseconds to each request and watch the counts arrive in a different order every time, each still under the right card.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Explain to a teammate, step by step, what happens from the moment someone opens <code>/sites</code> until the six cards appear: which render shows what, when the effect runs, where the types come from, and what the cleanup is for. Then describe what you saw with <code>--latency</code>, <code>?_status=500</code> and a stopped API, and which of the three messages you would most like to improve.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Rendering stays pure; <code>useEffect</code> runs code that talks to the outside world <em>after</em> React has updated the screen, and its cleanup undoes it</li>
+                        <li>The dependency array lists every value from the component that the effect reads: <code>[]</code> for once, <code>[siteId]</code> to follow a value, never nothing; the linter's <code>exhaustive-deps</code> rule checks it</li>
+                        <li>Strict Mode runs effects start, clean up, start in development only, to prove your cleanup works</li>
+                        <li>An effect function cannot be <code>async</code> (TS2345); use <code>.then</code>/<code>.catch</code> or an async function inside it, and annotate the error as <code>unknown</code></li>
+                        <li><code>LoadState&lt;T&gt;</code> makes loading, failed and ready explicit, and TypeScript only lets you read <code>data</code> once it is <code>ready</code>; "empty" is ready with no items</li>
+                        <li><code>fetch</code> rejects only when no answer arrives; check <code>ok</code>, turn error answers into an <code>ApiError</code>, and show people words, not stack traces</li>
+                        <li>An <code>AbortController</code> aborted in the cleanup cancels requests nobody is waiting for and prevents old answers from overwriting new ones</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Check the API's endpoints, switches and errors</td><td><a href="api.html">The shoreline-api reference</a></td></tr>
+                            <tr><td>Fix "Failed to fetch" and friends</td><td><a href="troubleshooting.html#failed-to-fetch">Troubleshooting: Failed to fetch</a></td></tr>
+                            <tr><td>Read React's reference for effects</td><td><a href="https://react.dev/reference/react/useEffect" target="_blank" rel="noopener">React: useEffect</a></td></tr>
+                            <tr><td>Decide whether you need an effect</td><td><a href="https://react.dev/learn/you-might-not-need-an-effect" target="_blank" rel="noopener">React: You Might Not Need an Effect</a></td></tr>
+                            <tr><td>Read about canceling requests</td><td><a href="https://developer.mozilla.org/en-US/docs/Web/API/AbortController" target="_blank" rel="noopener">MDN: AbortController</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You wrote your first effects, with dependency arrays and cleanups, and watched Strict Mode test them</li>
+                        <li>You gave the API client typed errors and typed pages, with totals read from response headers</li>
+                        <li>You built loading and error messages for every page, and practiced them with a slow, a failing and a stopped API</li>
+                        <li>You made every request cancelable, so old answers can never overwrite new ones</li>
+                        <li>You deleted the pasted data and let TypeScript lead you to every file that used it: Shoreline Crew HQ now shows what the API says</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>You wrote the same loading effect four times today. In <a href="lesson_14.html"><strong>Lesson 4.2: Custom Hooks</strong></a> you pull it out into a Hook of your own, <code>useApi</code>, generic over the data it loads, plus two small Hooks for the search box and the tab title. You will type what a Hook returns and see why a Hook is just a function with rules.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, <code>src/Scratch.tsx</code> is gone, and <code>client.ts</code> asks for <code>'/sites'</code> again (not <code>?_status=500</code>)</li>
+                    <li>Restart shoreline-api without switches (<code>node server.ts</code>)</li>
+                    <li>Keep your own app's list of screens and their loading, error and empty messages for Lesson 11.1</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today the app stopped pretending. Data that arrives later, sometimes slowly, sometimes not at all, is one of the hardest parts of front-end work, and you handled all of it: loading, failing, canceling, and the double run that catches mistakes. If the effect pattern still feels like a lot of lines, that is the right feeling: next lesson you will be glad to wrap it up. And when you saw the red error box after <code>?_status=500</code>, that was not something going wrong; it was your app doing exactly what you built it to do when the world goes wrong. That is what makes software trustworthy.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_12.html" class="prev-lesson">← Previous: Styling and Accessible Components</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_14.html" class="next-lesson">Next: Custom Hooks →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 19</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 19: Mutations and Client State</h1>
+    <p class="sub">How to teach Lessons 7.2 and 7.3: the HQ starts changing server data (mutation factories, invalidation by key, the API's field errors, an optimistic check-in desk with a rollback), then gives client state a small typed Zustand store that survives reloads and re-renders only what changed, with both projects started in class.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>7.2–7.3</b></span>
+      <span class="chip">Session <b>19</b> of 26 · Part 3</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Session 19 teaches two lessons that finish Module 7: 7.2 (the HQ learns to change server data) and 7.3 (client state gets its own small store). Same rhythm for both: frame → live demo (you type, they follow) → guided lab (new practice in a kit lab) → start the lesson project. Exercises, quizzes and journals go home.</li>
+  <li>Every command below was run for the output under it, in a learner's terminal on copies of Shoreline Crew HQ exactly as it is at the end of Lessons 7.2 and 7.3; every API answer comes from shoreline-api itself (a private copy, the API's dev tokens for Maya). Where a lesson shows the same command, the kit's output is the lesson's card: the generator checks it.</li>
+  <li>Keep <code class="inline">lesson_25.html</code> and <code class="inline">lesson_26.html</code> open: the invalidation table, the wait-or-optimistic table, the state homes table and the Redux Toolkit comparison are the boards of this session. Labs live in <code class="inline">labs/module-19/</code>.</li>
+  <li>Teal blocks are hands-on, amber blocks are watch-outs. Lesson codes match the course site.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 19: two big lessons, two installs</div>
+<p>The lessons estimate 135 + 130 = 265 minutes for a learner alone; the room has 150. Both projects start in class and finish at home. The risk is spending the room on typing the 7.2 project (61 minutes on the page) and never reaching Zustand. <b>Protect:</b> the invalidation question and the optimistic flow (7.2), and a working store with one selector (7.3). Steps 3 to 6 of 7.2 and Steps 4 and 5 of 7.3 go home; <code class="inline">lesson-26-start</code> and <code class="inline">lesson-27-start</code> are the fallbacks.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-19</code> (7 runs, under a minute). No API needed: MSW plays shoreline-api in Lab 7.2, seeded with real answers.</li>
+  <li>☐ <b>Projector machine:</b> <code class="inline">shoreline-hq</code> at the start of 7.2 (<code class="inline">lesson-25-start</code>) and a finished copy (<code class="inline">lesson-26-end</code>) for the 7.3 demo; the API and the dev server running; signed in as Maya; DevTools › Network filtered to <code class="inline">4000</code>. For the slow and failing demos you restart the API with <code class="inline">--latency=1500</code> (sign in again afterwards: a restart forgets sessions).</li>
+  <li>☐ <b>Network for npm:</b> 7.3 Step 1 runs <code class="inline">npm install zustand</code> (one package); the labs install their own packages once.</li>
+  <li>☐ <b>Board:</b> the change-forms model (send it / cross out what it affects / pencil in small changes); the question "what could this change have changed?"; the wait-or-optimistic table; the state homes table (six rows).</li>
+  <li>☐ <b>Sample data:</b> experiments change the API's memory (Publish, Cancel, marks). Restart <code class="inline">node server.ts</code> (or <code class="inline">POST /api/_reset</code>) between groups; it signs everyone out.</li>
+</ul>
+<div class="blk warn"><div class="h">Known traps in these lessons</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>The new cleanup is missing from the list</td><td>No invalidation after the POST (the list is still fresh)</td><td><code class="inline">onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: ['events'] })</code>, returning the promise.</td></tr>
+<tr><td>A mark flickers back for a moment</td><td>No <code class="inline">cancelQueries</code> in <code class="inline">onMutate</code></td><td>Cancel the roster's refetches before writing the optimistic mark.</td></tr>
+<tr><td><code class="inline">Uncaught (in promise)</code> after a failed save</td><td><code class="inline">mutateAsync</code> without try/catch</td><td>Catch where you await, or use <code class="inline">mutate</code>.</td></tr>
+<tr><td><code class="inline">TS2559 … has no properties in common with type 'UseMutationOptions…'</code></td><td>v4 <code class="inline">useMutation(fn, options)</code></td><td>One options object (or a factory).</td></tr>
+<tr><td><code class="inline">TS18048 'saved' is possibly 'undefined'</code></td><td>A rollback that trusts onMutate</td><td><code class="inline">if (saved?.before !== undefined)</code>.</td></tr>
+<tr><td><code class="inline">Maximum update depth exceeded</code>, <code class="inline">getSnapshot should be cached</code></td><td>A selector that builds a new object</td><td>One selector per value, or <code class="inline">useShallow</code>.</td></tr>
+<tr><td><code class="inline">TS1192 … has no default export</code> on zustand</td><td>v4 <code class="inline">import create from 'zustand'</code></td><td><code class="inline">import { create } from 'zustand'</code>.</td></tr>
+<tr><td><code class="inline">TS2345 … $$storeMutators … Source has 1 element(s)</code></td><td><code class="inline">create&lt;UiState&gt;(persist(…))</code></td><td><code class="inline">create&lt;UiState&gt;()(persist(…))</code>.</td></tr>
+<tr><td>The theme is stuck after a hand edit in DevTools</td><td>No checking <code class="inline">merge</code></td><td>The merge from the lesson; then any choice overwrites the bad data.</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 19 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up: from reading to changing</td><td>Three retrieval questions: what Publish does today, a key and its prefix, three non-server states.</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>7.2</b> Frame and mental model</td><td>The harbor office's change forms: send it, cross out what it affects, pencil in small changes.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">20</td><td><b>7.2</b> Live demo: mutations and invalidation</td><td>mutationOptions and useMutation (types from the factory), invalidateQueries by prefix, the API's 400 fieldErrors.</td></tr>
+      <tr><td class="t">0:40</td><td class="t">15</td><td><b>7.2</b> Live demo: wait, or show it now?</td><td>The decision table, the desk's optimistic flow, the rollback TypeScript insists on, v4 signatures.</td></tr>
+      <tr><td class="t">0:55</td><td class="t">20</td><td><b>7.2</b> Guided lab</td><td><code class="inline">labs/module-19/l7_2-mutations/starter</code>: Tasks 1 and 2 (sign up; invalidate what a sign-up changed).</td></tr>
+      <tr><td class="t">1:15</td><td class="t">10</td><td>Break</td><td>Leave the wait/optimistic table and the invalidation question on the board.</td></tr>
+      <tr><td class="t">1:25</td><td class="t">15</td><td><b>7.2</b> Start the lesson project</td><td>An HQ That Saves, Steps 1 and 2: the write requests and the mutation factories.</td></tr>
+      <tr><td class="t">1:40</td><td class="t">10</td><td><b>7.3</b> Frame and mental model</td><td>The crew's storage: where each kind of state lives, and colocation.</td></tr>
+      <tr><td class="t">1:50</td><td class="t">20</td><td><b>7.3</b> Live demo: a small typed store</td><td><code class="inline">create&lt;T&gt;()(…)</code>, selectors and re-renders, persist with a checking merge, getState and subscribe, the Redux Toolkit comparison.</td></tr>
+      <tr><td class="t">2:10</td><td class="t">15</td><td><b>7.3</b> Guided lab</td><td><code class="inline">labs/module-19/l7_3-client-state/starter</code>: Tasks 1 to 3 (pinned sites).</td></tr>
+      <tr><td class="t">2:25</td><td class="t">25</td><td><b>7.3</b> Start the lesson project</td><td>Display Choices That Stick, Steps 1 to 3: the store, the theme on the page, the choices in the footer.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 20.</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> 135 + 130 minutes on the lesson pages; 150 in the room after the warm-up, the break and the wrap-up. Each lesson gets its model, its demos, a guided lab and the start of its project; 7.2's demo is split in two because "wait or show it now?" is its own idea.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> 7.2's project Steps 3 to 6 (planning that saves, cancelling from the cleanup's page, the desk that saves, watching it slowly and with failures) and 7.3's Steps 4 and 5 (compact lists, breaking the saved data); both lessons' Exercises 1 and 2 (Exercise 3 is a stretch); both Quick Quizzes; both journal entries; the labs' remaining tasks.</p>
+<p><b>Protect, in this order:</b> the invalidation question; the optimistic flow with its three callbacks; a typed store read with selectors; the merge that checks localStorage. Cut the v4 steps first.</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up: From Reading to Changing</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">6m</td><td>Three questions on the board; pairs answer</td></tr>
+<tr><td class="t">4m</td><td>Call on pairs; bridge to the change forms</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Questions and answers</div>
+<ol class="steps">
+  <li>**W1.** 7.1's homework: you pressed Publish on the planning form. What did the HQ say, and what did shoreline-api receive? **Answer:** "Ready to save", and nothing: no request. Today it sends the POST.</li>
+  <li>**W2.** Write the key of the events list for Maya searching "pelican". Which short key reaches it and every other cleanup entry? **Answer:** <code class="inline">['events', 'list', 'q=pelican&amp;perPage=50', 'v01']</code> (the search string as the page builds it); <code class="inline">['events']</code> reaches it by prefix.</li>
+  <li>**W3.** Name three pieces of state in the HQ that are NOT server state (7.2's Before the Next Lesson asks for them). **Answer:** For example the search text (URL), a card's Show details (component), the confirm dialog (component), the desk's undo history (reducer), the session (session store).</li>
+</ol>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.2</span><h3>Mutations</h3><span class="dur">80 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Send typed POST and PATCH requests and check what comes back</li>
+  <li>Write mutationOptions factories and run them with useMutation, mutate and mutateAsync</li>
+  <li>Invalidate the cache by key after a change, and explain which entries a change makes out of date</li>
+  <li>Show an API's 400 fieldErrors under the fields they belong to</li>
+  <li>Decide when an update should be optimistic, and write one with onMutate, a rollback in onError and a refetch in onSettled</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame and mental model: the harbor office's change forms</td></tr>
+<tr><td class="t">20m</td><td>Live demo A: factories and types, invalidation, the API's 400</td></tr>
+<tr><td class="t">15m</td><td>Live demo B: wait or optimistic, the desk's flow, the rollback, v4</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: Lab 7.2 Tasks 1 and 2</td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project (after the break): Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Frame and mental model (10m)</div>
+<ul class="tick">
+  <li><b>Hook (2m).</b> Publish says "Ready to save" and nothing reaches the API; marks vanish on reload.</li>
+  <li><b>Query versus mutation (3m).</b> A query runs whenever a component needs it and is cached; a mutation runs when you call it, is not cached, is not retried. "What a mutation leaves behind is a cache that is out of date."</li>
+  <li><b>The change forms (5m).</b> The clerk sends each form to head office; head office accepts it or sends it back with notes in the margin (fieldErrors); once accepted, the clerk crosses out every logbook entry it affects (invalidation); for small everyday forms, the clerk pencils the change in at once and rubs it out if head office says no (optimistic).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Live demo A: factories, invalidation, refusals</div>
+<ol class="steps">
+  <li><b>The hook (2m).</b> On the 7.1 code (<code class="inline">lesson-25-start</code>): fill in Plan a cleanup, press Publish: "Ready to save", and the Network tab shows nothing. "The HQ can read and remember. Today it changes things."</li>
+  <li><b>A factory and its types (5m).</b> Create <code class="inline">src/api/mutations.ts</code> with the first factory: <code class="inline">mutationOptions</code> is the mutation twin of <code class="inline">queryOptions</code>.
+<div class="codefile">shoreline-hq/src/api/mutations.ts</div>
+<pre class="code" data-src="shoreline-hq/src/api/mutations.ts" data-stage="lesson_25" data-match="excerpt"><span class="c">/** Plan a cleanup. Waits for the API: the new cleanup's id comes from it. */</span>
+<span class="k">export</span> <span class="k">function</span> createEventMutation() {
+  <span class="k">return</span> mutationOptions({
+    mutationFn: (event: NewEvent) =&gt; postEvent(event),
+    <span class="c">// Every list of cleanups may now be missing one. Returning the promise keeps the</span>
+    <span class="c">// mutation pending until the lists on screen have been fetched again.</span>
+    onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: [<span class="s">'events'</span>] }),
+  })
+}</pre>
+Then the lesson's trick (hand each part to a function that wants a number), on the finished code:</li>
+  <li><b>What useMutation gives back (3m).</b> 
+<pre class="out">src/Scratch.tsx:10:17 - error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+
+10   cancel.mutate(42) // what does mutate take?
+                   ~~
+
+src/Scratch.tsx:11:15 - error TS2345: Argument of type 'CleanupEvent | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+
+11   wantsNumber(cancel.data) // and what comes back?
+                 ~~~~~~~~~~~
+
+src/Scratch.tsx:12:15 - error TS2345: Argument of type 'Error | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+
+12   wantsNumber(cancel.error)
+                 ~~~~~~~~~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:10</pre>
+<code class="inline">mutate</code> takes a string; <code class="inline">data</code> is <code class="inline">CleanupEvent | undefined</code>; <code class="inline">error</code> is <code class="inline">Error | null</code>. Read the lesson's table: <code class="inline">mutate</code> (start and move on) versus <code class="inline">mutateAsync</code> (await the answer; catch the rejection). A mutation is not retried by default: a retried POST could create the cleanup twice.</li>
+  <li><b>Invalidation: what could this change have changed? (5m).</b> Publish Dune Grass Cleanup without the <code class="inline">onSuccess</code>: the list still says 17 (the lesson measured it). Put <code class="inline">onSuccess</code> back: <code class="inline">invalidateQueries({ queryKey: ['events'] })</code> marks every list, detail and roster stale, and the ones on screen refetch now. Build the lesson's table on the board with the room: plan → <code class="inline">['events']</code>; cancel → <code class="inline">['events']</code>; a check-in mark → <code class="inline">['events']</code> and <code class="inline">['volunteers']</code>; an impact report (8.2) → <code class="inline">['impact']</code> too. Then the cancel, asked of the private API with Maya's token:
+<pre class="code">PATCH http://localhost:4000/api/events/e08  {"status": "cancelled"}</pre>
+<pre class="out">{
+  "id": "e08",
+  "title": "Weekend Cove Cleanup",
+  "status": "cancelled",
+  "capacity": 18,
+  "spotsTaken": 18
+}</pre>
+"Returning the promise keeps the mutation pending until the refetches on screen are done: isPending covers saving AND refreshing."</li>
+  <li><b>When the API says no (5m).</b> Turn off the planning form's local checks for a minute (the lesson's Step 3), type Dune and capacity 500, Publish. The API's answer to that body (here with a site chosen):
+<pre class="code">POST http://localhost:4000/api/events</pre>
+<pre class="out">HTTP/1.1 400 Bad Request
+content-type: application/json; charset=utf-8
+
+{
+  "error": "validation_failed",
+  "message": "Some fields need attention.",
+  "fieldErrors": {
+    "title": [
+      "Use at least 5 characters for the title."
+    ],
+    "date": [
+      "Enter a date as YYYY-MM-DD."
+    ],
+    "startTime": [
+      "Enter a time as HH:MM (24-hour clock)."
+    ],
+    "endTime": [
+      "Enter a time as HH:MM (24-hour clock)."
+    ],
+    "capacity": [
+      "Capacity must be a whole number from 1 to 200."
+    ],
+    "meetingPoint": [
+      "Say where volunteers meet (at least 3 characters)."
+    ]
+  }
+}</pre>
+6 messages from the API, with the form's own field names, so <code class="inline">FieldError</code> puts each under its field. Read the status codes the lesson's encouragement box names: 400 fix the input, 401 sign in again, 409 the data changed under you, 500 not your fault.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Live demo B: wait, or show it now?</div>
+<ol class="steps">
+  <li><b>Wait, or show it now? (3m).</b> The lesson's table on the board: big or hard to take back (cancel, publish, pay, delete) → wait; small, frequent, easy to undo (a check-in mark, a like) → optimistic. Ask the room for one of each from apps they use.</li>
+  <li><b>The optimistic flow (5m).</b> Draw the lesson's diagram (tap → onMutate: stop refetches → write the cache → PATCH → onError: old status back → onSettled: invalidate). Then the code:
+<div class="codefile">shoreline-hq/src/api/mutations.ts</div>
+<pre class="code wrap" data-src="shoreline-hq/src/api/mutations.ts" data-stage="lesson_25" data-match="excerpt">    onMutate: <span class="k">async</span> ({ signupId, mark }) =&gt; {
+      <span class="c">// A refetch already on its way would overwrite the new mark with the old answer</span>
+      <span class="k">await</span> queryClient.cancelQueries({ queryKey })
+      <span class="k">const</span> before = queryClient.getQueryData(queryKey)?.find((entry) =&gt; entry.id === signupId)?.status
+      setStatus(signupId, markStatus(mark))
+      <span class="k">return</span> { before }
+    },
+    <span class="c">// The API said no (or could not be reached): put the old status back</span>
+    onError: (_error, { signupId }, saved) =&gt; {
+      <span class="k">if</span> (saved?.before !== <span class="k">undefined</span>) {
+        setStatus(signupId, saved.before)
+      }
+    },</pre>
+Three reasons, one per callback: <code class="inline">cancelQueries</code> (a refetch on its way would overwrite the new mark), <code class="inline">{ before }</code> for THIS person only (other marks made meanwhile stay), <code class="inline">onSettled</code> asks for the truth either way.</li>
+  <li><b>The rollback TypeScript insists on (3m).</b> Replace the <code class="inline">if</code> with the bare line <code class="inline">setStatus(signupId, saved.before)</code> and run <code class="inline">npx tsc -b</code>:
+<pre class="out">src/api/mutations.ts:68:27 - error TS18048: 'saved' is possibly 'undefined'.
+
+68       setStatus(signupId, saved.before)
+                             ~~~~~
+
+src/api/mutations.ts:68:27 - error TS2345: Argument of type 'SignupStatus | undefined' is not assignable to parameter of type 'SignupStatus'.
+  Type 'undefined' is not assignable to type 'SignupStatus'.
+
+68       setStatus(signupId, saved.before)
+                             ~~~~~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/api/mutations.ts:68</pre>
+Two errors, one per undefined: <code class="inline">saved</code> (onMutate itself failed) and <code class="inline">before</code> (the sign-up was not in the cache). <code class="inline">saved?.before !== undefined</code> answers both.</li>
+  <li><b>A failure, on purpose (2m).</b> With <code class="inline">?_status=500</code> added to patchSignup's path (the lesson's Step 6), the API answers:
+<pre class="code">PATCH http://localhost:4000/api/signups/s088?_status=500</pre>
+<pre class="out">HTTP/1.1 500 Internal Server Error
+content-type: application/json; charset=utf-8
+
+{
+  "error": "server_error",
+  "message": "Simulated 500 response (the _status parameter)."
+}</pre>
+and the sign-up stays <code class="inline">confirmed</code> (the kit read the roster afterwards). On screen: Checked in, then Expected again, with the alert naming Diego. Take <code class="inline">?_status=500</code> out again.</li>
+  <li><b>Mutations from older tutorials (2m).</b> The v4 signature (function first, options second) and <code class="inline">isLoading</code>:
+<pre class="out">src/Scratch.tsx:6:30 - error TS2559: Type '(eventId: string) =&gt; Promise&lt;CleanupEvent&gt;' has no properties in common with type 'UseMutationOptions&lt;unknown, Error, void, unknown&gt;'.
+
+6   const cancel = useMutation((eventId: string) =&gt; patchEvent(eventId, { status: 'cancelled' }), {
+                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/Scratch.tsx:9:17 - error TS2339: Property 'isLoading' does not exist on type 'UseMutationResult&lt;unknown, Error, void, unknown&gt;'.
+  Property 'isLoading' does not exist on type 'Override&lt;MutationObserverErrorResult&lt;unknown, Error, void, unknown&gt;, { mutate: UseMutateFunction&lt;unknown, Error, void, unknown&gt;; }&gt; &amp; { ...; }'.
+
+9   return cancel.isLoading ? 'Cancelling…' : null
+                  ~~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/Scratch.tsx:6</pre>
+"has no properties in common" means "this is not the options object I expected". Version 5: one options object (or a factory), and <code class="inline">isPending</code>.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Saving without invalidating.</b> "It saved, but the list didn't change." Coach: "which keys could this have changed?" (Item 3; Lab 7.2 Task 2.)</li>
+  <li><b>An optimistic update for a big change.</b> Someone makes Cancel optimistic "because it feels faster". Coach with the table: what would 18 volunteers be told if the request then failed? (Item 4.)</li>
+  <li><b>mutateAsync without a catch.</b> The alert works but the console shows an uncaught error. Coach: <code class="inline">mutate</code> when you only need the status; <code class="inline">mutateAsync</code> + try/catch when the next line depends on the answer.</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab (20m)</div>
+<p><b>Folder:</b> <code class="inline">labs/module-19/l7_2-mutations/starter/</code> with <code class="inline">labs/module-19/l7_2-mutations/TASKS.md</code>; reference <code class="inline">labs/module-19/l7_2-mutations/solution/</code>. The volunteer's side of the crew (the HQ is the organizers' side): Theo signs up for cleanups and gives spots back. MSW plays shoreline-api, keeping the cleanups and Theo's sign-ups in memory from real answers, and the lab's cache never refreshes by itself (<code class="inline">staleTime: Infinity</code>), so only invalidation shows a change.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m):</b> all 7 tests fail.</li>
+  <li><b>Task 1 (10m):</b> <code class="inline">useMutation(signUpMutation())</code>, "Signing up…" while pending, then <code class="inline">You're signed up.</code> or <code class="inline">You're on the waiting list.</code> (<code class="inline">isSuccess</code> narrows <code class="inline">data</code>), or the API's 409 message. Circulate for <code class="inline">signUp.data?.status</code> outside an <code class="inline">isSuccess</code> check.</li>
+  <li><b>Task 2 (8m):</b> the spots line and Theo's list stay unchanged until <code class="inline">onSuccess</code> invalidates <code class="inline">['events']</code> AND <code class="inline">['me']</code>. Ask each pair to say why both.</li>
+  <li><b>Task 3 goes home</b> (the optimistic cancel); fast finishers start it now.</li>
+</ul>
+<p>As shipped, and the solution:</p>
+<pre class="out">Tests  7 failed (7)
+Tests  7 passed (7)</pre></div>
+<div class="blk lab"><div class="h">Start the lesson project (15m, after the break)</div>
+<p>The lesson project is <b>An HQ That Saves</b>, six steps. In the room: Steps 1 and 2.</p>
+<ul class="tick">
+  <li><b>Step 1 (8m):</b> <code class="inline">sendJSON</code> (a union of method names), <code class="inline">postEvent</code>, <code class="inline">patchEvent</code>, <code class="inline">patchSignup</code>, the <code class="inline">checkInCode</code> and sign-up checks in client.ts.</li>
+  <li><b>Step 2 (7m):</b> <code class="inline">src/api/mutations.ts</code> with the three factories and <code class="inline">markOf</code> / <code class="inline">markStatus</code>; <code class="inline">npx tsc -b</code> prints nothing.</li>
+  <li><b>Goes home:</b> Steps 3 to 6 (the form saves with <code class="inline">mutateAsync</code>; Cancel moves to the cleanup's page with the check-in code; the desk saves every mark; slow and failing on purpose) and the checklist.</li>
+</ul>
+<figure class="shot"><img src="../../../images/lesson_25/25-desk-rollback.png" alt="The check-in desk for Tide Pool Morning Cleanup. Under the line Checked in: 0 of 7, a red message says The mark for Diego Herrera was not saved. The server had a problem (500). Try again in a moment. In the table, Diego Herrera's badge says Expected again."><figcaption>A failed save, rolled back: Check in showed Diego as checked in at once, the API answered 500, and onError put his old status back in the cache.</figcaption></figure></div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<ul class="tick">
+  <li>When does a mutation run, and is it retried? <b>Answer:</b> when you call it; not by default.</li>
+  <li>Why return the promise from <code class="inline">invalidateQueries</code>? <b>Answer:</b> the mutation stays pending until the refetches on screen are done.</li>
+  <li>Which callback puts the old mark back? <b>Answer:</b> <code class="inline">onError</code>, with what <code class="inline">onMutate</code> returned.</li>
+</ul>
+<p>Workbook self-check, Items 1 to 6.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">A) It runs only when you call mutate or mutateAsync</span>; <b>Q2</b> <span data-sc="2"><code class="inline">mutate</code> takes the cleanup's id, a <code class="inline">string</code>; <code class="inline">data</code> is <code class="inline">CleanupEvent | undefined</code> (and <code class="inline">error</code> is <code class="inline">Error | null</code>)</span>; <b>Q3</b> <span data-sc="3">C) <code class="inline">['events']</code> and <code class="inline">['volunteers']</code></span>; <b>Q4</b> <span data-sc="4">D) A check-in mark at the desk</span>; <b>Q5</b> <span data-sc="5"><code class="inline">saved</code> is undefined when onMutate itself failed, and <code class="inline">before</code> is undefined when the sign-up was not in the cache; check <code class="inline">saved?.before !== undefined</code> first</span>; <b>Q6</b> <span data-sc="6">B) It flips Checked in → Expected → Checked in, when a refetch started by Diego's save lands</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> pairs who struggle with the optimistic flow trace one tap on paper first (the lesson's journal prompt), then read <code class="inline">markMutation</code> line by line against the diagram.</p>
+<p><b>Stretch:</b> the lesson's Exercise 1 (Publish a draft) and Exercise 3 (Delete a draft with <code class="inline">removeQueries</code>); Lab 7.2 Task 3.</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.3</span><h3>Client State</h3><span class="dur">70 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Decide where a piece of state belongs: the query cache, the URL, a component, a reducer, or an app-wide store</li>
+  <li>Create a typed Zustand store with state and actions, and read it with selectors that re-render only what changed</li>
+  <li>Keep a store across reloads with the persist middleware, and check the saved data before trusting it</li>
+  <li>Use a store outside React (getState, subscribe) for page-wide effects like a theme</li>
+  <li>Read Redux Toolkit code (slices, typed hooks, a Provider) and compare it with Zustand on size, code and tooling</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame and mental model: the crew's storage</td></tr>
+<tr><td class="t">20m</td><td>Live demo: a typed store, selectors, persist and merge, outside React, the RTK comparison</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: Lab 7.3 Tasks 1 to 3</td></tr>
+<tr><td class="t">25m</td><td>Start the lesson project: Steps 1 to 3</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Frame and mental model (10m)</div>
+<ul class="tick">
+  <li><b>Hook (2m).</b> Maya wants the HQ light on a sunny tablet; Luis wants it dark with short lists. Neither is the crew's data.</li>
+  <li><b>The crew's storage (5m).</b> The logbook (the cache), the notice board (the URL), pockets (component state), the desk's clipboard (a reducer), the volunteer's own bag (an app-wide store). Colocation: keep state as close as possible to where it is used.</li>
+  <li><b>Which library? (3m).</b> Read the lesson's encouragement box: the decision table is the skill that transfers; each library is a different-shaped box for the last row.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Live demo: a small typed store</div>
+<p>On the finished 7.3 code (<code class="inline">lesson-26-end</code>); outputs from the kit's runs.</p>
+<ol class="steps">
+  <li><b>Where does this state live? (3m).</b> Walk the lesson's table: the query cache, the URL, the component, a reducer, the session store, and (new) an app-wide store. The three questions in order: does the server own it? should a link reproduce it? does more than one far-apart part need it, and should it outlive the tab?</li>
+  <li><b>A typed store (4m).</b> Show <code class="inline">src/state/uiStore.ts</code>'s store (the finished code):
+<div class="codefile">shoreline-hq/src/state/uiStore.ts</div>
+<pre class="code wrap" data-src="shoreline-hq/src/state/uiStore.ts" data-stage="lesson_26" data-match="excerpt"><span class="k">export</span> <span class="k">const</span> useUiStore = create&lt;UiState&gt;()(
+  persist(
+    (set) =&gt; ({
+      theme: <span class="s">'system'</span>,
+      density: <span class="s">'roomy'</span>,
+      setTheme: (theme) =&gt; set({ theme }),
+      setDensity: (density) =&gt; set({ density }),
+    }),
+    {</pre>
+<code class="inline">create&lt;UiState&gt;()(…)</code>: the first call takes your type, the second infers persist's. Leave the <code class="inline">()</code> out and tsc says:</li>
+  <li><b>Without the extra parentheses (2m).</b> 
+<pre class="out">src/Scratch.ts:10:3 - error TS2345: Argument of type 'StateCreator&lt;UiState, [], [["zustand/persist", UiState]]&gt;' is not assignable to parameter of type 'StateCreator&lt;UiState, [], []&gt;'.
+  Type 'StateCreator&lt;UiState, [], [["zustand/persist", UiState]]&gt;' is not assignable to type '{ $$storeMutators?: [] | undefined; }'.
+    Types of property '$$storeMutators' are incompatible.
+      Type '[["zustand/persist", UiState]] | undefined' is not assignable to type '[] | undefined'.
+        Type '[["zustand/persist", UiState]]' is not assignable to type '[]'.
+          Source has 1 element(s) but target allows only 0.</pre>
+Read the last line: the middleware's types were not expected.</li>
+  <li><b>Selectors decide re-renders (4m).</b> DisplaySettings: four selectors, one value each.
+<div class="codefile">shoreline-hq/src/components/DisplaySettings.tsx</div>
+<pre class="code" data-src="shoreline-hq/src/components/DisplaySettings.tsx" data-stage="lesson_26" data-match="excerpt">  <span class="k">const</span> theme = useUiStore((state) =&gt; state.theme)
+  <span class="k">const</span> density = useUiStore((state) =&gt; state.density)
+  <span class="k">const</span> setTheme = useUiStore((state) =&gt; state.setTheme)
+  <span class="k">const</span> setDensity = useUiStore((state) =&gt; state.setDensity)</pre>
+EventCard selects a boolean, so a theme change re-renders 0 cards (measured; 15 with <code class="inline">const { density } = useUiStore()</code>). And the selectors are typed from the store:</li>
+  <li><b>Typed all the way (2m).</b> The lesson's Scratch.tsx, <code class="inline">npx tsc -b</code>:
+<pre class="out">src/Scratch.tsx:6:17 - error TS2367: This comparison appears to be unintentional because the types '"compact" | "roomy"' and '"cozy"' have no overlap.
+src/Scratch.tsx:7:42 - error TS2345: Argument of type '"purple"' is not assignable to parameter of type '"dark" | "light" | "system"'.
+Found 2 errors in the same file, starting at: src/Scratch.tsx:6</pre>
+A typo in a comparison and a wrong theme, caught across the whole app. Then the trap: a selector that builds an object gives a new answer every time; in Zustand 5 React gives up with "Maximum update depth exceeded" (the lesson's screenshot). One selector per value, or <code class="inline">useShallow</code>.</li>
+  <li><b>Persist, and check what comes back (3m).</b> After choosing Dark, localStorage holds (the lesson measured it):
+<pre class="out">{"state":{"theme":"dark","density":"roomy"},"version":0}</pre>
+What comes back is NOT checked by TypeScript: an old version, another app, a curious person in DevTools. The merge:</li>
+  <li><b>The merge.</b> 
+<div class="codefile">shoreline-hq/src/state/uiStore.ts</div>
+<pre class="code wrap" data-src="shoreline-hq/src/state/uiStore.ts" data-stage="lesson_26" data-match="excerpt">      <span class="c">// What localStorage holds is unknown (an old version, a hand edit): keep only values that pass the checks</span>
+      merge: (saved, current) =&gt; {
+        <span class="k">if</span> (<span class="k">typeof</span> saved !== <span class="s">'object'</span> || saved === <span class="k">null</span>) {
+          <span class="k">return</span> current
+        }
+        <span class="k">return</span> {
+          ...current,
+          theme: <span class="s">'theme'</span> <span class="k">in</span> saved &amp;&amp; isTheme(saved.theme) ? saved.theme : current.theme,
+          density: <span class="s">'density'</span> <span class="k">in</span> saved &amp;&amp; isDensity(saved.density) ? saved.density : current.density,
+        }
+      },</pre>
+Each value that fails falls back to the current default, field by field. Then outside React, in main.tsx: the theme on <code class="inline">&lt;html data-theme&gt;</code> before the first render, then <code class="inline">subscribe</code>:</li>
+  <li><b>Outside React (1m).</b> 
+<div class="codefile">shoreline-hq/src/main.tsx</div>
+<pre class="code" data-src="shoreline-hq/src/main.tsx" data-stage="lesson_26" data-match="excerpt"><span class="c">// The saved theme goes on &lt;html&gt; before the first render, then follows every change</span>
+showTheme(useUiStore.getState().theme)
+useUiStore.subscribe((state, previous) =&gt; {
+  <span class="k">if</span> (state.theme !== previous.theme) {
+    showTheme(state.theme)
+  }
+})</pre></li>
+  <li><b>The same store in Redux Toolkit (1m).</b> Show the lesson's comparison table: 1 package versus 10; +4.7 kB versus +25.0 kB; 48 lines in one file versus 64 in three plus a Provider; persistence built in versus by hand; DevTools built in. "Reach for RTK when the codebase already uses it."</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>Reading the whole store.</b> <code class="inline">const { density } = useUiStore()</code> works and reads naturally. Coach: "what does this component need?" Select it (Item 9; Lab 7.3 Task 3).</li>
+  <li><b>Trusting localStorage.</b> "TypeScript says theme is one of three." Coach: "who wrote that string?" Put purple in DevTools and reload without the merge (Item 11).</li>
+  <li><b>Server data in the store.</b> "Load the events once into the store." Coach: who invalidates that copy after Publish? Server data stays in the query cache.</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab (15m)</div>
+<p><b>Folder:</b> <code class="inline">labs/module-19/l7_3-client-state/starter/</code> with <code class="inline">labs/module-19/l7_3-client-state/TASKS.md</code>; reference <code class="inline">labs/module-19/l7_3-client-state/solution/</code>. Pinned sites: organizers pin the beaches they look after, in this browser only. The type check stops at the tests' <code class="inline">usePinStore.persist</code> until Task 2 adds persist (a first hint).</p>
+<ul class="tick">
+  <li><b>Task 1 (4m):</b> <code class="inline">togglePin</code> with <code class="inline">set((state) =&gt; …)</code> and a NEW array (the test keeps the old one and checks it).</li>
+  <li><b>Task 2 (6m):</b> <code class="inline">persist</code> with the name <code class="inline">shoreline-pins</code>, and a merge that keeps only real site ids, once each (<code class="inline">isSiteId</code> is given).</li>
+  <li><b>Task 3 (5m):</b> the last test counts re-renders with React's Profiler: 6 with the whole store, 1 with <code class="inline">state.pinned.includes(siteId)</code>.</li>
+</ul>
+<p>As shipped (tests, then the first type error), and the solution:</p>
+<pre class="out">Tests  7 failed (7)
+src/lab.test.tsx:39:21 - error TS2339: Property 'persist' does not exist on type 'UseBoundStore&lt;StoreApi&lt;PinState&gt;&gt;'.
+
+Tests  7 passed (7)</pre></div>
+<div class="blk lab"><div class="h">Start the lesson project (25m)</div>
+<p>The lesson project is <b>Display Choices That Stick</b>, five steps. In the room: Steps 1 to 3.</p>
+<ul class="tick">
+  <li><b>Step 1 (8m):</b> <code class="inline">npm install zustand</code>; <code class="inline">src/state/uiStore.ts</code> (themes and densities as <code class="inline">as const</code> arrays, the store with persist and merge, <code class="inline">showTheme</code>).</li>
+  <li><b>Step 2 (7m):</b> index.css tokens with <code class="inline">light-dark()</code> and <code class="inline">color-scheme</code> per <code class="inline">data-theme</code>; main.tsx shows the theme before the first render and subscribes.</li>
+  <li><b>Step 3 (10m):</b> DisplaySettings with the generic <code class="inline">Choices&lt;T&gt;</code> radio groups, first in the footer; the Sunrise focus ring.</li>
+  <li><b>Goes home:</b> Step 4 (compact lists through DataList and <code class="inline">--card-padding</code>) and Step 5 (reload, a second tab, purple in DevTools), the checklist.</li>
+</ul>
+<figure class="shot"><img src="../../../images/lesson_26/26-display-settings.png" alt="The footer of Shoreline Crew HQ on Deep Tide blue. A row of radio buttons: Theme with Match my device (selected), Light and Dark; Lists with Roomy (selected) and Compact. Below them the footer text Shoreline Crew HQ: the organizers' side of the crew."><figcaption>The new Display choices in the footer: two radio groups, each a fieldset with a legend. Both read and change the Zustand store.</figcaption></figure></div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<ul class="tick">
+  <li>What decides how often a component re-renders with Zustand? <b>Answer:</b> its selector's answer (compared with Object.is).</li>
+  <li>Why the extra <code class="inline">()</code> in <code class="inline">create&lt;UiState&gt;()(…)</code>? <b>Answer:</b> you give UiState; TypeScript infers the middleware's types in the second call.</li>
+  <li>Where does the display store save, and why not sessionStorage? <b>Answer:</b> localStorage: a preference should outlive the tab.</li>
+</ul>
+<p>Workbook self-check, Items 7 to 12.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">C) In a Zustand store, persisted to localStorage</span>; <b>Q8</b> <span data-sc="8">The empty pair of parentheses: <code class="inline">create&lt;UiState&gt;()(persist(…))</code></span>; <b>Q9</b> <span data-sc="9">A) 15</span>; <b>Q10</b> <span data-sc="10">D) React keeps re-rendering and gives up: Maximum update depth exceeded</span>; <b>Q11</b> <span data-sc="11">B) Match my device and Roomy, with no error in the console</span>; <b>Q12</b> <span data-sc="12">A) The codebase already uses it, or the team wants every change named and replayable</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> for learners new to stores, start from the lesson's 16-line core store (no persist) and add persist only once selectors make sense.</p>
+<p><b>Stretch:</b> Exercise 3 (keep tabs in step with the storage event and <code class="inline">persist.rehydrate()</code>) and the Going Further (dismissible tips with a <code class="inline">TipId</code> union and a merge that keeps only known ids).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<ol class="steps">
+  <li>Name one change in the HQ that waits for the API and one that is optimistic, with a reason each. <b>Answer:</b> cancel (big, hard to take back) / a check-in mark (small, frequent, easy to undo).</li>
+  <li>After a check-in mark, which keys are invalidated, and why <code class="inline">['volunteers']</code>? <b>Answer:</b> <code class="inline">['events']</code> and <code class="inline">['volunteers']</code>: hours come from attended cleanups.</li>
+  <li>Write a selector for "is the list compact?" <b>Answer:</b> <code class="inline">useUiStore((state) =&gt; state.density === 'compact')</code>.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects:</b> 7.2 Steps 3 to 6 and the checklist (including the "changes" list for Lesson 11.1); 7.3 Steps 4 and 5 and the checklist (including the state-homes table for your own app).</li>
+  <li><b>Lesson exercises:</b> 7.2 Exercises 1 and 2 (Publish a draft; which entries go stale); 7.3 Exercises 1 and 2 (compact site cards; where does it belong). Exercise 3 of each is a stretch.</li>
+  <li><b>Both Quick Quizzes</b> on the lesson pages.</li>
+  <li><b>Labs:</b> Lab 7.2 Task 3 (the optimistic cancel); Lab 7.3's stretch.</li>
+  <li><b>Journal:</b> both entries (one tap on Check in with a 500, followed through; the map of the HQ's state).</li>
+  <li><b>Before the Next Lesson (from 7.3):</b> <code class="inline">npx tsc -b</code>, <code class="inline">npm run lint</code> and <code class="inline">npm run build</code> pass; count how many places in the HQ describe a valid cleanup.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 20</div>
+<ul class="tick">
+  <li>The course folder with the finished Lesson 7.3 code (or <code class="inline">lesson-27-start</code>), the API runnable.</li>
+  <li>Session 20 (Lessons 8.1 and 8.2) runs <code class="inline">npm install react-hook-form zod @hookform/resolvers</code>: a working connection. For 8.2's uploads: any JPEG or PNG photo on your computer.</li>
+  <li>Your count of the places that describe a valid cleanup, the workbook, the journal.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the invalidation question; the optimistic flow; a store with a selector; the merge.</li>
+  <li><b>Cut first (saves 4m):</b> both v4 steps (they are in the lessons' Common Mistakes).</li>
+  <li><b>Cut second (saves 10m):</b> the Redux Toolkit comparison becomes a pointer to the lesson's table.</li>
+  <li><b>Cut third (saves 15m):</b> 7.2's project start: Steps 1 and 2 go home with the demo fresh.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>7.2 Exercise 2 on the board: which of Maya's five entries go stale after a mark, and which refetch now.</li>
+  <li>Restart the API with <code class="inline">--latency=1500</code> and do 7.2's Step 6 live: the badge changes at once, the PATCH lands later.</li>
+  <li>7.3 Exercise 3 live: two tabs, the storage event, <code class="inline">persist.rehydrate()</code>.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 19 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 14</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 14: Rendering Performance and Component Patterns</h1>
+    <p class="sub">Answers and reasoning for every Session 14 item: the warm-up, both self-checks, the predict-then-check items, the lab reference outputs (the compiler run included), the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>14</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Start Here · Warm-up</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>useAuth() throws when the context value is undefined. Why is that better than a default value?</b> A component rendered outside AuthProvider fails at once with a message that says what to fix, instead of quietly showing a guest (Lesson 5.2). Today's Tabs use the same pattern for their parts.</li>
+  <li><b>AuthProvider's value is a new object on every render. Lesson 5.2 said that is fine for now. When would it not be?</b> When the provider renders often for reasons that do not change the value: every reader would render again for nothing. Lesson 5.3 measures it (and finds the HQ's AuthProvider is fine).</li>
+  <li><b>The check-in desk keeps its marks in a reducer (Lesson 5.1). What happens to them if the desk component is removed from the page and added back?</b> They are gone: unmounting a component throws its state away, and the roster is fetched again. Lesson 5.4 hides tab panels instead of removing them for exactly this reason.</li>
+</ol>
+
+  <div class="sec"><h2>5.3 · Rendering Performance: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">With the React Compiler on, Maya presses Sign out on /events, and every EventCard still renders. Why?</div><div class="opts"><div class="opt">A) The compiler skipped EventCard because it breaks a rule</div><div class="opt">B) Their parent rendered, and the compiler never caches JSX</div><div class="opt correct">C) Each card calls useAuth(), and the context really changed: no memoization blocks that reason</div><div class="opt">D) Strict Mode renders every component twice in development</div></div><div class="why"><b>Why:</b> Three reasons to render: own state, a parent that renders, a context the component reads. The cards read the auth context, which changed, so they render; inside each card the compiler reused the badges and buttons. Measured: 82 component calls in the sign-out's commit without the compiler, 19 with it (Lesson 5.3, Exercise 1).<br><b>A</b> is wrong: EventCard follows the rules; the compiler optimized every HQ component.<br><b>B</b> is wrong: The compiler does cache JSX; that is how typing went from 560 renders to 14.<br><b>D</b> is wrong: Strict Mode doubles calls in development, but render counts are the same in a build.</div></div>
+  <div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">oxlint prints this for the supply experiment. You ignore it and click Remove Gloves, then Remove Bags. What does the list show?</div><pre class="code">  ⚠ react-hooks(exhaustive-deps): React Hook useCallback has a missing dependency: 'supplies'
+    ╭─[src/Scratch.tsx:31:6]
+ 29 │   const removeSupply = useCallback((supply: string) =&gt; {
+ 30 │     setSupplies(supplies.filter((item) =&gt; item !== supply))
+    ·                 ────┬───
+    ·                     ╰── useCallback uses `supplies` here
+ 31 │   }, [])
+    ·      ──
+ 32 │
+    ╰────
+  help: Either include it or remove the dependency array.
+
+Found 1 warning and 0 errors.</pre><div class="opts"><div class="opt">A) Grabbers</div><div class="opt correct">B) Gloves, Grabbers: Gloves comes back</div><div class="opt">C) An error: supplies is not defined</div><div class="opt">D) Bags, Grabbers: the second click does nothing</div></div><div class="why"><b>Why:</b> The callback keeps the supplies from the first render forever, so the second removal filters the ORIGINAL three and Gloves reappears (measured in Lesson 5.3). Read the warning as a bug report; the updater form <code class="inline">setSupplies((current) =&gt; ...)</code> needs no dependency.<br><b>A</b> is wrong: That is what correct code shows.<br><b>C</b> is wrong: supplies is defined; it is just old.<br><b>D</b> is wrong: The second click does run; it uses the stale array.</div></div>
+  <div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">You wrap EventGroups in <code class="inline">&lt;Profiler onRender={logRender}&gt;</code> and open the app with <code class="inline">npm run build</code> and <code class="inline">npm run preview</code>. What does the console show while you type?</div><div class="opts"><div class="opt correct">Nothing at all: production builds of React do not call onRender</div></div><div class="why"><b>Why:</b> Profiling is left out of production builds. Measure on the dev server (Lesson 5.3 measured one line per key there), compare before and after on the same machine, and never treat development times as promises about users.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">You copied an older tutorial's <code class="inline">vite.config.ts</code>. Which change fixes what <code class="inline">npx tsc -b</code> prints?</div><pre class="code">vite.config.ts:8:7 - error TS2353: Object literal may only specify known properties, and 'babel' does not exist in type 'Options'.
+
+8       babel: {
+        ~~~~~
+
+
+Found 1 error in vite.config.ts:8</pre><div class="opts"><div class="opt">A) Install <code class="inline">@babel/core</code> so the babel option exists</div><div class="opt">B) Cast the options with <code class="inline">as any</code> so the config compiles</div><div class="opt correct">C) Keep <code class="inline">react()</code> and add <code class="inline">babel({ presets: [reactCompilerPreset()] })</code> from <code class="inline">@rolldown/plugin-babel</code></div><div class="opt">D) Downgrade TypeScript: version 7 does not check config files</div></div><div class="why"><b>Why:</b> plugin-react 6 (Vite 8) has no babel option any more; its Options type says so. The compiler runs as a Babel preset through @rolldown/plugin-babel, the way the react-compiler-ts template sets it up (Lesson 5.3, Step 3). TypeScript checks vite.config.ts because tsconfig.node.json includes it.<br><b>A</b> is wrong: The option is gone from the plugin, not from Babel.<br><b>B</b> is wrong: That hides the error and the plugin still ignores the option: no compiler.<br><b>D</b> is wrong: TypeScript 7 checks it; that is how you found the mistake before building.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">A report screen sorts 100,000 log entries on every key press in its note box. Which change skips the sort while you type?</div><div class="opts"><div class="opt">A) Wrap the report component in <code class="inline">memo</code></div><div class="opt">B) Wrap the sort function in <code class="inline">useCallback</code></div><div class="opt">C) Move the sort into a <code class="inline">useEffect</code></div><div class="opt correct">D) <code class="inline">const top = useMemo(() =&gt; heaviest(logs, 3), [logs])</code></div></div><div class="why"><b>Why:</b> useMemo caches a calculated value until a dependency changes. memo skips a whole component, but here the component itself must render (its note changed). Measured in Lesson 5.3: a median of 30 ms per key press without it, 0.5 ms with it.<br><b>A</b> is wrong: The report's own state changed; memo only skips renders caused by a parent.<br><b>B</b> is wrong: useCallback keeps a function the same; calling it still sorts every time.<br><b>C</b> is wrong: An effect runs after rendering and would need state to show the result: more renders, not fewer.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">Lab 5.3's untouched starter, run with the React Compiler on (<code class="inline">npm run test:compiler</code>), ends like this. Which test still fails, and what fixes it?</div><pre class="code"> ❯ src/lab.test.tsx (7 tests | 1 failed)
+   ✓ Task 1: the shift roster (2)
+     ✓ marking two volunteers in a row keeps both marks
+     ✓ typing a note draws no row again
+   ✓ Task 2: the sort order context (2)
+     ✓ the button still switches the order
+     ✓ typing a note draws no label again
+   ❯ Task 3: the weight report (3)
+     ✓ totals per beach, heaviest first
+     × typing a note adds nothing up again
+     ✓ new logs are added up again
+      Tests  1 failed | 6 passed (7)</pre><div class="opts"><div class="opt correct">Task 3 (the weight report still adds up the logs on every key press); an explicit useMemo, which the compiler keeps</div></div><div class="why"><b>Why:</b> The compiler stabilized the roster's function and the context value without a single Hook, but it still called totalsByBeach 5 times while the note was typed: the same honest limit Lesson 5.3 measured on its report experiment. With the solution's useMemo, the compiler run passes all seven tests.</div></div>
+
+  <div class="sec"><h2>5.3 · Rendering Performance: predict, then check</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">npx tsc -b on vite.config.ts</div><pre class="code"><span class="k">import</span> react <span class="k">from</span> <span class="s">'@vitejs/plugin-react'</span>
+<span class="k">import</span> { defineConfig } <span class="k">from</span> <span class="s">'vite'</span>
+
+<span class="c">// From an older tutorial (plugin-react 4 and 5): the compiler as a Babel plugin inside react()</span>
+<span class="k">export</span> <span class="k">default</span> defineConfig({
+  plugins: [
+    react({
+      babel: {
+        plugins: [<span class="s">'babel-plugin-react-compiler'</span>],
+      },
+    }),
+  ],
+})</pre><div class="opts"><div class="opt correct"><pre class="out">vite.config.ts:8:7 - error TS2353: Object literal may only specify known properties, and 'babel' does not exist in type 'Options'.
+
+8       babel: {
+        ~~~~~
+
+
+Found 1 error in vite.config.ts:8</pre></div></div><div class="why"><b>Why:</b> plugin-react 6 (Vite 8) has no babel option, so its Options type rejects it: TS2353 at the <code class="inline">babel</code> key, before anything builds (TypeScript checks vite.config.ts through tsconfig.node.json). The fix is Step 3's setup: <code class="inline">react()</code> plus <code class="inline">babel({ presets: [reactCompilerPreset()] })</code>. Self-check Q4.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">npm run lint on src/components/EventCard.tsx (added at the top of the component)</div><pre class="code"><span class="c">// How many times has this card rendered?</span>
+<span class="k">const</span> renders = useRef(<span class="s">0</span>)
+renders.current += <span class="s">1</span>
+console.log(<span class="s">`${event.title}: render ${renders.current}`</span>)</pre><div class="opts"><div class="opt correct"><pre class="out">  ⚠ react(refs): Cannot access refs during render
+    ╭─[src/components/EventCard.tsx:27:3]
+ 26 │   const renders = useRef(0)
+ 27 │   renders.current += 1
+    ·   ───────┬───────
+    ·          ╰── Cannot access ref value during render
+ 28 │   console.log(`${event.title}: render ${renders.current}`)
+    ╰────
+  …
+Found 3 warnings and 0 errors.</pre></div></div><div class="why"><b>Why:</b> Three react(refs) warnings, one per use of <code class="inline">renders.current</code> while rendering, each with the note that the React Compiler skipped the component: EventCard loses all its memoization. Measured in Lesson 5.3: Show details went from 1 component render to 4, the sign-out's commit from 19 to 64. And on the dev server the counter counts double (Strict Mode). Measure with the Profiler instead.</div></div>
+
+  <div class="sec"><h2>5.4 · Component Patterns: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Why does <code class="inline">Tabs.tsx</code> NOT export <code class="inline">TabsContext</code>?</div><div class="opts"><div class="opt">A) To keep the bundle smaller</div><div class="opt correct">B) So only the parts in the same file can read it: the rest of the app sees four components</div><div class="opt">C) Because a .tsx file may not export a context</div><div class="opt">D) Because createContext needs a default value to be exported</div></div><div class="why"><b>Why:</b> A private context is what makes Tabs, TabList, Tab and TabPanel a family: nobody outside can read or fake the selected tab, and useTabs's error names the part that was used outside its parent (Lesson 5.4, Compound Components).<br><b>A</b> is wrong: Exporting a value costs nothing measurable.<br><b>C</b> is wrong: It may, but Fast Refresh's lint rule warns about non-component exports; that is a reason, not a rule of the language.<br><b>D</b> is wrong: The default is undefined on purpose (T | undefined + a throwing Hook).</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt"><code class="inline">npx tsc -b</code> reports this for <code class="inline">&lt;Button href="/events/new"&gt;Plan a cleanup&lt;/Button&gt;</code> (first two lines). What is the right fix?</div><pre class="code">src/Scratch.tsx:6:15 - error TS2322: Type '{ href: string; children: string; }' is not assignable to type 'IntrinsicAttributes &amp; { as?: "button" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;ButtonHTMLAttributes&lt;HTMLButtonElement&gt;, HTMLButtonElement&gt;, "as" | "className"&gt;'.
+  Property 'href' does not exist on type 'IntrinsicAttributes &amp; { as?: "button" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;ButtonHTMLAttributes&lt;HTMLButtonElement&gt;, HTMLButtonElement&gt;, "as" | "className"&gt;'. Did you mean 'ref'?</pre><div class="opts"><div class="opt correct">A) Add <code class="inline">as="a"</code>: a link needs the props of an a element</div><div class="opt">B) Rename <code class="inline">href</code> to <code class="inline">ref</code>, as TypeScript suggests</div><div class="opt">C) Add <code class="inline">href</code> to ButtonProps</div><div class="opt">D) Give the Button <code class="inline">variant="link"</code></div></div><div class="why"><b>Why:</b> Without as, C is the default 'button', and a button has no href. The props follow the as prop: with as="a" the same href is valid. Read a long error from its last line; the Did you mean is a spelling guess, not a design answer.<br><b>B</b> is wrong: ref is a real prop, but it is not what you meant: the guess comes from the spelling.<br><b>C</b> is wrong: Then every button would accept an href it ignores.<br><b>D</b> is wrong: The variant changes the look, not the element: it would still be a button.</div></div>
+  <div class="q" data-sc="9" data-kind="short"><div class="qn">Q9</div><div class="qt">Three errors, one cause. Which do you fix first, and how does DataList avoid the problem altogether?</div><pre class="code">src/Scratch.tsx:21:18 - error TS2322: Type 'DebrisCount[]' is not assignable to type '{ id: string; }[]'.
+src/Scratch.tsx:21:62 - error TS2339: Property 'category' does not exist on type '{ id: string; }'.
+src/Scratch.tsx:21:80 - error TS2339: Property 'count' does not exist on type '{ id: string; }'.
+Found 3 errors in the same file, starting at: src/Scratch.tsx:21</pre><div class="opts"><div class="opt correct">The first: DebrisCount has no id, so it does not satisfy the constraint; DataList asks for a getKey function instead of requiring an id</div></div><div class="why"><b>Why:</b> When T fails its constraint, TypeScript falls back to { id: string }, which is why the next two errors say category and count do not exist. Fix the first error, then check again. A constraint should ask for exactly what the component uses (Lesson 5.4, Why getKey and not item.id?).</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">In <code class="inline">moveBetweenTabs</code>, why must the code check <code class="inline">move === undefined</code> and <code class="inline">next === undefined</code> before <code class="inline">next.focus()</code>?</div><div class="opts"><div class="opt correct">A) noUncheckedIndexedAccess types <code class="inline">moves[event.key]</code> and <code class="inline">tabs[...]</code> as possibly undefined</div><div class="opt">B) React requires every event handler to return early</div><div class="opt">C) Arrow keys can fire twice in Strict Mode</div><div class="opt">D) oxlint's jsx-a11y rules ask for it</div></div><div class="why"><b>Why:</b> The HQ has had noUncheckedIndexedAccess on since Lesson 2.4: reading a Record or an array by index gives T | undefined, so TypeScript will not let you call next.focus() until you have ruled undefined out. A key that is not in moves returns early, without preventDefault.<br><b>B</b> is wrong: React has no such rule.<br><b>C</b> is wrong: Strict Mode doubles renders and effects, not key events.<br><b>D</b> is wrong: The a11y rule in this lesson is about a key handler on an element that cannot take focus.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">On Storm Debris Sweep (Details and Impact tabs), the focus is on Details. You press End, then ←, then the letter a. Which tab is selected?</div><div class="opts"><div class="opt">A) Impact</div><div class="opt">B) None: the letter a clears the selection</div><div class="opt">C) The focus has moved into the panel</div><div class="opt correct">D) Details</div></div><div class="why"><b>Why:</b> End jumps to the last tab (Impact); ← moves back and wraps, here to Details; a is not in moves, so nothing happens. Each move focuses AND clicks the tab: automatic activation (Lesson 5.4, Exercise 1).<br><b>A</b> is wrong: That is the state after End alone.<br><b>B</b> is wrong: Unknown keys return without doing anything.<br><b>C</b> is wrong: Tab (the key) moves focus into the panel; arrow keys stay in the tab list.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">You switch the HQ's Tabs to the dot form (<code class="inline">Tabs.List</code>, <code class="inline">Tabs.Tab</code>, <code class="inline">Tabs.Panel</code>) with Object.assign. It type-checks; what does <code class="inline">npm run lint</code> say (first warning shown), and what does it cost?</div><pre class="code">  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Move your component(s) to a separate file.
+    ╭─[src/components/Tabs.tsx:37:10]
+ 36 │ // The parent: owns which tab is selected and shares it with the parts inside
+ 37 │ function TabsRoot({ defaultTab, children }: TabsProps) {
+    ·          ────────
+ 38 │   const [selected, setSelected] = useState(defaultTab)</pre><div class="opts"><div class="opt correct">Four react(only-export-components) warnings, one per part; Fast Refresh may reload the whole page instead of keeping the components' state</div></div><div class="why"><b>Why:</b> The file now exports an object, not only components. Named exports (import { Tab, TabList, TabPanel, Tabs }) keep editing smooth and say just as clearly that the parts belong together (Lesson 5.4, Common Questions).</div></div>
+
+  <div class="sec"><h2>5.4 · Component Patterns: predict, then check</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">npx tsc -b on src/Scratch.tsx</div><pre class="code"><span class="k">import</span> <span class="k">type</span> { ReactNode } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> <span class="k">type</span> { DebrisCount } <span class="k">from</span> <span class="s">'./api/types.ts'</span>
+
+<span class="k">interface</span> IdListProps&lt;T <span class="k">extends</span> { id: <span class="k">string</span> }&gt; {
+  items: T[]
+  renderItem: (item: T) =&gt; ReactNode
+}
+
+<span class="c">// Only for items that have an id: the constraint lets the list use item.id as the key</span>
+<span class="k">function</span> IdList&lt;T <span class="k">extends</span> { id: <span class="k">string</span> }&gt;({ items, renderItem }: IdListProps&lt;T&gt;) {
+  <span class="k">return</span> (
+    &lt;ul&gt;
+      {items.map((item) =&gt; (
+        &lt;li key={item.id}&gt;{renderItem(item)}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}
+
+<span class="k">export</span> <span class="k">function</span> PiecesCounted({ items }: { items: DebrisCount[] }) {
+  <span class="k">return</span> &lt;IdList items={items} renderItem={(item) =&gt; <span class="s">`${item.category}: ${item.count}`</span>} /&gt;
+}</pre><div class="opts"><div class="opt correct"><pre class="out">src/Scratch.tsx:21:18 - error TS2322: Type 'DebrisCount[]' is not assignable to type '{ id: string; }[]'.
+  Property 'id' is missing in type 'DebrisCount' but required in type '{ id: string; }'.
+
+21   return &lt;IdList items={items} renderItem={(item) =&gt; `${item.category}: ${item.count}`} /&gt;
+                    ~~~~~
+
+  src/Scratch.tsx:10:29 - 'id' is declared here.
+    10 function IdList&lt;T extends { id: string }&gt;({ items, renderItem }: IdListProps&lt;T&gt;) {
+                                   ~~
+
+  src/Scratch.tsx:5:3 - The expected type comes from property 'items' which is declared here on type 'IntrinsicAttributes &amp; IdListProps&lt;{ id: string; }&gt;'
+    5   items: T[]
+        ~~~~~
+
+src/Scratch.tsx:21:62 - error TS2339: Property 'category' does not exist on type '{ id: string; }'.
+
+21   return &lt;IdList items={items} renderItem={(item) =&gt; `${item.category}: ${item.count}`} /&gt;
+                                                                ~~~~~~~~
+
+src/Scratch.tsx:21:80 - error TS2339: Property 'count' does not exist on type '{ id: string; }'.
+
+21   return &lt;IdList items={items} renderItem={(item) =&gt; `${item.category}: ${item.count}`} /&gt;
+                                                                                  ~~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:21</pre></div></div><div class="why"><b>Why:</b> TS2322 first: a DebrisCount has no id, so T cannot satisfy <code class="inline">{ id: string }</code>; TypeScript falls back to the constraint, which causes the two TS2339 errors on category and count. Fix the first error; better, ask only for what you use (getKey). Self-check Q9.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">npm run lint on src/components/Tabs.tsx (last line)</div><pre class="code"><span class="k">export</span> <span class="k">const</span> Tabs = Object.assign(TabsRoot, { List: TabList, Tab, Panel: TabPanel })</pre><div class="opts"><div class="opt correct"><pre class="out">  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Move your component(s) to a separate file.
+    ╭─[src/components/Tabs.tsx:37:10]
+ 36 │ // The parent: owns which tab is selected and shares it with the parts inside
+ 37 │ function TabsRoot({ defaultTab, children }: TabsProps) {
+    ·          ────────
+ 38 │   const [selected, setSelected] = useState(defaultTab)
+    ╰────
+
+  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Move your component(s) to a separate file.
+    ╭─[src/components/Tabs.tsx:50:10]
+ 49 │
+ 50 │ function TabList({ label, children }: TabListProps) {
+    ·          ───────
+ 51 │   return (
+    ╰────
+
+  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Move your component(s) to a separate file.
+    ╭─[src/components/Tabs.tsx:85:10]
+ 84 │
+ 85 │ function Tab({ id, children }: TabProps) {
+    ·          ───
+ 86 │   const { selected, select, baseId } = useTabs('Tab')
+    ╰────
+
+  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Move your component(s) to a separate file.
+     ╭─[src/components/Tabs.tsx:112:10]
+ 111 │
+ 112 │ function TabPanel({ id, children }: TabPanelProps) {
+     ·          ────────
+ 113 │   const { selected, baseId } = useTabs('TabPanel')
+     ╰────
+
+Found 4 warnings and 0 errors.</pre></div></div><div class="why"><b>Why:</b> It type-checks. oxlint reports four react(only-export-components) warnings, one per component, because the file now exports an object; Fast Refresh may then reload the whole page instead of keeping state. Named exports keep editing smooth. Self-check Q12.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the labs run exactly as <code class="inline">labs/check_labs.py</code> runs them (Node 24, in a terminal like a learner's, in a fresh copy of the lab folder). Test-runner durations are left out; everything else is as printed.</p>
+<div class="blk lab"><div class="h">Lab 5.3 (guided): labs/module-14/l5_3-rendering-performance/starter → solution</div>
+<p>As shipped, <code class="inline">npm test</code> fails three tests, each with the count of wasted work while four or five letters were typed:</p>
+<pre class="out">AssertionError: TODO 1: rows drawn while typing the note: expected 12 to be +0 // Object.is equality
+AssertionError: TODO 2: labels drawn while typing the note: expected 4 to be +0 // Object.is equality
+AssertionError: TODO 3: totals added up while typing the note: expected 5 to be +0 // Object.is equality</pre><pre class="out"> ❯ src/lab.test.tsx (7 tests | 3 failed)
+   ❯ Task 1: the shift roster (2)
+     ✓ marking two volunteers in a row keeps both marks
+     × typing a note draws no row again
+   ❯ Task 2: the sort order context (2)
+     ✓ the button still switches the order
+     × typing a note draws no label again
+   ❯ Task 3: the weight report (3)
+     ✓ totals per beach, heaviest first
+     × typing a note adds nothing up again
+     ✓ new logs are added up again
+      Tests  3 failed | 4 passed (7)</pre><p>The solution (<code class="inline">npm run typecheck</code> prints nothing after its two <code class="inline">&gt;</code> lines; <code class="inline">npm run lint</code> says <code class="inline">Found 0 warnings and 0 errors.</code>):</p>
+<pre class="out"> ✓ src/lab.test.tsx (7 tests)
+   ✓ Task 1: the shift roster (2)
+     ✓ marking two volunteers in a row keeps both marks
+     ✓ typing a note draws no row again
+   ✓ Task 2: the sort order context (2)
+     ✓ the button still switches the order
+     ✓ typing a note draws no label again
+   ✓ Task 3: the weight report (3)
+     ✓ totals per beach, heaviest first
+     ✓ typing a note adds nothing up again
+     ✓ new logs are added up again
+      Tests  7 passed (7)</pre><p>What each task shows: (1) <code class="inline">togglePresent</code> was a new function every render, so <code class="inline">memo(RosterList)</code> always saw a changed prop; <code class="inline">useCallback</code> with the updater form and <code class="inline">[]</code> keeps it, and the first test guards against the stale version (two marks in a row). (2) The provider's <code class="inline">{ order, toggleOrder }</code> was a new object every time <code class="inline">LogBoard</code> rendered (the provider's children are new), so the memo <code class="inline">SortToggle</code> rendered through the context, the reason memo never blocks; <code class="inline">useCallback</code> + <code class="inline">useMemo(() =&gt; ({ order, toggleOrder }), [order, toggleOrder])</code>. (3) <code class="inline">useMemo(() =&gt; totalsByBeach(logs), [logs])</code>; the third test fails an empty dependency array (new logs must be added up). Accept <code class="inline">useCallback</code> written with the toggle inline, and either order of the two Hooks in Task 2.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 5.3 stretch 1: the untouched starter with the React Compiler on</div>
+<p><code class="inline">npm run test:compiler</code> runs the same tests through <code class="inline">vite.compiler.config.ts</code> (<code class="inline">react()</code> + <code class="inline">babel({ presets: [reactCompilerPreset()] })</code>, Lesson 5.3's setup). On the starter, with no Hook added:</p>
+<pre class="out"> ❯ src/lab.test.tsx (7 tests | 1 failed)
+   ✓ Task 1: the shift roster (2)
+     ✓ marking two volunteers in a row keeps both marks
+     ✓ typing a note draws no row again
+   ✓ Task 2: the sort order context (2)
+     ✓ the button still switches the order
+     ✓ typing a note draws no label again
+   ❯ Task 3: the weight report (3)
+     ✓ totals per beach, heaviest first
+     × typing a note adds nothing up again
+     ✓ new logs are added up again
+      Tests  1 failed | 6 passed (7)</pre><pre class="out">AssertionError: TODO 3: totals added up while typing the note: expected 5 to be +0 // Object.is equality</pre><p>The compiler fixed Tasks 1 and 2 by itself (it kept the function and the context value the same between renders) and still called <code class="inline">totalsByBeach</code> 5 times while <code class="inline">windy</code> was typed: the honest limit Lesson 5.3 measured on its report experiment. With the solution's explicit <code class="inline">useMemo</code>, the compiler run passes all seven tests (<code class="inline">compiler-on-solution</code>). The lesson's rule holds: the compiler is an assistant, not a guarantee, and a measurement tells you which.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-14/l5_3-rendering-performance/debug_stale_roster.tsx (deliberately broken)</div>
+<p>Copied into <code class="inline">starter/src/StaleRoster.tsx</code>, <code class="inline">npm run lint</code> says:</p>
+<pre class="out">⚠ react-hooks(exhaustive-deps): React Hook useCallback has a missing dependency: 'present'
+    ╭─[src/StaleRoster.tsx:12:6]
+ 10 │   const markPresent = useCallback((id: string) =&gt; {
+ 11 │     setPresent(present.includes(id) ? present : [...present, id])
+    ·                ───┬───
+    ·                   ╰── useCallback uses `present` here
+ 12 │   }, [])
+    ·      ──
+ 13 │
+    ╰────
+  help: Either include it or remove the dependency array.
+
+Found 1 warning and 0 errors.
+Finished in …ms on 14 files with 150 rules using … threads.</pre><p>Clicking Ana Lima, then Ben Okafor, shows only Ben: the callback still holds the empty list from the first render, so the second click starts from nothing (the lesson's Gloves that came back). Fix: <code class="inline">setPresent((current) =&gt; (current.includes(id) ? current : [...current, id]))</code> with <code class="inline">[]</code>, or add <code class="inline">present</code> to the array (correct, but the function then changes with every mark).</p>
+</div>
+<div class="blk lab"><div class="h">Lab 5.4 (guided): labs/module-14/l5_4-component-patterns/starter → solution</div>
+<p>As shipped, <code class="inline">npm test</code> fails eight of nine tests with TODO messages, and <code class="inline">npm run typecheck</code> reports (first line of each error):</p>
+<pre class="out"> ❯ src/lab.test.tsx (9 tests | 8 failed)
+   ❯ Task 1: a compound ChoiceGroup (3)
+     × the default choice is pressed
+     × clicking a choice presses it and releases the other
+     × a Choice outside its group says what to fix
+   ❯ Task 2: a generic DataTable (3)
+     × one row per item, one cell per column (real debris counts)
+     × the same table infers another row type
+     × no rows: the empty message instead of a table
+   ❯ Task 3: a polymorphic Chip (3)
+     ✓ a span by default, with its tone
+     × as="a" renders a real link
+     × as="button" is a button that does not submit forms
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:109:15
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+      Tests  8 failed | 1 passed (9)</pre><pre class="out">src/ChoiceGroup.tsx:1:25 - error TS6133: 'useContext' is declared but its value is never read.
+src/ChoiceGroup.tsx:10:7 - error TS6133: 'ChoiceContext' is declared but its value is never read.
+src/chipTypes.tsx:15:8 - error TS2578: Unused '@ts-expect-error' directive.
+src/chipTypes.tsx:17:8 - error TS2578: Unused '@ts-expect-error' directive.
+src/lab.test.tsx:52:32 - error TS2339: Property 'category' does not exist on type 'object'.
+src/lab.test.tsx:55:54 - error TS2339: Property 'category' does not exist on type 'object'.
+src/lab.test.tsx:56:51 - error TS2339: Property 'count' does not exist on type 'object'.
+src/lab.test.tsx:70:36 - error TS2339: Property 'eventId' does not exist on type 'object'.
+src/lab.test.tsx:73:57 - error TS2339: Property 'eventId' does not exist on type 'object'.
+src/lab.test.tsx:74:59 - error TS2339: Property 'weightKg' does not exist on type 'object'.
+Found 10 errors in 3 files.</pre><p>The solution (<code class="inline">npm run typecheck</code> prints nothing after its two <code class="inline">&gt;</code> lines):</p>
+<pre class="out"> ✓ src/lab.test.tsx (9 tests)
+   ✓ Task 1: a compound ChoiceGroup (3)
+     ✓ the default choice is pressed
+     ✓ clicking a choice presses it and releases the other
+     ✓ a Choice outside its group says what to fix
+   ✓ Task 2: a generic DataTable (3)
+     ✓ one row per item, one cell per column (real debris counts)
+     ✓ the same table infers another row type
+     ✓ no rows: the empty message instead of a table
+   ✓ Task 3: a polymorphic Chip (3)
+     ✓ a span by default, with its tone
+     ✓ as="a" renders a real link
+     ✓ as="button" is a button that does not submit forms
+      Tests  9 passed (9)</pre><p>What each task shows: (1) a compound component: <code class="inline">ChoiceGroup</code> provides <code class="inline">{ selected, choose: setSelected }</code> through the private <code class="inline">ChoiceContext</code>, <code class="inline">useChoice</code> throws <code class="inline">&lt;Choice&gt; must be used inside &lt;ChoiceGroup&gt;</code>, each <code class="inline">Choice</code> sets <code class="inline">aria-pressed={value === selected}</code>. (2) <code class="inline">Column&lt;T&gt;</code>, <code class="inline">DataTableProps&lt;T&gt;</code>, <code class="inline">DataTable&lt;T&gt;</code>: T is inferred as DebrisCount for the counts and ImpactReport for the reports, which is why the six TS2339 errors in the test file disappear. (3) Chip typed like Lesson 5.4's Button with <code class="inline">'span'</code> as the default: the two TS2578 lines become real errors (a span has no href, a link has no disabled); <code class="inline">tone="loud"</code> was an error from the start because ChipTone was already a union. Accept <code class="inline">Omit&lt;..., 'as' | 'className'&gt;</code> or an explicit list of allowed elements, as long as the type tests pass.</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 5.3 · Rendering Performance</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="5.3">
+  <li><b>B</b> Their parent rendered, so React rendered them too: The search text is EventsPage state. When EventsPage renders, it creates EventGroups, the lists and the cards again, and without memo or the compiler React renders them all.</li>
+  <li><b>D</b> onRemove gets a new function on every render of the parent: A function declared in the parent's body is a new function on each render, so memo sees a changed onRemove prop. useCallback, or the React Compiler, keeps it the same.</li>
+  <li><b>C</b> Nothing: production builds of React do not call onRender: Production builds of React leave profiling out, so onRender is never called. Measure on the dev server (or with a special profiling build), and compare numbers on the same setup.</li>
+  <li><b>A</b> It skips the whole component and leaves it as written, without failing the build: The compiler only optimizes code that follows the Rules of React. It leaves this component exactly as written, without a message in the build; the lint warning, with its note that the compiler skipped the component, is your signal.</li>
+  <li><b>D</b> In the provider, keep the value the same object with useMemo (and toggleUnit with useCallback): The provider builds a new value object on each render, and every reader renders when the value changes. useCallback for toggleUnit plus useMemo for the object keep the value the same until unit really changes. Measured: zero renders while typing.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 5.4 · Component Patterns</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="5.4">
+  <li><b>B</b> It reads the selected id from a private context that Tabs provides: Tabs keeps the selected id in state and provides it through TabsContext. Each Tab reads the context with useTabs and compares its own id, so the caller never wires anything by hand.</li>
+  <li><b>C</b> DebrisCount, inferred from items: TypeScript infers the type parameter T from the items prop: DebrisCount. Then getKey and renderItem are checked against it, so item.category is known.</li>
+  <li><b>A</b> An error: disabled does not exist on the props of an a element: With as set to a, the props are an anchor's props, and an a element has no disabled attribute, so TypeScript reports TS2322: Property disabled does not exist. The props follow the as prop.</li>
+  <li><b>D</b> So the panels stay mounted and keep their state, like the check-in marks: A removed panel unmounts its content, and the state in it is lost: measured, the check-in marks went back to 0 of 7 and the roster was fetched again. A hidden panel stays mounted and keeps its state.</li>
+  <li><b>B</b> Only the call site: as={Link} to="/events/new" replaces as="a" href="/events/new": as accepts any ElementType, components included, and ComponentPropsWithRef of Link brings in its to prop. Only the call site changes, from as a with href to as Link with to; Button itself stays as it is.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Three reasons:</b> its own state changed (a set call or dispatch); its parent rendered; a context it reads changed.</li>
+  <li><b>A memo component with no props that still renders:</b> it reads a context whose value is a new object on every render of the provider; keep the value the same object with useMemo and its functions with useCallback (or let the compiler do it). memo never blocks a context update.</li>
+  <li><b>A pattern and its HQ component:</b> compound components, Tabs (TabList, Tab, TabPanel); render prop + generic component, DataList&lt;T&gt;; polymorphic as prop, Button.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A or B.</b> Thinks the compiler caches everything, or nothing. Return to the three reasons: a context change always renders its readers.</li>
+  <li><b>Q2 A.</b> Reads the warning as style advice. Run the lesson's Gloves case: the stale value is a real bug.</li>
+  <li><b>Q4 A or B.</b> Fixes the symptom (the type) instead of the setup. The option is gone from plugin-react 6.</li>
+  <li><b>Q5 A or B.</b> Mixes the three tools. memo skips a component, useCallback keeps a function, useMemo keeps a value.</li>
+  <li><b>Q8 B.</b> Follows the Did you mean. Read the last line, then ask what element the props belong to.</li>
+  <li><b>Q11 A.</b> Forgets that ← wraps. Walk moveBetweenTabs's <code class="inline">moves</code> record with the two tabs on the board.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 14 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

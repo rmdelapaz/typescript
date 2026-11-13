@@ -1,0 +1,67 @@
+{
+  "title": "A site desk: a typed loader, one error page, a guard with a safe ?next= and a sign-in action",
+  "lesson": "6.3",
+  "tasks": 3,
+  "runs": [
+    {
+      "name": "starter",
+      "dir": "starter",
+      "cmd": "npm test",
+      "exit": "nonzero",
+      "expect": [
+        "TODO 1",
+        "Tests  8 failed (8)"
+      ]
+    },
+    {
+      "name": "starter-types",
+      "dir": "starter",
+      "cmd": "npm run typecheck",
+      "exit": "nonzero",
+      "expect": [
+        "src/lab.test.tsx",
+        "Found 1 error in src/lab.test.tsx"
+      ]
+    },
+    {
+      "name": "solution",
+      "dir": "solution",
+      "cmd": "npm test",
+      "exit": 0,
+      "expect": [
+        "Tests  8 passed (8)"
+      ]
+    },
+    {
+      "name": "solution-types",
+      "dir": "solution",
+      "cmd": "npm run typecheck",
+      "exit": 0,
+      "absent": [
+        "error TS"
+      ]
+    },
+    {
+      "name": "solution-lint",
+      "dir": "solution",
+      "cmd": "npm run lint",
+      "exit": 0,
+      "expect": [
+        "Found 0 warnings and 0 errors."
+      ]
+    },
+    {
+      "name": "guard-only-in-parent",
+      "dir": "solution",
+      "cmd": "npm test",
+      "exit": "nonzero",
+      "files": {
+        "src/loaders.ts": "import { data, type LoaderFunctionArgs } from 'react-router'\nimport { ApiError, getCrew, getSite } from './api.ts'\nimport { crewOnly } from './guards.ts'\n\n/** /sites/:siteId: one beach site (Task 1) */\nexport async function siteLoader({ params, request }: LoaderFunctionArgs) {\n  const { siteId } = params\n  if (siteId === undefined) {\n    throw new Error('siteLoader needs a route with a :siteId parameter')\n  }\n  try {\n    // request.signal: leaving the page before the answer arrives cancels the request\n    return await getSite(siteId, request.signal)\n  } catch (error: unknown) {\n    // An expected failure becomes a route answer: the error page shows its statusText and message\n    if (error instanceof ApiError && error.status === 404) {\n      throw data('No beach site has this id. Check the link.', { status: 404, statusText: 'Site not found' })\n    }\n    throw error\n  }\n}\n\n/** /crew: the whole crew, organizers only (Task 2) */\nexport function crewLoader(args: LoaderFunctionArgs) {\n  // The parent route's crewOnly runs at the same time as this loader, not before it: check here too\n  return getCrew(args.request.signal)\n}\n"
+      },
+      "expect": [
+        "Tests  3 failed | 5 passed (8)",
+        "call crewOnly(args) first in crewLoader"
+      ]
+    }
+  ]
+}

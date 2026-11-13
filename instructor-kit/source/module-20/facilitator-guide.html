@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 20</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 20: React Hook Form + Zod and Complex Forms</h1>
+    <p class="sub">How to teach Lessons 8.1 and 8.2: one Zod schema for a form's checks and types, React Hook Form with inferred types and the API's field errors through setError, then a list inside a form (array schemas with row paths, useFieldArray and focus), an error summary and photo uploads, with both projects started in class.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>8.1–8.2</b></span>
+      <span class="chip">Session <b>20</b> of 26 · Part 3</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Session 20 teaches Module 8: Lesson 8.1 (one Zod schema for a form's checks and types, React Hook Form for the form) and Lesson 8.2 (a list in a form, an error summary, uploads). Same rhythm for both: frame → live demo → guided lab in a kit lab → start the lesson project. Exercises, quizzes and journals go home.</li>
+  <li>Every command below was run for the output under it, in a learner's terminal on copies of Shoreline Crew HQ exactly as it is at the end of Lessons 8.1 and 8.2; every API answer comes from shoreline-api (a private copy, the dev organizer token). Where a lesson shows the same command, the kit's output is the lesson's card: the generator checks it.</li>
+  <li>Keep <code class="inline">lesson_27.html</code> and <code class="inline">lesson_28.html</code> open (the RHF parts table, the modes, the decision tables). Labs live in <code class="inline">labs/module-20/</code>.</li>
+  <li>Session 21 opens with <b>Checkpoint 3 (Modules 7 and 8)</b>: today's homework is its preparation. Say so at the wrap-up.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 20: two long form lessons</div>
+<p>The lessons estimate 140 + 160 = 300 minutes; the room has 150. 8.2 is the longest lesson in Part 3. <b>Protect:</b> input versus output types, the API's 400 through setError, the list schema's paths, and focus after add/remove. The projects' later steps (8.1 Steps 3 to 5; 8.2 Steps 4 to 6) go home, with <code class="inline">lesson-28-start</code> and <code class="inline">lesson-29-start</code> as fallbacks.</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-20</code> (8 runs, under a minute, no API).</li>
+  <li>☐ <b>Projector machine:</b> <code class="inline">shoreline-hq</code> at the start of 8.1 (<code class="inline">lesson-27-start</code>) and a finished copy (<code class="inline">lesson-28-end</code>); the API and the dev server running; signed in as Maya; DevTools › Network filtered to <code class="inline">4000</code>. A JPEG, a GIF and a photo over 5 MB in a folder for the upload demo.</li>
+  <li>☐ <b>Network for npm:</b> 8.1 Step 1 runs <code class="inline">npm install react-hook-form zod @hookform/resolvers</code>.</li>
+  <li>☐ <b>Board:</b> "fields hold the input, the submit function gets the output"; the tally-sheet model; "when a click removes the clicked element, decide where the focus goes".</li>
+  <li>☐ <b>Sample data:</b> saving a report completes today's cleanup; restart <code class="inline">node server.ts</code> between groups (it signs everyone out).</li>
+</ul>
+<div class="blk warn"><div class="h">Known traps in these lessons</div>
+<table class="timing">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>TS2322 <code class="inline">Resolver&lt;…&gt; is not assignable…</code></td><td><code class="inline">useForm&lt;z.infer&lt;typeof schema&gt;&gt;</code></td><td>No type argument, or <code class="inline">useForm&lt;Input, unknown, Output&gt;</code>.</td></tr>
+<tr><td>TS2769 <code class="inline">'required_error' does not exist</code></td><td>Zod 3 code</td><td>The <code class="inline">error</code> option.</td></tr>
+<tr><td>The end-time message appears only after other fields are fixed</td><td>An object refine without <code class="inline">when</code></td><td><code class="inline">when</code> naming the fields the rule needs.</td></tr>
+<tr><td>TS2345 on <code class="inline">setError(name, …)</code></td><td>The API's keys are plain strings</td><td>A type predicate (<code class="inline">isEventField</code>), never a cast.</td></tr>
+<tr><td>A skipped count saves as 0</td><td><code class="inline">z.coerce.number()</code> on a count</td><td>Regex on the text, then <code class="inline">transform(Number)</code>.</td></tr>
+<tr><td>Upload answers 400 <code class="inline">Attach an image in a field named photo.</code></td><td>A hand-written <code class="inline">Content-Type</code> header</td><td>Leave it out with FormData.</td></tr>
+<tr><td>The focus jumps to the top after Remove</td><td>Nothing receives the focus</td><td>A ref on Add a row.</td></tr>
+<tr><td>Both steps visible (Exercise 3)</td><td><code class="inline">hidden</code> overridden by a <code class="inline">display</code> rule</td><td><code class="inline">.step[hidden] { display: none; }</code>.</td></tr>
+<tr><td>Build warning <code class="inline">Some chunks are larger than 500 kB</code></td><td>Zod and RHF in the one bundle</td><td>Expected until Lesson 10.1's code splitting.</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Session 20 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up: one description of a valid cleanup</td><td>Three retrieval questions: the four places, aria-describedby, the API's 400.</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>8.1</b> Frame and mental model</td><td>The sign-up sheet template (Zod) and the clipboard (React Hook Form).</td></tr>
+      <tr><td class="t">0:20</td><td class="t">20</td><td><b>8.1</b> Live demo: a type and its checks</td><td>The schema, try-schema with Node, z.input and z.output, the when option.</td></tr>
+      <tr><td class="t">0:40</td><td class="t">15</td><td><b>8.1</b> Live demo: React Hook Form</td><td>useForm + zodResolver with no type arguments, register's typed names, setError for the API's 400, two older-tutorial mistakes.</td></tr>
+      <tr><td class="t">0:55</td><td class="t">20</td><td><b>8.1</b> Guided lab</td><td><code class="inline">labs/module-20/l8_1-react-hook-form-zod/starter</code>: Tasks 1 and 2 (a join-the-crew schema and form).</td></tr>
+      <tr><td class="t">1:15</td><td class="t">10</td><td>Break</td><td>Leave "fields hold the input, submit gets the output" on the board.</td></tr>
+      <tr><td class="t">1:25</td><td class="t">15</td><td><b>8.1</b> Start the lesson project</td><td>Edit a Cleanup's Details, Steps 1 and 2: the libraries and the schema, Plan a cleanup on it.</td></tr>
+      <tr><td class="t">1:40</td><td class="t">10</td><td><b>8.2</b> Frame and mental model</td><td>The tally sheet on the clipboard: fixed boxes, a table of lines, photos clipped to the back.</td></tr>
+      <tr><td class="t">1:50</td><td class="t">20</td><td><b>8.2</b> Live demo: lists, summaries, uploads</td><td>Counts without coerce, superRefine paths, useFieldArray and focus, the error summary, FormData and the API's 415/400, steps or one page.</td></tr>
+      <tr><td class="t">2:10</td><td class="t">15</td><td><b>8.2</b> Guided lab</td><td><code class="inline">labs/module-20/l8_2-complex-forms/starter</code>: Tasks 1 to 3 (the supply checkout).</td></tr>
+      <tr><td class="t">2:25</td><td class="t">25</td><td><b>8.2</b> Start the lesson project</td><td>The Impact Report, Steps 1 to 3: the shared debris list and schema, save and upload, the error summary.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 21 (Checkpoint 3).</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> 140 + 160 minutes on the lesson pages; 150 in the room. Each lesson gets its model, its demos, a guided lab and the start of its project.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> 8.1's project Steps 3 to 5 (the update mutation and loader, the edit form and page, the way in and trying everything); 8.2's Steps 4 to 6 (the photo upload, the form and its page, trying everything); both lessons' Exercises 1 and 2 (Exercise 3 is a stretch); both Quick Quizzes; both journal entries; the labs' remaining tasks. Then revise Modules 7 and 8 for Checkpoint 3.</p>
+<p><b>Protect, in this order:</b> input versus output; setError after a predicate; list paths; focus after add and remove. Cut the Zod 3 and steps demo steps first.</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up: One Description of a Valid Cleanup</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">6m</td><td>Three questions; pairs answer</td></tr>
+<tr><td class="t">4m</td><td>Call on pairs; bridge: "today the first two places become one"</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Questions and answers</div>
+<ol class="steps">
+  <li>**W1.** Lesson 7.3's homework: how many places in the HQ describe a valid cleanup? Name them. **Answer:** Four: eventForm.ts's types (EventField, EventFormValues), its rules (validateEvent, toNewEvent), client.ts's isCleanupEvent (the shape coming back), and the API's own checks. The first two are today's problem.</li>
+  <li>**W2.** In Lesson 3.5's form, what kept a field's message linked to its box for screen readers? **Answer:** <code class="inline">aria-invalid</code> on the box and <code class="inline">aria-describedby</code> pointing at the message's id (FieldError).</li>
+  <li>**W3.** After the API answers 400 with fieldErrors, where did Lesson 7.2 put the messages? **Answer:** Under the matching fields (the API uses the form's field names), plus "Some fields need attention." in the status line.</li>
+</ol>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.1</span><h3>React Hook Form + Zod</h3><span class="dur">80 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Write a Zod 4 schema that is both a TypeScript type and the checks behind it, with messages people understand</li>
+  <li>Tell a schema's input type from its output type (z.input, z.output) and give useForm the right generics</li>
+  <li>Build a form with React Hook Form: register, handleSubmit, formState and zodResolver</li>
+  <li>Show the API's 400 field errors under the right fields with setError, and a form-wide message with a root error</li>
+  <li>Decide when a form needs a library and when React 19's form actions are enough, and say why</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame and mental model</td></tr>
+<tr><td class="t">20m</td><td>Live demo A: a type and its checks</td></tr>
+<tr><td class="t">15m</td><td>Live demo B: React Hook Form</td></tr>
+<tr><td class="t">20m</td><td>Guided lab: Lab 8.1 Tasks 1 and 2</td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project (after the break): Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Frame and mental model (10m)</div>
+<ul class="tick">
+  <li><b>Why a library (3m):</b> you built a complete form by hand in 3.5; forms are where bugs collect, and RHF and Zod are what you will meet in existing codebases.</li>
+  <li><b>The sign-up sheet template (4m):</b> the template decides the boxes (the type) and the notes beside them (the rules); every sheet printed from it matches. React Hook Form is the clipboard that holds the sheet while people fill it in.</li>
+  <li><b>What stays (3m):</b> the API is still the authority; some rules only it can check ("18 already signed up").</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Live demo A: a type and its checks</div>
+<ol class="steps">
+  <li><b>The problem (2m).</b> The warm-up's four places on the board; circle the first two. "The type says capacity is text; the rule says a whole number from 1 to 200; nothing connects them."</li>
+  <li><b>A schema: rules with messages (5m).</b> Open <code class="inline">src/api/schemas.ts</code> (finished 8.1 code). The title rule shows Zod 4's error function: one rule, two messages.
+<div class="codefile">shoreline-hq/src/api/schemas.ts</div>
+<pre class="code wrap" data-src="shoreline-hq/src/api/schemas.ts" data-stage="lesson_27" data-match="excerpt">    title: z
+      .string()
+      .trim()
+      <span class="c">// error can be a function: one rule, a message that fits what was typed</span>
+      .min(<span class="s">5</span>, {
+        error: (issue) =&gt;
+          issue.input === <span class="s">''</span> ? <span class="s">'Add a title.'</span> : <span class="s">'Use at least 5 characters for the title.'</span>,
+      })
+      .max(<span class="s">80</span>, <span class="s">'Keep the title to 80 characters or fewer.'</span>),
+    siteId: z.string().min(<span class="s">1</span>, <span class="s">'Choose one of the cleanup sites.'</span>),</pre>
+Then the rest: <code class="inline">.trim()</code> changes the value before the rules, <code class="inline">.refine</code> adds your own rule, <code class="inline">z.coerce.number&lt;string&gt;()</code> turns text into a number, the object refine with <code class="inline">path</code> and <code class="inline">when</code> for the end time.</li>
+  <li><b>Try it with Node (4m).</b> The lesson's <code class="inline">src/try-schema.ts</code>, run with Node (it strips the types):
+<pre class="code">node src/try-schema.ts</pre>
+<pre class="out">{
+  title: 'Dune Grass Cleanup',
+  siteId: 'north-jetty',
+  date: '2099-06-14',
+  startTime: '09:00',
+  endTime: '11:30',
+  capacity: 12,
+  meetingPoint: 'North jetty steps',
+  description: ''
+}
+{
+  title: [ 'Use at least 5 characters for the title.' ],
+  capacity: [ 'Capacity must be a whole number from 1 to 200.' ],
+  endTime: [ 'The end time must be after the start time.' ]
+}</pre>
+First object: the title lost its spaces and capacity is 12 without quotes. Second: one message per field from <code class="inline">z.flattenError</code>, the end-time message included because of <code class="inline">when</code>. Delete the file afterwards.</li>
+  <li><b>Two types from one schema (4m).</b> The lesson's Scratch.ts puts the wrong thing in each type:
+<pre class="out">src/Scratch.ts:4:14 - error TS2322: Type 'number' is not assignable to type 'string'.
+
+4 export const typed: EventFormValues['capacity'] = 12
+               ~~~~~
+
+src/Scratch.ts:5:14 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+5 export const checked: EventFormData['capacity'] = '12'
+               ~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/Scratch.ts:4</pre>
+Board rule: <b>fields hold the input, the submit function gets the output.</b> <code class="inline">z.infer</code> is <code class="inline">z.output</code>.</li>
+  <li><b>Zod 3 code from older tutorials (2m).</b> <code class="inline">required_error</code> (Zod 3):
+<pre class="out">src/Scratch.ts:5:13 - error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.
+
+5   .string({ required_error: 'Add a title.' })
+              ~~~~~~~~~~~~~~</pre>
+One <code class="inline">error</code> option replaces message/required_error/invalid_type_error; <code class="inline">{ message }</code> and <code class="inline">z.string().email()</code> still compile but are deprecated (struck through in VS Code).</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Live demo B: React Hook Form</div>
+<ol class="steps">
+  <li><b>useForm without type arguments (3m).</b> EditEventForm:
+<div class="codefile">shoreline-hq/src/components/EditEventForm.tsx</div>
+<pre class="code" data-src="shoreline-hq/src/components/EditEventForm.tsx" data-stage="lesson_27" data-match="excerpt">  } = useForm({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: toFormValues(event),
+  })</pre>
+Hover <code class="inline">useForm</code>: the input type first, the output type last, both from <code class="inline">zodResolver</code>. The lesson's table of parts: register, handleSubmit, formState.errors, isSubmitting, setError.</li>
+  <li><b>register knows the names (2m).</b> The lesson's typo:
+<pre class="out">src/Scratch.tsx:7:19 - error TS2345: Argument of type '"titel"' is not assignable to parameter of type '"capacity" | "date" | "description" | "endTime" | "meetingPoint" | "siteId" | "startTime" | "title"'.
+
+7   return register('titel')
+                    ~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:7</pre>
+In Lesson 3.5 EventField was written by hand to catch this.</li>
+  <li><b>The most common RHF type error (3m).</b> <code class="inline">useForm&lt;z.infer&lt;typeof eventFormSchema&gt;&gt;(…)</code>: the end of the message is the story:
+<pre class="out">    Type '{ title: string; siteId: string; date: string; startTime: string; endTime: string; capacity: number; meetingPoint: string; description: string; }' is not assignable to type '{ title: string; siteId: string; date: string; startTime: string; endTime: string; capacity: string; meetingPoint: string; description: string; }'.
+      Types of property 'capacity' are incompatible.
+        Type 'number' is not assignable to type 'string'.
+
+9     resolver: zodResolver(eventFormSchema),
+      ~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:9</pre>
+Read from the bottom up: <code class="inline">Types of property 'capacity' are incompatible</code>. Fix: no type argument, or all three <code class="inline">useForm&lt;EventFormValues, unknown, EventFormData&gt;</code>.</li>
+  <li><b>When the API says no (5m).</b> Weekend Cove Cleanup is full; the schema accepts capacity 10, the API does not (asked with Maya's token):
+<pre class="code">PATCH http://localhost:4000/api/events/e08  {"capacity": 10}</pre>
+<pre class="out">HTTP/1.1 400 Bad Request
+content-type: application/json; charset=utf-8
+
+{
+  "error": "validation_failed",
+  "message": "Some fields need attention.",
+  "fieldErrors": {
+    "capacity": [
+      "18 volunteers already hold a spot: capacity cannot be lower."
+    ]
+  }
+}</pre>
+Then the code that puts it under the field:</li>
+  <li><b>setError, after a type predicate (2m).</b> 
+<div class="codefile">shoreline-hq/src/components/EditEventForm.tsx</div>
+<pre class="code wrap" data-src="shoreline-hq/src/components/EditEventForm.tsx" data-stage="lesson_27" data-match="excerpt">      <span class="k">if</span> (error <span class="k">instanceof</span> ApiError &amp;&amp; error.fieldErrors !== <span class="k">undefined</span>) {
+        <span class="c">// 400: the API's own rules said no. Its messages go under the same fields as ours.</span>
+        <span class="k">let</span> first = <span class="k">true</span>
+        <span class="k">for</span> (<span class="k">const</span> [name, messages] <span class="k">of</span> Object.entries(error.fieldErrors)) {
+          <span class="k">if</span> (isEventField(name)) {
+            setError(name, { <span class="k">type</span>: <span class="s">'server'</span>, message: messages.join(<span class="s">' '</span>) }, { shouldFocus: first })
+            first = <span class="k">false</span>
+          }
+        }
+        setError(<span class="s">'root.server'</span>, { message: error.message })
+      } <span class="k">else</span> {</pre>
+Remove the <code class="inline">isEventField</code> check and tsc refuses <code class="inline">setError(name, …)</code>:</li>
+  <li><b>Without the check.</b> 
+<pre class="out">src/components/EditEventForm.tsx:45:20 - error TS2345: Argument of type 'string' is not assignable to parameter of type '"capacity" | "date" | "description" | "endTime" | "meetingPoint" | "siteId" | "startTime" | "title" | ErrorNamespacePath'.
+
+45           setError(name, { type: 'server', message: messages.join(' ') }, { shouldFocus: first })
+                      ~~~~
+
+
+Found 1 error in src/components/EditEventForm.tsx:45</pre>
+Do not cast: the API could send <code class="inline">suppliesProvided</code>, and that message would vanish.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b><code class="inline">useForm&lt;z.infer&lt;…&gt;&gt;</code>.</b> Coach: read the error from the bottom; which type do the fields hold? (Item 2.)</li>
+  <li><b>Casting the API's keys.</b> <code class="inline">name as EventField</code> compiles. Coach: what if the API sends a key the form lacks? (Item 5.)</li>
+  <li><b>Expecting React 19's form reset.</b> RHF uses onSubmit, not action: values stay; that is fine here.</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab (20m)</div>
+<p><b>Folder:</b> <code class="inline">labs/module-20/l8_1-react-hook-form-zod/starter/</code> with <code class="inline">labs/module-20/l8_1-react-hook-form-zod/TASKS.md</code>; reference <code class="inline">labs/module-20/l8_1-react-hook-form-zod/solution/</code>. A join-the-crew form (the HQ has none). The type check fails on the test's "checked data" line until the schema's output has a number.</p>
+<ul class="tick">
+  <li><b>Task 1 (8m):</b> the schema with an error function for the name, <code class="inline">z.email</code>, the shirt size (text in, a size out), coerced hours.</li>
+  <li><b>Task 2 (12m):</b> <code class="inline">useForm</code> + <code class="inline">zodResolver</code>, <code class="inline">register</code>, messages with ids and <code class="inline">aria-describedby</code>.</li>
+  <li><b>Task 3 goes home:</b> <code class="inline">setError</code> for the API's 400 after <code class="inline">isJoinField</code>.</li>
+</ul>
+<p>As shipped, and the solution:</p>
+<pre class="out">Tests  7 failed | 1 passed (8)
+Tests  8 passed (8)</pre></div>
+<div class="blk lab"><div class="h">Start the lesson project (15m, after the break)</div>
+<p>The lesson project is <b>Edit a Cleanup's Details</b>, five steps. In the room: Steps 1 and 2.</p>
+<ul class="tick">
+  <li><b>Step 1 (8m):</b> install the three libraries; <code class="inline">src/api/schemas.ts</code>; run <code class="inline">node src/try-schema.ts</code>, then delete it.</li>
+  <li><b>Step 2 (7m):</b> eventForm.ts takes its types from the schema; NewEventForm's action uses <code class="inline">safeParse</code> and <code class="inline">z.flattenError</code> (tsc lists the places to change).</li>
+  <li><b>Goes home:</b> Steps 3 to 5 (updateEventMutation, editEventLoader calling organizersOnly first, the route, EditEventForm and EditEventPage, OrganizerTools' Edit details, trying the 400).</li>
+</ul>
+<figure class="shot"><img src="../../../images/lesson_27/27-server-error.png" alt="The edit form for Weekend Cove Cleanup after Save changes. A status box above the form says Some fields need attention. The capacity box, holding 10, has a red border and the message 18 volunteers already hold a spot: capacity cannot be lower."><figcaption>A rule only shoreline-api can check: the schema accepted 10, the API answered 400, and setError put its message under the capacity field and in the status line.</figcaption></figure></div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<ul class="tick">
+  <li>What do the fields hold, and what does submit get? <b>Answer:</b> the input type (text); the output type (numbers).</li>
+  <li>Why no type argument on useForm? <b>Answer:</b> zodResolver carries both types.</li>
+  <li>Who has the last word on a rule? <b>Answer:</b> the API.</li>
+</ul>
+<p>Workbook self-check, Items 1 to 6.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">B) The rules and their messages are written once, and the form's types are read from the same schema</span>; <b>Q2</b> <span data-sc="2">Input <code class="inline">string</code> (what the box holds), output <code class="inline">number</code> (what the checked data holds)</span>; <b>Q3</b> <span data-sc="3">C) Runs the rule as soon as the two times have no problem, whatever the other fields say</span>; <b>Q4</b> <span data-sc="4">From the schema: <code class="inline">zodResolver(eventFormSchema)</code> carries its input and output types, <code class="inline">useForm</code> infers them, and <code class="inline">register</code> accepts only the input type's keys</span>; <b>Q5</b> <span data-sc="5">D) The API could send a key the form does not have, and its message would vanish into an error nobody displays</span>; <b>Q6</b> <span data-sc="6">A) Zod would add about 25 kB gzip to every visitor's download, while only organizers open the forms</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> pairs trace one Save through the lesson's diagram (resolver → messages | save → PATCH → 400 setError | 200 invalidate) before typing.</p>
+<p><b>Stretch:</b> Exercise 2 (a Zod response schema compared with <code class="inline">z.ZodType&lt;CleanupEvent&gt;</code>), Exercise 3 (send only dirty fields), Lab 8.1 Task 3.</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.2</span><h3>Complex Forms</h3><span class="dur">70 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Describe a list inside a form with a Zod array schema, including a rule about the whole list that puts its message on the right row</li>
+  <li>Build rows people can add and remove with React Hook Form's useFieldArray, with stable keys, typed field paths and sensible focus</li>
+  <li>Build an error summary that takes the focus after a failed save and links to every field with a problem</li>
+  <li>Upload a file with FormData: check it in the browser, send it without breaking the request, and explain the API's 413 and 415 answers</li>
+  <li>Save with PUT and refresh every cached answer the save changes</li>
+  <li>Decide when a long form should become steps, and how to check one step at a time</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame and mental model</td></tr>
+<tr><td class="t">20m</td><td>Live demo: lists, summaries, uploads, steps</td></tr>
+<tr><td class="t">15m</td><td>Guided lab: Lab 8.2 Tasks 1 to 3</td></tr>
+<tr><td class="t">25m</td><td>Start the lesson project: Steps 1 to 3</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Frame and mental model (10m)</div>
+<ul class="tick">
+  <li><b>What an impact report needs (4m):</b> the lesson's table: a list of unknown length, a dozen boxes, pictures, a lot to fill in.</li>
+  <li><b>The tally sheet (4m):</b> fixed boxes at the top, a table of lines below (the field array), the notice board of problems (the summary), photos clipped to the back with a number (ids).</li>
+  <li><b>Why it matters (2m):</b> line items, attachments and long forms are where real apps spend their form code, and where keys, focus and validation go wrong.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Live demo: lists, summaries, uploads</div>
+<p>On the finished 8.2 code (<code class="inline">lesson-28-end</code>); outputs from the kit's runs.</p>
+<ol class="steps">
+  <li><b>Counts: why not coerce (3m).</b> The lesson's comparison, run with Node:
+<pre class="out">0
+Enter a whole number.
+12</pre>
+Coercion turns an empty box into 0; for a count, 0 is a real answer. The HQ checks the text first:</li>
+  <li><b>wholeNumber.</b> 
+<div class="codefile">shoreline-hq/src/api/schemas.ts</div>
+<pre class="code" data-src="shoreline-hq/src/api/schemas.ts" data-stage="lesson_28" data-match="excerpt"><span class="k">function</span> wholeNumber(max: <span class="k">number</span>, message: <span class="k">string</span>) {
+  <span class="k">return</span> z
+    .string()
+    .trim()
+    .regex(/^\d+$/, message)
+    .transform(Number)
+    .refine((count) =&gt; count &lt;= max, message)
+}</pre></li>
+  <li><b>A rule about the whole list (4m).</b> The lesson's <code class="inline">src/try-impact.ts</code> (a duplicate row and an empty box), with Node:
+<pre class="code">node src/try-impact.ts</pre>
+<pre class="out">bags → Bags must be a whole number from 0 to 500.
+items.1.count → Count must be a whole number from 0 to 100000.
+items.2.category → Plastic bottles is already in the list: add to its count.
+{
+  bags: [ 'Bags must be a whole number from 0 to 500.' ],
+  items: [
+    'Count must be a whole number from 0 to 100000.',
+    'Plastic bottles is already in the list: add to its count.'
+  ]
+}</pre>
+Every issue has a path: <code class="inline">items.2.category</code> is row 3's menu. <code class="inline">z.flattenError</code> keeps only the first segment (the row is lost): for nested data, paths matter, and the resolver uses them.</li>
+  <li><b>Rows with useFieldArray (4m).</b> The two handlers that decide focus:
+<div class="codefile">shoreline-hq/src/components/ImpactReportForm.tsx</div>
+<pre class="code" data-src="shoreline-hq/src/components/ImpactReportForm.tsx" data-stage="lesson_28" data-match="excerpt">  <span class="k">function</span> addRow() {
+    <span class="k">const</span> category = nextCategory(getValues(<span class="s">'items'</span>))
+    <span class="k">if</span> (category === <span class="k">undefined</span>) <span class="k">return</span>
+    <span class="c">// The new row's count box gets the focus: the kind of debris is already chosen</span>
+    append({ category, count: <span class="s">''</span> }, { focusName: <span class="s">`items.${fields.length}.count`</span> })
+  }
+
+  <span class="k">function</span> removeRow(index: <span class="k">number</span>) {
+    remove(index)
+    <span class="c">// The Remove button is gone: put the focus somewhere that makes sense</span>
+    addRef.current?.focus()
+  }</pre>
+Key by <code class="inline">field.id</code>, paths by index. Paths are types too:</li>
+  <li><b>Typed paths (1m).</b> 
+<pre class="out">src/Scratch.tsx:8:44 - error TS2345: Argument of type '`items.${number}.cuont`' is not assignable to parameter of type '"bags" | "items" | "notes" | "volunteersAttended" | "weightKg" | `items.${number}` | `items.${number}.category` | `items.${number}.count`'.
+Found 1 error in src/Scratch.tsx:8</pre>
+<code class="inline">FieldPath&lt;ImpactFormValues&gt;</code>: template literal types such as <code class="inline">items.${number}.count</code>.</li>
+  <li><b>The error summary (2m).</b> One line carries the pattern:
+<div class="codefile">shoreline-hq/src/components/ImpactReportForm.tsx</div>
+<pre class="code" data-src="shoreline-hq/src/components/ImpactReportForm.tsx" data-stage="lesson_28" data-match="excerpt">          &lt;ErrorSummary key={submitCount} errors={withRowNumbers(listErrors(errors))} /&gt;</pre>
+A new key on every Save: a new summary takes the focus after each failed save, but not while someone fixes fields. <code class="inline">shouldFocusError: false</code> stops RHF fighting for the focus. Links use a click handler (a plain <code class="inline">#bags</code> adds to the history).</li>
+  <li><b>Uploads: FormData, and the API checks again (3m).</b> 
+<div class="codefile">shoreline-hq/src/api/client.ts</div>
+<pre class="code" data-src="shoreline-hq/src/api/client.ts" data-stage="lesson_28" data-match="excerpt"><span class="k">export</span> <span class="k">async</span> <span class="k">function</span> postPhoto(file: File): Promise&lt;Photo&gt; {
+  <span class="k">const</span> body = <span class="k">new</span> FormData()
+  body.append(<span class="s">'photo'</span>, file)
+  <span class="c">// No Content-Type header: fetch writes multipart/form-data with the boundary that separates the parts</span>
+  <span class="k">const</span> response = <span class="k">await</span> request(<span class="s">'/photos'</span>, { method: <span class="s">'POST'</span>, body })</pre>
+No Content-Type header: fetch writes <code class="inline">multipart/form-data; boundary=…</code>. What the API says to a GIF, and to a hand-written header without a boundary (curl against the private API):</li>
+  <li><b>415 and 400 (1m).</b> 
+<pre class="out">{
+  "error": "unsupported_media_type",
+  "message": "Photos must be JPEG, PNG or WebP images."
+}
+HTTP 415
+
+{
+  "error": "validation_failed",
+  "message": "Some fields need attention.",
+  "fieldErrors": {
+    "photo": [
+      "Attach an image in a field named photo."
+    ]
+  }
+}
+HTTP 400</pre></li>
+  <li><b>Should it be steps? (2m).</b> The lesson's decision table: steps fit separate tasks, answers that decide later questions, a review before a big commitment; the tally sheet is one sitting from one source, so one page with a summary. Exercise 3 practices steps anyway (trigger, hidden, focus on the heading).</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b><code class="inline">key={index}</code> on rows.</b> Coach: what does a key promise? <code class="inline">field.id</code> stays with the row's data (RHF's documentation asks for it).</li>
+  <li><b>Writing the Content-Type header.</b> Coach: who writes the boundary? (fetch, when the body is FormData.)</li>
+  <li><b>No focus after Remove.</b> Coach: Tab after removing: where are you? (Item 9.)</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab (15m)</div>
+<p><b>Folder:</b> <code class="inline">labs/module-20/l8_2-complex-forms/starter/</code> with <code class="inline">labs/module-20/l8_2-complex-forms/TASKS.md</code>; reference <code class="inline">labs/module-20/l8_2-complex-forms/solution/</code>. A supply checkout: what a team lead takes from the shed.</p>
+<ul class="tick">
+  <li><b>Task 1 (6m):</b> counts by regex and transform (empty is not 0), each item once with <code class="inline">superRefine</code>, <code class="inline">path: [index, 'item']</code> and <code class="inline">when</code>.</li>
+  <li><b>Task 2 (6m):</b> <code class="inline">useFieldArray</code>, Add a row with <code class="inline">focusName</code>, Remove with focus on Add.</li>
+  <li><b>Task 3 (3m):</b> <code class="inline">checkSheet(file)</code>: JPEG, PNG or PDF, 2 MB.</li>
+</ul>
+<p>As shipped, and the solution:</p>
+<pre class="out">Tests  9 failed | 1 passed (10)
+Tests  10 passed (10)</pre></div>
+<div class="blk lab"><div class="h">Start the lesson project (25m)</div>
+<p>The lesson project is <b>The Impact Report</b>, six steps. In the room: Steps 1 to 3.</p>
+<ul class="tick">
+  <li><b>Step 1 (10m):</b> utils/debris.ts, the report schema; <code class="inline">node src/try-impact.ts</code>, then delete it.</li>
+  <li><b>Step 2 (7m):</b> putImpact and postPhoto in client.ts; saveImpactMutation (setQueryData, then invalidate ['events'] and ['impact']) and uploadPhotoMutation.</li>
+  <li><b>Step 3 (8m):</b> formErrors.ts and ErrorSummary.</li>
+  <li><b>Goes home:</b> Step 4 (PhotoUpload), Step 5 (the form, its page, the way in), Step 6 (try everything), the checklist.</li>
+</ul>
+<figure class="shot"><img src="../../../images/lesson_28/28-error-summary.png" alt="The form after Save the report with empty boxes. At the top, a box with a red border has the heading Fix these 4 before saving and four links: Volunteers must be a whole number from 0 to 1000, Bags must be a whole number from 0 to 500, Weight must be a number of kilograms from 0 to 5000, and Row 1: Count must be a whole number from 0 to 100000. The same messages appear in red under each field."><figcaption>The error summary takes the focus after a failed save: every problem in one place, each one a link to its field. The messages under the fields stay, so nothing depends on the summary alone.</figcaption></figure></div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<ul class="tick">
+  <li>Why not coerce a count? <b>Answer:</b> an empty box would become 0.</li>
+  <li>What is <code class="inline">errors.items?.[1]?.count</code>? <b>Answer:</b> row 2's count error, if any: the errors tree has the values' shape.</li>
+  <li>Why <code class="inline">key={submitCount}</code> on the summary? <b>Answer:</b> each failed save mounts a new summary that takes the focus.</li>
+</ul>
+<p>Workbook self-check, Items 7 to 12.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">Coercion turns an empty box into 0, a valid count, so a skipped box would quietly report "zero"; checking the text first gives a message</span>; <b>Q8</b> <span data-sc="8">C) <code class="inline">['items', 2, 'category']</code> (the path relative to the list is [2, 'category'])</span>; <b>Q9</b> <span data-sc="9">B) On the page's body: the next Tab starts again from the top</span>; <b>Q10</b> <span data-sc="10">D) accept is only a hint to the picker: "All files", drag and drop and a 40 MB photo all get past it</span>; <b>Q11</b> <span data-sc="11">A) The Impact tab shows the new numbers at once, instead of the old ones for a moment</span>; <b>Q12</b> <span data-sc="12">B) A # link adds #bags to the address and a history entry, so Back first undoes the jump</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> build the field array first with only Add (no focus), then add focus, then Remove.</p>
+<p><b>Stretch:</b> Exercise 2 (a blob: preview, revoked in an effect's cleanup), Exercise 3 (the report in two steps), the Going Further (several photos and drag and drop).</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<ol class="steps">
+  <li>Capacity's input and output types? <b>Answer:</b> string in, number out.</li>
+  <li>Where does the duplicate-row message go, and how does it get there? <b>Answer:</b> under the repeated row's menu: <code class="inline">addIssue</code> with <code class="inline">path: [index, 'category']</code>.</li>
+  <li>Why no Content-Type header on a photo upload? <b>Answer:</b> fetch writes multipart/form-data with the boundary; a hand-written header has none (the API answers 400).</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish both lesson projects:</b> 8.1 Steps 3 to 5 and the checklist (including the list of your app's forms); 8.2 Steps 4 to 6 and the checklist (your app's line items, files, and the steps decision).</li>
+  <li><b>Lesson exercises:</b> 8.1 Exercises 1 and 2; 8.2 Exercises 1 and 2. Exercise 3 of each is a stretch.</li>
+  <li><b>Both Quick Quizzes</b> on the lesson pages.</li>
+  <li><b>Labs:</b> Lab 8.1 Task 3; Lab 8.2's stretch (an error summary).</li>
+  <li><b>Journal:</b> both entries.</li>
+  <li><b>Checkpoint 3 next session (Modules 7 and 8, 30 minutes):</b> reread the four lessons' Key Takeaways and redo the four Quick Quizzes.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 21</div>
+<ul class="tick">
+  <li>The course folder with the finished Lesson 8.2 code (or <code class="inline">lesson-29-start</code>), the API runnable.</li>
+  <li>Session 21 (Lesson 9.1, Testing Components) installs Vitest and Testing Library: a working connection.</li>
+  <li><b>Install at home:</b> <code class="inline">npm install</code> in <code class="inline">labs/module-21/checkpoint-3/starter</code> and <code class="inline">labs/module-21/l9_1-testing-components/starter</code>, then check <code class="inline">npm test</code> shows the TODO failures (Checkpoint 3 starts only when everyone's tests run).</li>
+  <li>The list of three things you would hate to break (8.2's Before the Next Lesson): your first test ideas.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> input versus output; setError after a predicate; list paths; focus after add and remove.</li>
+  <li><b>Cut first (saves 4m):</b> the Zod 3 step and the steps decision (both in the lessons).</li>
+  <li><b>Cut second (saves 15m):</b> 8.1's project start goes home.</li>
+  <li><b>Cut third (saves 10m):</b> the 8.2 lab's Task 3.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>8.1 Exercise 1 live: <code class="inline">mode: 'onTouched'</code> and <code class="inline">isDirty</code> (no empty saves).</li>
+  <li>8.2 Exercise 1 live: the error summary on the edit form.</li>
+  <li>Upload the GIF, the big PNG and a JPEG live with the Network tab open.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 20 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

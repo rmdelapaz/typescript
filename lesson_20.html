@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Build components that other components plug into, with TypeScript checking every connection: compound Tabs that share state through a private context, a generic DataList with a render prop, and a polymorphic Button with a typed as prop, all at work in Shoreline Crew HQ. React + TypeScript: Build a Modern Web App Lesson 5.4.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Component Patterns - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🧩 Lesson 5.4: Component Patterns</h1>
+                <p class="lead">Every component you have built so far does its own job with its own props. Today you build components that <em>other</em> components plug into: a set of tabs whose parts quietly agree on which tab is open, a list that will render anything you hand it, and one button that can also be a link. These are the patterns behind the component libraries you will meet at work, and with TypeScript each connection is checked, so plugging a part in wrong is an error in your editor instead of a bug report. By the end, a completed cleanup in the HQ shows its impact report on its own tab, and the check-in desk sits on a tab of its own on the day.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Build compound components that share state through a private, typed context, and explain when they beat one big configuration prop</li>
+                        <li>Make tabs that follow the accessible tabs pattern: roles, <code>aria-selected</code>, one tab stop and arrow keys</li>
+                        <li>Write a generic component with a render prop, and let TypeScript infer its type parameter from the props</li>
+                        <li>Type a polymorphic component whose props follow its <code>as</code> prop, with <code>ElementType</code> and <code>ComponentPropsWithRef</code></li>
+                        <li>Choose between plain props, children, compound components, render props and an <code>as</code> prop for a new component</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_19.html">Lesson 5.3: Rendering Performance</a> (your <code>shoreline-hq</code> with sign-in, the live check-in desk and the React Compiler)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A polymorphic <code>Button</code> used across the HQ, a generic <code>DataList&lt;T&gt;</code> for the events, sites and debris counts, and compound <code>Tabs</code> on the cleanup page with a new Impact tab</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3, React Compiler 1.0, oxlint 1.93, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and the browser, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-20-start.zip">lesson-20-start.zip</a> · Finished code: <a href="downloads/lesson-20-end.zip">lesson-20-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#plug-in" class="toc-link">Components That Others Plug Into</a></li>
+                        <li><a href="#compound" class="toc-link">Compound Components</a></li>
+                        <li><a href="#render-props" class="toc-link">Render Props and Generic Components</a></li>
+                        <li><a href="#polymorphic" class="toc-link">Polymorphic Components</a></li>
+                        <li><a href="#choosing" class="toc-link">Choosing a Pattern</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Tabs, Lists and One Button for the HQ</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="plug-in" class="lesson-section">
+                <h2>🔌 Components That Others Plug Into</h2>
+                <p>Since Lesson 3.2 you have shaped components with props and <code>children</code>: <code>Card</code> takes a title and whatever goes inside, <code>Badge</code> takes a label and a tone. That covers most of an app. Three situations need more:</p>
+                <ul>
+                    <li><strong>Several components that only work together.</strong> A tab means nothing without its panel. You want to write the tabs and the panels as separate pieces of JSX, in any order, yet have them agree on which one is open.</li>
+                    <li><strong>A component that owns the frame but not the contents.</strong> A list knows how to lay itself out and what to say when it is empty, but it cannot know whether it holds cleanups, beach sites or debris counts.</li>
+                    <li><strong>One look on different elements.</strong> "Plan a cleanup" should look like the HQ's main button, but it goes to another page, so it must be a link.</li>
+                </ul>
+                <p>The three patterns of this lesson answer them: <strong>compound components</strong>, <strong>render props</strong> and <strong>polymorphic components</strong>. None of them needs a new React API. They are ways of combining what you already know (context, generics, function props) so that a component is easy to plug into and hard to plug into wrong.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the check-in table</h4>
+                    <p>On the morning of a cleanup, the crew sets up a check-in table. <strong>Compound:</strong> everyone working at the table reads the same clipboard, so nobody has to be told which page is open; they just look. <strong>Render prop:</strong> the table hands each arriving volunteer to whoever is on name tags, and that person decides what the tag says. <strong>Polymorphic:</strong> the crew vest looks the same whether a volunteer or the harbor master wears it; what changes is who is inside.</p>
+                </div>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Open the docs of any React component library a team is likely to use (Radix, React Aria, Headless UI, MUI, Chakra) and you will find these three patterns on the first page: <code>Tabs.List</code> and <code>Tabs.Trigger</code>, <code>renderItem</code>, <code>as</code> or <code>component</code> props. Knowing how they work, and how they are typed, turns those docs from magic into something you can read, debug and, when a team builds its own design system, write.</p>
+                </div>
+            </section>
+
+            <section id="compound" class="lesson-section">
+                <h2>🗂️ Compound Components</h2>
+                <p>Here is the cleanup page's problem. A completed cleanup has details and an impact report; on the day of a cleanup, organizers need the check-in desk. The first design that comes to mind is one component with one big prop, an array that describes every tab:</p>
+                <pre data-snippet><code class="language-tsx">import { useState, type ReactNode } from 'react'
+
+interface TabConfig {
+  id: string
+  label: string
+  content: ReactNode
+}
+
+// One component, one big prop: every tab described in an array
+function ConfigTabs({ tabs }: { tabs: TabConfig[] }) {
+  const [selected, setSelected] = useState(tabs[0]?.id)
+  return (
+    &lt;&gt;
+      {tabs.map((tab) =&gt; (
+        &lt;button key={tab.id} type="button" onClick={() =&gt; setSelected(tab.id)}&gt;
+          {tab.label}
+        &lt;/button&gt;
+      ))}
+      {tabs.find((tab) =&gt; tab.id === selected)?.content}
+    &lt;/&gt;
+  )
+}
+
+export function ConfigDemo({ checkInDay }: { checkInDay: boolean }) {
+  return (
+    &lt;ConfigTabs
+      tabs={[
+        { id: 'details', label: 'Details', content: &lt;p&gt;Meet at the stairs.&lt;/p&gt; },
+        ...(checkInDay ? [{ id: 'desk', label: 'Check-in desk', content: &lt;p&gt;The desk&lt;/p&gt; }] : []),
+      ]}
+    /&gt;
+  )
+}</code></pre>
+                <p>It type-checks and lints cleanly, and for three fixed tabs it would do. But look at what the caller has to write: content squeezed into objects, a spread of a conditional array to leave a tab out, and no way to put anything between the tab buttons and the panel without adding another prop. Every new need (an icon in one tab, a badge with a count, a wrapper around the panels) becomes a new property in <code>TabConfig</code>.</p>
+                <p>A <strong>compound component</strong> splits the one component into parts that are written as ordinary JSX, the way <code>&lt;select&gt;</code> and <code>&lt;option&gt;</code> are in HTML. This is how the cleanup page uses the HQ's <code>Tabs</code> by the end of the lesson:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="excerpt"><code class="language-tsx">&lt;Tabs defaultTab={checkInDay ? 'desk' : 'details'}&gt;
+  &lt;TabList label="About this cleanup"&gt;
+    &lt;Tab id="details"&gt;Details&lt;/Tab&gt;
+    {checkInDay &amp;&amp; &lt;Tab id="desk"&gt;Check-in desk&lt;/Tab&gt;}
+    {completed &amp;&amp; &lt;Tab id="impact"&gt;Impact&lt;/Tab&gt;}
+  &lt;/TabList&gt;
+  &lt;TabPanel id="details"&gt;
+    &lt;AboutCleanup event={event} /&gt;
+  &lt;/TabPanel&gt;
+  {checkInDay &amp;&amp; (
+    &lt;TabPanel id="desk"&gt;
+      &lt;TodaysDesk eventId={event.id} /&gt;
+    &lt;/TabPanel&gt;
+  )}
+  {completed &amp;&amp; (
+    &lt;TabPanel id="impact"&gt;
+      &lt;ImpactSummary eventId={event.id} /&gt;
+    &lt;/TabPanel&gt;
+  )}
+&lt;/Tabs&gt;</code></pre>
+                </div>
+                <p>Leaving a tab out is a plain <code>&amp;&amp;</code>; the panels hold any JSX; the parts read like the page they draw. But how does a <code>&lt;Tab&gt;</code> know it is the selected one, when nobody passes it a <code>selected</code> prop? The parent shares its state through a context that only the parts can see, exactly the pattern you built for sign-in in Lesson 5.2:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/Tabs.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/Tabs.tsx" data-match="excerpt"><code class="language-tsx">// What every part of one set of tabs shares
+interface TabsValue {
+  selected: string
+  select: (tab: string) =&gt; void
+  /** From useId: makes the tab and panel ids unique, even with two sets of tabs on a page */
+  baseId: string
+}
+
+// Not exported: only the parts below can read it
+const TabsContext = createContext&lt;TabsValue | undefined&gt;(undefined)
+
+function useTabs(part: string): TabsValue {
+  const value = useContext(TabsContext)
+  if (value === undefined) {
+    throw new Error(`&lt;${part}&gt; must be used inside &lt;Tabs&gt;`)
+  }
+  return value
+}
+
+interface TabsProps {
+  /** The id of the tab that is selected at first */
+  defaultTab: string
+  children: ReactNode
+}
+
+// The parent: owns which tab is selected and shares it with the parts inside
+export function Tabs({ defaultTab, children }: TabsProps) {
+  const [selected, setSelected] = useState(defaultTab)
+  const baseId = useId()
+
+  return &lt;TabsContext value={{ selected, select: setSelected, baseId }}&gt;{children}&lt;/TabsContext&gt;
+}</code></pre>
+                </div>
+                <div class="mermaid">
+graph TD
+    A["Tabs: selected state"] --> B["TabsContext (private)"]
+    B --> C["Tab: am I selected?"]
+    B --> D["TabPanel: am I shown?"]
+    C --> E["click: select(id)"]
+    E --> A
+</div>
+                <ul>
+                    <li><strong>The context is not exported.</strong> Only <code>Tab</code>, <code>TabList</code> and <code>TabPanel</code> in the same file can read it. That is what makes the parts a family: the rest of the app sees four components and nothing else.</li>
+                    <li><strong><code>TabsValue | undefined</code> and a throwing Hook</strong>, as in Lesson 5.2: a part rendered outside <code>&lt;Tabs&gt;</code> fails loudly with a message that says what to fix (Common Mistakes shows it happening).</li>
+                    <li><strong><code>useId()</code></strong> gives each set of tabs its own prefix, so the ids that connect a tab to its panel never clash, even with two sets of tabs on one page.</li>
+                    <li>The value object is new on every render of <code>Tabs</code>. Lesson 5.3's lesson applies: with the React Compiler on, it is cached until <code>selected</code> changes, so you write it plainly.</li>
+                </ul>
+                <h3>Tabs people can use: the accessible tabs pattern</h3>
+                <p>A row of buttons that swaps content <em>looks</em> like tabs. To <em>be</em> tabs for a keyboard or screen reader user, it follows the tabs pattern from the WAI-ARIA Authoring Practices, the reference most component libraries follow:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Piece</th><th>What it does</th><th>In <code>Tabs.tsx</code></th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>role="tablist"</code> + <code>aria-label</code></td><td>Screen readers announce the list's name and role ("About this cleanup", tab list)</td><td><code>TabList</code></td></tr>
+                            <tr><td><code>role="tab"</code> + <code>aria-selected</code></td><td>Each tab says whether it is the selected one ("Impact, tab, selected, 2 of 2")</td><td><code>Tab</code></td></tr>
+                            <tr><td><code>aria-controls</code> / <code>aria-labelledby</code></td><td>Connect each tab to its panel, both ways, by id</td><td><code>Tab</code>, <code>TabPanel</code></td></tr>
+                            <tr><td>One tab stop: <code>tabIndex</code> 0 on the selected tab, -1 on the others</td><td><kbd>Tab</kbd> enters the tab list once and leaves to the panel, instead of visiting every tab</td><td><code>Tab</code></td></tr>
+                            <tr><td>Arrow keys, <kbd>Home</kbd>, <kbd>End</kbd></td><td>Move between tabs; the HQ selects the tab as focus moves (automatic activation)</td><td><code>moveBetweenTabs</code></td></tr>
+                            <tr><td><code>role="tabpanel"</code>, <code>hidden</code> when not selected</td><td>Only the selected panel is shown and read out</td><td><code>TabPanel</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The keyboard part is a few lines of DOM work, and TypeScript keeps it honest:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/Tabs.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/Tabs.tsx" data-match="excerpt"><code class="language-tsx">// Arrow keys move to the next or previous tab (and wrap around); Home and End jump to the ends
+function moveBetweenTabs(event: KeyboardEvent&lt;HTMLButtonElement&gt;) {
+  const list = event.currentTarget.closest('[role="tablist"]')
+  if (list === null) return
+  const tabs = [...list.querySelectorAll&lt;HTMLButtonElement&gt;('[role="tab"]')]
+  const current = tabs.indexOf(event.currentTarget)
+  const moves: Record&lt;string, number&gt; = {
+    ArrowRight: current + 1,
+    ArrowLeft: current - 1 + tabs.length,
+    Home: 0,
+    End: tabs.length - 1,
+  }
+  const move = moves[event.key]
+  if (move === undefined) return // any other key: not ours
+  const next = tabs[move % tabs.length]
+  if (next === undefined) return
+  event.preventDefault() // Home and End would scroll the page
+  next.focus()
+  next.click() // select it, as a click would
+}</code></pre>
+                </div>
+                <p><code>KeyboardEvent&lt;HTMLButtonElement&gt;</code> (React's event type, imported from <code>react</code>) makes <code>event.currentTarget</code> a button. <code>querySelectorAll&lt;HTMLButtonElement&gt;</code> is a generic you call with the element type you know is there. And because the HQ has <code>noUncheckedIndexedAccess</code> on since Lesson 2.4, both <code>moves[event.key]</code> and <code>tabs[…]</code> are typed <code>… | undefined</code>, so the two early returns are not caution for its own sake: TypeScript will not let you call <code>next.focus()</code> without them.</p>
+                <div class="card card-info">
+                    <h4>💡 The ids are plain strings</h4>
+                    <p><code>Tab</code> and <code>TabPanel</code> take <code>id: string</code>, so TypeScript cannot tell you that <code>"impact"</code> and <code>"impacts"</code> do not match. It is a real limit of a shared context: the parent cannot pass a type parameter down to its children through context, because context is set up when the module loads, not when you write <code>&lt;Tabs&gt;</code>. Common Mistakes shows what a typo does, and Exercise 3 shows a typed way around it.</p>
+                </div>
+            </section>
+
+            <section id="render-props" class="lesson-section">
+                <h2>🎁 Render Props and Generic Components</h2>
+                <p>The HQ draws lists in three places: the cleanups on <code>/events</code> (three times), the beach sites on <code>/sites</code>, and, after today, the debris counts of an impact report. Each needs the same frame: a <code>&lt;ul&gt;</code> with a layout, a <code>key</code> per item, and a friendly message when there is nothing to show. Only what each item looks like differs. So the list takes a function that draws one item:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/DataList.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/DataList.tsx" data-match="excerpt"><code class="language-tsx">interface DataListProps&lt;T&gt; {
+  items: T[]
+  /** A key for each item: unique in the list and the same on every render */
+  getKey: (item: T) =&gt; string
+  /** What one item looks like: a render prop, called once per item */
+  renderItem: (item: T) =&gt; ReactNode
+  /** Shown instead of an empty list */
+  emptyMessage: string
+  /** 'grid': cards side by side (the default); 'plain': a simple bulleted list */
+  layout?: 'grid' | 'plain'
+}</code></pre>
+                </div>
+                <p>A <strong>render prop</strong> is a prop whose value is a function that returns something to render: <code>renderItem</code> here. The component decides <em>when</em> and <em>where</em> to call it; the caller decides <em>what</em> comes out. You have used the idea since Lesson 3.3 without the name: the arrow you pass to <code>.map()</code> is exactly that.</p>
+                <p>The <code>&lt;T&gt;</code> makes it a <strong>generic component</strong>, written like Lesson 2.3's generic functions (<code>function DataList&lt;T&gt;(…)</code>; a function declaration needs no trailing comma). You almost never write the type argument yourself. TypeScript infers <code>T</code> from <code>items</code> and then checks the functions against it:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/SitesPage.tsx" data-match="excerpt"><code class="language-tsx">&lt;DataList
+  items={sites.state.data}
+  getKey={(site) =&gt; site.id}
+  emptyMessage="No beach sites yet."
+  renderItem={(site) =&gt; &lt;SiteCard site={site} /&gt;}
+/&gt;</code></pre>
+                </div>
+                <p><code>sites.state.data</code> is a <code>Site[]</code>, so <code>T</code> is <code>Site</code>, and the <code>site</code> in both arrows is a <code>Site</code>: hover over it in VS Code and the tooltip says <code>(parameter) site: Site</code>. Write <code>site.nmae</code> and you get the usual red underline. The same component, given the debris counts later in the project, infers <code>T</code> as <code>DebrisCount</code>, with no change to <code>DataList</code>.</p>
+                <h3>Why <code>getKey</code> and not <code>item.id</code>?</h3>
+                <p>A tempting shortcut is to require an <code>id</code> on every item, with a generic constraint (Lesson 2.3's <code>extends</code>), and use it as the key:</p>
+                <pre data-snippet><code class="language-tsx">import type { ReactNode } from 'react'
+import type { DebrisCount } from './api/types.ts'
+
+interface IdListProps&lt;T extends { id: string }&gt; {
+  items: T[]
+  renderItem: (item: T) =&gt; ReactNode
+}
+
+// Only for items that have an id: the constraint lets the list use item.id as the key
+function IdList&lt;T extends { id: string }&gt;({ items, renderItem }: IdListProps&lt;T&gt;) {
+  return (
+    &lt;ul&gt;
+      {items.map((item) =&gt; (
+        &lt;li key={item.id}&gt;{renderItem(item)}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}
+
+export function PiecesCounted({ items }: { items: DebrisCount[] }) {
+  return &lt;IdList items={items} renderItem={(item) =&gt; `${item.category}: ${item.count}`} /&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:21:18 - error TS2322: Type 'DebrisCount[]' is not assignable to type '{ id: string; }[]'.
+  Property 'id' is missing in type 'DebrisCount' but required in type '{ id: string; }'.
+
+21   return &lt;IdList items={items} renderItem={(item) =&gt; `${item.category}: ${item.count}`} /&gt;
+                    ~~~~~
+
+  src/Scratch.tsx:10:29 - 'id' is declared here.
+    10 function IdList&lt;T extends { id: string }&gt;({ items, renderItem }: IdListProps&lt;T&gt;) {
+                                   ~~
+
+  src/Scratch.tsx:5:3 - The expected type comes from property 'items' which is declared here on type 'IntrinsicAttributes &amp; IdListProps&lt;{ id: string; }&gt;'
+    5   items: T[]
+        ~~~~~
+
+src/Scratch.tsx:21:62 - error TS2339: Property 'category' does not exist on type '{ id: string; }'.
+
+21   return &lt;IdList items={items} renderItem={(item) =&gt; `${item.category}: ${item.count}`} /&gt;
+                                                                ~~~~~~~~
+
+src/Scratch.tsx:21:80 - error TS2339: Property 'count' does not exist on type '{ id: string; }'.
+
+21   return &lt;IdList items={items} renderItem={(item) =&gt; `${item.category}: ${item.count}`} /&gt;
+                                                                                  ~~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:21</code></pre>
+                </div>
+                <p>Three errors, one cause. Read the first: a <code>DebrisCount</code> is <code>{ category, count }</code> and has no <code>id</code>, so it does not satisfy the constraint. TypeScript then falls back to <code>T = { id: string }</code>, which is why the next two errors say <code>category</code> and <code>count</code> do not exist. That is a good habit to build: when one line has several errors, fix the first and check again. The fix here is not a fake <code>id</code>. A constraint should ask for exactly what the component needs, and <code>DataList</code> only needs <em>a</em> key, so it asks the caller for a <code>getKey</code> function and works for any <code>T</code>.</p>
+                <div class="card card-info">
+                    <h4>💡 Render props and custom Hooks</h4>
+                    <p>Before Hooks (React 16.8), render props were also the main way to share <em>logic</em>: <code>&lt;MouseTracker render={(position) =&gt; …} /&gt;</code>. Today a custom Hook does that job better (Lesson 4.2's <code>useApi</code> is one), and you will see logic-sharing render props mostly in older code. Render props are still the right tool when a component owns <em>markup</em> and needs the caller to fill in a part of it, as <code>DataList</code> does. A variation passes the function as <code>children</code>, <code>&lt;Loaded&gt;{(data) =&gt; …}&lt;/Loaded&gt;</code>: Exercise 2 builds one.</p>
+                </div>
+            </section>
+
+            <section id="polymorphic" class="lesson-section">
+                <h2>🎭 Polymorphic Components</h2>
+                <p>The HQ has two button looks, <code>primary</code> and <code>secondary</code>, in <code>Button.module.css</code> since Lesson 3.6, and a third, a button that looks like a link, hiding in <code>EventCard.module.css</code>. Every button in the app imports the CSS module and picks a class by hand, which means nothing stops a typo, a forgotten <code>type="button"</code> or a fourth look sneaking in. A <code>Button</code> component fixes that. And the "Plan a cleanup" link should get the primary look too, while staying a link: it goes to another page, so it must be an <code>&lt;a&gt;</code> that people can middle-click or open in a new tab.</p>
+                <p>A <strong>polymorphic component</strong> renders whatever element or component its <code>as</code> prop names, and its props change to match:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/Button.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/Button.tsx"><code class="language-tsx">import type { ComponentPropsWithRef, ElementType } from 'react'
+import styles from './Button.module.css'
+
+export type ButtonVariant = 'primary' | 'secondary' | 'link'
+
+/** Button's own props, plus every prop of the element or component named in `as` */
+type ButtonProps&lt;C extends ElementType&gt; = {
+  /** What to render: 'button' (the default), 'a', or a component such as a router link */
+  as?: C
+  variant?: ButtonVariant
+} &amp; Omit&lt;ComponentPropsWithRef&lt;C&gt;, 'as' | 'className'&gt;
+
+// The HQ's one button look, on whatever element the job needs
+export function Button&lt;C extends ElementType = 'button'&gt;({
+  as,
+  variant = 'secondary',
+  ...props
+}: ButtonProps&lt;C&gt;) {
+  const Component = as ?? 'button'
+  // A &lt;button&gt; in a form submits unless told otherwise: make "button" the default type
+  const type = Component === 'button' ? 'button' : undefined
+  return &lt;Component type={type} {...props} className={styles[variant]} /&gt;
+}</code></pre>
+                </div>
+                <p>Read the type from the inside out:</p>
+                <ul>
+                    <li><code>ElementType</code> is React's type for "anything you can render as a tag": a string like <code>'button'</code> or <code>'a'</code>, or a component. <code>C extends ElementType = 'button'</code> is a generic with a <strong>default</strong>: when you do not pass <code>as</code>, <code>C</code> is <code>'button'</code>.</li>
+                    <li><code>ComponentPropsWithRef&lt;C&gt;</code> looks up the props of whatever <code>C</code> is: <code>ComponentPropsWithRef&lt;'a'&gt;</code> has <code>href</code> and <code>target</code>; <code>ComponentPropsWithRef&lt;'button'&gt;</code> has <code>type</code> and <code>disabled</code>. It includes <code>ref</code>, which in React 19 is an ordinary prop (Lesson 4.3).</li>
+                    <li><code>Omit&lt;…, 'as' | 'className'&gt;</code> (a utility type from Lesson 2.4) removes the two props <code>Button</code> owns. Callers choose a <code>variant</code>; they cannot slip a different <code>className</code> past it.</li>
+                    <li>Inside, <code>as ?? 'button'</code> is the element to render, in a variable with a capital letter, because JSX treats a lowercase name as an HTML tag. <code>type</code> defaults to <code>"button"</code> only when the element is a button, and the caller's own <code>type="submit"</code> (spread after it) still wins.</li>
+                </ul>
+                <p>Now the props really do follow <code>as</code>. Three wrong uses:</p>
+                <pre data-snippet><code class="language-tsx">&lt;p&gt;
+  &lt;Button href="/events/new"&gt;Plan a cleanup&lt;/Button&gt;
+  &lt;Button as="a" href="/events/new" disabled&gt;
+    Plan a cleanup
+  &lt;/Button&gt;
+  &lt;Button variant="danger"&gt;Cancel cleanup&lt;/Button&gt;
+&lt;/p&gt;</code></pre>
+                <figure class="screenshot">
+                    <img src="images/lesson_20/20-button-misuse.png" alt="A terminal in shoreline-hq. npx tsc -b reports three TS2322 errors in src/Scratch.tsx: Property href does not exist on the props of a Button that renders a button; Property disabled does not exist on the props of a Button rendered as an a element; and the string danger is not assignable to type ButtonVariant. Found 3 errors." width="1100" height="602" loading="lazy">
+                    <figcaption>Three wrong uses of <code>Button</code>, three errors. The props TypeScript checks against follow the <code>as</code> prop: a button gets button props, an <code>a</code> gets link props.</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:6:15 - error TS2322: Type '{ href: string; children: string; }' is not assignable to type 'IntrinsicAttributes &amp; { as?: "button" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;ButtonHTMLAttributes&lt;HTMLButtonElement&gt;, HTMLButtonElement&gt;, "as" | "className"&gt;'.
+  Property 'href' does not exist on type 'IntrinsicAttributes &amp; { as?: "button" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;ButtonHTMLAttributes&lt;HTMLButtonElement&gt;, HTMLButtonElement&gt;, "as" | "className"&gt;'. Did you mean 'ref'?
+
+6       &lt;Button href="/events/new"&gt;Plan a cleanup&lt;/Button&gt;
+                ~~~~
+
+src/Scratch.tsx:7:41 - error TS2322: Type '{ as: "a"; href: string; disabled: true; children: string; }' is not assignable to type 'IntrinsicAttributes &amp; { as?: "a" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;AnchorHTMLAttributes&lt;HTMLAnchorElement&gt;, HTMLAnchorElement&gt;, "as" | "className"&gt;'.
+  Property 'disabled' does not exist on type 'IntrinsicAttributes &amp; { as?: "a" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;AnchorHTMLAttributes&lt;HTMLAnchorElement&gt;, HTMLAnchorElement&gt;, "as" | "className"&gt;'.
+
+7       &lt;Button as="a" href="/events/new" disabled&gt;
+                                          ~~~~~~~~
+
+src/Scratch.tsx:10:15 - error TS2322: Type '"danger"' is not assignable to type 'ButtonVariant | undefined'.
+
+10       &lt;Button variant="danger"&gt;Cancel cleanup&lt;/Button&gt;
+                 ~~~~~~~
+
+  src/components/Button.tsx:10:3 - The expected type comes from property 'variant' which is declared here on type 'IntrinsicAttributes &amp; { as?: "button" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;ButtonHTMLAttributes&lt;HTMLButtonElement&gt;, HTMLButtonElement&gt;, "as" | "className"&gt;'
+    10   variant?: ButtonVariant
+         ~~~~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:6</code></pre>
+                </div>
+                <p>The messages are long because they print the whole computed props type, but each ends with the line that matters: a button has no <code>href</code> (TypeScript even guesses you meant <code>ref</code>), a link has no <code>disabled</code>, and <code>"danger"</code> is not a <code>ButtonVariant</code>. Scroll to the last line of a long error first; that is where TypeScript says what is wrong.</p>
+                <h3>Why a component in <code>as</code> matters: React Router in Lesson 6.1</h3>
+                <p>Today "Plan a cleanup" is <code>&lt;Button as="a" href="&#47;events/new"&gt;</code>, and following it reloads the whole app. In Lesson 6.1, React Router's <code>&lt;Link&gt;</code> takes over links, and it wants a <code>to</code> prop instead of <code>href</code>. Because <code>as</code> accepts any component, <code>Button</code> needs no change for that. Here is the idea with a small stand-in for <code>Link</code>:</p>
+                <pre data-snippet><code class="language-tsx">import type { ReactNode } from 'react'
+import { Button } from './components/Button.tsx'
+
+interface RouteLinkProps {
+  to: string
+  className?: string
+  children: ReactNode
+}
+
+// A stand-in for React Router's &lt;Link&gt; (Lesson 6.1): it takes `to`, not `href`
+function RouteLink({ to, className, children }: RouteLinkProps) {
+  return (
+    &lt;a href={to} className={className}&gt;
+      {children}
+    &lt;/a&gt;
+  )
+}
+
+export function PlanLink() {
+  return (
+    &lt;Button as={RouteLink} to="/events/new" variant="primary"&gt;
+      Plan a cleanup
+    &lt;/Button&gt;
+  )
+}</code></pre>
+                <p>It compiles and lints cleanly, and <code>Button</code> now requires <code>to</code>, typed from <code>RouteLinkProps</code>; passing <code>href</code> instead is an error, like the ones above. In 6.1 the only change is at the call site: <code>as={Link} to="/events/new"</code>.</p>
+            </section>
+
+            <section id="choosing" class="lesson-section">
+                <h2>🧭 Choosing a Pattern</h2>
+                <p>Patterns are tools, not goals. Start with the simplest thing that works and move down the table only when the one above gets in the way:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You need…</th><th>Reach for</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A few settings</td><td>Plain props</td><td><code>Badge</code>, <code>StatusBadge</code></td></tr>
+                            <tr><td>A frame around any content</td><td><code>children</code></td><td><code>Card</code>, <code>AppLayout</code>, <code>Dialog</code></td></tr>
+                            <tr><td>Parts that only work together, arranged by the caller</td><td>Compound components + a private context</td><td><code>Tabs</code>, <code>TabList</code>, <code>Tab</code>, <code>TabPanel</code></td></tr>
+                            <tr><td>A frame that draws the caller's items, or hands the caller data</td><td>A render prop (often generic)</td><td><code>DataList&lt;T&gt;</code></td></tr>
+                            <tr><td>Shared logic without markup</td><td>A custom Hook</td><td><code>useApi</code>, <code>useDebouncedValue</code></td></tr>
+                            <tr><td>One look or behavior on different elements</td><td>A polymorphic <code>as</code> prop</td><td><code>Button</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A part outside its parent</h3>
+                    <p>A cleanup without tabs still shows its details. It is tempting to wrap them in a <code>TabPanel</code> anyway, so both branches look alike:</p>
+                    <pre data-snippet><code class="language-tsx">) : (
+  &lt;TabPanel id="details"&gt;
+    &lt;AboutCleanup event={event} /&gt;
+  &lt;/TabPanel&gt;
+)}</code></pre>
+                    <p>It type-checks and lints cleanly: TypeScript cannot see where a component is rendered. Measured on the dev server, opening Weekend Cove Cleanup (no tabs) showed "Could not load this cleanup. Something unexpected went wrong. Try again in a moment." with a <strong>Try again</strong> button, and the browser's Console showed the reason: <code>&lt;TabPanel&gt; must be used inside &lt;Tabs&gt;</code>. <code>useTabs</code> threw, the page's own error boundary from Lesson 4.4 caught it, and the message from the throwing Hook pointed straight at the fix. That is why <code>useTabs</code> takes the part's name.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Removing hidden panels instead of hiding them</h3>
+                    <p>"Only render the selected panel" sounds efficient:</p>
+                    <pre data-snippet><code class="language-tsx">export function TabPanel({ id, children }: TabPanelProps) {
+  const { selected, baseId } = useTabs('TabPanel')
+
+  // Only the selected panel is rendered
+  if (id !== selected) return null
+  return (
+    &lt;div
+      role="tabpanel"
+      id={`${baseId}-panel-${id}`}
+      aria-labelledby={`${baseId}-tab-${id}`}
+      tabIndex={0}
+      className={styles.panel}
+    &gt;
+      {children}
+    &lt;/div&gt;
+  )
+}</code></pre>
+                    <p>Measured, signed in as Maya on Tide Pool Morning Cleanup: check in Diego Herrera, switch to <strong>Details</strong> and back to <strong>Check-in desk</strong>, and the desk says "Checked in: 0 of 7" again, and the roster was requested from shoreline-api again. Removing a panel unmounts everything in it, and an unmounted component's state (here the desk's reducer from Lesson 5.1) is gone. The HQ's <code>TabPanel</code> keeps every panel mounted and sets <code>hidden</code>: switching tabs keeps the marks, and no request is sent. The price is that hidden panels still load their data (the Impact panel asks for its report when the page opens), which is fine for a few small panels.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Tab and panel ids that do not match</h3>
+                    <p>Write <code>&lt;TabPanel id="impacts"&gt;</code> for <code>&lt;Tab id="impact"&gt;</code> and <code>npx tsc -b</code> says nothing: both are just strings. Measured: clicking <strong>Impact</strong> selected the tab and showed no panel at all, with no error anywhere, and the tab's <code>aria-controls</code> pointed at an id that did not exist. When a tab shows nothing, compare the two ids first. (Exercise 3 makes this mistake a type error.)</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Tabs, Lists and One Button for the HQ</h2>
+                <p>You will give the HQ one <code>Button</code> and use it everywhere, replace the hand-written lists with a generic <code>DataList</code>, and build compound <code>Tabs</code> for the cleanup page, with a new Impact tab that reads each completed cleanup's impact report. Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>).</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_20/20-impact-tab.png" alt="The Storm Debris Sweep page in Shoreline Crew HQ. Under the title, the Completed badge and the date, a row of two tabs, Details and Impact, outlined in red; Impact is underlined as the selected tab. Below it, the heading What the crew collected, a line with the number of volunteers, bags and kilograms, and a Pieces counted list that starts with cigarette butts." width="1100" height="688" loading="lazy">
+                    <figcaption>A completed cleanup gets two tabs. The <strong>Impact</strong> panel loads the cleanup's impact report and lists the pieces counted with <code>DataList</code>.</figcaption>
+                </figure>
+
+                <div class="card">
+                    <h3>Step 1: The Button component <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>src/components/Button.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Button.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Button.tsx"><code class="language-tsx">import type { ComponentPropsWithRef, ElementType } from 'react'
+import styles from './Button.module.css'
+
+export type ButtonVariant = 'primary' | 'secondary' | 'link'
+
+/** Button's own props, plus every prop of the element or component named in `as` */
+type ButtonProps&lt;C extends ElementType&gt; = {
+  /** What to render: 'button' (the default), 'a', or a component such as a router link */
+  as?: C
+  variant?: ButtonVariant
+} &amp; Omit&lt;ComponentPropsWithRef&lt;C&gt;, 'as' | 'className'&gt;
+
+// The HQ's one button look, on whatever element the job needs
+export function Button&lt;C extends ElementType = 'button'&gt;({
+  as,
+  variant = 'secondary',
+  ...props
+}: ButtonProps&lt;C&gt;) {
+  const Component = as ?? 'button'
+  // A &lt;button&gt; in a form submits unless told otherwise: make "button" the default type
+  const type = Component === 'button' ? 'button' : undefined
+  return &lt;Component type={type} {...props} className={styles[variant]} /&gt;
+}</code></pre>
+                    </div>
+                    <p><code>Button.module.css</code> becomes the component's own stylesheet. Give it the link look (moved from <code>EventCard.module.css</code> in Step 2), and let the two button looks work on an <code>&lt;a&gt;</code> too (<code>display: inline-block</code>, no underline):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Button.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Button.module.css"><code class="language-css">/* The app's button looks: Button.tsx picks one with its variant prop */
+.primary,
+.secondary {
+  display: inline-block; /* also when Button renders an &lt;a&gt; */
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--link);
+  border-radius: 0.5rem;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--link);
+  color: var(--page);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--link);
+}
+
+/* Looks like a link, acts like a button: it shows, hides or opens something here */
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}</code></pre>
+                    </div>
+                    <p><code>styles[variant]</code> picks the class whose name is the variant, which is why the variants are named exactly like the classes.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Use it everywhere <span class="step-time">(10 min)</span></h3>
+                    <p>Every <code>&lt;button&gt;</code> that uses <code>buttonStyles</code> becomes a <code>&lt;Button&gt;</code>. The pattern is the same each time; here it is in <code>LoadStatus.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/LoadStatus.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/LoadStatus.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import type { LoadState } from '../utils/loadState.ts'
+-import buttonStyles from './Button.module.css'
++import { Button } from './Button.tsx'
+ import styles from './LoadStatus.module.css'
+ // ...
+         {onRetry &amp;&amp; (
+-          &lt;button type="button" className={buttonStyles.secondary} onClick={onRetry}&gt;
+-            Try again
+-          &lt;/button&gt;
++          &lt;Button onClick={onRetry}&gt;Try again&lt;/Button&gt;
+         )}</code></pre>
+                    </div>
+                    <p>Change the import, then drop <code>type="button"</code> (now the default) and <code>className={buttonStyles.secondary}</code> (the default variant); <code>buttonStyles.primary</code> becomes <code>variant="primary"</code>. Do the same in these files:</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>File</th><th>Buttons</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>src/App.tsx</code> (import from <code>./components/Button.tsx</code>)</td><td><strong>Try again</strong> in <code>PageCrashed</code></td></tr>
+                                <tr><td><code>src/components/EventFilters.tsx</code></td><td><strong>Clear filters</strong></td></tr>
+                                <tr><td><code>src/components/ConfirmDialog.tsx</code></td><td>the keep button; the confirm button with <code>variant="primary"</code></td></tr>
+                                <tr><td><code>src/components/CheckInDesk.tsx</code></td><td><strong>Undo last change</strong> (keep <code>aria-disabled</code> and <code>onClick</code>)</td></tr>
+                                <tr><td><code>src/components/RosterTable.tsx</code></td><td><strong>Check in</strong> and <strong>No-show</strong> (keep <code>aria-pressed</code>)</td></tr>
+                                <tr><td><code>src/components/NewEventForm.tsx</code></td><td><strong>Save as draft</strong> and <strong>Publish</strong> (<code>variant="primary"</code>); both keep <code>type="submit"</code>, <code>name</code>, <code>value</code>, <code>disabled</code></td></tr>
+                                <tr><td><code>src/pages/SignInPage.tsx</code> (import from <code>../components/Button.tsx</code>)</td><td><strong>Sign in</strong>: <code>type="submit"</code>, <code>variant="primary"</code></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>For example, the form's two buttons:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="excerpt"><code class="language-tsx">&lt;Button type="submit" name="status" value="draft" disabled={isPending}&gt;
+  Save as draft
+&lt;/Button&gt;
+&lt;Button
+  type="submit"
+  name="status"
+  value="scheduled"
+  variant="primary"
+  disabled={isPending}
+&gt;
+  Publish
+&lt;/Button&gt;</code></pre>
+                    </div>
+                    <p>In <code>EventCard.tsx</code>, the two link-looking buttons get <code>variant="link"</code> (import <code>Button</code> from <code>./Button.tsx</code>):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">       &lt;div className={styles.actions}&gt;
+-        &lt;button
+-          type="button"
+-          className={styles.toggle}
++        &lt;Button
++          variant="link"
+           aria-expanded={showDetails}
+           onClick={() =&gt; setShowDetails((shown) =&gt; !shown)}
+         &gt;
+           {showDetails ? 'Hide details' : 'Show details'}
+           &lt;VisuallyHidden&gt; for {event.title}&lt;/VisuallyHidden&gt;
+-        &lt;/button&gt;
++        &lt;/Button&gt;
+         {canCancel &amp;&amp; (
+-          &lt;button
+-            type="button"
+-            className={styles.toggle}
+-            aria-haspopup="dialog"
+-            onClick={() =&gt; setConfirming(true)}
+-          &gt;
++          &lt;Button variant="link" aria-haspopup="dialog" onClick={() =&gt; setConfirming(true)}&gt;
+             Cancel cleanup&lt;VisuallyHidden&gt; for {event.title}&lt;/VisuallyHidden&gt;
+-          &lt;/button&gt;
++          &lt;/Button&gt;
+         )}</code></pre>
+                    </div>
+                    <p>and delete the <code>.toggle</code> rule (with its comment) from <code>EventCard.module.css</code>; it lives in <code>Button.module.css</code> now. Finally, the organizers' "Plan a cleanup" link on <code>EventsPage.tsx</code> becomes the first <code>as</code> user (import <code>Button</code> from <code>../components/Button.tsx</code>):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">       {isOrganizer &amp;&amp; (
+         &lt;p&gt;
+-          &lt;a href="/events/new"&gt;Plan a cleanup&lt;/a&gt;
++          &lt;Button as="a" href="/events/new" variant="primary"&gt;
++            Plan a cleanup
++          &lt;/Button&gt;
+         &lt;/p&gt;
+       )}</code></pre>
+                    </div>
+                    <figure class="screenshot">
+                        <img src="images/lesson_20/20-plan-button.png" alt="The top of the Cleanup events page while Maya Okafor is signed in. Under the heading, Plan a cleanup now looks like a filled teal button, outlined in red; below it are the search box and the status filter, and the status line Found 17 cleanups." width="1100" height="404" loading="lazy">
+                        <figcaption><code>&lt;Button as="a" href="&#47;events/new" variant="primary"&gt;</code>: a real link, so it opens a page and works with a middle-click, but with the HQ's primary button look.</figcaption>
+                    </figure>
+                    <p>Check that no file but <code>Button.tsx</code> still imports the stylesheet: search the project for <code>Button.module.css</code> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>, <kbd>⌘ Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> on a Mac). One result means the HQ's button looks now live in one place. Measured in the browser: every button on the events page has a <code>type</code>, and "Plan a cleanup" is an <code>&lt;a href="&#47;events/new"&gt;</code> with no <code>type</code> at all.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: A generic DataList <span class="step-time">(9 min)</span></h3>
+                    <p>Create <code>src/components/DataList.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DataList.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/DataList.tsx"><code class="language-tsx">import type { ReactNode } from 'react'
+import styles from './DataList.module.css'
+
+interface DataListProps&lt;T&gt; {
+  items: T[]
+  /** A key for each item: unique in the list and the same on every render */
+  getKey: (item: T) =&gt; string
+  /** What one item looks like: a render prop, called once per item */
+  renderItem: (item: T) =&gt; ReactNode
+  /** Shown instead of an empty list */
+  emptyMessage: string
+  /** 'grid': cards side by side (the default); 'plain': a simple bulleted list */
+  layout?: 'grid' | 'plain'
+}
+
+// Any list: DataList owns the list, its layout and its empty state; the caller owns each item
+export function DataList&lt;T&gt;({
+  items,
+  getKey,
+  renderItem,
+  emptyMessage,
+  layout = 'grid',
+}: DataListProps&lt;T&gt;) {
+  if (items.length === 0) {
+    return &lt;p className={styles.empty}&gt;{emptyMessage}&lt;/p&gt;
+  }
+
+  return (
+    &lt;ul className={styles[layout]}&gt;
+      {items.map((item) =&gt; (
+        &lt;li key={getKey(item)}&gt;{renderItem(item)}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Its styles are <code>EventList.module.css</code>'s, renamed (<code>.list</code> becomes <code>.grid</code>), plus a <code>.plain</code> layout. Create <code>src/components/DataList.module.css</code>, then delete <code>EventList.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DataList.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/DataList.module.css"><code class="language-css">/* As many 16rem columns as fit: one on a phone, three on a laptop */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1.5rem;
+  margin: 0 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.plain {
+  margin: 0 0 1rem;
+}
+
+.empty {
+  margin: 0 0 2rem;
+  padding: 1rem 1.25rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.75rem;
+  color: var(--text-muted);
+}</code></pre>
+                    </div>
+                    <p><code>EventList</code> keeps its job (cleanups, with each one's site) but hands the list itself to <code>DataList</code>. Replace the whole file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventList.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventList.tsx"><code class="language-tsx">import type { CleanupEvent, Site } from '../api/types.ts'
+import { DataList } from './DataList.tsx'
+import { EventCard } from './EventCard.tsx'
+
+interface EventListProps {
+  events: CleanupEvent[]
+  sites: Site[]
+  emptyMessage: string
+}
+
+export function EventList({ events, sites, emptyMessage }: EventListProps) {
+  return (
+    &lt;DataList
+      items={events}
+      getKey={(event) =&gt; event.id}
+      emptyMessage={emptyMessage}
+      renderItem={(event) =&gt; (
+        &lt;EventCard event={event} site={sites.find((site) =&gt; site.id === event.siteId)} /&gt;
+      )}
+    /&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>And the sites page, which drew its cards in a plain <code>&lt;div&gt;</code>, gets a real list (import <code>DataList</code> from <code>../components/DataList.tsx</code>):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/SitesPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">       {sites.state.kind === 'ready' ? (
+-        &lt;div className={styles.grid}&gt;
+-          {sites.state.data.map((site) =&gt; (
+-            &lt;SiteCard key={site.id} site={site} /&gt;
+-          ))}
+-        &lt;/div&gt;
++        &lt;DataList
++          items={sites.state.data}
++          getKey={(site) =&gt; site.id}
++          emptyMessage="No beach sites yet."
++          renderItem={(site) =&gt; &lt;SiteCard site={site} /&gt;}
++        /&gt;
+       ) : (</code></pre>
+                    </div>
+                    <p>Reload <code>/events</code> and <code>/sites</code>: they look as before. Measured: <code>/sites</code> now has six <code>&lt;li&gt;</code> elements, so screen readers announce a list of six items, which the old <code>&lt;div&gt;</code> never did.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Compound Tabs <span class="step-time">(15 min)</span></h3>
+                    <p>Create <code>src/components/Tabs.tsx</code>. You have met each part in the explanation above; here is the whole file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Tabs.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Tabs.tsx"><code class="language-tsx">import {
+  createContext,
+  useContext,
+  useId,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react'
+import styles from './Tabs.module.css'
+
+// What every part of one set of tabs shares
+interface TabsValue {
+  selected: string
+  select: (tab: string) =&gt; void
+  /** From useId: makes the tab and panel ids unique, even with two sets of tabs on a page */
+  baseId: string
+}
+
+// Not exported: only the parts below can read it
+const TabsContext = createContext&lt;TabsValue | undefined&gt;(undefined)
+
+function useTabs(part: string): TabsValue {
+  const value = useContext(TabsContext)
+  if (value === undefined) {
+    throw new Error(`&lt;${part}&gt; must be used inside &lt;Tabs&gt;`)
+  }
+  return value
+}
+
+interface TabsProps {
+  /** The id of the tab that is selected at first */
+  defaultTab: string
+  children: ReactNode
+}
+
+// The parent: owns which tab is selected and shares it with the parts inside
+export function Tabs({ defaultTab, children }: TabsProps) {
+  const [selected, setSelected] = useState(defaultTab)
+  const baseId = useId()
+
+  return &lt;TabsContext value={{ selected, select: setSelected, baseId }}&gt;{children}&lt;/TabsContext&gt;
+}
+
+interface TabListProps {
+  /** What the tabs are about, for screen readers: "About this cleanup" */
+  label: string
+  children: ReactNode
+}
+
+export function TabList({ label, children }: TabListProps) {
+  return (
+    &lt;div role="tablist" aria-label={label} className={styles.list}&gt;
+      {children}
+    &lt;/div&gt;
+  )
+}
+
+// Arrow keys move to the next or previous tab (and wrap around); Home and End jump to the ends
+function moveBetweenTabs(event: KeyboardEvent&lt;HTMLButtonElement&gt;) {
+  const list = event.currentTarget.closest('[role="tablist"]')
+  if (list === null) return
+  const tabs = [...list.querySelectorAll&lt;HTMLButtonElement&gt;('[role="tab"]')]
+  const current = tabs.indexOf(event.currentTarget)
+  const moves: Record&lt;string, number&gt; = {
+    ArrowRight: current + 1,
+    ArrowLeft: current - 1 + tabs.length,
+    Home: 0,
+    End: tabs.length - 1,
+  }
+  const move = moves[event.key]
+  if (move === undefined) return // any other key: not ours
+  const next = tabs[move % tabs.length]
+  if (next === undefined) return
+  event.preventDefault() // Home and End would scroll the page
+  next.focus()
+  next.click() // select it, as a click would
+}
+
+interface TabProps {
+  /** Matches the id of the TabPanel this tab shows */
+  id: string
+  children: ReactNode
+}
+
+export function Tab({ id, children }: TabProps) {
+  const { selected, select, baseId } = useTabs('Tab')
+  const isSelected = id === selected
+
+  return (
+    &lt;button
+      type="button"
+      role="tab"
+      id={`${baseId}-tab-${id}`}
+      aria-selected={isSelected}
+      aria-controls={`${baseId}-panel-${id}`}
+      tabIndex={isSelected ? 0 : -1}
+      className={styles.tab}
+      onClick={() =&gt; select(id)}
+      onKeyDown={moveBetweenTabs}
+    &gt;
+      {children}
+    &lt;/button&gt;
+  )
+}
+
+interface TabPanelProps {
+  /** Matches the id of the Tab that shows this panel */
+  id: string
+  children: ReactNode
+}
+
+export function TabPanel({ id, children }: TabPanelProps) {
+  const { selected, baseId } = useTabs('TabPanel')
+
+  // Hidden, not removed: what is inside keeps its state (check-in marks) while another tab shows
+  return (
+    &lt;div
+      role="tabpanel"
+      id={`${baseId}-panel-${id}`}
+      aria-labelledby={`${baseId}-tab-${id}`}
+      tabIndex={0}
+      hidden={id !== selected}
+      className={styles.panel}
+    &gt;
+      {children}
+    &lt;/div&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Two decisions worth noticing. The arrow keys are handled on each <code>Tab</code>, the element that has the focus, instead of on the tab list: oxlint's <code>jsx-a11y(interactive-supports-focus)</code> warns about a key handler on a <code>role="tablist"</code> element that cannot be focused itself. And <code>next.click()</code> selects the tab through its own <code>onClick</code>, so a key press and a click take the same path. Then <code>src/components/Tabs.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Tabs.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Tabs.module.css"><code class="language-css">/* A row of tabs over a line; the selected one is underlined in the link color */
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 1.5rem 0 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  border-bottom-color: var(--link);
+  color: var(--text);
+}
+
+.panel {
+  padding-top: 0.5rem;
+}</code></pre>
+                    </div>
+                    <p>Exactly four exports, all components: the context and <code>useTabs</code> stay private, so Fast Refresh's lint rule from Lesson 5.2 has nothing to warn about.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The impact report <span class="step-time">(12 min)</span></h3>
+                    <p>Completed cleanups have an impact report at <code>GET /api/events/:id/impact</code> (open <code>http://localhost:4000/api/events/e01/impact</code> to see one). As with every API answer since Lesson 2.4, the client checks its shape before anyone uses it. In <code>src/api/client.ts</code>, add <code>DebrisCategory</code>, <code>DebrisCount</code> and <code>ImpactReport</code> to the type import, the two checks before <code>isApiErrorBody</code>, and <code>getImpact</code> before <code>postSignIn</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">const debrisCategories: DebrisCategory[] = [
+  'plastic-bottles', 'plastic-bags', 'food-wrappers', 'bottle-caps', 'cigarette-butts',
+  'fishing-gear', 'glass', 'metal', 'foam', 'other',
+]
+
+function isDebrisCount(value: unknown): value is DebrisCount {
+  return (
+    isRecord(value) &amp;&amp;
+    debrisCategories.some((category) =&gt; category === value.category) &amp;&amp;
+    typeof value.count === 'number'
+  )
+}
+
+/** The organizers' summary of a completed cleanup (GET /api/events/:id/impact) */
+function isImpactReport(value: unknown): value is ImpactReport {
+  return (
+    isRecord(value) &amp;&amp;
+    typeof value.eventId === 'string' &amp;&amp;
+    typeof value.volunteersAttended === 'number' &amp;&amp;
+    typeof value.bags === 'number' &amp;&amp;
+    typeof value.weightKg === 'number' &amp;&amp;
+    isListOf(isDebrisCount)(value.items) &amp;&amp;
+    typeof value.notes === 'string' &amp;&amp;
+    isStringArray(value.photoIds) &amp;&amp;
+    typeof value.submittedAt === 'string'
+  )
+}
+// ...
+/** A completed cleanup's impact report. No report yet is an ApiError with status 404. */
+export function getImpact(eventId: string, signal?: AbortSignal): Promise&lt;ImpactReport&gt; {
+  return getJSON(`/events/${encodeURIComponent(eventId)}/impact`, isImpactReport, signal)
+}</code></pre>
+                    </div>
+                    <p><code>isListOf(isDebrisCount)</code> is Lesson 4.1's helper turning a check for one item into a check for a list. Then the panel's content, <code>src/components/ImpactSummary.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactSummary.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactSummary.tsx"><code class="language-tsx">import { getImpact } from '../api/client.ts'
+import type { DebrisCategory } from '../api/types.ts'
+import { useApi } from '../hooks/useApi.ts'
+import { DataList } from './DataList.tsx'
+import { LoadStatus } from './LoadStatus.tsx'
+
+// The API's labels for its debris categories (GET /api/meta lists the same ones)
+const debrisLabels: Record&lt;DebrisCategory, string&gt; = {
+  'plastic-bottles': 'Plastic bottles',
+  'plastic-bags': 'Plastic bags',
+  'food-wrappers': 'Food wrappers',
+  'bottle-caps': 'Bottle caps',
+  'cigarette-butts': 'Cigarette butts',
+  'fishing-gear': 'Fishing line and nets',
+  glass: 'Glass',
+  metal: 'Metal and cans',
+  foam: 'Foam pieces',
+  other: 'Other',
+}
+
+interface ImpactSummaryProps {
+  eventId: string
+}
+
+// What a completed cleanup took off the beach, from its impact report
+export function ImpactSummary({ eventId }: ImpactSummaryProps) {
+  const impact = useApi(`/events/${eventId}/impact`, (signal) =&gt; getImpact(eventId, signal))
+
+  if (impact.state.kind !== 'ready') {
+    return &lt;LoadStatus state={impact.state} what="the impact report" onRetry={impact.reload} /&gt;
+  }
+  const report = impact.state.data
+  const mostFirst = report.items.toSorted((a, b) =&gt; b.count - a.count)
+
+  return (
+    &lt;&gt;
+      &lt;h2&gt;What the crew collected&lt;/h2&gt;
+      &lt;p&gt;
+        Volunteers: {report.volunteersAttended}. Bags: {report.bags}. Weight: {report.weightKg} kg.
+      &lt;/p&gt;
+      {report.notes !== '' &amp;&amp; &lt;p&gt;{report.notes}&lt;/p&gt;}
+      &lt;h3&gt;Pieces counted&lt;/h3&gt;
+      &lt;DataList
+        items={mostFirst}
+        getKey={(item) =&gt; item.category}
+        layout="plain"
+        emptyMessage="Nothing was counted at this cleanup."
+        renderItem={(item) =&gt; `${debrisLabels[item.category]}: ${item.count}`}
+      /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Here <code>DataList</code> meets its third type: <code>T</code> is <code>DebrisCount</code>, the key is the category (unique within one report), and <code>renderItem</code> returns a plain string, which is a fine <code>ReactNode</code>. <code>debrisLabels</code> is a <code>Record&lt;DebrisCategory, string&gt;</code>, so, as with Lesson 3.3's lookup tables, a category added to the API's types would be a type error here until it has a label. <code>toSorted</code> returns a sorted copy and leaves the report as it came.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Tabs on the cleanup page <span class="step-time">(8 min)</span></h3>
+                    <p>In <code>src/pages/EventPage.tsx</code>, add three imports: the <code>CleanupEventDetail</code> type, <code>ImpactSummary</code> and the four <code>Tabs</code> parts (the other lines are already there):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="excerpt"><code class="language-tsx">import { eventPromise, forgetEvent } from '../api/eventPromises.ts'
+import type { CleanupEventDetail } from '../api/types.ts'
+import { useAuth } from '../auth/AuthContext.ts'
+import { CheckInDesk } from '../components/CheckInDesk.tsx'
+import { ErrorBoundary, type FallbackProps } from '../components/ErrorBoundary.tsx'
+import { ImpactSummary } from '../components/ImpactSummary.tsx'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { SitePicture } from '../components/SitePicture.tsx'
+import { SpotsLine } from '../components/SpotsLine.tsx'
+import { StatusBadge } from '../components/StatusBadge.tsx'
+import { Tab, TabList, TabPanel, Tabs } from '../components/Tabs.tsx'</code></pre>
+                    </div>
+                    <p>Move what everyone reads (description, supplies, where to meet) out of <code>EventDetails</code> into a small component above it, and let <code>EventDetails</code> choose: tabs when the cleanup has more than one thing to show, the plain details otherwise. Replace <code>EventDetails</code> with:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="excerpt"><code class="language-tsx">interface AboutCleanupProps {
+  event: CleanupEventDetail
+}
+
+// What everyone wants to know: what happens, and where to meet
+function AboutCleanup({ event }: AboutCleanupProps) {
+  const { site } = event
+  return (
+    &lt;&gt;
+      &lt;p&gt;{event.description}&lt;/p&gt;
+      {event.suppliesProvided.length &gt; 0 &amp;&amp; (
+        &lt;p&gt;We bring: {event.suppliesProvided.join(', ')}.&lt;/p&gt;
+      )}
+      &lt;h2&gt;Where to meet&lt;/h2&gt;
+      &lt;p&gt;
+        {event.meetingPoint}, {site.name} ({site.town}).
+      &lt;/p&gt;
+      &lt;p&gt;Parking: {site.parking}&lt;/p&gt;
+      &lt;SitePicture image={site.image} /&gt;
+    &lt;/&gt;
+  )
+}
+
+// Rendered only once the cleanup has arrived: until then, use() suspends
+function EventDetails({ eventId, viewer }: EventDetailsProps) {
+  const { isOrganizer } = useAuth()
+  const event = use(eventPromise(eventId, viewer))
+  useDocumentTitle(event.title)
+  const checkInDay = isOrganizer &amp;&amp; event.status === 'scheduled' &amp;&amp; event.date === today
+  const completed = event.status === 'completed'
+
+  return (
+    &lt;article&gt;
+      &lt;h1&gt;{event.title}&lt;/h1&gt;
+      &lt;p className={styles.badges}&gt;
+        &lt;StatusBadge status={event.status} /&gt;
+      &lt;/p&gt;
+      &lt;p className={pageStyles.lead}&gt;
+        &lt;time dateTime={event.date}&gt;{formatDate(event.date)}&lt;/time&gt;, {event.startTime} to{' '}
+        {event.endTime}
+      &lt;/p&gt;
+      &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
+      {checkInDay || completed ? (
+        // More than one thing to show: tabs, with only the tabs this cleanup needs
+        &lt;Tabs defaultTab={checkInDay ? 'desk' : 'details'}&gt;
+          &lt;TabList label="About this cleanup"&gt;
+            &lt;Tab id="details"&gt;Details&lt;/Tab&gt;
+            {checkInDay &amp;&amp; &lt;Tab id="desk"&gt;Check-in desk&lt;/Tab&gt;}
+            {completed &amp;&amp; &lt;Tab id="impact"&gt;Impact&lt;/Tab&gt;}
+          &lt;/TabList&gt;
+          &lt;TabPanel id="details"&gt;
+            &lt;AboutCleanup event={event} /&gt;
+          &lt;/TabPanel&gt;
+          {checkInDay &amp;&amp; (
+            &lt;TabPanel id="desk"&gt;
+              &lt;TodaysDesk eventId={event.id} /&gt;
+            &lt;/TabPanel&gt;
+          )}
+          {completed &amp;&amp; (
+            &lt;TabPanel id="impact"&gt;
+              &lt;ImpactSummary eventId={event.id} /&gt;
+            &lt;/TabPanel&gt;
+          )}
+        &lt;/Tabs&gt;
+      ) : (
+        &lt;AboutCleanup event={event} /&gt;
+      )}
+    &lt;/article&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>On the day of a cleanup, organizers land on the desk tab, the reason they opened the page; everyone else starts on <strong>Details</strong>. A scheduled cleanup on any other day, or a cancelled one, has nothing extra to show, so it gets no tabs at all: a tab list with one tab would only add noise for screen reader users.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_20/20-desk-tabs-phone.png" alt="Tide Pool Morning Cleanup on a phone in dark mode, signed in as Maya. Two tabs, Details and Check-in desk; Check-in desk is selected. Below, the Check-in desk card says Checked in: 1 of 7, and Diego Herrera&#x27;s row shows a Checked in badge." width="390" height="844" loading="lazy">
+                        <figcaption>On the day of a cleanup, organizers land on the <strong>Check-in desk</strong> tab. Switch to <strong>Details</strong> and back: the marks are still there, because hidden panels stay mounted.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 7: Check it with the keyboard <span class="step-time">(5 min)</span></h3>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 13ms on 50 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>Then open Storm Debris Sweep (<code>/events/e01</code>) and put the mouse away. Press <kbd>Tab</kbd> until the focus ring is on <strong>Details</strong>, then <kbd>→</kbd>: <strong>Impact</strong> is selected and its panel shows "Volunteers: 10. Bags: 5. Weight: 18.5 kg." and a list that starts "Cigarette butts: 241". Press <kbd>→</kbd> again and you are back on <strong>Details</strong> (it wraps); <kbd>End</kbd> and <kbd>Home</kbd> jump to the last and first tab. Press <kbd>Tab</kbd> once more and the focus moves into the panel, not to the next tab. Finally, sign in as Maya, open Tide Pool Morning Cleanup, check someone in, switch tabs and back: the mark is still there.</p>
+                    <p><strong>Your own project:</strong> look at the screens you sketched for your Lesson 11.1 idea. Find one place for each pattern, or decide honestly that it needs none: a screen with sections that could be tabs, a list type that repeats, a call to action that should be a link. Write one line for each.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>Button</code> renders every button in the HQ, and <code>Button.tsx</code> is the only file that imports <code>Button.module.css</code></li>
+                        <li>☐ "Plan a cleanup" is a link (<code>as="a"</code>) with the primary look</li>
+                        <li>☐ <code>DataList</code> draws the cleanups, the beach sites and the debris counts; <code>EventList.module.css</code> is gone</li>
+                        <li>☐ A completed cleanup shows <strong>Details</strong> and <strong>Impact</strong> tabs, and the Impact tab loads its report</li>
+                        <li>☐ The tabs work with arrow keys, <kbd>Home</kbd> and <kbd>End</kbd>, and check-in marks survive a tab switch</li>
+                        <li>☐ <code>npx tsc -b</code> and <code>npm run lint</code> pass with no warnings</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: A keyboard and screen reader walk-through</h3>
+                    <p>No code this time. On <code>/events/e01</code>, predict for each key what will be selected and where the focus will be, starting with the focus on <strong>Details</strong>: <kbd>→</kbd>, <kbd>→</kbd>, <kbd>End</kbd>, <kbd>Home</kbd>, <kbd>←</kbd>, then the letter <kbd>a</kbd>. Then try it. If you have a screen reader (NVDA on Windows is free; VoiceOver is built into macOS, <kbd>⌘ Cmd</kbd>+<kbd>F5</kbd>), listen to what it says when the focus lands on a tab.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Look at <code>moves</code> in <code>moveBetweenTabs</code>. Which keys are in it, and what does the function do with a key that is not?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Measured, on the build and on the dev server: <kbd>→</kbd> Impact, <kbd>→</kbd> Details (wraps around), <kbd>End</kbd> Impact, <kbd>Home</kbd> Details, <kbd>←</kbd> Impact (wraps the other way), <kbd>a</kbd> stays on Impact, because <code>moves['a']</code> is <code>undefined</code> and the function returns without calling <code>preventDefault()</code>. Each time, the selected tab is also the focused one, with <code>tabIndex</code> 0 while the other has -1. A screen reader announces the tab's name, its role and its state, along the lines of "Impact, tab, selected, 2 of 2" (the exact words differ between screen readers); all of it comes from the roles and ARIA attributes, none from the CSS.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A render prop as children</h3>
+                    <p>Every page that uses <code>useApi</code> repeats the same shape: if the data is ready, draw it; otherwise <code>&lt;LoadStatus … onRetry={….reload} /&gt;</code>. Write a generic <code>Loaded&lt;T&gt;</code> component in <code>src/components/Loaded.tsx</code> that takes <code>result</code> (what <code>useApi</code> returns), <code>what</code> (for the messages) and a function as <code>children</code> that receives the data, and use it on the sites page.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>useApi</code> returns an <code>ApiResult&lt;T&gt;</code> (exported from <code>hooks/useApi.ts</code>), so <code>result: ApiResult&lt;T&gt;</code> lets TypeScript infer <code>T</code>. Type <code>children</code> as <code>(data: T) =&gt; ReactNode</code>. A component may return whatever that function returns.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/Loaded.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import type { ReactNode } from 'react'
+import type { ApiResult } from '../hooks/useApi.ts'
+import { LoadStatus } from './LoadStatus.tsx'
+
+interface LoadedProps&lt;T&gt; {
+  /** What useApi returned */
+  result: ApiResult&lt;T&gt;
+  /** For the messages: "the beach sites" */
+  what: string
+  /** Called with the data once it is ready: a render prop passed as children */
+  children: (data: T) =&gt; ReactNode
+}
+
+// The loading message, or the error with Try again, until the data is ready; then whatever children draws
+export function Loaded&lt;T&gt;({ result, what, children }: LoadedProps&lt;T&gt;) {
+  if (result.state.kind !== 'ready') {
+    return &lt;LoadStatus state={result.state} what={what} onRetry={result.reload} /&gt;
+  }
+  return children(result.state.data)
+}</code></pre>
+                        </div>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">&lt;Loaded result={sites} what="the beach sites"&gt;
+  {(data) =&gt; (
+    &lt;DataList
+      items={data}
+      getKey={(site) =&gt; site.id}
+      emptyMessage="No beach sites yet."
+      renderItem={(site) =&gt; &lt;SiteCard site={site} /&gt;}
+    /&gt;
+  )}
+&lt;/Loaded&gt;</code></pre>
+                        </div>
+                        <p>In <code>{(data) =&gt; …}</code>, <code>data</code> is a <code>Site[]</code>, inferred from <code>sites</code>, and inside it <code>DataList</code> infers <code>Site</code> again: two generic components, no type written by hand. It compiles, lints cleanly and draws the same six sites (measured). Whether it is worth it is a judgment call: it saves three lines per page and adds one more thing to learn. The course's code keeps the explicit version, because in Lesson 7.1 TanStack Query replaces <code>useApi</code> and changes this shape anyway.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Tab ids TypeScript can check (Stretch)</h3>
+                    <p>Optional stretch, not counted in the lesson time (about 20 minutes).</p>
+                    <p>Make the id typo from Common Mistakes a compile error, without changing <code>Tabs.tsx</code>. Write a function <code>typedTabs&lt;Id extends string&gt;()</code> in a new file <code>src/components/typedTabs.ts</code> that returns the four parts with their <code>id</code> and <code>defaultTab</code> props narrowed to <code>Id</code>, and use it in <code>EventPage.tsx</code> with the union <code>'details' | 'desk' | 'impact'</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A component is a function from props to <code>ReactNode</code>. A function that accepts <code>{ id: string }</code> can be used where one that accepts <code>{ id: Id }</code> is expected (it accepts more, not less), so the existing components fit the narrower types with no cast. Call <code>typedTabs</code> once, at module level, and destructure the parts.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/typedTabs.ts</div>
+                            <pre data-snippet><code class="language-ts">import type { ReactNode } from 'react'
+import { Tab, TabList, TabPanel, Tabs } from './Tabs.tsx'
+
+/** The Tabs parts again, with their ids narrowed to the union you name */
+interface TypedTabs&lt;Id extends string&gt; {
+  Tabs: (props: { defaultTab: Id; children: ReactNode }) =&gt; ReactNode
+  TabList: typeof TabList
+  Tab: (props: { id: Id; children: ReactNode }) =&gt; ReactNode
+  TabPanel: (props: { id: Id; children: ReactNode }) =&gt; ReactNode
+}
+
+// The same components at runtime; only their types change
+export function typedTabs&lt;Id extends string&gt;(): TypedTabs&lt;Id&gt; {
+  return { Tabs, TabList, Tab, TabPanel }
+}</code></pre>
+                        </div>
+                        <p>In <code>EventPage.tsx</code>, replace the <code>Tabs.tsx</code> import with <code>import { typedTabs } from '../components/typedTabs.ts'</code> and add, below the imports:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">// The cleanup page's tabs: only these three ids compile
+const { Tabs, TabList, Tab, TabPanel } = typedTabs&lt;'details' | 'desk' | 'impact'&gt;()</code></pre>
+                        </div>
+                        <p>The JSX does not change. Now the typo is caught, with a suggestion:</p>
+                        <div class="card card-output">
+                            <h4>Expected output (npx tsc -b)</h4>
+                            <pre><code>src/pages/EventPage.tsx:107:23 - error TS2820: Type '"impacts"' is not assignable to type '"desk" | "details" | "impact"'. Did you mean '"impact"'?
+
+107             &lt;TabPanel id="impacts"&gt;
+                          ~~
+
+  src/components/typedTabs.ts:9:23 - The expected type comes from property 'id' which is declared here on type 'IntrinsicAttributes &amp; { id: "desk" | "details" | "impact"; children: ReactNode; }'
+    9   TabPanel: (props: { id: Id; children: ReactNode }) =&gt; ReactNode
+                            ~~
+
+
+Found 1 error in src/pages/EventPage.tsx:107</code></pre>
+                        </div>
+                        <p>It compiles, lints cleanly and works the same in the browser (measured). It lives in a <code>.ts</code> file of its own because a <code>.tsx</code> file that exports a function that is not a component would get a Fast Refresh warning. The course's code keeps plain string ids: for one page with three tabs, the extra file costs more than it catches.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> In the HQ's <code>Tabs</code>, how does a <code>&lt;Tab id="impact"&gt;</code> know whether it is the selected tab?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Look at the JSX on the cleanup page. Is there a selected prop on any Tab?">
+                                A) <code>EventPage</code> passes it a <code>selected</code> prop
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Tabs keeps the selected id in state and provides it through TabsContext. Each Tab reads the context with useTabs and compares its own id, so the caller never wires anything by hand.">
+                                B) It reads the selected id from a private context that <code>Tabs</code> provides
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Where does Tab get selected from: the DOM, or React?">
+                                C) It checks the <code>aria-selected</code> attribute in the DOM
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Does Tab call useState for the selection, or does something above it?">
+                                D) Each <code>Tab</code> keeps its own <code>useState</code> for being selected
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> You write <code>&lt;DataList items={report.items} getKey={(item) =&gt; item.category} … /&gt;</code>, where <code>report.items</code> is a <code>DebrisCount[]</code>. What is the type of <code>item</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Did you write a type argument? What does TypeScript do with items instead?">
+                                A) <code>unknown</code>, until you write <code>DataList&lt;DebrisCount&gt;</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="DataList has no constraint on T. Where would id come from?">
+                                B) <code>{ id: string }</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="TypeScript infers the type parameter T from the items prop: DebrisCount. Then getKey and renderItem are checked against it, so item.category is known.">
+                                C) <code>DebrisCount</code>, inferred from <code>items</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> What does <code>npx tsc -b</code> say about <code>&lt;Button as="a" href="&#47;events/new" disabled&gt;</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="With as set to a, the props are an anchor's props, and an a element has no disabled attribute, so TypeScript reports TS2322: Property disabled does not exist. The props follow the as prop.">
+                                A) An error: <code>disabled</code> does not exist on the props of an <code>a</code> element
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Button's props come from ComponentPropsWithRef of whatever as names. Which element's props apply here?">
+                                B) Nothing: <code>Button</code> accepts every button prop whatever <code>as</code> is
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="as is typed with ElementType. Is a an element type?">
+                                C) An error: <code>as</code> only accepts components, not tag names
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="variant has a default. Is it required?">
+                                D) An error: <code>variant</code> is missing
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why does the HQ's <code>TabPanel</code> set <code>hidden</code> instead of returning <code>null</code> when its tab is not selected?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The React Compiler is on in both versions. What happens to a component's state when it is removed?">
+                                A) Returning <code>null</code> from a component breaks the React Compiler
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Would a screen reader read a panel that has the hidden attribute?">
+                                B) So that screen readers can read all the panels at once
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Hidden panels still render and even load their data. What does staying mounted keep?">
+                                C) Because hidden panels make the page load faster
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A removed panel unmounts its content, and the state in it is lost: measured, the check-in marks went back to 0 of 7 and the roster was fetched again. A hidden panel stays mounted and keeps its state.">
+                                D) So the panels stay mounted and keep their state, like the check-in marks
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> In Lesson 6.1, "Plan a cleanup" switches to React Router's <code>&lt;Link to="/events/new"&gt;</code>. What changes?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="as is typed as ElementType. Is a component an element type?">
+                                A) <code>Button</code> needs a new overload that accepts <code>Link</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="as accepts any ElementType, components included, and ComponentPropsWithRef of Link brings in its to prop. Only the call site changes, from as a with href to as Link with to; Button itself stays as it is.">
+                                B) Only the call site: <code>as={Link} to="/events/new"</code> replaces <code>as="a" href="&#47;events/new"</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A link that goes to another page is still a link. Would a button be right here?">
+                                C) The link goes back to a <code>&lt;button&gt;</code> with an <code>onClick</code> that navigates
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Libraries write <code>&lt;Tabs.Tab&gt;</code>. Why does the HQ use separate names?</summary>
+                    <p>The dot form is built by attaching the parts to the parent, usually with <code>export const Tabs = Object.assign(TabsRoot, { List: TabList, Tab, Panel: TabPanel })</code>. TypeScript types it perfectly. But measured in the HQ, <code>npm run lint</code> then reports four warnings, one per component, all <code>react(only-export-components)</code>: "Fast refresh only works when a file only exports components", because the export is now an object, not a component, and when you edit such a file, Fast Refresh may reload the whole page instead of keeping the components' state. Named exports keep editing smooth, and <code>import { Tab, TabList, TabPanel, Tabs }</code> says just as clearly that the parts belong together. Libraries make the other choice because their code is not edited in your project.</p>
+                </details>
+                <details>
+                    <summary>Should I write my own Tabs, or use a library?</summary>
+                    <p>In a team project, often a library: headless libraries such as Radix UI, React Aria or Headless UI ship tabs, menus and dialogs with the keyboard and ARIA details worked out across browsers and screen readers, and leave the styling to you. Writing your own once, as you did today, is how you learn to judge them, read their types and fix them when they misbehave. For a handful of simple widgets like the HQ's, your own small components are fine, as long as you test them with a keyboard (and, from Lesson 9.3, with automated accessibility checks).</p>
+                </details>
+                <details>
+                    <summary>When should a generic component's type parameter have a constraint?</summary>
+                    <p>When the component really uses something from <code>T</code>. <code>DataList</code> never looks inside an item, so <code>T</code> is unconstrained and the caller supplies <code>getKey</code> and <code>renderItem</code>. If you wrote a <code>SortedList&lt;T extends { date: string }&gt;</code> that sorts by date, the constraint would say so and give you <code>item.date</code> inside. Ask for the least you need, as the <code>IdList</code> experiment showed.</p>
+                </details>
+                <details>
+                    <summary>I have seen <code>asChild</code> instead of <code>as</code>. What is the difference?</summary>
+                    <p>Some libraries (Radix UI is the best-known) use <code>&lt;Button asChild&gt;&lt;Link to="…"&gt;…&lt;/Link&gt;&lt;/Button&gt;</code>: instead of naming the element, you pass the element as the only child, and the component merges its props and classes into it. It avoids the long generic types of <code>as</code>, at the cost of a little runtime merging. Both solve the same problem; recognize either when you see it. The HQ uses <code>as</code> because it shows how far TypeScript's types can follow a prop.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Turn the "Show details" toggle on each event card into a small compound <code>Disclosure</code>: <code>&lt;Disclosure&gt;</code>, <code>&lt;DisclosureButton&gt;</code> (a <code>Button</code> with <code>variant="link"</code> and <code>aria-expanded</code>) and <code>&lt;DisclosurePanel&gt;</code>, sharing an <code>open</code> state through a private context, with <code>aria-controls</code> connecting button and panel through <code>useId</code>. Keep the button's accessible name ("Show details for …"), check it with the keyboard, and decide at the end whether the card is clearer than with its one <code>useState</code>. Either answer is a good result, if you can say why.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> For each of today's three patterns, write one sentence on the problem it solves and one HQ component that uses it. Then write down the longest TypeScript error you met today and, in your own words, what its last line was telling you.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Compound components split one component into parts written as ordinary JSX; the parent shares its state through a context the parts can read and nothing else can</li>
+                        <li>A <code>T | undefined</code> context with a throwing Hook turns "a part outside its parent" into a clear error message</li>
+                        <li>Accessible tabs need roles, <code>aria-selected</code>, <code>aria-controls</code>/<code>aria-labelledby</code>, one tab stop and arrow keys; hidden panels stay mounted and keep their state</li>
+                        <li>A render prop lets a component own the frame while the caller draws each item; a generic component (<code>DataList&lt;T&gt;</code>) infers <code>T</code> from its props and checks the callbacks against it</li>
+                        <li>A constraint on a type parameter should ask for exactly what the component uses; <code>getKey</code> beats requiring an <code>id</code></li>
+                        <li>A polymorphic component types its props as <code>ComponentPropsWithRef&lt;C&gt;</code> for <code>C extends ElementType</code>, so the props follow the <code>as</code> prop; in long errors, read the last line first</li>
+                        <li>Start with plain props and <code>children</code>; reach for a pattern when they get in the way</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Look up generic and React types</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Read the accessible tabs pattern</td><td><a href="https://www.w3.org/WAI/ARIA/apg/patterns/tabs/" target="_blank" rel="noopener">WAI-ARIA APG: Tabs Pattern</a></td></tr>
+                            <tr><td>Read about passing JSX and functions as props</td><td><a href="https://react.dev/learn/passing-props-to-a-component" target="_blank" rel="noopener">React: Passing Props to a Component</a></td></tr>
+                            <tr><td>Read React's reference for <code>useId</code></td><td><a href="https://react.dev/reference/react/useId" target="_blank" rel="noopener">React: useId</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You gave the HQ one <code>Button</code> with three typed variants, and the "Plan a cleanup" link its proper look while staying a link</li>
+                        <li>You replaced three hand-written lists with one generic <code>DataList</code> that TypeScript checks for cleanups, sites and debris counts alike</li>
+                        <li>You built accessible compound tabs from scratch, keyboard support included</li>
+                        <li>Completed cleanups now show their impact report, and the check-in desk has a tab of its own on the day</li>
+                        <li>You read long generic type errors from the last line up, and know which mistakes the types cannot catch</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Module 5 is done: the HQ's state is structured, shared, fast and built from components that fit together. Next, the HQ gets real navigation. In <a href="lesson_21.html"><strong>Lesson 6.1: React Router 8</strong></a> you replace the temporary page switch in <code>App.tsx</code> with routes, layouts and a not-found page, links stop reloading the app, and "Plan a cleanup" becomes <code>&lt;Button as={Link} to="/events/new"&gt;</code>, with no change to <code>Button</code> itself.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code> and <code>npm run lint</code> pass, and that the tabs work with the keyboard</li>
+                    <li>Note every place in the HQ that uses a plain <code>&lt;a href="&#47;…"&gt;</code> to another page: those are the links Lesson 6.1 changes</li>
+                    <li>Keep your "one line per pattern" note for your Lesson 11.1 plan</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today's code had the longest types of the course so far, and errors to match. If <code>ComponentPropsWithRef&lt;C&gt;</code> still looks like a lot, that is normal: you do not need to write it from memory, you need to recognize it, read it from the inside out, and know which line of an error to look at first. You did all three. You also built something many developers only ever import: tabs that work for everyone, keyboard and screen reader included. That is craft, and it shows. Well done.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_19.html" class="prev-lesson">← Previous: Rendering Performance</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_21.html" class="next-lesson">Next: React Router 8 →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

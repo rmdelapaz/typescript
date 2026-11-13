@@ -1,0 +1,63 @@
+# Runs on GitHub's computers for every push to main and every pull request (Lesson 10.2).
+# The course folder is the repository: shoreline-hq and shoreline-api sit side by side, as on your computer.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The checks only read the code: no write access to the repository
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Types, lint, unit tests and builds
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shoreline-hq
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: shoreline-hq/package-lock.json
+      - run: npm ci
+      - run: npx tsc -b
+      # The HQ's rule is zero warnings: here a warning fails the run too
+      - run: npm run lint -- --deny-warnings
+      - run: npx vitest run
+      - run: npm run build
+      # The version you deploy must build as well
+      - run: npm run build:demo
+
+  e2e:
+    name: End-to-end tests with shoreline-api
+    # Only when the quick checks are green: no browser minutes spent on a change that does not compile
+    needs: checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shoreline-hq
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: shoreline-hq/package-lock.json
+      - run: npm ci
+      # Chromium plus the system libraries it needs on a fresh Ubuntu machine
+      - run: npx playwright install --with-deps chromium
+      # playwright.config.ts starts ../shoreline-api and a preview of the normal build
+      - run: npm run test:e2e
+      # When a test fails, keep Playwright's report (traces included) for a week
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: shoreline-hq/playwright-report/
+          retention-days: 7

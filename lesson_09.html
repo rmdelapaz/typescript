@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Draw lists and decide what shows: map arrays to elements with stable keys, show empty states, use if, ? : and && safely, keep labels complete with Record lookup tables, and let a discriminated union decide what a component draws. Build Shoreline Crew HQ's cleanup events page. React + TypeScript: Build a Modern Web App Lesson 3.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Lists and Conditional Rendering - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>📋 Lesson 3.3: Lists and Conditional Rendering</h1>
+                <p class="lead">Almost every screen you will ever build is a list of something, and almost every list has parts that only apply sometimes: a "Full" warning, a "Cancelled" badge, a friendly message when there is nothing to show. Today you will turn arrays into elements with keys React can trust, decide what appears with plain JavaScript, and let TypeScript make sure no status and no case is ever forgotten. By the end, Shoreline Crew HQ has its cleanup events page, built from the same <code>CleanupEvent</code> type the API uses.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Turn an array into elements with <code>map</code>, filtering and ordering it first without changing the original</li>
+                        <li>Explain what a <code>key</code> does, choose a stable one from the data, and read React's key warnings</li>
+                        <li>Show parts of a component only when they apply with <code>if</code> and early returns, <code>? :</code>, <code>&amp;&amp;</code> and <code>null</code>, and avoid the <code>0</code> trap</li>
+                        <li>Give every value of a union a label with a <code>Record</code> lookup table that TypeScript keeps complete</li>
+                        <li>Let a discriminated union decide what a component draws, with TypeScript narrowing each case</li>
+                        <li>Build the HQ's events page from a typed <code>CleanupEvent[]</code> with <code>EventList</code>, <code>EventCard</code>, <code>StatusBadge</code> and <code>SpotsLine</code>, including an empty state</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_08.html">Lesson 3.2: Props, Children and Composition</a> (your <code>shoreline-hq</code> with the sites page)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> The Cleanup events page (coming up, drafts and past cleanups, with status badges, spots and an empty state), friendlier terrain labels on the sites page, and a "Next cleanup" card on the home page</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-09-start.zip">lesson-09-start.zip</a> · Finished code: <a href="downloads/lesson-09-end.zip">lesson-09-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#lists" class="toc-link">From an Array to Elements</a></li>
+                        <li><a href="#keys" class="toc-link">Keys: How React Tells Items Apart</a></li>
+                        <li><a href="#conditional" class="toc-link">Showing Things Only When They Apply</a></li>
+                        <li><a href="#lookup-tables" class="toc-link">Lookup Tables TypeScript Keeps Complete</a></li>
+                        <li><a href="#unions-ui" class="toc-link">Discriminated Unions Decide What to Draw</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Cleanup Events Page</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="lists" class="lesson-section">
+                <h2>📋 From an Array to Elements</h2>
+                <p>React has no special loop syntax. In Lesson 3.1 you saw that React draws an array by drawing each item in it, and in Lesson 3.2 you used <code>sites.map(...)</code> to make six cards. That is the whole idea: <strong><code>map</code> turns an array of data into an array of elements</strong>, and you put that array in your TSX. Create <code>src/Scratch.tsx</code> in <code>shoreline-hq</code> again (your experiment file for this lesson) and try it with plain strings:</p>
+                <pre data-snippet><code class="language-tsx">const supplies = ['Gloves', 'Bags', 'Line cutters']
+
+export function SupplyList() {
+  const items = supplies.map((item) =&gt; &lt;li key={item}&gt;{item}&lt;/li&gt;)
+  return &lt;ul&gt;{items}&lt;/ul&gt;
+}</code></pre>
+                <p><code>npx tsc -b</code> is silent. Hover over <code>items</code> in VS Code: its type is <code>JSX.Element[]</code>, an array of elements, inferred from what the callback returns. You did not annotate <code>item</code> either: <code>supplies</code> is a <code>string[]</code>, so TypeScript knows each <code>item</code> is a <code>string</code>. The same inference made <code>site</code> a <code>Site</code> in Lesson 3.2. Usually you write the <code>map</code> right inside the braces, as <code>SitesPage</code> does; a variable like <code>items</code> is handy when the expression gets long.</p>
+                <h3>Filter and order first, then map</h3>
+                <p>A page rarely shows an array exactly as it arrived. The HQ's events page shows the upcoming cleanups in one list and the past ones, newest first, in another. Work out each list with the array methods you know from JavaScript, then <code>map</code> it:</p>
+                <pre data-snippet><code class="language-tsx">const upcoming = events.filter((event) =&gt; event.status === 'scheduled')
+const past = events
+  .filter((event) =&gt; event.status === 'completed' || event.status === 'cancelled')
+  .toReversed()</code></pre>
+                <p>Notice <code>toReversed()</code>, not <code>reverse()</code>. <code>reverse()</code> and <code>sort()</code> change the array they are called on, and the array here is data the component was given (Lesson 3.2: props and shared data are read-only). <code>toReversed()</code> and <code>toSorted()</code> return a new array and leave the original alone. They are part of ES2023, which is exactly what the template's <code>tsconfig.app.json</code> lists in <code>lib</code>, so TypeScript knows them. <code>filter</code> and <code>map</code> always returned new arrays, which is why they are the everyday tools of React code.</p>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Inboxes, feeds, rosters, search results, order histories: list screens are most of what front-end developers build. The habits from this lesson (data in, elements out, nothing changed along the way, a stable key for every item, a sentence instead of a blank space when a list is empty) are the ones reviewers check first in a pull request.</p>
+                </div>
+            </section>
+
+            <section id="keys" class="lesson-section">
+                <h2>🔑 Keys: How React Tells Items Apart</h2>
+                <p>When a list changes (a cleanup is added, one is cancelled, the list is filtered), React compares the new list with the one it drew last time and changes as little of the page as it can. To do that it must know which new item is which old item. Position is not enough: if a new cleanup appears at the top, every item moves down one place. So you give each item a <strong>key</strong>, a name that stays the same as long as the item does.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: name tags at check-in</h4>
+                    <p>At a big cleanup, every volunteer gets a name tag at the check-in table. When the crew splits into teams and shuffles around the beach, the organizer still knows who is who by reading the tags, not by counting heads from the left. A key is that name tag. "The third person from the left" (an index) stops being the same person the moment someone joins the line; "Theo" stays Theo.</p>
+                </div>
+                <div class="mermaid">
+graph TD
+    A["New list of elements"] --> B{"Same key as before?"}
+    B -->|"yes"| C["Keep it, update it"]
+    B -->|"no, new key"| D["Create it"]
+    E["Key gone from the list"] --> F["Remove it"]
+</div>
+                <p>The rules are short:</p>
+                <ul>
+                    <li><strong>Take the key from the data.</strong> Every <code>CleanupEvent</code> and <code>Site</code> has an <code>id</code> from the API: use it. A key is a string or a number.</li>
+                    <li><strong>Unique among siblings.</strong> Two items in the same list must not share a key. Items in different lists may.</li>
+                    <li><strong>Stable.</strong> The same item gets the same key every time. Never make one up while rendering (<code>Math.random()</code>, <code>crypto.randomUUID()</code>): a new key every render means "a brand-new item" every render, and oxlint's <code>react(purity)</code> rule from Lesson 3.1 flags those calls anyway.</li>
+                    <li><strong>On the element <code>map</code> returns.</strong> In <code>events.map((event) =&gt; &lt;li key={event.id}&gt;...&lt;/li&gt;)</code> the key goes on the <code>&lt;li&gt;</code>, not on something inside it.</li>
+                </ul>
+                <p>As you saw in Lesson 3.2, <code>key</code> is one of React's own props: it never reaches your component, and TypeScript accepts it on every element through <code>IntrinsicAttributes</code>.</p>
+                <h3>What React says when a key is missing or repeated</h3>
+                <p>The linter catches a missing key while you type (you will see its message in the project). If one slips through, the browser console tells you when the page renders in development. With the key removed from the project's <code>EventList</code>, the console shows:</p>
+                <div class="card card-output">
+                    <h4>Browser console (dev server, key missing)</h4>
+                    <pre><code>Each child in a list should have a unique "key" prop.
+
+Check the render method of `EventList`. See https://react.dev/link/warning-keys for more information.</code></pre>
+                </div>
+                <p>And with a key that repeats (every event keyed by its status, so eight items are called <code>scheduled</code>), one error per repeat, starting with:</p>
+                <div class="card card-output">
+                    <h4>Browser console (dev server, duplicate keys)</h4>
+                    <pre><code>Encountered two children with the same key, `scheduled`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version.</code></pre>
+                </div>
+                <p>Read the second one closely: "may cause children to be duplicated and/or omitted". A repeated key is not a cosmetic warning; React may draw the wrong number of cards. Both messages appear only in development, never in a production build, which is one more reason to keep the console open while you work.</p>
+                <h3>And the index?</h3>
+                <p><code>map</code> passes each item's position as a second argument, and <code>key={index}</code> makes the warnings go away. Neither TypeScript nor oxlint says a word about it:</p>
+                <pre data-snippet><code class="language-tsx">const supplies = ['Gloves', 'Bags', 'Line cutters']
+
+export function SupplyList() {
+  return (
+    &lt;ul&gt;
+      {supplies.map((item, index) =&gt; (
+        &lt;li key={index}&gt;{item}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}</code></pre>
+                <p>The trouble starts when the list changes. Insert a new cleanup at the top and look at what each key now points to:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Position</th><th>Before</th><th>After inserting "Family Beach Morning" at the top</th><th>Key <code>index</code> says</th><th>Key <code>event.id</code> says</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>0</td><td>Weekend Cove Cleanup</td><td>Family Beach Morning</td><td>item 0 changed</td><td>e10 is new</td></tr>
+                            <tr><td>1</td><td>Boardwalk and Mudflats</td><td>Weekend Cove Cleanup</td><td>item 1 changed</td><td>e08 moved</td></tr>
+                            <tr><td>2</td><td>(none)</td><td>Boardwalk and Mudflats</td><td>item 2 is new</td><td>e09 moved</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>With index keys React thinks every row changed and one was added at the end. On today's cards that only costs some extra work. Once rows hold their own state (a half-typed note, an open menu, a checked box: Lesson 3.4 onward), that state stays with the <em>position</em> and ends up on the wrong cleanup. An index is acceptable only for a list that never reorders, never gets items inserted or removed, and has no ids; you will meet one in Exercise 2.</p>
+            </section>
+
+            <section id="conditional" class="lesson-section">
+                <h2>🔀 Showing Things Only When They Apply</h2>
+                <p>A component is a function, so deciding what it draws is ordinary JavaScript. There is no special React syntax to learn, only four tools and where each one fits. Here they are in one component that summarizes a cleanup (it takes <code>CleanupEvent | undefined</code>, because "the next cleanup" may not exist):</p>
+                <pre data-snippet><code class="language-tsx">import type { CleanupEvent } from './api/types.ts'
+
+interface EventSummaryProps {
+  event: CleanupEvent | undefined
+}
+
+export function EventSummary({ event }: EventSummaryProps) {
+  // 1. if and an early return: nothing to show, so say so and stop
+  if (!event) {
+    return &lt;p&gt;Nothing scheduled yet.&lt;/p&gt;
+  }
+
+  return (
+    &lt;section&gt;
+      &lt;h2&gt;{event.title}&lt;/h2&gt;
+      {/* 2. ? : picks one of two things */}
+      &lt;p&gt;{event.status === 'cancelled' ? 'Cancelled' : `Starts at ${event.startTime}`}&lt;/p&gt;
+      {/* 3. &amp;&amp; shows something or nothing */}
+      {event.spotsTaken &gt;= event.capacity &amp;&amp; &lt;p&gt;Full: new sign-ups join the waiting list&lt;/p&gt;}
+      {/* 4. null draws nothing: a value worked out before the return */}
+      {event.description === '' ? null : &lt;p&gt;{event.description}&lt;/p&gt;}
+    &lt;/section&gt;
+  )
+}</code></pre>
+                <ol>
+                    <li><strong><code>if</code> with an early return</strong> handles "this whole component looks different": no event, so say so and stop. After the <code>if</code>, TypeScript has <em>narrowed</em> <code>event</code> from <code>CleanupEvent | undefined</code> to <code>CleanupEvent</code> (Lesson 2.2), so <code>event.title</code> is safe.</li>
+                    <li><strong><code>? :</code></strong> picks one of two things inside the TSX.</li>
+                    <li><strong><code>&amp;&amp;</code></strong> shows something or nothing: if the left side is falsy, the expression is that falsy value; otherwise it is the element on the right.</li>
+                    <li><strong><code>null</code></strong> means "draw nothing here". A component may also return <code>null</code> to draw nothing at all.</li>
+                </ol>
+                <p>This is the promise from Lesson 3.1 put to work: React draws nothing for <code>true</code>, <code>false</code>, <code>null</code> and <code>undefined</code>, which is exactly what makes <code>&amp;&amp;</code> and <code>null</code> useful. Leave out the check and TypeScript reminds you that "might not exist" is part of the type:</p>
+                <pre data-snippet><code class="language-tsx">export function EventSummary({ event }: EventSummaryProps) {
+  return &lt;h2&gt;{event.title}&lt;/h2&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:8:15 - error TS18048: 'event' is possibly 'undefined'.
+
+8   return &lt;h2&gt;{event.title}&lt;/h2&gt;
+                ~~~~~
+
+
+Found 1 error in src/Scratch.tsx:8</code></pre>
+                </div>
+                <p>TS18048 is the same message you met with optional props in Lesson 3.2. It is TypeScript asking "and what should the screen show when there is no event?", a question about your users, not only about types.</p>
+                <h3>The <code>0</code> trap</h3>
+                <p><code>&amp;&amp;</code> returns its left side when that side is falsy. <code>false</code>, <code>null</code> and <code>undefined</code> draw nothing, but <strong>numbers draw</strong>, including <code>0</code>. A waiting-list notice written with <code>length &amp;&amp;</code>:</p>
+                <pre data-snippet><code class="language-tsx">interface WaitingListProps {
+  waiting: string[]
+}
+
+export function WaitingList({ waiting }: WaitingListProps) {
+  return &lt;div&gt;{waiting.length &amp;&amp; &lt;p&gt;{waiting.length} people are waiting for a spot.&lt;/p&gt;}&lt;/div&gt;
+}</code></pre>
+                <p>passes <code>npx tsc -b</code> and <code>npm run lint</code> without a word (a number is a valid <code>ReactNode</code>). Rendered with React 19.3, once with nobody waiting and once with two people:</p>
+                <div class="card card-output">
+                    <h4>Output (React 19.3, rendered to HTML)</h4>
+                    <pre><code>&lt;div&gt;0&lt;/div&gt;
+&lt;div&gt;&lt;p&gt;2 people are waiting for a spot.&lt;/p&gt;&lt;/div&gt;</code></pre>
+                </div>
+                <p>A lone "0" on the page. Make the left side a real boolean: <code>waiting.length &gt; 0 &amp;&amp; ...</code>. That is the form you will use in the project.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want to…</th><th>Use</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Draw something completely different (or nothing) for a whole component</td><td><code>if</code> + early <code>return</code></td><td><code>EventList</code>: an empty list returns a sentence</td></tr>
+                            <tr><td>Pick one of two things in place</td><td><code>cond ? a : b</code></td><td>The site name or "Site to be confirmed"</td></tr>
+                            <tr><td>Show one thing or nothing</td><td><code>boolean &amp;&amp; element</code></td><td>"We bring:" only when there are supplies</td></tr>
+                            <tr><td>Draw a label for each value of a union</td><td>A <code>Record</code> lookup table (next section)</td><td><code>StatusBadge</code>, terrain labels</td></tr>
+                            <tr><td>Draw different things for each member of a discriminated union</td><td><code>switch</code> on the discriminant</td><td><code>SpotsLine</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="lookup-tables" class="lesson-section">
+                <h2>🗂️ Lookup Tables TypeScript Keeps Complete</h2>
+                <p>The sites page shows the API's raw terrain words: <code>sand</code>, <code>mixed</code>. People would rather read "Sandy beach" and "Sand and rocks". You could write a chain of <code>? :</code>, but there is a tidier tool: an object with one entry per value, typed with the utility type <code>Record</code> from Lesson 2.4:</p>
+                <pre data-snippet><code class="language-tsx">import type { Terrain } from './api/types.ts'
+
+const terrainLabels: Record&lt;Terrain, string&gt; = {
+  sand: 'Sandy beach',
+  rocky: 'Rocky shore',
+  marsh: 'Tidal marsh',
+  mixed: 'Sand and rocks',
+}
+
+export function TerrainLabel({ terrain }: { terrain: Terrain }) {
+  return &lt;span&gt;{terrainLabels[terrain]}&lt;/span&gt;
+}</code></pre>
+                <p><code>Record&lt;Terrain, string&gt;</code> means "an object with exactly the keys <code>'sand' | 'rocky' | 'marsh' | 'mixed'</code>, each holding a string". That one annotation buys three checks. Forget a key or misspell one, and TypeScript says so:</p>
+                <pre data-snippet><code class="language-tsx">import type { EventStatus } from './api/types.ts'
+
+const missing: Record&lt;EventStatus, string&gt; = {
+  scheduled: 'Scheduled',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
+const misspelled: Record&lt;EventStatus, string&gt; = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+  completed: 'Completed',
+  canceled: 'Cancelled',
+}
+
+console.log(missing, misspelled)</code></pre>
+                <figure class="screenshot">
+                    <img src="images/lesson_09/09-lookup-errors.png" alt="A terminal in shoreline-hq. npx tsc -b reports two errors in src/Scratch.tsx: on line 3, TS2741 Property draft is missing in the lookup table but required in type Record of EventStatus and string; on line 13, TS2561 canceled does not exist in the type, Did you mean to write cancelled?" width="1100" height="266" loading="lazy">
+                    <figcaption>Two lookup tables typed <code>Record&lt;EventStatus, string&gt;</code>: one forgot <code>draft</code>, one used the American spelling <code>canceled</code>, but the API's word is <code>cancelled</code>. TypeScript names the missing key and suggests the right spelling.</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:3:7 - error TS2741: Property 'draft' is missing in type '{ scheduled: string; completed: string; cancelled: string; }' but required in type 'Record&lt;EventStatus, string&gt;'.
+
+3 const missing: Record&lt;EventStatus, string&gt; = {
+        ~~~~~~~
+
+src/Scratch.tsx:13:3 - error TS2561: Object literal may only specify known properties, but 'canceled' does not exist in type 'Record&lt;EventStatus, string&gt;'. Did you mean to write 'cancelled'?
+
+13   canceled: 'Cancelled',
+     ~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/Scratch.tsx:3</code></pre>
+                </div>
+                <p>TS2741 lists the missing key by name. TS2561 even suggests the fix: American English spells it "canceled", but the API's word is <code>cancelled</code>, and the table must match the API, not the dictionary. The third check is the one that pays off for years: when the type grows, every table built on it stops compiling until you add the new entry. Imagine the API adds a <code>postponed</code> status one day:</p>
+                <pre data-snippet><code class="language-tsx">import type { EventStatus } from './api/types.ts'
+
+// Imagine the API adds a fifth status one day
+type NextEventStatus = EventStatus | 'postponed'
+
+const statusLabels: Record&lt;NextEventStatus, string&gt; = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
+console.log(statusLabels)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:6:7 - error TS2741: Property 'postponed' is missing in type '{ draft: string; scheduled: string; completed: string; cancelled: string; }' but required in type 'Record&lt;NextEventStatus, string&gt;'.
+
+6 const statusLabels: Record&lt;NextEventStatus, string&gt; = {
+        ~~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:6</code></pre>
+                </div>
+                <p>That is what <strong>exhaustive</strong> means: every possible value is handled, and the compiler, not your memory, keeps it that way. Reading from the table is safe too. <code>terrainLabels[terrain]</code> is a plain <code>string</code>, even with <code>noUncheckedIndexedAccess</code> on (Lesson 2.4), because a <code>Terrain</code> can only be one of the four keys that are guaranteed to exist. Compare a loose table typed <code>Record&lt;string, string&gt;</code>:</p>
+                <pre data-snippet><code class="language-tsx">const loose: Record&lt;string, string&gt; = {
+  draft: 'Draft',
+  scheduled: 'Scheduled',
+}
+
+export function LooseLabel({ status }: { status: string }) {
+  return &lt;span&gt;{loose[status].toUpperCase()}&lt;/span&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:7:17 - error TS2532: Object is possibly 'undefined'.
+
+7   return &lt;span&gt;{loose[status].toUpperCase()}&lt;/span&gt;
+                  ~~~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:7</code></pre>
+                </div>
+                <p>With any string as a key, nothing guarantees the entry exists, so every lookup is "maybe undefined" and nothing checks that the table is complete. Key the table by the union.</p>
+            </section>
+
+            <section id="unions-ui" class="lesson-section">
+                <h2>🧭 Discriminated Unions Decide What to Draw</h2>
+                <p>In Lesson 2.2 you wrote <code>LoadState</code>, a union whose members share a <code>kind</code> property and carry different data: only <code>failed</code> has a <code>message</code>, only <code>ready</code> has <code>events</code>. Unions like this are made for components, because each member usually needs a different piece of screen:</p>
+                <pre data-snippet><code class="language-tsx">import type { CleanupEvent } from './api/types.ts'
+
+type LoadState =
+  | { kind: 'loading' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'ready'; events: CleanupEvent[] }
+
+export function EventsStatus({ state }: { state: LoadState }) {
+  switch (state.kind) {
+    case 'loading':
+      return &lt;p&gt;Loading cleanups...&lt;/p&gt;
+    case 'failed':
+      return &lt;p role="alert"&gt;Could not load cleanups: {state.message}&lt;/p&gt;
+    case 'ready':
+      return &lt;p&gt;{state.events.length} cleanups&lt;/p&gt;
+  }
+}</code></pre>
+                <p>Inside <code>case 'failed':</code>, TypeScript has narrowed <code>state</code> to <code>{ kind: 'failed'; message: string }</code>, so <code>state.message</code> is allowed; inside <code>case 'ready':</code> it is the member with <code>events</code>. Try reading <code>message</code> before checking the kind:</p>
+                <pre data-snippet><code class="language-tsx">export function EventsStatus({ state }: { state: LoadState }) {
+  return &lt;p&gt;Could not load cleanups: {state.message}&lt;/p&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:9:45 - error TS2339: Property 'message' does not exist on type 'LoadState'.
+  Property 'message' does not exist on type '{ kind: "loading"; }'.
+
+9   return &lt;p&gt;Could not load cleanups: {state.message}&lt;/p&gt;
+                                              ~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:9</code></pre>
+                </div>
+                <p>Read the second line: the <code>loading</code> member has no <code>message</code>, so on a loading screen there is nothing to show. The type makes impossible screens impossible to write: no "error message while still loading", no "events" before they arrive. Lesson 4.1 uses this exact pattern when the events come from the API.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ A switch is not checked for completeness (yet)</h4>
+                    <p>Delete the <code>case 'failed':</code> lines and <code>npx tsc -b</code> still passes: the component simply draws nothing for a failure. A lookup table complains about a missing key; a <code>switch</code> does not complain about a missing case, because a component is allowed to return <code>undefined</code>. When you have a label per value, prefer a table. When each case draws something different, use a <code>switch</code> and test every case in the browser. Lesson 5.1 adds the <code>never</code> check that makes a switch exhaustive too.</p>
+                </div>
+                <p>In the project you will write a union of your own for an event card's spots line: an open cleanup has a number of spots left, a full one has a waiting list, a past one shows nothing. Each kind carries only the data it needs.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Braces in the <code>map</code> callback, and no <code>return</code></h4>
+                    <p>An arrow function with braces needs a <code>return</code>. Without it, every item becomes <code>undefined</code> and the list is empty:</p>
+                    <pre data-snippet><code class="language-tsx">export function SupplyList() {
+  return (
+    &lt;ul&gt;
+      {supplies.map((item) =&gt; {
+        &lt;li key={item}&gt;{item}&lt;/li&gt;
+      })}
+    &lt;/ul&gt;
+  )
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b, trimmed)</h4>
+                        <pre><code>src/Scratch.tsx:6:7 - error TS2322: Type 'void[]' is not assignable to type 'ReactNode'.
+...
+            Type 'void' is not assignable to type 'ReactNode'.
+
+6       {supplies.map((item) =&gt; {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~
+7         &lt;li key={item}&gt;{item}&lt;/li&gt;
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+8       })}
+  ~~~~~~~~~
+...
+Found 1 error in src/Scratch.tsx:6</code></pre>
+                    </div>
+                    <p>Read the first and the last message lines: the callback returns <code>void</code>, and <code>void</code> is not something React can draw. Use parentheses, <code>(item) =&gt; (&lt;li ...&gt;)</code>, or write <code>return</code> inside the braces.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ <code>count &amp;&amp; ...</code> with a number</h4>
+                    <p>No tool warns you, and the page shows a stray "0". Compare explicitly: <code>count &gt; 0 &amp;&amp; ...</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Index keys on a list that changes</h4>
+                    <p>They silence the warning without fixing anything. Use the item's <code>id</code>; keep the index for lists that never change.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Putting the key inside the item component</h4>
+                    <p><code>key</code> belongs on the element the <code>map</code> callback returns. A key written inside <code>EventCard</code> is on the wrong element (and <code>EventCard</code> never receives a <code>key</code> prop anyway). The linter points at the element that needs it.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Cleanup Events Page</h2>
+                <p>Organizers spend most of their time looking at cleanups: which ones are coming up, which are full, which drafts still need publishing, how the past ones went. Today the HQ gets its <strong>Cleanup events</strong> page, plus friendlier labels on the sites page and a "Next cleanup" card on the home page. When you are done, the events page's tree looks like this:</p>
+                <div class="mermaid">
+graph TD
+    P["EventsPage"] -->|"events, 3 times"| L["EventList"]
+    L -->|"empty: a sentence"| E["p.empty-state"]
+    L -->|"event, per item"| C["EventCard"]
+    C -->|"status"| B["StatusBadge"]
+    C -->|"availability"| S["SpotsLine"]
+</div>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>) and keep <code>http://localhost:5173</code> open. Delete <code>src/Scratch.tsx</code> if you still have it.</p>
+
+                <div class="card">
+                    <h3>Step 1: The events as typed data <span class="step-time">(8 min)</span></h3>
+                    <p>The same move as the sites in Lesson 3.2. Open <code>http://localhost:4000/api/events?perPage=50</code> in your browser: the API sends 10 events per page unless you ask for more, and <code>perPage=50</code> gets all 15 public cleanups. Create <code>src/data/events.ts</code> with the header below, then <code>export const events: CleanupEvent[] = </code> followed by the JSON you copy from the browser (<kbd>Ctrl</kbd>+<kbd>A</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>A</kbd> on a Mac; in Firefox, the <strong>Raw Data</strong> tab and <strong>Copy</strong>). The start of the file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/data/events.ts</div>
+                        <pre data-src="shoreline-hq/src/data/events.ts" data-match="excerpt"><code class="language-ts">import type { CleanupEvent } from '../api/types.ts'
+
+// The public cleanups, copied from GET /api/events?perPage=50 (Lesson 3.3).
+// Lesson 4.1 fetches them from the API instead, and this file goes away.
+export const events: CleanupEvent[] = [
+  {
+    "id": "e01",
+    "title": "Storm Debris Sweep",
+    "siteId": "driftwood-cove",
+    "status": "completed",
+    // ...
+]</code></pre>
+                    </div>
+                    <p>TypeScript checks all 15 objects against <code>CleanupEvent</code>, including every <code>status</code> against the four <code>EventStatus</code> words. Your dates will differ from the course's: the API's sample data is built around today. The public list has no drafts; drafts are only sent to signed-in organizers, which the HQ learns in Lesson 5.2. That gives you a real empty list to design for.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Friendlier terrain labels <span class="step-time">(6 min)</span></h3>
+                    <p>Lesson 3.2 promised this one. Replace <code>src/components/SiteCard.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SiteCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SiteCard.tsx"><code class="language-tsx">import type { Site, Terrain } from '../api/types.ts'
+import { Badge } from './Badge.tsx'
+import { Card } from './Card.tsx'
+import { SitePicture } from './SitePicture.tsx'
+
+const terrainLabels: Record&lt;Terrain, string&gt; = {
+  sand: 'Sandy beach',
+  rocky: 'Rocky shore',
+  marsh: 'Tidal marsh',
+  mixed: 'Sand and rocks',
+}
+
+interface SiteCardProps {
+  site: Site
+}
+
+export function SiteCard({ site }: SiteCardProps) {
+  return (
+    &lt;Card title={site.name}&gt;
+      &lt;SitePicture image={site.image} /&gt;
+      &lt;p className="badges"&gt;
+        &lt;Badge label={site.town} /&gt;
+        &lt;Badge label={terrainLabels[site.terrain]} /&gt;
+        &lt;Badge
+          label={site.accessible ? 'Step-free route' : 'No step-free route'}
+          tone={site.accessible ? 'success' : 'info'}
+        /&gt;
+      &lt;/p&gt;
+      &lt;p&gt;{site.description}&lt;/p&gt;
+      &lt;p className="muted"&gt;Parking: {site.parking}&lt;/p&gt;
+    &lt;/Card&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Three changes: <code>Terrain</code> joins the type import, the table sits at module level (it never changes, so there is no reason to build it on every render), and the terrain badge reads <code>terrainLabels[site.terrain]</code>. Visit <code>/sites</code>: the badges now say "Sandy beach", "Sand and rocks", "Tidal marsh" and "Rocky shore".</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: More badge tones, and StatusBadge <span class="step-time">(10 min)</span></h3>
+                    <p>Statuses need four looks: scheduled (Seafoam), completed (Kelp green), cancelled (Coral red) and draft (an outline). Give <code>Badge</code>'s tone union a name and two more members. Replace <code>src/components/Badge.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Badge.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Badge.tsx"><code class="language-tsx">export type BadgeTone = 'info' | 'success' | 'neutral' | 'danger'
+
+interface BadgeProps {
+  label: string
+  tone?: BadgeTone
+}
+
+export function Badge({ label, tone = 'info' }: BadgeProps) {
+  return &lt;span className={`badge badge-${tone}`}&gt;{label}&lt;/span&gt;
+}</code></pre>
+                    </div>
+                    <p><code>BadgeTone</code> is exported so other components can use the same union instead of repeating the four words. Now the status badge. Create <code>src/components/StatusBadge.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/StatusBadge.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/StatusBadge.tsx"><code class="language-tsx">import type { EventStatus } from '../api/types.ts'
+import { Badge, type BadgeTone } from './Badge.tsx'
+
+// One entry per status: TypeScript reports a missing or misspelled one.
+const statusBadges: Record&lt;EventStatus, { label: string; tone: BadgeTone }&gt; = {
+  draft: { label: 'Draft', tone: 'neutral' },
+  scheduled: { label: 'Scheduled', tone: 'info' },
+  completed: { label: 'Completed', tone: 'success' },
+  cancelled: { label: 'Cancelled', tone: 'danger' },
+}
+
+interface StatusBadgeProps {
+  status: EventStatus
+}
+
+export function StatusBadge({ status }: StatusBadgeProps) {
+  const { label, tone } = statusBadges[status]
+  return &lt;Badge label={label} tone={tone} /&gt;
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>import { Badge, type BadgeTone }</code> imports a value and a type in one line; the inline <code>type</code> keeps <code>verbatimModuleSyntax</code> happy (Lesson 2.4).</li>
+                        <li>The table holds an object per status, so the label and the tone can never disagree. Each <code>tone</code> is checked against <code>BadgeTone</code>: a <code>'warning'</code> there would be TS2322.</li>
+                        <li>The component is two lines: look up, destructure, draw. All the decisions live in the table.</li>
+                    </ul>
+                    <p>Add the Coral brand color to the <code>:root</code> block of <code>src/index.css</code> (change these lines):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css">   --kelp: #2d6a4f;
++  --coral: #b23a22;
+   --ink: #1f2a37;</code></pre>
+                    </div>
+                    <p>and these rules at the end of the file (the event list and empty state are for Step 6):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="excerpt"><code class="language-css">/* Event lists and more badge tones (Lesson 3.3) */
+.badge-neutral {
+  border: 1px solid var(--text-muted);
+  color: var(--text);
+}
+
+.badge-danger {
+  background: var(--coral);
+  color: var(--white);
+}
+
+.event-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1.5rem;
+  margin: 0 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.card h3 {
+  margin-top: 0;
+}
+
+.spots-full {
+  font-weight: 600;
+}
+
+.empty-state {
+  margin: 0 0 2rem;
+  padding: 1rem 1.25rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.75rem;
+  color: var(--text-muted);
+}</code></pre>
+                    </div>
+                    <p>White text on Coral passes the 4.5 to 1 contrast check in both modes because the badge sets both colors. The outline badge uses the page's own text colors, so it follows dark mode.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: A union for the spots line <span class="step-time">(10 min)</span></h3>
+                    <p>What a card says about spots depends on the event: a scheduled cleanup with room says how many spots are left, a full one points to the waiting list, a past or cancelled one says nothing. Model that as a discriminated union with a function that works it out. Make a <code>utils</code> folder in <code>src</code> and create <code>src/utils/availability.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/availability.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/availability.ts"><code class="language-ts">import type { CleanupEvent } from '../api/types.ts'
+
+// What an event card says about spots. Each kind carries only the data that kind needs.
+export type Availability =
+  | { kind: 'open'; spotsLeft: number }
+  | { kind: 'full' }
+  | { kind: 'closed' }
+
+export function getAvailability(event: CleanupEvent): Availability {
+  if (event.status !== 'scheduled') {
+    return { kind: 'closed' }
+  }
+  const spotsLeft = event.capacity - event.spotsTaken
+  return spotsLeft &gt; 0 ? { kind: 'open', spotsLeft } : { kind: 'full' }
+}</code></pre>
+                    </div>
+                    <p>A plain <code>.ts</code> file: no TSX, no React, just data in and data out, which also makes it easy to test in Module 9. <code>kind</code> is the same discriminant name as <code>LoadState</code>'s, so every union in the HQ reads the same way. Only the <code>open</code> member has <code>spotsLeft</code>: a full event has no spots-left number to get wrong. Then the component that draws it. Create <code>src/components/SpotsLine.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SpotsLine.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SpotsLine.tsx"><code class="language-tsx">import type { Availability } from '../utils/availability.ts'
+
+interface SpotsLineProps {
+  availability: Availability
+  capacity: number
+}
+
+export function SpotsLine({ availability, capacity }: SpotsLineProps) {
+  switch (availability.kind) {
+    case 'open':
+      return (
+        &lt;p&gt;
+          {availability.spotsLeft} of {capacity} spots left
+        &lt;/p&gt;
+      )
+    case 'full':
+      return &lt;p className="spots-full"&gt;Full: new sign-ups join the waiting list&lt;/p&gt;
+    case 'closed':
+      return null
+  }
+}</code></pre>
+                    </div>
+                    <p>Each <code>case</code> returns its own piece of screen, and <code>closed</code> returns <code>null</code>: the component draws nothing at all. Hover over <code>availability</code> inside <code>case 'open':</code> to see the narrowed type.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: EventCard <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>src/components/EventCard.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx"><code class="language-tsx">import type { CleanupEvent } from '../api/types.ts'
+import { sites } from '../data/sites.ts'
+import { getAvailability } from '../utils/availability.ts'
+import { SpotsLine } from './SpotsLine.tsx'
+import { StatusBadge } from './StatusBadge.tsx'
+
+interface EventCardProps {
+  event: CleanupEvent
+}
+
+export function EventCard({ event }: EventCardProps) {
+  const site = sites.find((s) =&gt; s.id === event.siteId)
+
+  return (
+    &lt;article className="card event-card"&gt;
+      &lt;h3&gt;{event.title}&lt;/h3&gt;
+      &lt;p className="badges"&gt;
+        &lt;StatusBadge status={event.status} /&gt;
+      &lt;/p&gt;
+      &lt;p&gt;
+        &lt;time dateTime={event.date}&gt;{event.date}&lt;/time&gt;, {event.startTime} to {event.endTime}
+      &lt;/p&gt;
+      &lt;p&gt;{site ? site.name : 'Site to be confirmed'}: {event.meetingPoint}&lt;/p&gt;
+      &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
+      {event.suppliesProvided.length &gt; 0 &amp;&amp; (
+        &lt;p className="muted"&gt;We bring: {event.suppliesProvided.join(', ')}&lt;/p&gt;
+      )}
+    &lt;/article&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>sites.find(...)</code> returns <code>Site | undefined</code>: an event could name a site the list does not have. The <code>? :</code> handles it with a fallback, and TypeScript would not let you forget (you will see the error in Step 7).</li>
+                        <li><code>&lt;article&gt;</code> with an <code>&lt;h3&gt;</code>, not the <code>Card</code> component: the events page groups cards under <code>h2</code> headings, so each card's heading is one level down. It reuses the <code>.card</code> class for the look.</li>
+                        <li><code>&lt;time dateTime={event.date}&gt;</code> marks the date for browsers and assistive technology. The date is shown as the API sends it for now.</li>
+                        <li>"We bring" uses <code>length &gt; 0 &amp;&amp;</code>, the safe form, never <code>length &amp;&amp;</code>.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: EventList, EventsPage, and a way to reach it <span class="step-time">(14 min)</span></h3>
+                    <p>The list, with its empty state. Create <code>src/components/EventList.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventList.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventList.tsx"><code class="language-tsx">import type { CleanupEvent } from '../api/types.ts'
+import { EventCard } from './EventCard.tsx'
+
+interface EventListProps {
+  events: CleanupEvent[]
+  emptyMessage: string
+}
+
+export function EventList({ events, emptyMessage }: EventListProps) {
+  if (events.length === 0) {
+    return &lt;p className="empty-state"&gt;{emptyMessage}&lt;/p&gt;
+  }
+
+  return (
+    &lt;ul className="event-list"&gt;
+      {events.map((event) =&gt; (
+        &lt;li key={event.id}&gt;
+          &lt;EventCard event={event} /&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The early return draws a sentence instead of an empty <code>&lt;ul&gt;</code>; the page passes in what that sentence should say, because "no drafts" and "no past cleanups" need different words. The <code>key</code> is on the <code>&lt;li&gt;</code>, the element the callback returns. Now the page. Create <code>src/pages/EventsPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx"><code class="language-tsx">import { EventList } from '../components/EventList.tsx'
+import { events } from '../data/events.ts'
+
+export function EventsPage() {
+  const upcoming = events.filter((event) =&gt; event.status === 'scheduled')
+  const drafts = events.filter((event) =&gt; event.status === 'draft')
+  const past = events
+    .filter((event) =&gt; event.status === 'completed' || event.status === 'cancelled')
+    .toReversed()
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Cleanup events&lt;/h1&gt;
+      &lt;p className="lead"&gt;
+        {upcoming.length} coming up, {past.length} in the log.
+      &lt;/p&gt;
+      &lt;h2&gt;Coming up&lt;/h2&gt;
+      &lt;EventList events={upcoming} emptyMessage="Nothing scheduled yet." /&gt;
+      &lt;h2&gt;Drafts&lt;/h2&gt;
+      &lt;EventList events={drafts} emptyMessage="No drafts waiting to be published." /&gt;
+      &lt;h2&gt;Past cleanups&lt;/h2&gt;
+      &lt;EventList events={past} emptyMessage="No cleanups in the log yet." /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The three lists are worked out inside the component with <code>filter</code> and <code>toReversed()</code>: derived from the data every render, never stored separately, never changing <code>events</code> itself. Next, the page needs an address. In Lesson 3.2, <code>App</code> chose between two pages with <code>? :</code>; with three, a small component with early returns reads better. Replace <code>src/App.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx"><code class="language-tsx">import { AppLayout } from './components/AppLayout.tsx'
+import { EventsPage } from './pages/EventsPage.tsx'
+import { HomePage } from './pages/HomePage.tsx'
+import { SitesPage } from './pages/SitesPage.tsx'
+
+// Temporary, until React Router arrives in Lesson 6.1: the header's links load the whole
+// page again, so reading the address once, when the app starts, is enough to pick a page.
+const path = window.location.pathname
+
+function CurrentPage() {
+  if (path === '/events') {
+    return &lt;EventsPage /&gt;
+  }
+  if (path === '/sites') {
+    return &lt;SitesPage /&gt;
+  }
+  return &lt;HomePage /&gt;
+}
+
+export function App() {
+  return (
+    &lt;AppLayout&gt;
+      &lt;CurrentPage /&gt;
+    &lt;/AppLayout&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p><code>CurrentPage</code> is not exported: it is a helper for <code>App</code> alone. It is still temporary; React Router replaces it in Lesson 6.1. Click <strong>Events</strong> in the header:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_09/09-events-page.png" alt="The Cleanup events page of Shoreline Crew HQ in a desktop browser. Under the heading Cleanup events and the line 8 coming up, 7 in the log, the section Coming up shows event cards three to a row: Tide Pool Morning Cleanup, Weekend Cove Cleanup and Boardwalk and Mudflats. Each card has the title, a pale Scheduled badge, the date and times, the site and meeting point, a spots line (Weekend Cove Cleanup says Full: new sign-ups join the waiting list, in bold) and a gray We bring line." width="1100" height="688" loading="lazy">
+                        <figcaption><code>EventList</code> maps each event to an <code>EventCard</code>. The spots line is different on every card: the <code>Availability</code> union decides what <code>SpotsLine</code> draws.</figcaption>
+                    </figure>
+                    <p>Scroll down to the drafts and the past cleanups:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_09/09-events-empty.png" alt="Further down the events page: the heading Drafts with a dashed box reading No drafts waiting to be published, then the heading Past cleanups with cards for Sunset Stairs Cleanup, Long Strand Big Day and Creek Mouth After the Rains. The first two have a green Completed badge, the third a red Cancelled badge, and none of them has a spots line." width="944" height="535" loading="lazy">
+                        <figcaption>An empty list gets a sentence instead of nothing. In the past list, <code>StatusBadge</code> looks up each status's label and tone, and <code>SpotsLine</code> returns <code>null</code> for closed events.</figcaption>
+                    </figure>
+                    <p>Finally the home page. Its old line "The first real screens arrive over the next lessons" is no longer true, and the home page is the right place for the next cleanup. Replace <code>src/pages/HomePage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx"><code class="language-tsx">import { Card } from '../components/Card.tsx'
+import { events } from '../data/events.ts'
+
+const crewName = 'Shoreline Crew'
+const tagline = 'Many hands, cleaner sands.'
+const towns = ['Port Marisol', 'Calder Bay', 'Seal Rock']
+
+export function HomePage() {
+  const nextCleanup = events.find((event) =&gt; event.status === 'scheduled')
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;{crewName} HQ&lt;/h1&gt;
+      &lt;p className="lead"&gt;{tagline}&lt;/p&gt;
+      &lt;p&gt;
+        Plan cleanups, sign up volunteers and count what comes off the beaches of{' '}
+        {towns.join(', ')}.
+      &lt;/p&gt;
+      &lt;div className="card-grid"&gt;
+        &lt;Card title="Next cleanup"&gt;
+          {nextCleanup ? (
+            &lt;p&gt;
+              {nextCleanup.title}, &lt;time dateTime={nextCleanup.date}&gt;{nextCleanup.date}&lt;/time&gt; at{' '}
+              {nextCleanup.startTime}.
+            &lt;/p&gt;
+          ) : (
+            &lt;p&gt;Nothing scheduled yet.&lt;/p&gt;
+          )}
+          &lt;a href="/events"&gt;See all cleanups&lt;/a&gt;
+        &lt;/Card&gt;
+        &lt;Card title="Our beach sites"&gt;
+          &lt;p&gt;Six stretches of coast, from sandy beaches to a tidal marsh.&lt;/p&gt;
+          &lt;a href="/sites"&gt;See all six sites&lt;/a&gt;
+        &lt;/Card&gt;
+      &lt;/div&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p><code>find</code> returns the first scheduled event or <code>undefined</code>, and the <code>? :</code> covers both. Because the data is sorted by date, the first scheduled event is the next one. The two cards now sit in a <code>card-grid</code>, side by side on a laptop.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 7: Check it everywhere, and break it <span class="step-time">(6 min)</span></h3>
+                    <p>Check <code>/events</code> at phone size and in dark mode, and tab through it.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_09/09-events-phone-dark.png" alt="The Cleanup events page on a phone-sized screen in dark mode. The cards stack in one column on a dark navy page; the first card, Tide Pool Morning Cleanup, shows its Scheduled badge, date and times, Otter Creek Mouth with its meeting point, the spots left and what the crew brings." width="390" height="760" loading="lazy">
+                        <figcaption>The same list at 390 pixels in dark mode: the grid drops to one column.</figcaption>
+                    </figure>
+                    <p>Then break it once each, running the command shown and undoing each change:</p>
+                    <ol>
+                        <li>In <code>StatusBadge.tsx</code>, delete the <code>draft</code> line of the table (<code>npx tsc -b</code>).</li>
+                        <li>In <code>EventCard.tsx</code>, replace <code>{site ? site.name : 'Site to be confirmed'}</code> with <code>{site.name}</code> (<code>npx tsc -b</code>).</li>
+                        <li>In <code>EventList.tsx</code>, change <code>&lt;li key={event.id}&gt;</code> to <code>&lt;li&gt;</code> (<code>npm run lint</code>).</li>
+                    </ol>
+                    <div class="card card-output">
+                        <h4>Expected output (1: a status without a badge)</h4>
+                        <pre><code>src/components/StatusBadge.tsx:5:7 - error TS2741: Property 'draft' is missing in type '{ scheduled: { label: string; tone: "info"; }; completed: { label: string; tone: "success"; }; cancelled: { label: string; tone: "danger"; }; }' but required in type 'Record&lt;EventStatus, { label: string; tone: BadgeTone; }&gt;'.
+
+5 const statusBadges: Record&lt;EventStatus, { label: string; tone: BadgeTone }&gt; = {
+        ~~~~~~~~~~~~
+
+
+Found 1 error in src/components/StatusBadge.tsx:5</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (2: a site that might not exist)</h4>
+                        <pre><code>src/components/EventCard.tsx:23:11 - error TS18048: 'site' is possibly 'undefined'.
+
+23       &lt;p&gt;{site.name}: {event.meetingPoint}&lt;/p&gt;
+             ~~~~
+
+
+Found 1 error in src/components/EventCard.tsx:23</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (3: npm run lint, the key missing)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  ⚠ react(jsx-key): Missing "key" prop for element in iterator.
+    ╭─[src/components/EventList.tsx:16:15]
+ 15 │     &lt;ul className="event-list"&gt;
+ 16 │       {events.map((event) =&gt; (
+    ·               ─┬─
+    ·                ╰── Iterator starts here.
+ 17 │         &lt;li&gt;
+    ·          ─┬
+    ·           ╰── Element generated here.
+ 18 │           &lt;EventCard event={event} /&gt;
+    ╰────
+  help: Add a "key" prop to the element in the iterator (https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key).
+
+Found 1 warning and 0 errors.
+Finished in 12ms on 23 files with 116 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>The first is the lookup table doing its job: the message spells out the type of each entry you did write, and which key is missing. The second is TS18048 from the teaching section, in real code. The third is a warning, not an error, so the page still runs, but the course keeps <code>npm run lint</code> at zero warnings. Undo all three, then run the full check:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run build)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 35 modules transformed.
+computing gzip size...
+dist/index.html                   0.46 kB │ gzip:  0.30 kB
+dist/assets/index-BFfuUSvz.css    2.58 kB │ gzip:  1.01 kB
+dist/assets/index-D7ZOtPK3.js   236.71 kB │ gzip: 73.38 kB
+
+✓ built in 112ms</code></pre>
+                    </div>
+                    <p>35 modules instead of 28: the seven new files (four components, the page, the utility and the events data). (Times, sizes and hashes will differ.)</p>
+                    <p><strong>Your own project:</strong> list the statuses or categories your Lesson 11.1 app's main data can have (a recipe is draft or published; a workout is planned, done or skipped). Write them as a union, then write the <code>Record</code> table of labels for it, and sketch what your list screen shows when there is nothing in it yet.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>src/data/events.ts</code> holds the 15 public cleanups, typed <code>CleanupEvent[]</code></li>
+                        <li>☐ The sites page shows terrain labels from a <code>Record&lt;Terrain, string&gt;</code> table</li>
+                        <li>☐ <code>StatusBadge</code> takes its label and tone from a <code>Record&lt;EventStatus, …&gt;</code> table, and I saw TS2741 when a status was missing</li>
+                        <li>☐ <code>getAvailability</code> returns an <code>Availability</code> union and <code>SpotsLine</code> draws each kind (nothing for closed events)</li>
+                        <li>☐ <code>/events</code> shows Coming up, Drafts (with its empty state) and Past cleanups, keyed by <code>event.id</code>, and the home page shows the next cleanup</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> all pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time). Work in <code>src/Scratch.tsx</code>, check with <code>npx tsc -b</code>, and delete the file afterwards.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: A volunteer's skills</h3>
+                    <p>Write a <code>SkillList</code> component that takes a <code>volunteer</code> with just the <code>name</code> and <code>skills</code> of a <code>Volunteer</code>, and draws the skills as a list with friendly labels ("First aid", "Boat handling", "Heavy lifting", "Photography", "Data recording", "Team lead"). When the volunteer has no skills, it draws "NAME has no skills listed yet." instead. Show it twice: Luis Romero with first aid and team lead, and Theo Nakamura with none.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A <code>Record&lt;Skill, string&gt;</code> table, an early return for the empty case, and <code>map</code> with the skill itself as the key (a volunteer has each skill once, so it is unique among siblings). Keys with a dash, like <code>'first-aid'</code>, need quotes in the table.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import type { Skill, Volunteer } from './api/types.ts'
+
+const skillLabels: Record&lt;Skill, string&gt; = {
+  'first-aid': 'First aid',
+  'boat-handling': 'Boat handling',
+  'heavy-lifting': 'Heavy lifting',
+  photography: 'Photography',
+  'data-recording': 'Data recording',
+  'team-lead': 'Team lead',
+}
+
+interface SkillListProps {
+  volunteer: Pick&lt;Volunteer, 'name' | 'skills'&gt;
+}
+
+function SkillList({ volunteer }: SkillListProps) {
+  if (volunteer.skills.length === 0) {
+    return &lt;p&gt;{volunteer.name} has no skills listed yet.&lt;/p&gt;
+  }
+
+  return (
+    &lt;ul aria-label={`Skills of ${volunteer.name}`}&gt;
+      {volunteer.skills.map((skill) =&gt; (
+        &lt;li key={skill}&gt;{skillLabels[skill]}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}
+
+export function Skills() {
+  return (
+    &lt;&gt;
+      &lt;SkillList volunteer={{ name: 'Luis Romero', skills: ['first-aid', 'team-lead'] }} /&gt;
+      &lt;SkillList volunteer={{ name: 'Theo Nakamura', skills: [] }} /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                        <p>The <code>aria-label</code> tells screen-reader users whose list it is, which helps when two lists sit next to each other. The labels match the ones the API sends in <code>GET /api/meta</code>; when the HQ fetches data in Module 4 it could use those instead, but a typed table stays useful whenever the words are the app's own.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Read the errors, fix the roster summary</h3>
+                    <p>A teammate wrote a summary of an event's sign-ups. It does not pass the check, and it has one more bug no tool will report. Put it in <code>src/Scratch.tsx</code>, run <code>npx tsc -b</code>, fix every error, and then find the bug that is still there.</p>
+                    <pre data-snippet><code class="language-tsx">import type { SignupStatus } from './api/types.ts'
+
+const signupLabels: Record&lt;SignupStatus, string&gt; = {
+  confirmed: 'Confirmed',
+  waitlist: 'Waiting list',
+  cancelled: 'Cancelled',
+  attended: 'Attended',
+}
+
+interface RosterSummaryProps {
+  statuses: SignupStatus[]
+}
+
+export function RosterSummary({ statuses }: RosterSummaryProps) {
+  return (
+    &lt;section&gt;
+      &lt;h2&gt;Sign-ups&lt;/h2&gt;
+      {statuses.length &amp;&amp; &lt;p&gt;{statuses.length} sign-ups so far&lt;/p&gt;}
+      &lt;ul&gt;
+        {statuses.map((status) =&gt; {
+          &lt;li&gt;{signupLabels[status]}&lt;/li&gt;
+        })}
+      &lt;/ul&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Two errors at first. Fix the first one and run the check again: a third appears, because TypeScript reports a misspelled key before it checks for missing ones. <code>SignupStatus</code> has five values. For the bug no tool reports, think about an event with no sign-ups yet.</p>
+                        <div class="card card-output">
+                            <h4>Expected output (npx tsc -b, first run, trimmed)</h4>
+                            <pre><code>src/Scratch.tsx:5:3 - error TS2561: Object literal may only specify known properties, but 'waitlist' does not exist in type 'Record&lt;SignupStatus, string&gt;'. Did you mean to write 'waitlisted'?
+
+5   waitlist: 'Waiting list',
+    ~~~~~~~~
+...
+Found 2 errors in the same file, starting at: src/Scratch.tsx:5</code></pre>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import type { SignupStatus } from './api/types.ts'
+
+const signupLabels: Record&lt;SignupStatus, string&gt; = {
+  confirmed: 'Confirmed',
+  waitlisted: 'Waiting list',
+  cancelled: 'Cancelled',
+  attended: 'Attended',
+  'no-show': 'No-show',
+}
+
+interface RosterSummaryProps {
+  statuses: SignupStatus[]
+}
+
+export function RosterSummary({ statuses }: RosterSummaryProps) {
+  return (
+    &lt;section&gt;
+      &lt;h2&gt;Sign-ups&lt;/h2&gt;
+      {statuses.length &gt; 0 &amp;&amp; &lt;p&gt;{statuses.length} sign-ups so far&lt;/p&gt;}
+      &lt;ul&gt;
+        {statuses.map((status, index) =&gt; (
+          &lt;li key={index}&gt;{signupLabels[status]}&lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+                        <p>After <code>waitlist</code> becomes <code>waitlisted</code>, the check reports the missing key:</p>
+                        <div class="card card-output">
+                            <h4>Expected output (npx tsc -b, second run, first error)</h4>
+                            <pre><code>src/Scratch.tsx:3:7 - error TS2741: Property '"no-show"' is missing in type '{ confirmed: string; waitlisted: string; cancelled: string; attended: string; }' but required in type 'Record&lt;SignupStatus, string&gt;'.
+
+3 const signupLabels: Record&lt;SignupStatus, string&gt; = {
+        ~~~~~~~~~~~~</code></pre>
+                        </div>
+                        <p>Note the quotes in <code>'"no-show"'</code>: a key with a dash is written as a quoted property name. The <code>map</code> callback needs parentheses instead of braces, and then the <code>&lt;li&gt;</code> needs a key. The statuses repeat (many sign-ups are <code>confirmed</code>), so the status cannot be the key, and plain strings have no id: this short, read-only list is the rare case where <code>key={index}</code> is fine. In Module 5 the roster uses <code>RosterEntry</code> objects with their own <code>id</code>. The silent bug was <code>statuses.length &amp;&amp;</code>, which draws "0" for an event with no sign-ups; <code>statuses.length &gt; 0 &amp;&amp;</code> fixes it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Only a few spots left (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 20 minutes).</em></p>
+                    <p>Organizers want cards to say "Only 1 spot left" (or "Only 3 spots left") when three or fewer spots remain, in bold. Add a <code>few</code> kind with <code>spotsLeft</code> to <code>Availability</code> and return it from <code>getAvailability</code>. Run <code>npx tsc -b</code> <em>before</em> you touch <code>SpotsLine</code>, and look at the Jetty Rocks Deep Clean card: what does it show, and why did nothing warn you? Then add the case.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The check passes and the card loses its spots line: <code>SpotsLine</code>'s switch has no <code>few</code> case, so it returns <code>undefined</code>, which draws nothing (the warning card in the unions section). Use <code>? :</code> inside the case for "spot" or "spots".</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/utils/availability.ts</div>
+                            <pre data-snippet><code class="language-ts">import type { CleanupEvent } from '../api/types.ts'
+
+// What an event card says about spots. Each kind carries only the data that kind needs.
+export type Availability =
+  | { kind: 'open'; spotsLeft: number }
+  | { kind: 'few'; spotsLeft: number }
+  | { kind: 'full' }
+  | { kind: 'closed' }
+
+export function getAvailability(event: CleanupEvent): Availability {
+  if (event.status !== 'scheduled') {
+    return { kind: 'closed' }
+  }
+  const spotsLeft = event.capacity - event.spotsTaken
+  if (spotsLeft &lt;= 0) {
+    return { kind: 'full' }
+  }
+  return spotsLeft &lt;= 3 ? { kind: 'few', spotsLeft } : { kind: 'open', spotsLeft }
+}</code></pre>
+                        </div>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/SpotsLine.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import type { Availability } from '../utils/availability.ts'
+
+interface SpotsLineProps {
+  availability: Availability
+  capacity: number
+}
+
+export function SpotsLine({ availability, capacity }: SpotsLineProps) {
+  switch (availability.kind) {
+    case 'open':
+      return (
+        &lt;p&gt;
+          {availability.spotsLeft} of {capacity} spots left
+        &lt;/p&gt;
+      )
+    case 'few':
+      return (
+        &lt;p className="spots-full"&gt;
+          Only {availability.spotsLeft} {availability.spotsLeft === 1 ? 'spot' : 'spots'} left
+        &lt;/p&gt;
+      )
+    case 'full':
+      return &lt;p className="spots-full"&gt;Full: new sign-ups join the waiting list&lt;/p&gt;
+    case 'closed':
+      return null
+  }
+}</code></pre>
+                        </div>
+                        <p>The course's own code keeps the three-kind version. This exercise is the best argument for Lesson 5.1's <code>never</code> check, which turns the silent missing case into a compile error.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> What does React use an item's <code>key</code> for?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Keys never reach the browser as attributes. Who reads them?">
+                                A) It becomes the <code>id</code> attribute of the element in the HTML
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="React compares the new list with the last one by key: same key means the same item, kept and updated; a new key is created; a missing key is removed. That is why keys must be stable and unique among siblings.">
+                                B) To match each item with the one it drew last time, so it can keep, update, move, add or remove items correctly
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The component never receives key. Where does it stay?">
+                                C) To pass an identifier to the component, which reads it as <code>props.key</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Order comes from the array you map. What does the key help React recognize?">
+                                D) To sort the list in the right order
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> An event has no sign-ups, so <code>signups</code> is an empty array. What does <code>&lt;div&gt;{signups.length &amp;&amp; &lt;p&gt;Sign-ups so far&lt;/p&gt;}&lt;/div&gt;</code> show?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The left side is falsy, so the paragraph is skipped. But what value does the expression produce?">
+                                A) An empty div, as intended
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A number is a valid ReactNode. Did tsc complain in the lesson?">
+                                B) A TypeScript error, because a number is not an element
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The length is 0, which is falsy. Is the right side evaluated?">
+                                C) The paragraph
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The && expression evaluates to its falsy left side, the number 0, and React draws numbers. Write signups.length greater than 0 so the left side is a real boolean.">
+                                D) A div containing the character 0
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A table is typed <code>Record&lt;EventStatus, string&gt;</code> and has entries for <code>scheduled</code>, <code>completed</code> and <code>cancelled</code> only. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The type promises a key for every status. Who notices when one is missing?">
+                                A) It compiles, and drafts show an empty label
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The error comes from the type checker, before anything runs. Which tool?">
+                                B) It compiles, and React throws an error when a draft is drawn
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Record with a union of keys requires every key. tsc reports TS2741, Property draft is missing, so the table cannot fall out of date with the type.">
+                                C) <code>npx tsc -b</code> reports TS2741: property <code>'draft'</code> is missing
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> <code>state</code> is a <code>LoadState</code> (<code>loading</code>, <code>failed</code> with a <code>message</code>, <code>ready</code> with <code>events</code>). Inside <code>case 'failed':</code> of <code>switch (state.kind)</code>, what is the type of <code>state</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Checking the discriminant narrows the union to the one member whose kind is failed, so state.message is a string you can read safely.">
+                                A) <code>{ kind: 'failed'; message: string }</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The switch already checked the kind. What does checking a discriminant do to a union?">
+                                B) Still the whole <code>LoadState</code> union
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Narrowing keeps the member as it is. Which properties does the failed member have?">
+                                C) <code>string</code>, the message
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Which key fits the events list best?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Many events share a status. What did the console say about repeated keys?">
+                                A) <code>key={event.status}</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The list is filtered and ordered differently on each page. What happens to an index when items move?">
+                                B) <code>key={index}</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A new key every render means a new item every render. Is that stable?">
+                                C) <code>key={crypto.randomUUID()}</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The API's id is unique, comes from the data and never changes for the same event, which is exactly what a key needs to be.">
+                                D) <code>key={event.id}</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>How do I key a group of elements that has no wrapper?</summary>
+                    <p>A definition list needs a <code>&lt;dt&gt;</code> and a <code>&lt;dd&gt;</code> per item, with nothing around them. The short fragment syntax <code>&lt;&gt;</code> cannot take a key, so import <code>Fragment</code> and write it out:</p>
+                    <pre data-snippet><code class="language-tsx">import { Fragment } from 'react'
+import type { Site } from './api/types.ts'
+
+export function SiteGlossary({ sites }: { sites: Site[] }) {
+  return (
+    &lt;dl&gt;
+      {sites.map((site) =&gt; (
+        &lt;Fragment key={site.id}&gt;
+          &lt;dt&gt;{site.name}&lt;/dt&gt;
+          &lt;dd&gt;{site.description}&lt;/dd&gt;
+        &lt;/Fragment&gt;
+      ))}
+    &lt;/dl&gt;
+  )
+}</code></pre>
+                </details>
+                <details>
+                    <summary>Should I filter inside the component or store the filtered lists?</summary>
+                    <p>Work them out inside the component, as <code>EventsPage</code> does. Filtering 15 or even 1,500 events takes a blink, and a value worked out from the data can never be out of date with it. Lesson 3.4 calls these <em>derived values</em> and keeps them that way when filters come from the user; Lesson 5.3 shows how to measure before reaching for <code>useMemo</code>.</p>
+                </details>
+                <details>
+                    <summary>Lookup table, <code>switch</code> or <code>if</code>?</summary>
+                    <p>A table when each value maps to data (a label, a tone, an icon): it is short and TypeScript checks it is complete. A <code>switch</code> on a discriminant when each case draws something different and needs that member's own data. An <code>if</code> with an early return when one condition changes the whole component, like an empty list.</p>
+                </details>
+                <details>
+                    <summary>Why is <code>BadgeTone</code> exported from a component file? Doesn't the linter complain?</summary>
+                    <p>The template's <code>react/only-export-components</code> rule (it keeps fast refresh reliable) warns about exported <em>values</em> that are not components. Types disappear when the code is compiled, so exporting one is fine, and <code>npm run lint</code> stays at zero warnings. A helper <em>function</em> like <code>getAvailability</code> belongs in a <code>.ts</code> file, which is why it lives in <code>src/utils/</code>.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Give each site card a line saying how many cleanups are coming up there: "2 cleanups coming up", "1 cleanup coming up", or nothing at all when there are none. Work out the count in <code>SiteCard</code> from <code>events</code> with <code>filter</code>, choose "cleanup" or "cleanups" with <code>? :</code>, and show the line with a real boolean on the left of <code>&amp;&amp;</code>. Then ask yourself: should <code>SiteCard</code> import the events itself, or should <code>SitesPage</code> work out the counts and pass a number down as a prop? (Lesson 3.2's design table has an opinion.)</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Explain keys to a friend who has never used React, using your own analogy (not name tags). Then list the three ways this lesson hides or shows something on the screen, with one HQ example each, and write down which one you would have reached for before today.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li><code>map</code> turns data into elements; <code>filter</code>, <code>toSorted</code> and <code>toReversed</code> shape the list first without changing the original</li>
+                        <li>Every item needs a <code>key</code> that is unique among its siblings and stable: take it from the data's <code>id</code>, put it on the element <code>map</code> returns, keep the index for lists that never change</li>
+                        <li>Conditional rendering is plain JavaScript: <code>if</code> with an early return, <code>? :</code>, <code>&amp;&amp;</code> with a real boolean (never a bare number) and <code>null</code></li>
+                        <li>An empty list deserves a sentence, not a blank space</li>
+                        <li>A <code>Record&lt;Union, T&gt;</code> lookup table is exhaustive: TypeScript reports a missing key (TS2741) or a misspelled one (TS2561), and safe to read</li>
+                        <li>A discriminated union on <code>kind</code> lets a component draw each case with exactly that case's data; a <code>switch</code> narrows but does not check completeness until Lesson 5.1</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up list and conditional patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Review unions, narrowing and <code>Record</code></td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Read React's guide to lists and keys</td><td><a href="https://react.dev/learn/rendering-lists" target="_blank" rel="noopener">React: Rendering Lists</a></td></tr>
+                            <tr><td>Read React's guide to conditional rendering</td><td><a href="https://react.dev/learn/conditional-rendering" target="_blank" rel="noopener">React: Conditional Rendering</a></td></tr>
+                            <tr><td>Read TypeScript's page on narrowing and discriminated unions</td><td><a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html" target="_blank" rel="noopener">TypeScript Handbook: Narrowing</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You built the HQ's events page: three lists, keyed by id, with an empty state</li>
+                        <li>You read React's key warnings and know why index keys and repeated keys cause trouble</li>
+                        <li>You used every conditional rendering tool and dodged the <code>0</code> trap</li>
+                        <li>You wrote lookup tables that TypeScript keeps complete, and gave the sites page friendly terrain labels</li>
+                        <li>You wrote your first discriminated union for the UI and a component that draws each kind</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Everything the HQ shows is still fixed when the page loads. In <a href="lesson_10.html"><strong>Lesson 3.4: State and Events</strong></a> it starts to respond: a search box and a status filter for the events page, typed with <code>useState</code> and typed event handlers, with the filtered list worked out from state the same way you worked out today's lists from data.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass in <code>shoreline-hq</code>, and delete <code>src/Scratch.tsx</code></li>
+                    <li>Click through Home, Events and Sites once more, in light and dark mode</li>
+                    <li>Keep your own app's status union and its label table for Lesson 11.1</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Keys, early returns, lookup tables, narrowing: today you met several ideas that experienced developers still get wrong now and then, which is why React warns, TypeScript checks and linters exist. Every red message you read today was a bug that never reached an organizer's screen. If the difference between a table and a switch is not fully clear yet, that is normal: you will write several more of each before Module 5, and each one will feel more natural than the last.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_08.html" class="prev-lesson">← Previous: Props, Children and Composition</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_10.html" class="next-lesson">Next: State and Events →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

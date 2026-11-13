@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Give Shoreline Crew HQ real navigation with React Router 8 in data mode: routes as typed objects, a layout route with an Outlet, Link and NavLink with aria-current, URL parameters with useParams, a not-found page and an error element, plus focus and scroll after every page change. React + TypeScript: Build a Modern Web App Lesson 6.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>React Router 8 - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🧭 Lesson 6.1: React Router 8</h1>
+                <p class="lead">Since Lesson 3.2 the HQ has picked its page with a few lines that read the address once, when the app starts. Every link loads the whole app again: the JavaScript, the fonts, the data. Today the HQ gets a real router. Links swap the page in place, the Back button works, a cleanup's address becomes something the code can read, unknown addresses get a friendly page, and a crashing page no longer takes the header with it. You will also take care of what a router does not do for free: telling keyboard and screen reader users that the page changed.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain what client-side routing changes compared with following plain links, and why the server must still answer every address</li>
+                        <li>Describe an app's pages as typed route objects with <code>createBrowserRouter</code>, including a layout route, an index route and a catch-all <code>*</code> route</li>
+                        <li>Navigate with <code>Link</code> and <code>NavLink</code>, style the current link through <code>aria-current</code>, and pass <code>Link</code> to a polymorphic component</li>
+                        <li>Read URL parameters with <code>useParams</code>, narrow their <code>string | undefined</code> type, and reset a component's state with a <code>key</code> when only the parameter changes</li>
+                        <li>Choose between a route's <code>errorElement</code> and your own error boundary, and keep the layout on screen when a page crashes</li>
+                        <li>Move the focus and the scroll position after a page change so every visitor knows where they are</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_20.html">Lesson 5.4: Component Patterns</a> (your <code>shoreline-hq</code> with the polymorphic <code>Button</code> and the cleanup page's tabs)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> The HQ's router: a layout route with the header and footer, routes for every page, a not-found page, an error page that keeps the layout, router links everywhere with the current section marked, and focus and scroll handling after each page change</li>
+                    <li><span class="meta-label">🧩 Stack</span> React Router 8.5, React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and the browser, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-21-start.zip">lesson-21-start.zip</a> · Finished code: <a href="downloads/lesson-21-end.zip">lesson-21-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#why-router" class="toc-link">Why the HQ Needs a Router</a></li>
+                        <li><a href="#routes" class="toc-link">Routes as Typed Data</a></li>
+                        <li><a href="#layouts" class="toc-link">Layouts, Index Routes and Not Found</a></li>
+                        <li><a href="#links" class="toc-link">Links That Do Not Reload</a></li>
+                        <li><a href="#params" class="toc-link">Reading the Address: useParams</a></li>
+                        <li><a href="#errors" class="toc-link">When a Page Crashes</a></li>
+                        <li><a href="#after-navigation" class="toc-link">After the Page Changes</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Real Navigation for the HQ</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="why-router" class="lesson-section">
+                <h2>🗺️ Why the HQ Needs a Router</h2>
+                <p>Open <code>src/App.tsx</code> from the last lesson. A comment says it plainly: the page is chosen from <code>window.location.pathname</code>, read once, "until React Router arrives". That worked because every link in the HQ is a plain <code>&lt;a href="&#47;events"&gt;</code>, and a plain link makes the browser throw the app away and load it again from the top. Each click repeats the whole start-up: download and run the JavaScript, read the session from <code>sessionStorage</code>, fetch the page's data. The Back button works, but only because each click is a full page load.</p>
+                <p>A <strong>router</strong> keeps the app running and changes the page inside it. When someone follows a router link, it writes the new address into the address bar with the browser's History API (no request for a new HTML page), works out which page the address belongs to, and asks React to render that page. Everything that is the same on both pages (the header, the footer, the signed-in user) stays as it is. The Back and Forward buttons, bookmarks and shared links keep working, because the address is still the real address of the page.</p>
+
+                <div class="card card-info">
+                    <h3>💡 Mental model: the meeting-point board</h3>
+                    <p>On cleanup mornings the crew puts up a board at the parking lot: "Gloves and bags: blue tent. Check-in: picnic table. First-timers: talk to Maya." Volunteers read the board and walk to the right spot; nobody rebuilds the beach for each one. The router is that board. The address is what a visitor is looking for, the route list is the board, and the page is the spot it points to. The beach (the app, with its header, its signed-in user and its loaded code) stays where it is.</p>
+                </div>
+
+                <div class="mermaid">
+graph TD
+    A["Click a router link"] --> B["URL changes, no page load"]
+    B --> C["Router matches the routes"]
+    C --> D["AppLayout stays on screen"]
+    D --> E["Outlet renders the new page"]
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Plain links (the HQ until today)</th><th>Router links (from today)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Following a link</td><td>Loads the app again: HTML, JavaScript, fonts, then the data</td><td>Renders the new page; only its data is fetched</td></tr>
+                            <tr><td>State outside the page</td><td>Lost, unless it was saved (the session survives in <code>sessionStorage</code>)</td><td>Kept: the header, the signed-in user, anything above the page</td></tr>
+                            <tr><td>Back and Forward</td><td>Work (each one is another page load)</td><td>Work, without a page load</td></tr>
+                            <tr><td>Choosing the page</td><td>Your own <code>if</code>s and a regular expression</td><td>A route list the router matches, with parameters</td></tr>
+                            <tr><td>The server</td><td>Must answer every address with the app</td><td>Still must answer every address with the app (more on that at the end)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Why this matters beyond speed: in a team codebase the route list is the first file people read to find their way around, and route-level ideas such as layouts, error pages and (in Lesson 6.3) data loading all hang off it. React itself has no idea what an address is. The router is the piece that connects the two, and React Router is the one most React apps you will meet use.</p>
+            </section>
+
+            <section id="routes" class="lesson-section">
+                <h2>📦 Routes as Typed Data</h2>
+                <p>React Router 8 is one package, <code>react-router</code>. Install it in <code>shoreline-hq</code> (Step 1 does this with you); its TypeScript types are inside the package, so there is no <code>@types</code> package to add. This course was checked with version 8.5.1.</p>
+                <p>React Router can be used in three ways, called <strong>modes</strong>. The HQ uses <strong>data mode</strong>: you describe the routes as an array of plain objects, hand it to <code>createBrowserRouter</code>, and render the result with <code>&lt;RouterProvider&gt;</code>. Data mode is the one that later lets a route load its data before the page renders and handle form submissions (Lesson 6.3), so starting there means nothing gets rewritten.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Mode</th><th>How you describe routes</th><th>Where you will meet it</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Declarative</strong></td><td>JSX: <code>&lt;BrowserRouter&gt;</code>, <code>&lt;Routes&gt;</code>, <code>&lt;Route&gt;</code></td><td>Many tutorials and older apps; no loaders or actions</td></tr>
+                            <tr><td><strong>Data</strong> (the HQ)</td><td>Route objects in <code>createBrowserRouter([...])</code></td><td>Single-page apps that load data per route</td></tr>
+                            <tr><td><strong>Framework</strong></td><td>A routes file plus a Vite plugin, with server rendering</td><td>Full-stack apps; it is what the Remix framework became</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Here is the start of the HQ's route list. Each object is one route: a <code>path</code> to match and an <code>element</code> to render.</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                    <pre data-src="shoreline-hq/src/App.tsx" data-match="excerpt"><code class="language-tsx">// Every address the HQ knows, and the page it shows there
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: &lt;AppLayout /&gt;,
+    children: [
+      {
+        // A route without a path: it adds the error page and keeps the layout around it
+        errorElement: &lt;PageCrashed /&gt;,
+        children: [
+          { index: true, element: &lt;HomePage /&gt; },
+          { path: 'events', element: &lt;EventsPage /&gt; },
+          { path: 'events/new', element: &lt;NewEventPage /&gt; },
+          { path: 'events/:eventId', element: &lt;EventPage /&gt; },
+          { path: 'sites', element: &lt;SitesPage /&gt; },
+          { path: 'sign-in', element: &lt;SignInPage /&gt; },
+          { path: '*', element: &lt;NotFoundPage /&gt; },
+        ],
+      },
+    ],
+  },
+])</code></pre>
+                </div>
+                <p>Paths of child routes are relative to their parent: <code>'events/:eventId'</code> inside <code>'/'</code> matches <code>/events/e08</code>. A segment that starts with a colon is a <strong>parameter</strong>: it matches any one segment and hands its value to the page (that is how <code>EventPage</code> learns which cleanup to show). The order does not decide the match. React Router ranks the routes, so <code>events/new</code> wins over <code>events/:eventId</code> for <code>/events/new</code> wherever they appear in the list, and <code>*</code> only matches what nothing else does.</p>
+
+                <h3>TypeScript checks the shape of every route</h3>
+                <p>The array is typed as <code>RouteObject[]</code>, and <code>RouteObject</code> is a union you already know how to read from Lesson 2.2: an <code>IndexRouteObject</code> (<code>index: true</code>, and <code>children?: undefined</code>) or a <code>NonIndexRouteObject</code> (<code>index?: false</code>, with optional <code>children</code>). An index route is the page <em>at</em> its parent's address, so it cannot have pages of its own. Try giving one children:</p>
+                <pre data-snippet><code class="language-tsx">import { createBrowserRouter } from 'react-router'
+import { EventsPage } from './pages/EventsPage.tsx'
+import { NewEventPage } from './pages/NewEventPage.tsx'
+
+// An index route is the page AT its parent's address: it cannot have pages of its own
+export const router = createBrowserRouter([
+  {
+    index: true,
+    element: &lt;EventsPage /&gt;,
+    children: [{ path: 'new', element: &lt;NewEventPage /&gt; }],
+  },
+])</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:7:3 - error TS2322: Type '{ index: true; element: JSX.Element; children: [{ path: string; element: JSX.Element; }]; }' is not assignable to type 'RouteObject'.
+  Types of property 'children' are incompatible.
+    Type '[{ path: string; element: Element; }]' is not assignable to type 'undefined'.
+
+  7   {
+      ~
+  8     index: true,
+    ~~~~~~~~~~~~~~~~
+...
+ 10     children: [{ path: 'new', element: &lt;NewEventPage /&gt; }],
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 11   },
+    ~~~
+
+
+Found 1 error in src/Scratch.tsx:7</code></pre>
+                </div>
+                <p>Read it from the bottom up: <code>children</code> must be <code>undefined</code> on this object, because <code>index: true</code> picked the index member of the union. That is a discriminated union guarding you from a route that could never render. Error messages like this one are TypeScript doing its job early; the fix is to read the last line, not to fight the first.</p>
+
+                <div class="card card-info">
+                    <h3>🧩 Version note: react-router-dom and older tutorials</h3>
+                    <p>Until version 6, browser apps installed <code>react-router-dom</code>. Since version 7 everything lives in <code>react-router</code>, and there is no version 8 of <code>react-router-dom</code>: on npm its latest release is a 7.x that brings its own copy of <code>react-router</code> 7. Tutorials written for older versions also wrap the app in <code>&lt;BrowserRouter&gt;</code> and use <code>&lt;Switch&gt;</code> (version 5) or <code>&lt;Routes&gt;</code>. If you follow one, translate its imports to <code>react-router</code>; the Common Mistakes section shows what happens when the two packages meet.</p>
+                </div>
+            </section>
+
+            <section id="layouts" class="lesson-section">
+                <h2>🏗️ Layouts, Index Routes and Not Found</h2>
+                <p>The HQ's frame (skip link, header, <code>&lt;main&gt;</code>, footer) is the same on every page. In the route list it becomes a <strong>layout route</strong>: the route for <code>/</code> renders <code>&lt;AppLayout /&gt;</code>, and its children are the pages. <code>AppLayout</code> no longer takes <code>children</code>; it renders <code>&lt;Outlet /&gt;</code> where the page goes, and the router fills the outlet with whichever child route matches.</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/AppLayout.tsx" data-match="excerpt"><code class="language-tsx">import { Outlet, ScrollRestoration, useLocation } from 'react-router'
+// ...
+      &lt;main id="main" ref={mainRef} tabIndex={-1} className={styles.page}&gt;
+        &lt;Outlet /&gt;
+      &lt;/main&gt;</code></pre>
+                </div>
+                <p>Between the layout route and the pages sits a route with no <code>path</code> at all. A <strong>pathless route</strong> does not add anything to the address; it groups its children so they can share something. Here they share an <code>errorElement</code>, which the section on crashes explains. Inside it:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Route</th><th>Matches</th><th>Renders</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>{ index: true }</code></td><td><code>&#47;</code> exactly (the parent's own address)</td><td><code>HomePage</code></td></tr>
+                            <tr><td><code>'events'</code>, <code>'events/new'</code>, <code>'sites'</code>, <code>'sign-in'</code></td><td>That address (a trailing slash too: <code>&#47;events/</code> showed the events page)</td><td>The page</td></tr>
+                            <tr><td><code>'events/:eventId'</code></td><td><code>&#47;events/e08</code>, <code>&#47;events/anything</code></td><td><code>EventPage</code>, which reads <code>eventId</code></td></tr>
+                            <tr><td><code>'*'</code></td><td>Everything else, such as <code>&#47;volunteers</code> or <code>&#47;events/e01/photos</code></td><td><code>NotFoundPage</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Because the <code>*</code> route is a child of the layout, the not-found page keeps the header, the footer and a way back:</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_21/21-not-found.png" alt="Shoreline Crew HQ at the address slash volunteers. The header and footer are the usual ones; the page says Page not found, There is no page at this address in Shoreline Crew HQ, with links to the home page and the list of cleanups." width="1100" height="688" loading="lazy">
+                    <figcaption>The <code>*</code> route catches every address the HQ does not know. It sits inside the layout route, so the header and footer stay and people have a way on.</figcaption>
+                </figure>
+                <p>The <strong>Volunteers</strong> and <strong>Impact</strong> links have left the header for now. Until today they quietly showed the home page; with a router they would land on "Page not found", which is honest but not a good link. They come back with their pages.</p>
+            </section>
+
+            <section id="links" class="lesson-section">
+                <h2>🔗 Links That Do Not Reload</h2>
+                <p><code>&lt;Link to="&#47;events"&gt;</code> renders a real <code>&lt;a href="&#47;events"&gt;</code>, so it still works with a middle-click, "Open in new tab", "Copy link" and a screen reader's links list. What changes is a plain left click: <code>Link</code> cancels the browser's page load and tells the router to navigate instead. Measured in the HQ (on the build and on the dev server): from the home page, through Events, a cleanup, Back, Forward and the logo back home, the browser loaded exactly one HTML page, the first one.</p>
+                <p><code>Link</code> takes <code>to</code>, not <code>href</code>. TypeScript knows:</p>
+                <pre data-snippet><code class="language-tsx">import { Link } from 'react-router'
+
+export function BackToList() {
+  return &lt;Link href="/events"&gt;← All cleanups&lt;/Link&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:4:16 - error TS2322: Type '{ href: string; children: string; }' is not assignable to type 'IntrinsicAttributes &amp; LinkProps &amp; RefAttributes&lt;HTMLAnchorElement&gt;'.
+  Property 'href' does not exist on type 'IntrinsicAttributes &amp; LinkProps &amp; RefAttributes&lt;HTMLAnchorElement&gt;'. Did you mean 'ref'?
+
+4   return &lt;Link href="/events"&gt;← All cleanups&lt;/Link&gt;
+                 ~~~~
+
+
+Found 1 error in src/Scratch.tsx:4</code></pre>
+                </div>
+
+                <h3>NavLink: the link that knows it is current</h3>
+                <p>A <code>NavLink</code> is a <code>Link</code> that compares its <code>to</code> with the current address. When they match, it adds <code>aria-current="page"</code>, which screen readers announce ("current page"), and a class named <code>active</code>. CSS Modules rename your classes, so a global <code>active</code> class is awkward to style; style the attribute instead, as Lesson 3.6's Exercise 1 did by hand. Then what people see and what screen readers hear can never disagree:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/Header.module.css</div>
+                    <pre data-src="shoreline-hq/src/components/Header.module.css" data-match="excerpt"><code class="language-css">.nav a[aria-current='page'] {
+  font-weight: 700;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 0.3em;
+}</code></pre>
+                </div>
+                <p>By default a <code>NavLink</code> also counts the addresses below its own as a match. Measured: <strong>Events</strong> is current on <code>&#47;events</code>, <code>&#47;events/new</code> and <code>&#47;events/e08</code>, which is what you want for a section of the app. Add the <code>end</code> prop when only the exact address should count (Exercise 1 measures it).</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_21/21-nav-current.png" alt="The top of the Weekend Cove Cleanup page in Shoreline Crew HQ. In the dark header, the navigation shows Events and Sites; Events, outlined in red, is bold with a thick underline because it is the current section. Below it are the link All cleanups and the cleanup&#x27;s title." width="1100" height="258" loading="lazy">
+                    <figcaption><code>NavLink</code> gives <strong>Events</strong> <code>aria-current="page"</code> on every address that starts with <code>&#47;events</code>, including a single cleanup. The header's CSS styles that attribute, so what people see matches what screen readers announce.</figcaption>
+                </figure>
+
+                <h3>Link through the polymorphic Button</h3>
+                <p>Lesson 5.4 promised this one. "Plan a cleanup" has been <code>&lt;Button as="a" href="&#47;events/new" variant="primary"&gt;</code>. Because <code>as</code> accepts any component, and the props follow it, the change is at the call site only:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { useEffect, useRef, useState } from 'react'
++import { Link } from 'react-router'
+ import { getEvents, getSites } from '../api/client.ts'
+ // ...
+-          &lt;Button as="a" href="/events/new" variant="primary"&gt;
++          &lt;Button as={Link} to="/events/new" variant="primary"&gt;
+             Plan a cleanup
+           &lt;/Button&gt;</code></pre>
+                </div>
+                <p><code>Button</code> is unchanged. With <code>as={Link}</code>, its props come from <code>ComponentPropsWithRef&lt;typeof Link&gt;</code>, so <code>to</code> is required and <code>href</code> is an error, exactly as the stand-in showed last lesson. In the browser it is still an <code>&lt;a href="&#47;events/new"&gt;</code> with no <code>type</code> attribute, in the primary teal.</p>
+            </section>
+
+            <section id="params" class="lesson-section">
+                <h2>🔎 Reading the Address: useParams</h2>
+                <p>Until today <code>App</code> pulled the cleanup's id out of the address with a regular expression and passed it to <code>EventPage</code> as a prop. With the route <code>'events/:eventId'</code>, the page asks the router instead:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="excerpt"><code class="language-tsx">// The route is events/:eventId, so the router fills in eventId from the address
+export function EventPage() {
+  const { eventId } = useParams()
+  const { session } = useAuth()
+  const viewer = session?.user.id ?? 'guest'
+
+  if (eventId === undefined) {
+    throw new Error('EventPage needs a route with an :eventId parameter')
+  }</code></pre>
+                </div>
+                <p>Hover <code>eventId</code> in VS Code and the tooltip shows <code>string | undefined</code>. TypeScript cannot see the route list from inside <code>EventPage</code>: the same component could be rendered by a route with no <code>:eventId</code>, and then there would be no value. So you narrow it, as with any <code>T | undefined</code> since Lesson 2.2. Throwing is the right narrowing here, because a missing parameter is a bug in the route list, not something a visitor can cause; the error element shows the crash page and the console names the problem. (Lesson 6.2 looks at keeping paths and parameter names in one place.)</p>
+                <p>The parameter's name is the contract between route and page. Rename it on one side only and TypeScript stays quiet, because both sides are just strings. The Common Mistakes section shows what that looks like.</p>
+
+                <h3>Same route, new parameter: give it a key</h3>
+                <p>Here is a subtle one. When the address changes from one cleanup to another, the route stays the same, so React keeps the same <code>EventPage</code> and everything inside it, with its state. The tabs from Lesson 5.4 remember their selection with <code>useState(defaultTab)</code>, and a default only applies when a component mounts. The HQ has no links between two cleanups yet, so to measure it, a temporary "Next" link was added to the page. Signed in as Maya, on Storm Debris Sweep with the <strong>Impact</strong> tab open, following it to Tide Pool Morning Cleanup gave:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Tabs shown</th><th>Selected tab</th><th>Visible panels</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Without a key</td><td>Details, Check-in desk</td><td>none (still "impact")</td><td>0: an empty page under the tabs</td></tr>
+                            <tr><td>With <code>key={eventId}</code></td><td>Details, Check-in desk</td><td>Check-in desk</td><td>1: the desk, as on a fresh visit</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>A <code>key</code> is React's identity for a component (you met it on list items in Lesson 3.3). Change it and React throws the old component away and mounts a new one. Putting <code>key={eventId}</code> on the page's <code>ErrorBoundary</code> resets everything inside it at once: the boundary's error state (a "Cleanup not found" will not stick to the next cleanup), the Suspense boundary, the details and the tabs.</p>
+            </section>
+
+            <section id="errors" class="lesson-section">
+                <h2>🧯 When a Page Crashes</h2>
+                <p>In Lesson 4.4 you wrapped every page in your own <code>ErrorBoundary</code> class with a <code>PageCrashed</code> fallback. In data mode the router catches errors itself: each route can have an <code>errorElement</code>, and when anything inside the route throws while rendering, React Router renders the nearest <code>errorElement</code> instead. (In Lesson 6.3, errors thrown while loading a route's data land there too, which your own boundary could never catch.) So the app-wide boundary becomes the pathless route's <code>errorElement</code>, and <code>PageCrashed</code> moves into it.</p>
+                <p>Where you put it decides what stays on screen. To see it, <code>SitesPage</code> was made to throw <code>new Error('Test crash: the sites page broke while rendering')</code>, and the <strong>Sites</strong> link followed:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th><code>errorElement</code> on…</th><th>What the visitor saw</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>the pathless route inside the layout (the HQ)</td><td>The header with <strong>Sites</strong> marked current, "Something went wrong on this page", the footer</td></tr>
+                            <tr><td>the layout route itself</td><td>The same message, but no header and no footer: the error element replaced the layout too</td></tr>
+                            <tr><td>no route</td><td>React Router's own screen, "Unexpected Application Error!", in place of the whole app</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <figure class="screenshot">
+                    <img src="images/lesson_21/21-page-crashed.png" alt="Shoreline Crew HQ after the Sites page crashed. The header still shows Events and Sites, with Sites marked as current. The page area says Something went wrong on this page, It is not something you did, with a Try again button and a Go to the home page link, outlined in red." width="1100" height="361" loading="lazy">
+                    <figcaption>The pathless route's <code>errorElement</code> replaces only the page: the header, the footer and the navigation keep working.</figcaption>
+                </figure>
+                <p>And this is the "no route" row, the screen your visitors would get if you forgot the <code>errorElement</code> entirely:</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_21/21-default-error.png" alt="A bare page with no header and no footer. The heading Unexpected Application Error! in large type, the message Test crash: the sites page broke while rendering, a long stack trace on a grey background, and a note from React Router: Hey developer, you can provide a way better UX than this when your app throws errors by providing your own ErrorBoundary or errorElement prop on your route." width="1100" height="481" loading="lazy">
+                    <figcaption>With no <code>errorElement</code> on any route, React Router shows its own development screen in place of the whole app. Your users would see this too, without the hints.</figcaption>
+                </figure>
+                <p><strong>Try again</strong> needs one change. React Router remembers a rendering error until the address changes, so <code>PageCrashed</code> navigates to the address it is already on, with <code>replace</code> so the history does not grow: <code>navigate(location, { replace: true })</code>. Measured: while the page still threw, <strong>Try again</strong> showed the error page again; once it stopped throwing, <strong>Try again</strong> brought back the sites. Following any other link clears the error as well.</p>
+                <p>Your own <code>ErrorBoundary</code> class still has a job. <code>EventPage</code> keeps its boundary from Lesson 4.4: it sits around one part of the page, tells "Cleanup not found" apart from "Could not load", and its <strong>Try again</strong> forgets the failed request first. Route error elements for whole pages; your own boundary for a part of a page.</p>
+                <p>An error element can also read the error with <code>useRouteError()</code>. Its return type is <code>unknown</code>, because JavaScript can throw anything, so you narrow before you use it:</p>
+                <pre data-snippet><code class="language-tsx">import { isRouteErrorResponse, useRouteError } from 'react-router'
+
+// An error page that says what went wrong (an errorElement can use this Hook)
+export function RouteProblem() {
+  const error = useRouteError() // unknown: anything can be thrown
+  if (isRouteErrorResponse(error)) {
+    return &lt;h1&gt;{error.status} {error.statusText}&lt;/h1&gt;
+  }
+  if (error instanceof Error) {
+    return &lt;h1&gt;Something went wrong: {error.message}&lt;/h1&gt;
+  }
+  return &lt;h1&gt;Something went wrong&lt;/h1&gt;
+}</code></pre>
+                <p><code>isRouteErrorResponse</code> is a type predicate (Lesson 2.4) for the error responses a route's data loading can throw, with a <code>status</code> such as 404. The HQ's <code>PageCrashed</code> does not show error details to visitors, so it does not need this yet; Lesson 6.3 will.</p>
+            </section>
+
+            <section id="after-navigation" class="lesson-section">
+                <h2>♿ After the Page Changes</h2>
+                <p>A full page load does three things a router navigation does not do on its own. You add them back once, in <code>AppLayout</code>, and every page benefits.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>A page load…</th><th>After a router navigation, without help</th><th>The HQ's fix</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>starts at the top of the page</td><td>stays scrolled where the old page was</td><td><code>&lt;ScrollRestoration /&gt;</code> from React Router (measured: a cleanup opened from the bottom of the list starts at the top)</td></tr>
+                            <tr><td>sets a new title</td><td>keeps the old title</td><td>already done: <code>useDocumentTitle</code> sets it, and restores the previous title when the page leaves (Lesson 4.2), so the home page shows "Shoreline Crew HQ" again</td></tr>
+                            <tr><td>moves keyboard and screen reader focus to the top of the new document</td><td>leaves the focus on the link that was clicked, or drops it on <code>&lt;body&gt;</code> if the link left the page</td><td>focus <code>&lt;main&gt;</code> when the address changes</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/AppLayout.tsx" data-match="excerpt"><code class="language-tsx">export function AppLayout() {
+  const { pathname } = useLocation()
+  const mainRef = useRef&lt;HTMLElement&gt;(null)
+  const shownPath = useRef(pathname)
+
+  // After a link changes the page, start reading from the new page, not from the old link
+  useEffect(() =&gt; {
+    if (pathname !== shownPath.current) {
+      shownPath.current = pathname
+      mainRef.current?.focus({ preventScroll: true })
+    }
+  }, [pathname])</code></pre>
+                </div>
+                <p><code>&lt;main&gt;</code> gets <code>tabIndex={-1}</code>, so a script can focus it but the <kbd>Tab</kbd> key never stops on it. The ref remembers the address the focus was last moved for, which keeps the very first page (and React's Strict Mode, which runs effects twice in development) from grabbing the focus on load. <code>preventScroll</code> leaves scrolling to <code>ScrollRestoration</code>. Measured after pressing <kbd>Enter</kbd> on "See all six sites": the focus was on <code>main#main</code>, no focus ring was drawn around the page (one small CSS rule, in Step 2), and the next <kbd>Tab</kbd> went to the skip link, the first thing on the page, just as after a full page load. A screen reader then reads from the start of the new page instead of staying on a link that is gone. Screen readers differ in what they announce when a landmark gets the focus, so test with one if you can; focusing the main area or its heading are both common, well-supported choices.</p>
+                <p>Back still lands at the top of the list here, not where you were: the events list fetches its data after the page appears, so the page is short when React Router restores the position. Once data arrives before the page renders (Lesson 6.3), the saved position has somewhere to go.</p>
+
+                <div class="card card-warning">
+                    <h3>⚠️ The server must still answer every address</h3>
+                    <p>A router changes the address without asking the server, but a visitor can also type <code>&#47;events/e08</code>, bookmark it, or press reload. Then the browser asks the server for <code>&#47;events/e08</code>, and the server has no such file: the app is one <code>index.html</code>. Vite's dev server and <code>npm run preview</code> already answer unknown addresses with <code>index.html</code> (measured: reloading <code>&#47;events/e08</code> works on both), and the router takes it from there. A plain static host does not. Served from a static server that behaves like a free host with no extra settings, the built HQ opened at <code>&#47;</code> and links worked, but reloading <code>&#47;events</code> answered <strong>404</strong>, and so did opening <code>&#47;events/e08</code> directly. Hosts call the fix a <strong>SPA fallback</strong> or rewrite rule: "for any address, serve <code>index.html</code> with status 200". Lesson 10.2 adds it for Netlify.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A plain <code>&lt;a href&gt;</code> left behind</h3>
+                    <p>Miss one link while converting, and it still "works", which is why it is easy to miss. With <strong>Events</strong> in the header put back to <code>&lt;a href="&#47;events"&gt;</code>, measured on the dev server: clicking it loaded a new HTML page, and a value stored on <code>window</code> before the click was gone afterwards (the whole app started over). It also lost <code>aria-current</code>, since only a <code>NavLink</code> sets it. Search the project for <code>href="&#47;</code> (VS Code: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd>, <kbd>⌘ Cmd</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd> on a Mac); the only <code>href</code> left in the HQ should be the skip link's <code>#main</code>, which stays an ordinary link because it jumps within the page.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A Link outside the router</h3>
+                    <p>The first idea for converting <code>App</code> is often to keep the layout where it was and put the router inside it: <code>&lt;AppLayout&gt;&lt;RouterProvider router={router} /&gt;&lt;/AppLayout&gt;</code>. It compiles and lints cleanly. In the browser the page stayed blank (<code>#root</code> empty), with this error in the Console:</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>Cannot destructure property 'basename' of 'import_react.useContext(...)' as it is null.</code></pre>
+                    </div>
+                    <p>The header's <code>Link</code>s and <code>NavLink</code>s were rendered outside <code>&lt;RouterProvider&gt;</code>, where there is no router for them to read (<code>useContext(...)</code> is <code>null</code>: the "undefined context" trap from Lesson 5.2, inside a library). Every component that uses a router link or a router Hook must be inside the router. That is why the layout is a route.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Following an old tutorial: react-router-dom</h3>
+                    <p>An older tutorial says <code>npm install react-router-dom</code> and imports <code>NavLink</code> from it. In a copy of the HQ, that installed <code>react-router-dom</code> 7.18.5, which brought its own <code>react-router</code> 7.18.5 next to the HQ's 8.5.1 (<code>npm ls react-router</code> lists both). TypeScript was happy; the browser showed React Router's error screen with the same message as above: "Cannot destructure property 'basename' of 'import_react.useContext(...)' as it is null.". Two copies of the router means two separate contexts, and the 7.x <code>NavLink</code> cannot see the 8.x router. Import everything from <code>react-router</code>, and if the old package got installed, <code>npm uninstall react-router-dom</code>.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ The route's parameter and the page disagree</h3>
+                    <p>Write the route as <code>'events/:id'</code> while <code>EventPage</code> reads <code>eventId</code>, and <code>npx tsc -b</code> and <code>npm run lint</code> both pass. Measured on <code>&#47;events/e08</code>: "Something went wrong on this page", and in the Console the error <code>EventPage</code> throws: "EventPage needs a route with an :eventId parameter". Without that check, <code>undefined</code> would have reached the API as part of an address. Keep the name in one place you can see from both sides (the comment above <code>EventPage</code> does that for now).</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Forgetting the key when only the parameter changes</h3>
+                    <p>Measured above: without <code>key={eventId}</code>, a selected tab (or an error) from one cleanup carries over to the next when the route stays the same. Any page whose state belongs to "this one item" needs a key from the item's id once two items can link to each other.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Real Navigation for the HQ</h2>
+                <p>You will install React Router, turn <code>App.tsx</code> into the HQ's route list, make <code>AppLayout</code> a layout route, add the not-found page, convert every link, and let <code>EventPage</code> read its id from the address. Start shoreline-api (<code>node server.ts</code> in <code>shoreline-api</code>) in one terminal; you will start the dev server after Step 1.</p>
+
+                <div class="card">
+                    <h3>Step 1: Install React Router and write the routes <span class="step-time">(12 min)</span></h3>
+                    <p>In <code>shoreline-hq</code>:</p>
+                    <pre class="terminal"><code class="language-bash">npm install react-router</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>added 3 packages, and audited 78 packages in 891ms
+
+15 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities</code></pre>
+                    </div>
+                    <p><code>package.json</code> now lists <code>"react-router": "^8.5.1"</code> (or a newer 8.x). The three packages are React Router and two small packages it uses. Now replace <code>src/App.tsx</code>: the page switch, the regular expression and the <code>ErrorBoundary</code> wrapper go; the route list and <code>RouterProvider</code> come in. <code>PageCrashed</code> stays, with router links.</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx"><code class="language-tsx">import { createBrowserRouter, Link, useLocation, useNavigate } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
+import { AuthProvider } from './auth/AuthProvider.tsx'
+import { AppLayout } from './components/AppLayout.tsx'
+import { Button } from './components/Button.tsx'
+import { EventPage } from './pages/EventPage.tsx'
+import { EventsPage } from './pages/EventsPage.tsx'
+import { HomePage } from './pages/HomePage.tsx'
+import { NewEventPage } from './pages/NewEventPage.tsx'
+import { NotFoundPage } from './pages/NotFoundPage.tsx'
+import { SignInPage } from './pages/SignInPage.tsx'
+import { SitesPage } from './pages/SitesPage.tsx'
+
+// Shown instead of a page that crashed while rendering; the header and footer keep working
+function PageCrashed() {
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  return (
+    &lt;div role="alert"&gt;
+      &lt;h1&gt;Something went wrong on this page&lt;/h1&gt;
+      &lt;p&gt;It is not something you did. Try again, or start over from the home page.&lt;/p&gt;
+      &lt;p&gt;
+        &lt;Button onClick={() =&gt; navigate(location, { replace: true })}&gt;Try again&lt;/Button&gt;{' '}
+        &lt;Link to="/"&gt;Go to the home page&lt;/Link&gt;
+      &lt;/p&gt;
+    &lt;/div&gt;
+  )
+}
+
+// Every address the HQ knows, and the page it shows there
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: &lt;AppLayout /&gt;,
+    children: [
+      {
+        // A route without a path: it adds the error page and keeps the layout around it
+        errorElement: &lt;PageCrashed /&gt;,
+        children: [
+          { index: true, element: &lt;HomePage /&gt; },
+          { path: 'events', element: &lt;EventsPage /&gt; },
+          { path: 'events/new', element: &lt;NewEventPage /&gt; },
+          { path: 'events/:eventId', element: &lt;EventPage /&gt; },
+          { path: 'sites', element: &lt;SitesPage /&gt; },
+          { path: 'sign-in', element: &lt;SignInPage /&gt; },
+          { path: '*', element: &lt;NotFoundPage /&gt; },
+        ],
+      },
+    ],
+  },
+])
+
+export function App() {
+  return (
+    &lt;AuthProvider&gt;
+      &lt;RouterProvider router={router} /&gt;
+    &lt;/AuthProvider&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Notes: <code>RouterProvider</code> comes from <code>react-router/dom</code>, the version for browsers (the one from <code>react-router</code> also works, but the <code>/dom</code> one plugs React DOM in for you). <code>router</code> is created once, at module level, not inside <code>App</code>: a new router on every render would start over each time. <code>AuthProvider</code> stays outside the router, so the session survives every page change. <code>NotFoundPage</code> does not exist yet, so TypeScript reports it until Step 3, and <code>EventPage</code> gets no props now, so TypeScript reports that until Step 5: two red underlines that are your to-do list.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: AppLayout becomes the layout route <span class="step-time">(8 min)</span></h3>
+                    <p>Replace <code>src/components/AppLayout.tsx</code>. The <code>children</code> prop and its interface go; <code>&lt;Outlet /&gt;</code>, the focus effect and <code>&lt;ScrollRestoration /&gt;</code> come in:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.tsx"><code class="language-tsx">import { useEffect, useRef } from 'react'
+import { Outlet, ScrollRestoration, useLocation } from 'react-router'
+import styles from './AppLayout.module.css'
+import { Footer } from './Footer.tsx'
+import { Header } from './Header.tsx'
+
+// The frame around every page: the router renders the current page where &lt;Outlet /&gt; is
+export function AppLayout() {
+  const { pathname } = useLocation()
+  const mainRef = useRef&lt;HTMLElement&gt;(null)
+  const shownPath = useRef(pathname)
+
+  // After a link changes the page, start reading from the new page, not from the old link
+  useEffect(() =&gt; {
+    if (pathname !== shownPath.current) {
+      shownPath.current = pathname
+      mainRef.current?.focus({ preventScroll: true })
+    }
+  }, [pathname])
+
+  return (
+    &lt;&gt;
+      &lt;a className={styles.skipLink} href="#main"&gt;
+        Skip to main content
+      &lt;/a&gt;
+      &lt;Header /&gt;
+      &lt;main id="main" ref={mainRef} tabIndex={-1} className={styles.page}&gt;
+        &lt;Outlet /&gt;
+      &lt;/main&gt;
+      &lt;Footer /&gt;
+      &lt;ScrollRestoration /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Add one rule at the end of <code>AppLayout.module.css</code>, so a focused <code>&lt;main&gt;</code> does not get the global focus ring around the whole page (it is not something you can operate, so the ring would only confuse):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.module.css" data-match="excerpt"><code class="language-css">/* main gets the focus after a page change (tabIndex -1): no ring around the whole page */
+.page:focus {
+  outline: none;
+}</code></pre>
+                    </div>
+                    <p><code>useLocation()</code> returns a <code>Location</code> object (<code>pathname</code>, <code>search</code>, <code>hash</code>, <code>state</code>, <code>key</code>); hover it to see the type. Only the <code>pathname</code> matters here, so a change of search text alone (Lesson 6.2's filters) will not steal the focus from the search box.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: The not-found page <span class="step-time">(5 min)</span></h3>
+                    <p>Create <code>src/pages/NotFoundPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/NotFoundPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/NotFoundPage.tsx"><code class="language-tsx">import { Link } from 'react-router'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './Page.module.css'
+
+// The router's last route, path '*': any address the HQ does not know ends up here
+export function NotFoundPage() {
+  useDocumentTitle('Page not found')
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Page not found&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;There is no page at this address in Shoreline Crew HQ.&lt;/p&gt;
+      &lt;p&gt;
+        Check the address for a typo, or go to the &lt;Link to="/"&gt;home page&lt;/Link&gt; or the{' '}
+        &lt;Link to="/events"&gt;list of cleanups&lt;/Link&gt;.
+      &lt;/p&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>It sets its own title with <code>useDocumentTitle</code> like every page, and it offers two ways on. A not-found page is a normal part of a site, not an error: nothing crashed, so it is a route, not an <code>errorElement</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Router links everywhere <span class="step-time">(14 min)</span></h3>
+                    <p>Start the dev server (<code>npm run dev</code>) and keep the browser open as you go. First the header: the logo becomes a <code>Link</code>, the section links become <code>NavLink</code>s, and Volunteers and Impact leave for now.</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Header.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Header.tsx"><code class="language-tsx">import { Link, NavLink } from 'react-router'
+import logoUrl from '../assets/logo.svg'
+import styles from './Header.module.css'
+import { UserMenu } from './UserMenu.tsx'
+
+export function Header() {
+  return (
+    &lt;header className={styles.header}&gt;
+      &lt;Link className={styles.brand} to="/"&gt;
+        &lt;img src={logoUrl} alt="" width={40} height={40} /&gt;
+        &lt;span&gt;Shoreline Crew HQ&lt;/span&gt;
+      &lt;/Link&gt;
+      &lt;nav className={styles.nav} aria-label="Main"&gt;
+        &lt;ul&gt;
+          &lt;li&gt;&lt;NavLink to="/events"&gt;Events&lt;/NavLink&gt;&lt;/li&gt;
+          &lt;li&gt;&lt;NavLink to="/sites"&gt;Sites&lt;/NavLink&gt;&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/nav&gt;
+      &lt;UserMenu /&gt;
+    &lt;/header&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Add the <code>aria-current</code> rule from the NavLink section at the end of <code>Header.module.css</code>. Then the other links, all the same change: import <code>Link</code> from <code>react-router</code>, then <code>&lt;a href=…&gt;</code> becomes <code>&lt;Link to=…&gt;</code>. In <code>UserMenu.tsx</code> (the class stays):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/UserMenu.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/UserMenu.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">+import { Link } from 'react-router'
+ import type { Role } from '../api/types.ts'
+ // ...
+   if (session === null) {
+     return (
+-      &lt;a className={styles.link} href="/sign-in"&gt;
++      &lt;Link className={styles.link} to="/sign-in"&gt;
+         Sign in
+-      &lt;/a&gt;
++      &lt;/Link&gt;
+     )
+   }</code></pre>
+                    </div>
+                    <p>In <code>EventCard.tsx</code>, the title link (a template literal works in <code>to</code> as it did in <code>href</code>):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { useState } from 'react'
++import { Link } from 'react-router'
+ import type { CleanupEvent, Site } from '../api/types.ts'
+ // ...
+       &lt;h3&gt;
+-        &lt;a href={`/events/${event.id}`}&gt;{event.title}&lt;/a&gt;
++        &lt;Link to={`/events/${event.id}`}&gt;{event.title}&lt;/Link&gt;
+       &lt;/h3&gt;</code></pre>
+                    </div>
+                    <p>The rest, each with the <code>Link</code> import added at the top:</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>File</th><th>Link</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>src/pages/HomePage.tsx</code></td><td>"See all cleanups" (<code>to="&#47;events"</code>) and "See all six sites" (<code>to="&#47;sites"</code>)</td></tr>
+                                <tr><td><code>src/pages/SignInPage.tsx</code></td><td>"Go to the cleanups" in <code>SignedIn</code> (<code>to="&#47;events"</code>)</td></tr>
+                                <tr><td><code>src/pages/EventsPage.tsx</code></td><td>"Plan a cleanup": <code>as={Link} to="&#47;events/new"</code> (the diff in the Links section)</td></tr>
+                                <tr><td><code>src/pages/EventPage.tsx</code></td><td>"← All cleanups", in Step 5</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>For example, the home page's cards:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="excerpt"><code class="language-tsx">&lt;div className={styles.grid}&gt;
+  &lt;Card title="Next cleanup"&gt;
+    {upcoming.state.kind === 'ready' ? (
+      &lt;NextCleanup upcoming={upcoming.state.data} /&gt;
+    ) : (
+      &lt;LoadStatus state={upcoming.state} what="the next cleanup" onRetry={upcoming.reload} /&gt;
+    )}
+    &lt;Link to="/events"&gt;See all cleanups&lt;/Link&gt;
+  &lt;/Card&gt;
+  &lt;Card title="Our beach sites"&gt;
+    &lt;p&gt;Six stretches of coast, from sandy beaches to a tidal marsh.&lt;/p&gt;
+    &lt;Link to="/sites"&gt;See all six sites&lt;/Link&gt;
+  &lt;/Card&gt;
+&lt;/div&gt;</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: EventPage reads its id <span class="step-time">(8 min)</span></h3>
+                    <p>At the top of <code>src/pages/EventPage.tsx</code>, import from <code>react-router</code>, fix the comment above <code>today</code> (links no longer reload the app, so the date is now read once per visit to the HQ, not once per page), and give <code>TodaysDesk</code> its own props interface, since <code>EventPage</code> no longer has props:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { Suspense, use } from 'react'
++import { Link, useParams } from 'react-router'
+ import { ApiError, describeError, getRoster } from '../api/client.ts'
+ // ...
+-// Read once, when the app starts: the pages reload whenever you follow a link
++// Read once, when the app starts. An HQ left open past midnight keeps the old date until it
++// reloads: fine for a check-in desk that opens in the morning.
+ const today = toDateString(new Date())
+
+-interface EventPageProps {
++interface TodaysDeskProps {
+   eventId: string
+ }
+ // ...
+-function TodaysDesk({ eventId }: EventPageProps) {
++function TodaysDesk({ eventId }: TodaysDeskProps) {</code></pre>
+                    </div>
+                    <p>Then the page itself, at the bottom of the file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="excerpt"><code class="language-tsx">// The route is events/:eventId, so the router fills in eventId from the address
+export function EventPage() {
+  const { eventId } = useParams()
+  const { session } = useAuth()
+  const viewer = session?.user.id ?? 'guest'
+
+  if (eventId === undefined) {
+    throw new Error('EventPage needs a route with an :eventId parameter')
+  }
+  return (
+    &lt;&gt;
+      &lt;p&gt;
+        &lt;Link to="/events"&gt;← All cleanups&lt;/Link&gt;
+      &lt;/p&gt;
+      {/* A new key for each cleanup: a fresh boundary, fresh tabs, nothing left from the last one */}
+      &lt;ErrorBoundary
+        key={eventId}
+        fallback={EventProblem}
+        onRetry={() =&gt; forgetEvent(eventId, viewer)}
+      &gt;
+        &lt;Suspense fallback={&lt;LoadStatus state={{ kind: 'loading' }} what="the cleanup" /&gt;}&gt;
+          &lt;EventDetails eventId={eventId} viewer={viewer} /&gt;
+        &lt;/Suspense&gt;
+      &lt;/ErrorBoundary&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The red underlines from Step 1 should be gone. Run the checks:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint</code></pre>
+                    <p><code>tsc</code> prints nothing, and the linter ends with <code>Found 0 warnings and 0 errors.</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Walk through it <span class="step-time">(7 min)</span></h3>
+                    <ol>
+                        <li>On the home page, click <strong>Events</strong>. The list appears without the flash of a page load, and <strong>Events</strong> is bold and underlined. Open a cleanup: <strong>Events</strong> stays marked.</li>
+                        <li>Press the browser's Back and Forward buttons. Both work, and the tab's title follows.</li>
+                        <li>Scroll to the bottom of the list and open a past cleanup: the cleanup starts at the top.</li>
+                        <li>Press <kbd>Tab</kbd> until "See all six sites" on the home page is focused, then <kbd>Enter</kbd>. Press <kbd>Tab</kbd> once more: the focus goes to the skip link, at the start of the new page.</li>
+                        <li>Type <code>localhost:5173/volunteers</code> into the address bar: "Page not found", with the header. Try <code>&#47;events/e01/photos</code> too.</li>
+                        <li>Sign in as Maya (<code>maya.okafor@example.com</code>, <code>shoreline-demo</code>), go to the cleanups, and click <strong>Plan a cleanup</strong>: the form opens, and Maya is still signed in, in the corner.</li>
+                        <li>Reload on <code>&#47;events/e08</code>: it works, because the dev server answers every address with the app.</li>
+                    </ol>
+                    <p>Then build it once, to see what the router costs:</p>
+                    <pre class="terminal"><code class="language-bash">npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 170 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-DvwWjq85.css                             7.58 kB │ gzip:   2.43 kB
+dist/assets/index-Dh0UlpjM.js                            373.80 kB │ gzip: 118.16 kB
+
+✓ built in 1.01s</code></pre>
+                    </div>
+                    <p>After the last lesson the JavaScript was 275.88 kB (86.68 kB gzip); React Router adds roughly 98 kB (about 31 kB gzip). Your hashes and times will differ. Lesson 10.1 splits the bundle so each page loads only what it needs.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li><code>App.tsx</code> holds the route list: a layout route, a pathless route with <code>errorElement</code>, an index route, the pages, and <code>*</code></li>
+                        <li><code>AppLayout</code> renders <code>&lt;Outlet /&gt;</code>, moves the focus to <code>&lt;main&gt;</code> after a page change, and includes <code>&lt;ScrollRestoration /&gt;</code></li>
+                        <li>No <code>href="&#47;…"</code> is left in <code>src</code>: every page link is a <code>Link</code>, <code>NavLink</code> or <code>Button as={Link}</code></li>
+                        <li>The current section is marked with <code>aria-current="page"</code> and styled through that attribute</li>
+                        <li><code>EventPage</code> reads <code>eventId</code> with <code>useParams</code>, narrows it, and keys its boundary by it</li>
+                        <li>Unknown addresses show "Page not found" inside the layout</li>
+                        <li><code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass</li>
+                    </ul>
+                    <p><strong>Your own project:</strong> write down the address list for the app you will build in Lesson 11.1: each path, the page it shows, which parts share a layout, and which segments are parameters. A route list is one of the best first sketches of an app.</p>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time). Exercise 3 is an optional stretch, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Predict the current link</h3>
+                    <p>For each address, predict which header link has <code>aria-current="page"</code>: <code>&#47;</code>, <code>&#47;events</code>, <code>&#47;events/new</code>, <code>&#47;events/e08</code>, <code>&#47;sites</code>, <code>&#47;volunteers</code>. Check each one (in DevTools, the Elements panel shows the attribute; or look for the bold link). Then add <code>end</code> to the Events <code>NavLink</code>, predict again for the three <code>&#47;events</code> addresses, check, and remove <code>end</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Without <code>end</code>, a <code>NavLink</code> matches its own address and every address below it. With <code>end</code>, only its own. The logo is a plain <code>Link</code>, so it is never marked.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Measured: <code>&#47;</code> none; <code>&#47;events</code>, <code>&#47;events/new</code> and <code>&#47;events/e08</code> Events; <code>&#47;sites</code> Sites; <code>&#47;volunteers</code> none (the not-found page). With <code>&lt;NavLink to="&#47;events" end&gt;</code>: <code>&#47;events</code> Events, while <code>&#47;events/new</code> and <code>&#47;events/e08</code> have no current link at all. For a section of an app, leave <code>end</code> off: someone reading one cleanup is still in Events.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Say which address was not found</h3>
+                    <p>Make the not-found page show the address it could not find, as in "There is no page at <code>&#47;volunteers</code> in Shoreline Crew HQ.", so people can spot a typo.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>useLocation()</code> gives you the current <code>pathname</code>. React escapes text in JSX, so showing whatever someone typed into the address bar is safe.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import { Link, useLocation } from 'react-router'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './Page.module.css'
+
+// The router's last route, path '*': any address the HQ does not know ends up here
+export function NotFoundPage() {
+  useDocumentTitle('Page not found')
+  const { pathname } = useLocation()
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Page not found&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;
+        There is no page at &lt;code&gt;{pathname}&lt;/code&gt; in Shoreline Crew HQ.
+      &lt;/p&gt;
+      &lt;p&gt;
+        Check the address for a typo, or go to the &lt;Link to="/"&gt;home page&lt;/Link&gt; or the{' '}
+        &lt;Link to="/events"&gt;list of cleanups&lt;/Link&gt;.
+      &lt;/p&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                        <p>Measured on <code>&#47;volunteers</code>: "There is no page at /volunteers in Shoreline Crew HQ." It type-checks and lints cleanly. The course's code continues without this change.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): Discard a plan with useNavigate</h3>
+                    <p>Optional stretch, not counted in the lesson time. Some navigation happens after something else, not on a click of a link: "Discard this plan?", then leave the form. Add a <strong>Discard</strong> button to <code>NewEventForm</code> that opens the <code>ConfirmDialog</code> from Lesson 4.3 and, when confirmed, goes to <code>&#47;events</code> with <code>useNavigate</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>const navigate = useNavigate()</code> at the top of the component, then <code>navigate('&#47;events')</code> in the dialog's <code>onConfirm</code>. Keep a <code>discarding</code> boolean in state for the dialog. A link would be wrong here: leaving needs a confirmation first.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">export function NewEventForm({ sites }: NewEventFormProps) {
+  const navigate = useNavigate()
+  const [discarding, setDiscarding] = useState(false)
+// ...
+    &lt;Button variant="link" aria-haspopup="dialog" onClick={() =&gt; setDiscarding(true)}&gt;
+      Discard
+    &lt;/Button&gt;
+  &lt;/div&gt;
+&lt;/form&gt;
+{discarding &amp;&amp; (
+  &lt;ConfirmDialog
+    title="Discard this plan?"
+    keepLabel="Keep editing"
+    confirmLabel="Discard it"
+    onKeep={() =&gt; setDiscarding(false)}
+    onConfirm={() =&gt; navigate('/events')}
+  &gt;
+    &lt;p&gt;Nothing you typed here is saved.&lt;/p&gt;
+  &lt;/ConfirmDialog&gt;
+)}</code></pre>
+                        <p>Measured as Maya: <strong>Keep editing</strong> closed the dialog with the typed title still there; <strong>Discard it</strong> went to <code>&#47;events</code>; and Back returned to an empty form, because a new visit mounts a new form. A navigation is a history entry like a click on a link, so Back works as people expect. Not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> A volunteer clicks a <code>&lt;Link to="&#47;sites"&gt;</code> in the HQ's header. What does the browser do?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Count the HTML pages the browser loaded in the measurement. Did it ask the server for a new document?">
+                                A) Requests the page sites from the server and loads the app again
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The address bar matters: bookmarks and Back depend on it. Does a router leave it alone?">
+                                B) Shows the sites page but keeps the old address, so Back is not affected
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Link cancels the normal page load, the router writes the new address into history, matches the routes, and React renders SitesPage into the Outlet. The header, the session and the loaded code stay.">
+                                C) Changes the address without a page load, and the router renders the sites page in the layout's Outlet
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The header is part of the layout route. Does it change between pages?">
+                                D) Unmounts the whole app, header included, and mounts it again with the new page
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> In <code>EventPage</code>, what is the type of <code>eventId</code> in <code>const { eventId } = useParams()</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="useParams cannot see which route rendered the component, so every parameter may be missing. The page narrows it with a check before using it as a string.">
+                                A) <code>string | undefined</code>, because TypeScript cannot know which route rendered the page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Is the route list visible to TypeScript from inside EventPage?">
+                                B) <code>string</code>, read from the path <code>'events/:eventId'</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Parameters are pieces of the address. What type is any piece of an address?">
+                                C) <code>number</code>, because ids are numbered
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> The sites page throws while rendering. In the HQ's route list, where should the <code>errorElement</code> go so the header and footer stay on screen?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The measurement put it there: what happened to the header?">
+                                A) On the layout route, the one with <code>path: '&#47;'</code> and <code>AppLayout</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="RouterProvider has no such prop. Where do error elements belong?">
+                                B) On <code>&lt;RouterProvider&gt;</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Without any errorElement, what did React Router show?">
+                                C) Nowhere: React Router keeps the layout by default
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The error element replaces the route it belongs to, including that route's element. On a pathless route inside the layout, only the page area is replaced, so the header, footer and navigation keep working.">
+                                D) On a pathless route inside the layout route, around the pages
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Without a <code>key</code>, why did the tabs show no selected tab after going from one cleanup to another?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The request for the new cleanup succeeded. What stayed the same instead?">
+                                A) The new cleanup failed to load
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The route was the same, so React kept the same components and their state. Tabs kept impact from the old cleanup, and useState ignores its default after the first render. A key from the event id makes React mount fresh components.">
+                                B) The route stayed the same, so React kept the components and the old selected tab, which the new cleanup does not have
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="NavLink is in the header. Does it know about tabs?">
+                                C) <code>NavLink</code> reset the tabs' state
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> The built HQ is on a static host with no extra settings. Clicking from the home page to Events works, but reloading on <code>&#47;events</code> gives a 404. Why?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A reload asks the server for the address. The host has only index.html and the assets, so it answers 404 unless a SPA fallback rule serves index.html for every address, after which the router takes over.">
+                                A) The reload asks the server for &#47;events, and the host has no such file until a SPA fallback serves index.html for every address
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Clicking worked, so the route exists. Who answers a reload: the router or the server?">
+                                B) The <code>'events'</code> route is missing from the route list
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Would a 404 from the server depend on what the build contains?">
+                                C) <code>npm run build</code> leaves the router out of the production bundle
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should I write <code>element: &lt;HomePage /&gt;</code> or <code>Component: HomePage</code>?</summary>
+                    <p>Both work in data mode. <code>element</code> takes JSX, like the declarative <code>&lt;Route element={…}&gt;</code> you will see in tutorials, and <code>errorElement</code> matches it. <code>Component</code> and <code>ErrorBoundary</code> take a component itself (React Router's documentation uses them). The HQ uses <code>element</code>, partly because a route property called <code>ErrorBoundary</code> next to your own <code>ErrorBoundary</code> class would be confusing. Pick one style per project.</p>
+                </details>
+                <details>
+                    <summary>What about declarative mode, with <code>&lt;Routes&gt;</code> and <code>&lt;Route&gt;</code>?</summary>
+                    <p>It is still part of React Router 8 and imports from <code>react-router</code>; this version type-checks and lints cleanly in the HQ:</p>
+                    <pre data-snippet><code class="language-tsx">import { BrowserRouter, Route, Routes } from 'react-router'
+import { EventsPage } from './pages/EventsPage.tsx'
+import { HomePage } from './pages/HomePage.tsx'
+
+// Declarative mode: the same routes as JSX. Fine for small apps, but no loaders or actions.
+export function DeclarativeApp() {
+  return (
+    &lt;BrowserRouter&gt;
+      &lt;Routes&gt;
+        &lt;Route index element={&lt;HomePage /&gt;} /&gt;
+        &lt;Route path="events" element={&lt;EventsPage /&gt;} /&gt;
+      &lt;/Routes&gt;
+    &lt;/BrowserRouter&gt;
+  )
+}</code></pre>
+                    <p>You will meet it in many codebases. It cannot load data per route or handle form actions, which the HQ uses from Lesson 6.3, so the HQ starts in data mode.</p>
+                </details>
+                <details>
+                    <summary>Why not focus the page's <code>&lt;h1&gt;</code> instead of <code>&lt;main&gt;</code>?</summary>
+                    <p>Focusing the heading is a fine choice too, and some teams prefer it because many screen readers then read the page's name right away. It needs every page to mark its heading, and the cleanup page's heading arrives only after its data loads, so the HQ focuses <code>&lt;main&gt;</code>, which is always there. Whichever you choose, the rule is the same: after a page change, the focus belongs at the start of the new content.</p>
+                </details>
+                <details>
+                    <summary>Can I still use <code>&lt;a href&gt;</code> for links that leave the HQ?</summary>
+                    <p>Yes. <code>Link</code> is for addresses inside the app. A link to another site (the API's documentation, a map of the beach) stays an ordinary <code>&lt;a href="https://…"&gt;</code>, and so does the skip link, which jumps within the page.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>After a crash, <strong>Try again</strong> brings the page back, but the focus is lost: the button that had it is gone and the address did not change, so the layout's effect does not run. Give <code>PageCrashed</code>'s heading a ref and <code>tabIndex={-1}</code>, and focus it when the error page appears, the way <code>SignedIn</code> does on the sign-in page. Then think about what should have the focus after a successful retry, and try your answer with the keyboard.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Draw the HQ's route list as a tree, from the layout route down to <code>*</code>, and mark where the error element sits. Then write two sentences: what a full page load did for free that you had to add back today, and why.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A router changes the address with the History API and renders the matching page, without loading the app again; the server must still answer every address with <code>index.html</code></li>
+                        <li>React Router 8 is one package, <code>react-router</code>; in data mode the routes are typed objects passed to <code>createBrowserRouter</code> and rendered by <code>RouterProvider</code> from <code>react-router/dom</code></li>
+                        <li>A layout route renders <code>&lt;Outlet /&gt;</code> where its child pages go; an index route is the page at the parent's address; <code>*</code> catches everything else</li>
+                        <li><code>Link</code> takes <code>to</code>; <code>NavLink</code> adds <code>aria-current="page"</code>, which is also the best thing to style; <code>as={Link}</code> works with a polymorphic component</li>
+                        <li><code>useParams</code> values are <code>string | undefined</code>: narrow them, and key the page's state by the parameter when the route can stay the same</li>
+                        <li>An <code>errorElement</code> on a pathless route inside the layout replaces only the page; your own boundary still guards parts of a page</li>
+                        <li>After a navigation, move the focus to the new content and let <code>ScrollRestoration</code> handle the scroll position</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Fix a blank page or a 404 on reload</td><td><a href="troubleshooting.html">Troubleshooting</a></td></tr>
+                            <tr><td>Read React Router's documentation (choose data mode)</td><td><a href="https://reactrouter.com/" target="_blank" rel="noopener">reactrouter.com</a></td></tr>
+                            <tr><td>Read about the History API the router uses</td><td><a href="https://developer.mozilla.org/en-US/docs/Web/API/History_API" target="_blank" rel="noopener">MDN: History API</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>The HQ is a real single-page app: following a link no longer loads the app again, and Back and Forward work</li>
+                        <li>You replaced a hand-written page switch with a typed route list, a layout route and a not-found page</li>
+                        <li>The header marks the current section for everyone, sighted or not, from one attribute</li>
+                        <li>A crashing page now keeps the header and offers a working way out</li>
+                        <li>You handled the part of client-side routing many apps forget: focus and scroll after a page change</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The address now chooses the page. Next, it carries more. In <a href="lesson_22.html"><strong>Lesson 6.2: Search Params, Nested Routes and Typed Navigation</strong></a> the events page's search and status filter move into the address, so a filtered list can be bookmarked, shared and restored with Back, and you will look at ways to keep the HQ's addresses in one place, so a typo in a link is harder to make.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code> and <code>npm run lint</code> pass and that every link in the HQ navigates without a page load</li>
+                    <li>On the events page, search for "pelican", then reload: notice what the filters forget. That is the next lesson's problem</li>
+                    <li>Keep your route list sketch for your Lesson 11.1 plan</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Routing can feel like plumbing: lots of small changes across many files, and the result looks almost the same as before. But look at what changed underneath. The HQ now behaves like the apps you use every day, and you know why each piece is there, including the focus and the server fallback that many apps get wrong. If a blank page or a strange error showed up on the way, you met the same messages working developers meet, and now you know what they mean. That is real progress.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_20.html" class="prev-lesson">← Previous: Component Patterns</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_22.html" class="next-lesson">Next: Search Params, Nested Routes and Typed Navigation →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

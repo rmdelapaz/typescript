@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 24</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 24: Deploying</h1>
+    <p class="sub">Your workbook for Session 24: the launch-readiness checklist, the key ideas of Lesson 10.2, a worked example of one source and two builds, the guided lab, the project checklist, the self-check and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lesson <b>10.2</b> + launch check</span>
+      <span class="chip">Session <b>24</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Know whether you are ready to launch: Git, accounts, sign-ins, the network.</li>
+  <li>Explain the HQ's environments, and decide "demo or not" in the build.</li>
+  <li>Make deep links, caching and security headers work on a static host.</li>
+  <li>Write and run a CI workflow; choose a host by reading its terms; deploy a draft, then production (if your accounts are ready).</li>
+</ul>
+
+  <div class="sec"><h2>Start Here: Launch Readiness</h2><span class="rule"></span></div>
+<div class="blk lab"><div class="h">The check, and what only you can do</div>
+<ul class="tick">
+  <li>☐ From my course folder <code class="inline">shoreline</code>: <code class="inline">node labs/module-24/l10_2-deploying/launch_check.mjs</code></li>
+  <li>☐ Its verdict: READY / READY WITH NOTES / NOT READY (circle one)</li>
+  <li>☐ Git is installed (<code class="inline">git --version</code>) and knows my name and email</li>
+  <li>☐ I have a GitHub account and can sign in to it from Git (browser sign-in, <code class="inline">gh auth login</code> or a token; never my password in the terminal)</li>
+  <li>☐ I have a Netlify account (it can be joined with GitHub) and <code class="inline">npx netlify-cli login</code> worked on this laptop</li>
+  <li>☐ Network test, classroom Wi-Fi: github.com ☐ app.netlify.com ☐ registry.npmjs.org ☐</li>
+  <li>☐ Network test, my phone on mobile data (Wi-Fi off): a public site opens ☐ (later: my live link)</li>
+  <li>☐ If NOT READY, my plan (what, where, by when):</li>
+</ul>
+<div class="write"></div>
+<p>No real deploy is required to pass this session. Steps 1 to 5 of the project need no account and no network; Steps 6 and 7 can be done at home.</p>
+</div>
+
+  <div class="sec"><h2>Lesson</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">10.2</span><h3>Deploying</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain the HQ's environments (development, tests, preview, demo, deployed) and how Vite modes and import.meta.env decide what each build contains</li>
+  <li>Build a demo version that runs shoreline-api's own code in the browser through MSW's service worker, without a byte of it reaching the normal build</li>
+  <li>Make deep links work on a static host with a _redirects fallback, and set caching and security headers with _headers</li>
+  <li>Write a GitHub Actions workflow that runs the type check, lint, unit tests, both builds and the Playwright suite against the real API on every push</li>
+  <li>Choose a host by reading its current terms, deploy a draft and then production with the Netlify CLI, and check the live site from the outside</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Environments are builds:</b> development, unit tests, e2e, demo, deployed. Vite replaces <code class="inline">import.meta.env.MODE</code> and every <code class="inline">VITE_</code> value with text at build time; a branch that is always false disappears with its imports.</li>
+  <li><b>The demo build</b> (<code class="inline">npm run build:demo</code>, mode <code class="inline">demo</code>) runs shoreline-api's own core in the browser through MSW's service worker: works on any static host, private sample data per visitor, resets on reload, a banner that says so.</li>
+  <li><b>A build decision belongs in the build:</b> MODE, never the hostname.</li>
+  <li><b>Static hosts:</b> <code class="inline">public/_redirects</code> <code class="inline">/* /index.html 200</code> for deep links; <code class="inline">public/_headers</code>: <code class="inline">/assets/*</code> immutable for a year, index.html checked every visit, three security headers.</li>
+  <li><b>CI (GitHub Actions):</b> one repository (the course folder), two jobs; <code class="inline">npm ci</code>, <code class="inline">tsc -b</code>, <code class="inline">lint --deny-warnings</code>, Vitest, both builds; then e2e against the real API with <code class="inline">needs: checks</code>.</li>
+  <li><b>Hosts' terms:</b> Netlify Free 300 credits a month, 15 per production deploy: deploy by hand after green checks (draft, look, <code class="inline">--prod</code>).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: one source, two builds</div>
+<p>The demo build carries the API's code and the worker:</p>
+<pre class="out">dist/mockServiceWorker.js                                 17.33 kB
+dist/assets/index-1kSsfq1Y.css                             6.67 kB │ gzip:   2.19 kB
+dist/assets/index-SntSXxQo.js                             50.50 kB │ gzip:  17.66 kB
+dist/assets/forms-wPpF5eqp.js                            127.33 kB │ gzip:  38.45 kB
+dist/assets/vendor-DenlHpDj.js                           355.82 kB │ gzip: 111.15 kB
+dist/assets/browser-urx2_hst.js                          429.68 kB │ gzip: 164.46 kB</pre><p>The normal build of the same source has neither:</p>
+<pre class="out">dist/assets/index-BlFE3Y1m.css                             9.02 kB │ gzip:   2.73 kB
+dist/assets/index-Bgq2oWDs.js                             62.74 kB │ gzip:  21.44 kB
+dist/assets/forms-wPpF5eqp.js                            127.33 kB │ gzip:  38.45 kB
+dist/assets/vendor-DenlHpDj.js                           355.82 kB │ gzip: 111.15 kB</pre><p>Both builds copy <code class="inline">public/</code> into <code class="inline">dist/</code>, so the host's files are where the host reads them:</p>
+<pre class="out">_headers  _redirects  assets  favicon.svg  images  index.html  mockServiceWorker.js</pre></div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li><code class="inline">labs/module-24/l10_2-deploying/TASKS.md</code>; <code class="inline">npm install</code> once in <code class="inline">starter</code>, then the build-and-check command (three tasks of FIX lines).</li>
+  <li>Task 1: MODE instead of the hostname. Task 2: the host's files, in <code class="inline">public/</code>, with the right caching. Task 3: an old workflow made reviewable.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>FIX line I fixed</th><th>What a visitor (or a reviewer) would have noticed</th></tr></thead>
+<tbody>
+<tr><td></td><td></td></tr>
+<tr><td></td><td></td></tr>
+<tr><td></td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Lesson project: in class and at home</div>
+<p><b>Shoreline Crew HQ Goes Live</b> (lesson page). In class: Steps 1 to 5 (and 6 and 7 if READY).</p>
+<ul class="tick">
+  <li>☐ Step 1: the top-level .gitignore, <code class="inline">git init -b main</code>, <code class="inline">git check-ignore -v</code> proves .env.local, node_modules and dist stay out; first commit</li>
+  <li>☐ Step 2: the demo build (plugin, browser.ts, main.tsx, client.ts, banner, pictures, <code class="inline">build:demo</code>)</li>
+  <li>☐ Step 3: the demo works with the API stopped; the normal build has no browser file; the budget test passes</li>
+  <li>☐ Step 4: <code class="inline">_redirects</code> and <code class="inline">_headers</code> in <code class="inline">public/</code>, checked</li>
+  <li>☐ Step 5: <code class="inline">.github/workflows/ci.yml</code>, its commands green on my laptop, committed</li>
+  <li>☐ Step 6: pushed to GitHub; both jobs green (or: at home)</li>
+  <li>☐ Step 7: draft deploy, a look, <code class="inline">--prod</code>; the live launch checklist ticked in my journal (or: at home)</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">You deploy the NORMAL build of the HQ (VITE_API_URL=http://localhost:4000) and send the link to a friend. What do they see?</div><div class="opts"><div class="opt">A) The HQ with your computer's data, while your API runs</div><div class="opt">B) Pages that say they could not reach the server: localhost is THEIR computer</div><div class="opt">C) The demo with sample data: Netlify switches MSW on</div><div class="opt">D) A blank page: Netlify refuses React apps</div></div></div>
+<div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">The live home page works, but reloading /events/e08 shows "Not Found". What fixes it?</div><div class="opts"><div class="opt">A) <code class="inline">/*  /index.html  200</code> in <code class="inline">public/_redirects</code></div><div class="opt">B) A Cache-Control rule in _headers</div><div class="opt">C) Adding events/:eventId to the router twice</div><div class="opt">D) Deploying the normal build instead</div></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">A teammate starts the demo API with a hostname check instead of the mode check. The normal build then prints this. What is wrong?</div><pre class="code">dist/assets/browser-urx2_hst.js                          429.68 kB │ gzip: 164.46 kB</pre><div class="opts"><div class="opt">A) Nothing: the browser file is never downloaded</div><div class="opt">B) tsc should have refused it</div><div class="opt">C) The minifier failed</div><div class="opt">D) The API's code is in the normal build, and any HQ deployed to Netlify would answer from sample data</div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Why may files in /assets/ be cached for a year, but not index.html?</div><div class="opts"><div class="opt">A) Netlify ignores caching for HTML</div><div class="opt">B) index.html is too small to matter</div><div class="opt">C) Hashed files get a new name when they change; index.html keeps its name and points at the newest files</div><div class="opt">D) The service worker caches index.html</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt"><code class="inline">npm run lint</code> prints this and exits with 0. Why does the CI workflow call <code class="inline">npm run lint -- --deny-warnings</code>?</div><pre class="code">⚠ eslint(no-unused-vars): Variable 'password' is declared but never used. Unused variables should start with a '_'.
+...
+Found 1 warning and 0 errors.</pre><div class="opts"><div class="opt">A) To make oxlint faster</div><div class="opt">B) Without it a warning never fails the step; the HQ's rule is zero warnings</div><div class="opt">C) --deny-warnings fixes the warnings</div><div class="opt">D) GitHub requires it</div></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">In the HQ's workflow, why does the e2e job say needs: checks?</div><div class="opts"><div class="opt">A) The first job installs shoreline-api</div><div class="opt">B) The e2e job deploys when it passes</div><div class="opt">C) GitHub runs only one job at a time</div><div class="opt">D) It waits for the quick checks and skips itself when they are red: no browser minutes for a change that does not compile</div></div></div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Why does the course folder (with shoreline-api and shoreline-hq side by side) become ONE repository?</div><div class="opts"><div class="opt">A) The e2e job starts ../shoreline-api, and workflows live in .github/workflows at the TOP</div><div class="opt">B) GitHub allows one repository per account</div><div class="opt">C) Netlify deploys whole repositories</div><div class="opt">D) So node_modules is shared</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">What does this print in the course folder, and what does each line prove?</div><pre class="code">git check-ignore -v shoreline-hq/.env.local shoreline-hq/node_modules shoreline-hq/dist</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">On Netlify's free plan, which costs credits the course tells you to watch?</div><div class="opts"><div class="opt">A) Every page view of the demo, 15 credits each</div><div class="opt">B) Each production deploy (15 credits), so deploy by hand after green checks</div><div class="opt">C) Draft deploys only</div><div class="opt">D) Nothing: free means unlimited</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">Why <code class="inline">npx netlify-cli deploy --no-build --dir dist</code> and not plain deploy?</div><div class="opts"><div class="opt">A) --no-build makes the upload smaller</div><div class="opt">B) --no-build skips the draft</div><div class="opt">C) Without it the CLI runs a build of its own; you have just built the demo you want</div><div class="opt">D) dist is the only folder Netlify accepts</div></div></div>
+<div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">Name two checks of the live launch checklist that ONLY make sense from outside your computer.</div><div class="write"></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">The launch-readiness check prints FIX for "shoreline-hq/.env.local is in the repository". What do you do?</div><div class="opts"><div class="opt">A) Delete the repository on GitHub</div><div class="opt">B) Nothing: VITE_ values are public anyway</div><div class="opt">C) Add .env.local to .gitignore again</div><div class="opt">D) <code class="inline">git rm --cached shoreline-hq/.env.local</code>, commit, and keep the file on disk</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: paste your live address and your ticked launch checklist (if you deployed). Then answer the Shoreline Crew coordinator, who asks: "Great, can the volunteers start using this on Saturday?" Explain, for someone who is not a developer, what the demo is and isn't, and what it would take (and roughly cost) to run the HQ for real. Finally: which checks would you trust more on a busy day, the ones on your computer or the ones on GitHub, and why?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">E1</div><div class="qt">Why is <code class="inline">if (import.meta.env.MODE === 'demo')</code> safe and a hostname check is not?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">What do <code class="inline">_redirects</code> and <code class="inline">_headers</code> each do for the HQ?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Your CI run is red but everything passes on your laptop. Name two likely causes.</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Project Steps 1 to 5 committed; Steps 6 and 7 if I have the accounts and the network</li>
+  <li>☐ Exercise 1 (actionlint); Exercises 2 and 3 are stretches</li>
+  <li>☐ The Quick Quiz and the journal entry (the paragraph for the coordinator)</li>
+  <li>☐ Lab 10.2 Task 3</li>
+  <li>☐ Launch check rerun before Session 25 if it was NOT READY</li>
+  <li>☐ Bring to Session 25: the course folder (a repository), my live link if I have one, my Lesson 11.1 notes, the final project kit</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>environment</td><td>One place the code runs, with its own settings (and, for a front end, its own build)</td></tr>
+<tr><td>Vite mode, <code class="inline">import.meta.env.MODE</code></td><td><code class="inline">development</code>, <code class="inline">production</code>, <code class="inline">test</code> or any <code class="inline">--mode</code> name; replaced with text at build time</td></tr>
+<tr><td>demo build</td><td><code class="inline">npm run build:demo</code>: the API's code runs in the visitor's browser through MSW</td></tr>
+<tr><td>service worker</td><td>A script the browser installs for a site; it can answer the site's requests</td></tr>
+<tr><td>static host, CDN</td><td>Serves a folder of files over HTTPS from servers around the world; runs none of your code</td></tr>
+<tr><td>SPA fallback</td><td><code class="inline">/* /index.html 200</code>: every address without a file gets the app's page</td></tr>
+<tr><td><code class="inline">Cache-Control: immutable</code></td><td>Keep this file; it never changes (safe for hashed file names)</td></tr>
+<tr><td>continuous integration (CI)</td><td>A computer runs the checks on every push and marks the change green or red</td></tr>
+<tr><td>workflow, job, step, runner</td><td>GitHub Actions' YAML file / a group of steps on one machine / one command or action / the machine</td></tr>
+<tr><td><code class="inline">needs</code></td><td>One job waits for another and is skipped if it fails</td></tr>
+<tr><td>artifact</td><td>A file a run keeps for download (the Playwright report on failure)</td></tr>
+<tr><td>draft / production deploy</td><td>A temporary address to look at / the live address (15 credits on Netlify Free)</td></tr>
+<tr><td>launch-readiness check</td><td><code class="inline">launch_check.mjs</code>: Git, repository, workflow, host files, remote, Netlify link, and the by-hand list</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 24 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

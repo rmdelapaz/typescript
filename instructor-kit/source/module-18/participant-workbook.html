@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 18</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 18: TanStack Query</h1>
+    <p class="sub">Your workbook for Session 18: the Part 3 catch-up and refresher, the key ideas of Lesson 7.1, a worked example, the guided lab, predict-then-check practice, a self-check and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lesson <b>7.1</b></span>
+      <span class="chip">Session <b>18</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Tell server state from client state, and explain what a cache adds to fetching.</li>
+  <li>Write typed <code class="inline">queryOptions</code> factories whose keys hold everything the answer depends on.</li>
+  <li>Read a query result: narrow it with <code class="inline">isSuccess</code>, keep the last list with <code class="inline">placeholderData</code>.</li>
+  <li>Explain the requests that <code class="inline">staleTime</code> and <code class="inline">retry</code> cause, and use a loader to fill the cache.</li>
+  <li>Start An HQ With a Memory: the provider, the client and factories, the first pages on the cache.</li>
+</ul>
+
+  <div class="sec"><h2>Start Here: Starting with Part 3?</h2><span class="rule"></span></div>
+<p>If you took Parts 1 and 2, your course folder is ready: run the check in step 5 and go to the refresher. If you are starting with Part 3 (or your code has drifted), do all six steps before the session.</p>
+<div class="blk"><div class="h">Catch-up steps</div>
+<ul class="tick">
+  <li>☐ 1. Unzip <code class="inline">lesson-24-start.zip</code> into a new folder <code class="inline">shoreline</code> (not in OneDrive, iCloud or Dropbox); it holds <code class="inline">shoreline-api</code>, <code class="inline">shoreline-hq</code>, <code class="inline">ts-lab</code></li>
+  <li>☐ 2. Copy the kit's <code class="inline">labs/</code> folder into <code class="inline">shoreline/</code></li>
+  <li>☐ 3. In <code class="inline">shoreline-hq</code>: copy <code class="inline">.env.example</code> to <code class="inline">.env.local</code>, then <code class="inline">npm ci</code></li>
+  <li>☐ 4. Terminal 1 in <code class="inline">shoreline-api</code>: <code class="inline">node server.ts</code> · Terminal 2 in <code class="inline">shoreline-hq</code>: <code class="inline">npm run dev</code></li>
+  <li>☐ 5. Terminal 3 in <code class="inline">shoreline</code>: <code class="inline">node labs/module-18/l7_0-starting-with-part-3/check_environment.mjs</code> → the last line says <code class="inline">READY …</code></li>
+  <li>☐ 6. <code class="inline">npm run build</code> in <code class="inline">shoreline-hq</code> ends with <code class="inline">✓ built in</code>; I signed in at http://localhost:5173/sign-in as maya.okafor@example.com (password <code class="inline">shoreline-demo</code>) and opened Volunteers</li>
+</ul>
+<p>Then Lab 7.0 (<code class="inline">labs/module-18/l7_0-starting-with-part-3</code>), Tasks 2 and 3: a short refresher on the TypeScript Lesson 7.1 leans on.</p>
+</div>
+<div class="blk"><div class="h">Refresher: four questions (pairs, then the room)</div>
+<div class="q"><div class="qn">R1</div><div class="qt">Lesson 4.1's LoadState had three kinds. Name them, and say what TypeScript lets you read in each.</div><div class="write"></div></div>
+<div class="q"><div class="qn">R2</div><div class="qt">useApi(key, load) from Lesson 4.2: what was the key for, and what happened when it changed?</div><div class="write"></div></div>
+<div class="q"><div class="qn">R3</div><div class="qt">A guest opens /volunteers. What runs first, and what do they see?</div><div class="write"></div></div>
+<div class="q"><div class="qn">R4</div><div class="qt">Why does the events page have no loader, when the sites page does?</div><div class="write"></div></div>
+</div>
+
+  <div class="sec"><h2>Lesson</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.1</span><h3>TanStack Query</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain what server state is, and what a cache adds to fetching it</li>
+  <li>Set up a QueryClient and write typed queryOptions factories with keys that include everything the answer depends on</li>
+  <li>Read a query's result with useQuery, narrowing it with isSuccess, and keep the last list on screen with placeholderData</li>
+  <li>Choose staleTime and retry settings and explain the requests they cause</li>
+  <li>Fill the cache from route loaders and read it with useSuspenseQuery, with a Try again that really tries again</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Server state is borrowed:</b> the API owns cleanups, sites and the crew; the HQ holds a copy that ages. Client state (a dialog, the search text, the undo history) belongs to the browser.</li>
+  <li><b>The logbook:</b> a <code class="inline">QueryClient</code> (the cache) keeps each answer under a <b>query key</b>; a <b>query function</b> fetches it (with an AbortSignal). Equal keys share one entry and one request.</li>
+  <li><b>The key rule:</b> the key holds everything the answer depends on (filters, page, who asks), general to specific, the viewer last: <code class="inline">['events', 'list', search, viewer]</code>. Then <code class="inline">['events']</code> reaches every list and detail.</li>
+  <li><b><code class="inline">queryOptions</code> factories</b> keep key and function together and carry the data type to every Hook and loader: no type arguments.</li>
+  <li><b>A result is a union tagged by status:</b> pending / error / success. <code class="inline">isSuccess</code> narrows <code class="inline">data</code>; <code class="inline">isFetching</code> is a separate question (a background refresh). <code class="inline">placeholderData: keepPreviousData</code> keeps the last list while a new key loads.</li>
+  <li><b>Fresh, stale, retried:</b> <code class="inline">staleTime</code> (the HQ: 30 s) decides when to ask again; <code class="inline">gcTime</code> (5 min) when to forget; <code class="inline">retry</code> which failures deserve another try (never a 4xx). Loaders: <code class="inline">queryClient.query({ ...q, staleTime: 'static' })</code>, pages: <code class="inline">useSuspenseQuery</code>, boundaries: <code class="inline">onRetry={reset}</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: what the query Hooks give back</div>
+<p>The lesson's Scratch.tsx, which hands each query result to a function that wants a number:</p>
+<pre class="code"><span class="k">import</span> { useQuery, useSuspenseQuery } <span class="k">from</span> <span class="s">'@tanstack/react-query'</span>
+<span class="k">import</span> { eventQuery, eventsQuery } <span class="k">from</span> <span class="s">'./api/queries.ts'</span>
+
+<span class="c">// What do the query Hooks give back? Hand each result to a function that wants a number.</span>
+<span class="k">function</span> show(value: <span class="k">number</span>) {
+  <span class="k">return</span> value
+}
+
+<span class="k">export</span> <span class="k">function</span> Scratch() {
+  <span class="k">const</span> list = useQuery(eventsQuery(<span class="s">'perPage=50'</span>, <span class="s">'guest'</span>))
+  <span class="k">const</span> cleanup = useSuspenseQuery(eventQuery(<span class="s">'e08'</span>, <span class="s">'guest'</span>))
+  show(list.data)
+  show(cleanup.data)
+  <span class="k">if</span> (list.isSuccess) {
+    show(list.data)
+  }
+  <span class="k">return</span> <span class="k">null</span>
+}</pre><p><code class="inline">npx tsc -b</code> on the finished Lesson 7.1 code:</p>
+<pre class="out">src/Scratch.tsx:12:8 - error TS2345: Argument of type 'Page&lt;CleanupEvent&gt; | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+
+12   show(list.data)
+          ~~~~~~~~~
+
+src/Scratch.tsx:13:8 - error TS2345: Argument of type 'CleanupEventDetail' is not assignable to parameter of type 'number'.
+
+13   show(cleanup.data)
+          ~~~~~~~~~~~~
+
+src/Scratch.tsx:15:10 - error TS2345: Argument of type 'Page&lt;CleanupEvent&gt;' is not assignable to parameter of type 'number'.
+
+15     show(list.data)
+            ~~~~~~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:12</pre><p>Read it in three moves. <b>Line 12:</b> <code class="inline">useQuery</code>'s data is <code class="inline">Page&lt;CleanupEvent&gt; | undefined</code>: there is no data until the query succeeds. <b>Line 15:</b> inside <code class="inline">if (list.isSuccess)</code> the same expression is <code class="inline">Page&lt;CleanupEvent&gt;</code>: the check narrowed the union. <b>Line 13:</b> <code class="inline">useSuspenseQuery</code>'s data is <code class="inline">CleanupEventDetail</code>, never undefined: it suspends instead of returning without data. And nowhere a type argument: every type came from the factory's query function.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-18/l7_1-tanstack-query/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code> (8 failures) and <code class="inline">npm run typecheck</code>.</li>
+  <li>Task 1: read the two Task 1 failures before you change anything. Fix the key.</li>
+  <li>Task 2: <code class="inline">useQuery</code>, early returns on <code class="inline">isPending</code> and <code class="inline">isError</code>, then the list. Hover <code class="inline">data</code> after the returns.</li>
+  <li>Task 3 (after the break): <code class="inline">shouldRetry</code>. The last test counts requests.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Task 1: which part was missing from the key, and why did it type-check anyway?</td><td></td></tr>
+<tr><td>Task 1: why does <code class="inline">invalidateQueries({ queryKey: ['events'] })</code> still reach your fixed key?</td><td></td></tr>
+<tr><td>Task 2: what type does <code class="inline">data</code> have after the two early returns?</td><td></td></tr>
+<tr><td>Task 3: how many requests did a 404 send with the starter's rule, and with yours?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write your prediction first. P1 and P2 with the API running; P3 to P5 are the lesson's Exercise 2, checked on <code class="inline">npm run preview</code> with DevTools › Network filtered to 4000.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict: the same address, asked by a guest and by Maya (organizer). Do the two answers have the same number of cleanups?</div><pre class="code">http://localhost:4000/api/events?perPage=50      (X-Total-Count?)</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the status code and the message, then open it signed in as Maya. Should a query try it again?</div><pre class="code">http://localhost:4000/api/volunteers/v99</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Lesson 7.1, Exercise 2 (a): a fresh tab, the home page, then Sites, then Events. How many GET /api/sites?</div><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Exercise 2 (b): on /events open Weekend Cove Cleanup, press Back, open it again within 30 seconds. How many GET /api/events/e08?</div><div class="write"></div></div>
+<div class="q"><div class="qn">P5</div><div class="qt">Exercise 2 (c): signed in as Maya, open /volunteers/v99. How many requests for v99, and how long until the error (on npm run preview)?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>An HQ With a Memory</b> (lesson page, "Project: An HQ With a Memory"). In class: Steps 1 to 3. At home: Steps 4 to 7 and the checklist.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">@tanstack/react-query</code> installed; <code class="inline">QueryClientProvider</code> outside <code class="inline">AuthProvider</code> and the router</li>
+  <li>☐ Step 2: <code class="inline">getImpactTotals</code> and its guards in client.ts; <code class="inline">queries.ts</code> with the client (30 s, no 4xx retries), <code class="inline">viewerId</code> and eight factories</li>
+  <li>☐ Step 3: the new <code class="inline">LoadStatus</code>; HomePage, NewEventPage and VolunteerPage on <code class="inline">useQuery</code></li>
+  <li>☐ Step 4: EventsPage and VolunteersPage with <code class="inline">placeholderData: keepPreviousData</code></li>
+  <li>☐ Step 5: loaders fill the cache; SitesPage, EventPage, ImpactSummary on <code class="inline">useSuspenseQuery</code>; <code class="inline">useApi.ts</code> and <code class="inline">loadState.ts</code> deleted; <code class="inline">npx tsc -b</code> silent</li>
+  <li>☐ Step 6: the Impact page (totals, the SVG chart with its aria-label) and its NavLink</li>
+  <li>☐ Step 7: watched the cache work in the Network tab; tsc, lint and build pass</li>
+  <li>☐ My own project: its kinds of server data, a key for each, a sensible staleTime next to each</li>
+</ul>
+<div class="write tall"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which of these is server state in Shoreline Crew HQ?</div><div class="opts"><div class="opt">A) Whether the Cancel cleanup dialog is open</div><div class="opt">B) The text typed into the events search box</div><div class="opt">C) The check-in desk's undo history</div><div class="opt">D) The roster of today's cleanup</div></div></div>
+<div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">An organizer filters the events list. Which key does the events list query need?</div><div class="opts"><div class="opt">A) <code class="inline">['events']</code></div><div class="opt">B) <code class="inline">['events', 'list', search, viewer]</code></div><div class="opt">C) <code class="inline">['events', 'list', viewer]</code></div><div class="opt">D) <code class="inline">['events', viewer, 'list']</code></div></div></div>
+<div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">tsc prints this for the lesson's Scratch.tsx. What is <code class="inline">list.data</code> before any check, and what removes the <code class="inline">undefined</code>?</div><pre class="code">src/Scratch.tsx:12:8 - error TS2345: Argument of type 'Page&lt;CleanupEvent&gt; | undefined' is not assignable to parameter of type 'number'.
+src/Scratch.tsx:13:8 - error TS2345: Argument of type 'CleanupEventDetail' is not assignable to parameter of type 'number'.
+src/Scratch.tsx:15:10 - error TS2345: Argument of type 'Page&lt;CleanupEvent&gt;' is not assignable to parameter of type 'number'.
+Found 3 errors in the same file, starting at: src/Scratch.tsx:12</pre><div class="write"></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">The API runs with <code class="inline">--latency=800</code>. On /events you type "pelican". The events query uses <code class="inline">placeholderData: keepPreviousData</code>. What does the page show while the new list loads?</div><div class="opts"><div class="opt">A) "Loading the cleanups…" until the 3 matches arrive</div><div class="opt">B) An empty list, then the 3 matches</div><div class="opt">C) The 15 cleanups, until the 3 matches replace them</div><div class="opt">D) The 3 matches at once, from the cache</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">The QueryClient's staleTime is 0 (the default). Maya opens Weekend Cove Cleanup, then presses Back to the events list. What happens?</div><div class="opts"><div class="opt">A) The list appears at once from the cache, and its requests run again behind it</div><div class="opt">B) The list shows "Loading the cleanups…" until the requests come back</div><div class="opt">C) Nothing is sent: the list is in the cache</div><div class="opt">D) The list is thrown away and fetched from scratch</div></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">With the HQ's retry rule below, which failure is tried again?</div><pre class="code">retry: (failureCount, error) =&gt;
+  !(error <span class="k">instanceof</span> ApiError &amp;&amp; error.status &lt; <span class="s">500</span>) &amp;&amp; failureCount &lt; <span class="s">2</span>,</pre><div class="opts"><div class="opt">A) A 404 for /api/volunteers/v99, once more</div><div class="opt">B) A 401 after a session ended, twice more</div><div class="opt">C) A 403 for a volunteer opening the crew list</div><div class="opt">D) A 500 from the API, up to two more times</div></div></div>
+<div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">Code from an older tutorial gives this. What is the version 5 name of this option, and what replaced the other two v4 options in the same object?</div><pre class="code">src/Scratch.tsx:9:5 - error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UseQueryOptions&lt;Site[], Error, Site[], string[]&gt;'.
+
+9     cacheTime: 10 * 60 * 1000,
+      ~~~~~~~~~</pre><div class="write"></div></div>
+<div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">What does this loader line do?</div><pre class="code"><span class="k">await</span> queryClient.query({ ...sitesQuery(), staleTime: <span class="s">'static'</span> })</pre><div class="opts"><div class="opt">A) Always fetches the sites, then caches them for good</div><div class="opt">B) Uses any cached copy of the sites, however old, and fetches only when there is none</div><div class="opt">C) Marks the sites as never stale, so the page never refreshes them</div><div class="opt">D) Prefetches the sites without waiting for them</div></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">Why does EventPage build its key from the loader's {eventId, viewer} instead of reading useAuth()?</div><div class="opts"><div class="opt">A) On sign-out the session changes before the loader re-runs; a key from the session would ask for the guest's copy of a draft too early</div><div class="opt">B) useAuth() cannot be called in a page</div><div class="opt">C) The loader's viewer is a different person</div><div class="opt">D) Query keys cannot hold values from context</div></div></div>
+<div class="q" data-sc="10" data-kind="short"><div class="qn">Q10</div><div class="qt">Someone removes <code class="inline">viewer</code> from the events list key. tsc says this. What would Maya see on the dev server (which does not type-check) after signing in?</div><pre class="code">src/api/queries.ts:44:45 - error TS6133: 'viewer' is declared but its value is never read.
+Found 1 error in src/api/queries.ts:44</pre><div class="write"></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">The Impact tab's ErrorBoundary has no onRetry={reset}. The report failed to load; the person presses Try again. What happens?</div><div class="opts"><div class="opt">A) A new request, and the report if the API is back</div><div class="opt">B) The same error at once, and no request</div><div class="opt">C) The whole page reloads</div><div class="opt">D) The query retries three times, then the error</div></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">Which value does a component read with useSuspenseQuery(eventQuery(eventId, viewer)).data?</div><div class="opts"><div class="opt">A) <code class="inline">CleanupEventDetail | undefined</code></div><div class="opt">B) <code class="inline">Promise&lt;CleanupEventDetail&gt;</code></div><div class="opt">C) <code class="inline">CleanupEventDetail</code></div><div class="opt">D) <code class="inline">unknown, until you add a type argument</code></div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: pick one key from queries.ts and write its story for one visit: who builds it (a loader, a page, or both), whether there is an entry, whether it is fresh, what request (if any) goes out, and when the entry is finally thrown away. Then one sentence: what would go wrong if one part of that key were missing?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Write the key for "the cleanups at one site, as Maya sees them".</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">The list shows at once when you press Back, and a request still goes out. Why?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Why do 404s not get retried in the HQ?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish An HQ With a Memory: Steps 4 to 7 and every checklist item</li>
+  <li>☐ Lesson 7.1 Exercises 1 and 2 (Exercise 3 is a stretch)</li>
+  <li>☐ The Quick Quiz on the lesson page</li>
+  <li>☐ Lab 7.1's stretch; starting with Part 3: Lab 7.0 Tasks 2 and 3</li>
+  <li>☐ The journal entry</li>
+  <li>☐ Before Session 19: tsc, lint and build pass; I pressed Publish on the planning form and noted what I expect the events list to show</li>
+  <li>☐ Bring: the course folder (Lesson 7.1 finished, or <code class="inline">lesson-25-start</code>), internet for <code class="inline">npm install zustand</code>, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>server state / client state</td><td>Data the API owns and the app copies / data only this browser knows</td></tr>
+<tr><td>TanStack Query</td><td>The library that keeps server state in a shared cache (many people still call it React Query)</td></tr>
+<tr><td><code class="inline">QueryClient</code></td><td>The cache itself, created once outside React; <code class="inline">QueryClientProvider</code> hands it to every component</td></tr>
+<tr><td>query key</td><td>An array that labels a cache entry; it holds everything the answer depends on</td></tr>
+<tr><td>query function</td><td>The function that fetches an entry; it gets a <code class="inline">signal</code> that is aborted when nobody needs the answer</td></tr>
+<tr><td><code class="inline">queryOptions</code></td><td>Puts a key and a function together and keeps their types (the HQ's factories)</td></tr>
+<tr><td><code class="inline">useQuery</code></td><td>Reads a query in a component: a result tagged by status (pending, error, success)</td></tr>
+<tr><td><code class="inline">isFetching</code></td><td>A request is running right now (also during a background refresh of good data)</td></tr>
+<tr><td><code class="inline">placeholderData: keepPreviousData</code></td><td>Keep the last answer on screen while a new key loads; <code class="inline">isPlaceholderData</code> says so</td></tr>
+<tr><td>fresh / stale, <code class="inline">staleTime</code></td><td>Young enough to use without asking / shown but refetched; the time that separates them</td></tr>
+<tr><td><code class="inline">gcTime</code></td><td>How long an unused entry stays in memory (was <code class="inline">cacheTime</code> in version 4)</td></tr>
+<tr><td><code class="inline">retry</code></td><td>Which failures to try again, and how often (the HQ: never 4xx, at most 2 more)</td></tr>
+<tr><td><code class="inline">useSuspenseQuery</code></td><td>Reads a query and suspends until there is data: its data is never undefined</td></tr>
+<tr><td><code class="inline">queryClient.query</code></td><td>Fills (or reads) an entry from outside a component; with <code class="inline">staleTime: 'static'</code> any cached copy counts</td></tr>
+<tr><td><code class="inline">useQueryErrorResetBoundary</code></td><td>Gives <code class="inline">reset</code>, which lets queries below an error boundary try again</td></tr>
+<tr><td>indexed access type</td><td><code class="inline">ImpactTotals['byMonth'][number]</code>: the type of one item of a property's array</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 18 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

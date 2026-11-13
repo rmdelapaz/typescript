@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Let Shoreline Crew HQ change data with TanStack Query mutations: typed POST and PATCH requests, mutationOptions factories, invalidation by key, the API's field errors under the right fields, and optimistic check-in marks that roll back when a save fails. React + TypeScript: Build a Modern Web App Lesson 7.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Mutations - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>✍️ Lesson 7.2: Mutations</h1>
+                <p class="lead">Fill in the planning form and press Publish: the HQ says "Ready to save", and nothing reaches shoreline-api. Cancel a cleanup: "Nothing is sent". Check volunteers in: the marks vanish when you reload. The HQ can read and remember, but it cannot change anything yet. Today it learns to. You will send new cleanups, cancellations and check-in marks to the API with TanStack Query's mutations, tell the cache which answers are out of date afterwards, show the API's own field messages when it says no, and make the check-in desk feel instant by showing each mark before the API has answered, and taking it back if the save fails.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Send typed <code>POST</code> and <code>PATCH</code> requests and check what comes back</li>
+                        <li>Write <code>mutationOptions</code> factories and run them with <code>useMutation</code>, <code>mutate</code> and <code>mutateAsync</code></li>
+                        <li>Invalidate the cache by key after a change, and explain which entries a change makes out of date</li>
+                        <li>Show an API's 400 <code>fieldErrors</code> under the fields they belong to</li>
+                        <li>Decide when an update should be optimistic, and write one with <code>onMutate</code>, a rollback in <code>onError</code> and a refetch in <code>onSettled</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 135 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_24.html">Lesson 7.1: TanStack Query</a> (your <code>shoreline-hq</code> on the query cache), the planning form from <a href="lesson_11.html">Lesson 3.5</a> and the check-in desk from <a href="lesson_17.html">Lesson 5.1</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> Planning that saves, cancelling from a cleanup's page (with its check-in code for organizers), and a check-in desk that saves every mark</li>
+                    <li><span class="meta-label">🧩 Stack</span> TanStack Query 5.107, React Router 8.5, React 19.3, TypeScript 7.0, Vite 8.3, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and the browser, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-25-start.zip">lesson-25-start.zip</a> · Finished code: <a href="downloads/lesson-25-end.zip">lesson-25-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#changing" class="toc-link">Changing Server Data</a></li>
+                        <li><a href="#invalidate" class="toc-link">After the API Agrees: Invalidation</a></li>
+                        <li><a href="#refused" class="toc-link">When the API Says No</a></li>
+                        <li><a href="#optimistic" class="toc-link">Wait, or Show It Now?</a></li>
+                        <li><a href="#desk" class="toc-link">Who Owns the Check-in Marks Now?</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: An HQ That Saves</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="changing" class="lesson-section">
+                <h2>📝 Changing Server Data</h2>
+                <p>A query reads; a <strong>mutation</strong> changes something on the server: creating a cleanup (<code>POST</code>), changing one (<code>PATCH</code>), deleting one (<code>DELETE</code>). TanStack Query treats them differently, and for good reasons. A query runs by itself whenever a component needs its data; a mutation runs only when you call it, because "create a cleanup" must happen once, when the organizer presses Publish, not every time a component mounts. A query's answer is kept in the cache under a key; a mutation's answer is not cached at all. What a mutation leaves behind is a cache that is out of date, and cleaning that up is your job.</p>
+                <div class="card card-info">
+                    <h3>💡 Mental model: the harbor office's change forms</h3>
+                    <p>In Lesson 7.1 the harbor office kept a logbook of readings. Now crew members hand in change forms: "add a cleanup on the north jetty", "cancel Saturday's sweep". The clerk sends each form to head office (the API), which may accept it or send it back with notes in the margins ("this date is in the past"). Once head office accepts a form, the clerk crosses out every logbook entry it affects, so the next person who asks gets a fresh reading. For small, everyday forms, a busy clerk pencils the change into the logbook straight away and rubs it out if head office says no. Those are the three ideas of this lesson: <strong>mutations</strong>, <strong>invalidation</strong> and <strong>optimistic updates</strong>.</p>
+                </div>
+                <p>A mutation needs a <strong>mutation function</strong>: something that sends the request and returns a promise. Like the query functions, it lives next to the code that knows the API, and it is typed from end to end. The HQ's write requests share one helper in <code>client.ts</code> that sends JSON and checks the answer with a type predicate, exactly like <code>getJSON</code> does for reads:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                    <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">/** Send JSON with POST or PATCH, and check the JSON that comes back */
+async function sendJSON&lt;T&gt;(
+  method: 'POST' | 'PATCH',
+  path: string,
+  body: unknown,
+  isT: (value: unknown) =&gt; value is T,
+): Promise&lt;T&gt; {
+  const response = await request(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data: unknown = await response.json()
+  if (!isT(data)) {
+    throw new Error(`Unexpected data from ${method} /api${path}`)
+  }
+  return data
+}</code></pre>
+                </div>
+                <p>Then, as with queries, a factory puts the pieces together. <code>mutationOptions</code> is the mutation twin of <code>queryOptions</code>: it takes the options and gives them back with their types worked out.</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/mutations.ts</div>
+                    <pre data-src="shoreline-hq/src/api/mutations.ts" data-match="excerpt"><code class="language-ts">/** Cancel a scheduled cleanup. Waits for the API: a big change should not look done before it is. */
+export function cancelEventMutation() {
+  return mutationOptions({
+    mutationFn: (eventId: string) =&gt; patchEvent(eventId, { status: 'cancelled' }),
+    onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: ['events'] }),
+  })
+}</code></pre>
+                </div>
+                <p>A component runs it with <code>useMutation</code>, which returns an object with a function to start the mutation and its status. TypeScript reads every type from the factory: the <strong>variables</strong> (what you pass in) from the mutation function's parameter, and the <strong>data</strong> (what comes back) from its promise. The trick from Lesson 6.3, passing values to a function that wants a number, shows all three:</p>
+                <pre data-snippet><code class="language-tsx">import { useMutation } from '@tanstack/react-query'
+import { cancelEventMutation } from './api/mutations.ts'
+
+function wantsNumber(value: number) {
+  return value
+}
+
+export function Scratch() {
+  const cancel = useMutation(cancelEventMutation())
+  cancel.mutate(42) // what does mutate take?
+  wantsNumber(cancel.data) // and what comes back?
+  wantsNumber(cancel.error)
+  return null
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:10:17 - error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+
+10   cancel.mutate(42) // what does mutate take?
+                   ~~
+
+src/Scratch.tsx:11:15 - error TS2345: Argument of type 'CleanupEvent | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+
+11   wantsNumber(cancel.data) // and what comes back?
+                 ~~~~~~~~~~~
+
+src/Scratch.tsx:12:15 - error TS2345: Argument of type 'Error | null' is not assignable to parameter of type 'number'.
+  Type 'null' is not assignable to type 'number'.
+
+12   wantsNumber(cancel.error)
+                 ~~~~~~~~~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:10</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Part of the result</th><th>Type here</th><th>What it is for</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>mutate(variables, callbacks?)</code></td><td>takes a <code>string</code></td><td>Start it and move on; errors land in <code>error</code></td></tr>
+                            <tr><td><code>mutateAsync(variables)</code></td><td>returns <code>Promise&lt;CleanupEvent&gt;</code></td><td>Start it and <code>await</code> the answer (inside a form action, say); a failure rejects the promise</td></tr>
+                            <tr><td><code>status</code> / <code>isIdle</code>, <code>isPending</code>, <code>isError</code>, <code>isSuccess</code></td><td>a union, like a query's</td><td>Show "Cancelling…", an error, a done message</td></tr>
+                            <tr><td><code>data</code>, <code>error</code>, <code>variables</code></td><td><code>CleanupEvent | undefined</code>, <code>Error | null</code>, <code>string | undefined</code></td><td>The last mutation's answer, failure and input</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>One more difference from queries: a mutation is <strong>not retried</strong> by default (TanStack Query's default <code>retry</code> for mutations is 0). That is deliberate. If a <code>POST</code> timed out after the server saved it, trying again would create the cleanup twice. Retrying a change is safe only when the server can tell a repeat from a new request; shoreline-api's phone logs do that with a <code>clientId</code>, which the React Native course uses.</p>
+            </section>
+
+            <section id="invalidate" class="lesson-section">
+                <h2>🧹 After the API Agrees: Invalidation</h2>
+                <p>The organizer publishes Dune Grass Cleanup. The API now has 18 cleanups; the cache still holds the list with 17, and it is fresh for up to 30 seconds. Nothing in the cache knows that a <code>POST</code> happened. <code>queryClient.invalidateQueries({ queryKey: ['events'] })</code> tells it: every entry whose key <em>starts with</em> <code>['events']</code> is now stale. Entries a component is showing are fetched again right away; the others are fetched the next time someone needs them. This is the payoff of Lesson 7.1's keys, general to specific: one short key reaches every list, every detail and every roster.</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/mutations.ts</div>
+                    <pre data-src="shoreline-hq/src/api/mutations.ts" data-match="excerpt"><code class="language-ts">/** Plan a cleanup. Waits for the API: the new cleanup's id comes from it. */
+export function createEventMutation() {
+  return mutationOptions({
+    mutationFn: (event: NewEvent) =&gt; postEvent(event),
+    // Every list of cleanups may now be missing one. Returning the promise keeps the
+    // mutation pending until the lists on screen have been fetched again.
+    onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: ['events'] }),
+  })
+}</code></pre>
+                </div>
+                <p><code>onSuccess</code> runs after the API has said yes. Returning the promise from <code>invalidateQueries</code> matters: the mutation stays pending until the refetches on screen are done, so <code>isPending</code> (and an <code>await mutateAsync(...)</code>) cover the whole "saving and refreshing" time. Measured: cancelling Weekend Cove Cleanup on its page sent <code>PATCH /api/events/e08</code> and then <code>GET /api/events/e08</code>, the page's own query, refetched because it was on screen. Back on the list, it said "Found 17 cleanups: 7 coming up, 8 in the log." Nothing else had to be told.</p>
+                <p>Which keys to invalidate is a question about your data, not about React: <em>what could this change have changed?</em></p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Change</th><th>What it can change</th><th>Keys invalidated</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Plan a cleanup (<code>POST /api/events</code>)</td><td>Lists of cleanups, the home page's next cleanup</td><td><code>['events']</code></td></tr>
+                            <tr><td>Cancel a cleanup (<code>PATCH /api/events/:id</code>)</td><td>That cleanup, every list it appears in</td><td><code>['events']</code></td></tr>
+                            <tr><td>Check-in mark (<code>PATCH /api/signups/:id</code>)</td><td>The roster, the spots left (a no-show frees a spot, and the first person waiting gets it), a volunteer's hours</td><td><code>['events']</code> and <code>['volunteers']</code></td></tr>
+                            <tr><td>An impact report (Lesson 8.2)</td><td>The crew's totals</td><td><code>['impact']</code> too</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The <code>Volunteer</code> type says <code>hoursLogged</code> counts "hours from attended cleanups", so a mark can change it, and the HQ invalidates <code>['volunteers']</code> even though shoreline-api, a teaching API, only works the hours out for its sample data. Code to the contract, not to one server's shortcuts. Invalidating an entry nobody is showing costs nothing but a flag.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: callback names in TanStack Query 5.107</h4>
+                    <p>The value <code>onMutate</code> returns is passed to <code>onError</code>, <code>onSuccess</code> and <code>onSettled</code>. Many articles call that parameter <code>context</code>; the 5.107 type definitions call it <code>onMutateResult</code>, and every callback now gets a separate last argument named <code>context</code> that holds the <code>QueryClient</code> (<code>context.client</code>). The HQ imports its <code>queryClient</code> instead, as its loaders do.</p>
+                </div>
+            </section>
+
+            <section id="refused" class="lesson-section">
+                <h2>🙅 When the API Says No</h2>
+                <p>The planning form already checks the fields before anything is sent, with the same rules as the API (Lesson 3.5). The API checks them again, and it must: a browser can be bypassed, and the API is the lock on the door. When it rejects a request, shoreline-api answers <code>400</code> with a body like <code>{ "error": "validation_failed", "message": "Some fields need attention.", "fieldErrors": { "title": ["Use at least 5 characters for the title."] } }</code>. <code>request()</code> already turns that into an <code>ApiError</code> with a <code>fieldErrors</code> property, and since Lesson 3.5 the form's <code>FieldErrors</code> type has exactly the API's shape. So a failed save can put the API's messages under the same fields:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="excerpt"><code class="language-tsx">try {
+  const created = await createEvent.mutateAsync(toNewEvent(values, status))
+  await navigate(`/events/${created.id}`)
+  return initialState
+} catch (error: unknown) {
+  // 400: the API checked the fields too, and its messages go under the same fields
+  if (error instanceof ApiError &amp;&amp; error.fieldErrors !== undefined) {
+    return { values, errors: error.fieldErrors, problem: error.message }
+  }
+  return { values, errors: {}, problem: `Not saved. ${describeError(error)}` }
+}</code></pre>
+                </div>
+                <p><code>catch (error: unknown)</code> is honest: anything can be thrown. <code>instanceof ApiError</code> narrows it, the <code>!== undefined</code> check narrows <code>fieldErrors</code>, and TypeScript accepts the API's <code>Record&lt;string, string[]&gt;</code> as the form's <code>FieldErrors</code>. Every other failure (the API is down, the sign-in ended) becomes one sentence from <code>describeError</code>, in the form's status line. To see the API's own messages, the project has you switch off the local checks for a minute:</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_25/25-api-errors.png" alt="The Plan a cleanup form after Publish, with the local checks turned off. Above the form: Some fields need attention. Under each field a red message from shoreline-api, for example Use at least 5 characters for the title, Choose one of the cleanup sites, Enter a date as YYYY-MM-DD, and Capacity must be a whole number from 1 to 200." width="1100" height="1165" loading="lazy">
+                    <figcaption>The same <code>FieldError</code> components, now showing shoreline-api's 400 answer: its <code>fieldErrors</code> use the form's field names, so they land under the right fields.</figcaption>
+                </figure>
+                <p>Measured: one <code>POST /api/events</code>, seven messages from the API under seven fields, "Some fields need attention." in the status line, and the focus on the title field, because the effect from Lesson 4.3 moves it to the first field marked invalid, wherever its message came from. Notice the date and time messages: "Enter a date as YYYY-MM-DD." is the API's wording, not the form's "Pick a date.". Two checkers, one set of fields.</p>
+                <div class="card card-info">
+                    <h4>🌱 A "no" from the server is information</h4>
+                    <p>The first time a save fails it can feel like the app broke. Read it the way you have learned to read <code>tsc</code>: which status (400, 401, 409, 500), which field, what does the message ask for? A 400 says "fix the input", a 401 "sign in again", a 409 "the data changed under you", a 500 "not your fault, try again". Each one deserves a different sentence on screen, and you now have the tools to write them.</p>
+                </div>
+            </section>
+
+            <section id="optimistic" class="lesson-section">
+                <h2>⚡ Wait, or Show It Now?</h2>
+                <p>So far the HQ waits: press <strong>Publish</strong>, see "Saving…", then the new page. That is right for a change the person should not believe in until it is true. Cancelling a cleanup tells 18 volunteers their Saturday is off; showing "Cancelled" before the API agrees would be a lie if the request then failed. The check-in desk is different. On the morning of a cleanup an organizer taps <strong>Check in</strong> for person after person, often on a weak phone connection. Waiting 1.5 seconds after every tap makes the desk feel broken, and a failed mark is cheap to fix. That is the case for an <strong>optimistic update</strong>: change the screen first, send the request, and put things back if it fails.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Wait for the API</th><th>Optimistic</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Big or hard to take back: cancel, publish, pay, delete</td><td>Small, frequent, easy to undo: a check-in mark, a like, a checkbox</td></tr>
+                            <tr><td>The answer has something you need (a new id)</td><td>You already know what the answer will look like</td></tr>
+                            <tr><td>Show "Saving…", then the result</td><td>Show the result, then quietly confirm or roll back</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>TanStack Query gives a mutation three moments to hook into. <code>onMutate</code> runs before the request; whatever it returns comes back to the others. <code>onError</code> runs if the request fails. <code>onSettled</code> runs after either. An optimistic update uses all three:</p>
+                <div class="mermaid">
+graph TD
+    A["Tap Check in"] --> B["onMutate: stop refetches"]
+    B --> C["Write the new mark in the cache"]
+    C --> D["PATCH /api/signups/:id"]
+    D -->|"200"| F["onSettled: invalidate"]
+    D -->|"error"| E["onError: old status back"]
+    E --> F
+    F --> G["Refetch: the API's truth"]
+                </div>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/mutations.ts</div>
+                    <pre data-src="shoreline-hq/src/api/mutations.ts" data-match="excerpt"><code class="language-ts">export function markMutation(eventId: string, viewer: string) {
+  const { queryKey } = rosterQuery(eventId, viewer)
+
+  // Change one sign-up's status in the cached roster (a copy: the cached array is never changed)
+  function setStatus(signupId: string, status: SignupStatus) {
+    queryClient.setQueryData(queryKey, (entries) =&gt;
+      entries?.map((entry) =&gt; (entry.id === signupId ? { ...entry, status } : entry)),
+    )
+  }
+
+  return mutationOptions({
+    mutationFn: ({ signupId, mark }: MarkChange) =&gt;
+      patchSignup(signupId, { status: markStatus(mark) }),
+    // Runs before the request: show the change now, and remember what to put back
+    onMutate: async ({ signupId, mark }) =&gt; {
+      // A refetch already on its way would overwrite the new mark with the old answer
+      await queryClient.cancelQueries({ queryKey })
+      const before = queryClient.getQueryData(queryKey)?.find((entry) =&gt; entry.id === signupId)?.status
+      setStatus(signupId, markStatus(mark))
+      return { before }
+    },
+    // The API said no (or could not be reached): put the old status back
+    onError: (_error, { signupId }, saved) =&gt; {
+      if (saved?.before !== undefined) {
+        setStatus(signupId, saved.before)
+      }
+    },
+    // Either way, ask the API for the truth: the roster, the spots left, a waiting list that moved up.
+    // A volunteer's hours count attended cleanups, so the crew's answers are out of date too.
+    onSettled: () =&gt;
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['events'] }),
+        queryClient.invalidateQueries({ queryKey: ['volunteers'] }),
+      ]),
+  })
+}</code></pre>
+                </div>
+                <ul>
+                    <li><code>setQueryData(queryKey, updater)</code> changes a cache entry by hand. Because <code>queryKey</code> comes from <code>rosterQuery</code>, it carries the data type: <code>entries</code> is <code>RosterEntry[] | undefined</code> with no annotation. The updater returns a <em>copy</em>, as a reducer would; every component showing that entry re-renders.</li>
+                    <li><code>cancelQueries</code> first, because a roster refetch that is already on its way would arrive with the old status and overwrite the new one (the Common Mistakes section measures it).</li>
+                    <li><code>onMutate</code> returns <code>{ before }</code>, only this one person's old status. Rolling back that single entry, instead of the whole roster from before, leaves alone any other marks made in the meantime.</li>
+                    <li>In <code>onError</code>, <code>saved</code> may be <code>undefined</code> (if <code>onMutate</code> itself threw), and TypeScript insists you check.</li>
+                    <li><code>onSettled</code> asks the API for the truth either way: the optimistic guess was only a guess.</li>
+                </ul>
+                <p>Measured with the API slowed down (<code>--latency=1500</code>): 150 ms after the tap, Diego Herrera's badge already said "Checked in" and the count said "Checked in: 1 of 7"; the <code>PATCH</code> answered 200 after 1.5 seconds. With every save forced to fail, the badge said "Checked in" while the request was out, then "Expected" again with an alert:</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_25/25-desk-rollback.png" alt="The check-in desk for Tide Pool Morning Cleanup. Under the line Checked in: 0 of 7, a red message says The mark for Diego Herrera was not saved. The server had a problem (500). Try again in a moment. In the table, Diego Herrera&#x27;s badge says Expected again." width="1100" height="688" loading="lazy">
+                    <figcaption>A failed save, rolled back: <strong>Check in</strong> showed Diego as checked in at once, the API answered 500, and <code>onError</code> put his old status back in the cache.</figcaption>
+                </figure>
+            </section>
+
+            <section id="desk" class="lesson-section">
+                <h2>🧭 Who Owns the Check-in Marks Now?</h2>
+                <p>In Lesson 5.1 the desk's reducer held two things: the marks (a <code>Map</code> from sign-up id to mark) and an undo history. That was right while the marks lived only in the browser tab. Now shoreline-api stores them, as each sign-up's <code>status</code> (<code>'attended'</code>, <code>'no-show'</code>, or back to <code>'confirmed'</code>). By Lesson 7.1's rule they are server state, and server state lives in the cache. Keeping a second copy in the reducer would mean two places that can disagree after a reload, a rollback or another organizer's change. So the marks move out, and the reducer keeps what only this desk knows:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Before (Lesson 5.1)</th><th>Now</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>The marks</td><td>Reducer state, lost on reload</td><td>shoreline-api, read through the roster in the cache (the optimistic update writes there)</td></tr>
+                            <tr><td>The undo history</td><td>Reducer state: every change</td><td>Reducer state: every change <em>the API accepted</em></td></tr>
+                            <tr><td>Undo</td><td>A reducer action that put the old mark back</td><td>One more save (the old mark), then the reducer forgets that entry</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The reducer gets smaller, and it still earns its place: "what did I just do at this desk?" is client state, and a reducer with two typed actions and an exhaustive <code>switch</code> is a good home for it. A change is recorded only after <code>mutateAsync</code> resolves, so a mark that failed (and was rolled back) never shows up in the history, and Undo never "restores" something the server never had:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/CheckInDesk.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/CheckInDesk.tsx" data-match="excerpt"><code class="language-tsx">async function changeMark(signupId: string, mark: Mark | undefined) {
+  const before = marks.get(signupId)
+  try {
+    await save.mutateAsync({ signupId, mark })
+    // Only changes the API accepted can be undone
+    dispatch({ type: 'saved', change: { signupId, before } })
+  } catch {
+    // onError has already put the old mark back, and the alert below says why
+  }
+}
+
+// Undo is one more change: send the mark from before, then forget that history entry
+async function undo() {
+  if (last === undefined || save.isPending) return
+  try {
+    await save.mutateAsync({ signupId: last.signupId, mark: last.before })
+    dispatch({ type: 'undone' })
+  } catch {
+    // As above: the desk shows what shoreline-api has
+  }
+}</code></pre>
+                </div>
+                <p>Why <code>mutateAsync</code> here and plain <code>mutate</code> in other places? Both start the same mutation. <code>mutateAsync</code> returns a promise you can <code>await</code>, which is what "record it once it is saved" needs, and a promise that rejects must be caught. The empty <code>catch</code> blocks are not hiding anything: <code>onError</code> has already rolled back, and <code>save.isError</code> shows the alert. Measured: Check in, then Undo, sent <code>PATCH /api/signups/s088</code> twice (attended, then confirmed), each followed by the refetch of the cleanup and its roster, and Diego was "Expected" again. After marking Diego and Theo and reloading the page, the desk still said "Checked in: 1 of 7. No-shows: 1. Still expected: 5." and the spots line "6 of 12 spots left": the API had them.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Saving without invalidating</h3>
+                    <p>Leave out <code>createEventMutation</code>'s <code>onSuccess</code> and everything still type-checks, lints and saves. Measured: an organizer opened the events list, planned Dune Grass Cleanup, saw its new page, and pressed <strong>← All cleanups</strong>: "Found 17 cleanups: 8 coming up, 7 in the log.", with no Dune Grass Cleanup. The list in the cache was still fresh, so nothing asked the API. After every mutation, ask "which keys could this have changed?"</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A rollback that trusts <code>onMutate</code></h3>
+                    <p>Writing <code>setStatus(signupId, saved.before)</code> without the check:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_25/25-rollback-error.png" alt="A terminal in shoreline-hq. npx tsc -b reports two errors at src/api/mutations.ts line 58: TS18048 &#x27;saved&#x27; is possibly &#x27;undefined&#x27;, and TS2345 Argument of type SignupStatus or undefined is not assignable to parameter of type SignupStatus." width="1100" height="355" loading="lazy">
+                        <figcaption>TypeScript knows that <code>onError</code> can run without <code>onMutate</code>'s result (when <code>onMutate</code> itself failed), so the third parameter may be <code>undefined</code>. Optional chaining and a check make the rollback safe.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/api/mutations.ts:68:27 - error TS18048: 'saved' is possibly 'undefined'.
+
+68       setStatus(signupId, saved.before)
+                             ~~~~~
+
+src/api/mutations.ts:68:27 - error TS2345: Argument of type 'SignupStatus | undefined' is not assignable to parameter of type 'SignupStatus'.
+  Type 'undefined' is not assignable to type 'SignupStatus'.
+
+68       setStatus(signupId, saved.before)
+                             ~~~~~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/api/mutations.ts:68</code></pre>
+                    </div>
+                    <p>The first error is about <code>saved</code> (the mutation can fail before <code>onMutate</code> returned anything), the second about <code>before</code> (the sign-up may not have been in the cache). <code>saved?.before !== undefined</code> answers both.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ An optimistic update without <code>cancelQueries</code></h3>
+                    <p>Measured with <code>--latency=1000</code>: tap Check in for Diego, then 1.3 seconds later for Grace Whitaker. Diego's save had just finished, so its <code>onSettled</code> had started a roster refetch. Without <code>cancelQueries</code>, that refetch (asked before Grace's change reached the API) landed after Grace's optimistic mark: her badge went "Checked in", "Expected", "Checked in" again. With <code>cancelQueries</code>, it stayed "Checked in" the whole time. A flicker like that makes people tap again, which here would undo the mark.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ <code>mutateAsync</code> without <code>try</code>/<code>catch</code></h3>
+                    <p>Without the <code>try</code>/<code>catch</code> in <code>changeMark</code>, a failed save still rolled back and showed the alert (that is <code>onError</code> and <code>isError</code>), but the browser also reported an uncaught error: "Simulated 500 response (the _status parameter)." A rejected promise nobody handles is a bug report waiting to happen. Catch it where you <code>await</code> it, or use <code>mutate</code>, which never rejects.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Mutations from older tutorials</h3>
+                    <p>Version 4 took the function first and the options second, and called pending "loading":</p>
+                    <pre data-snippet data-legacy><code class="language-tsx">import { useMutation } from '@tanstack/react-query'
+import { patchEvent } from './api/client.ts'
+
+export function Scratch() {
+  // Version 4 style: the function first, then the options
+  const cancel = useMutation((eventId: string) =&gt; patchEvent(eventId, { status: 'cancelled' }), {
+    onSuccess: () =&gt; console.log('cancelled'),
+  })
+  return cancel.isLoading ? 'Cancelling…' : null
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/Scratch.tsx:6:30 - error TS2559: Type '(eventId: string) =&gt; Promise&lt;CleanupEvent&gt;' has no properties in common with type 'UseMutationOptions&lt;unknown, Error, void, unknown&gt;'.
+
+6   const cancel = useMutation((eventId: string) =&gt; patchEvent(eventId, { status: 'cancelled' }), {
+                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+src/Scratch.tsx:9:17 - error TS2339: Property 'isLoading' does not exist on type 'UseMutationResult&lt;unknown, Error, void, unknown&gt;'.
+  Property 'isLoading' does not exist on type 'Override&lt;MutationObserverErrorResult&lt;unknown, Error, void, unknown&gt;, { mutate: UseMutateFunction&lt;unknown, Error, void, unknown&gt;; }&gt; &amp; { ...; }'.
+
+9   return cancel.isLoading ? 'Cancelling…' : null
+                  ~~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/Scratch.tsx:6</code></pre>
+                    </div>
+                    <p>In version 5 there is one options object (<code>useMutation({ mutationFn, onSuccess })</code>, or a factory) and the flag is <code>isPending</code>. The first message is hard to read: "has no properties in common" means "this is not the options object I expected".</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: An HQ That Saves</h2>
+                <p>Step 1 adds the requests, Step 2 the mutation factories, and Steps 3 to 5 put them to work: the planning form, cancelling, and the check-in desk. Step 6 watches it all happen, slowly and with failures. Keep shoreline-api and <code>npm run dev</code> running, and sign in as Maya (<code>maya.okafor@example.com</code>, password <code>shoreline-demo</code>).</p>
+
+                <div class="card">
+                    <h3>Step 1: The write requests <span class="step-time">(8 min)</span></h3>
+                    <p>In <code>src/api/client.ts</code>, update the header comment and add three request types to the type imports (they come from the API's <code>types.ts</code>):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight">-// Shoreline Crew HQ's API client (Lessons 2.4, 4.1, 5.2, 5.4, 6.2, 6.3 and 7.1).
++// Shoreline Crew HQ's API client (Lessons 2.4, 4.1, 5.2, 5.4, 6.2, 6.3, 7.1 and 7.2).
+ // Data from the API is unknown until a check proves its shape.
+ import type {</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   DebrisCount,
+   ErrorCode,
++  EventChanges,
+   EventStatus,
+   ImpactReport,
+   ImpactTotals,
++  NewEvent,
+   PageInfo,
+   Role,</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   SignInResponse,
+   Signup,
++  SignupChanges,
+   SignupStatus,
+   Site,</code></pre>
+                    </div>
+                    <p>Organizers get the cleanup's <code>checkInCode</code> from <code>GET /api/events/:id</code>. The type already has it as optional, but nothing checked it yet. Data from the API is unknown until a check proves its shape, so <code>isCleanupEventDetail</code> checks it when it is there:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> }
+ 
+-/** A cleanup as GET /api/events/:id sends it: a CleanupEvent plus its whole site */
++/** A cleanup as GET /api/events/:id sends it: a CleanupEvent plus its whole site
++ * (and, for organizers, the code volunteers type to check in on the day) */
+ export function isCleanupEventDetail(value: unknown): value is CleanupEventDetail {
+-  return isCleanupEvent(value) &amp;&amp; 'site' in value &amp;&amp; isSite(value.site)
++  return (
++    isCleanupEvent(value) &amp;&amp;
++    'site' in value &amp;&amp;
++    isSite(value.site) &amp;&amp;
++    (!('checkInCode' in value) || typeof value.checkInCode === 'string')
++  )
+ }
+ </code></pre>
+                    </div>
+                    <p><code>PATCH /api/signups/:id</code> answers with a plain <code>Signup</code>. A roster entry is a sign-up plus its volunteer, so the sign-up check becomes its own function and the roster check builds on it:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> }
+ 
++/** One sign-up, as PATCH /api/signups/:id sends it back */
++function isSignup(value: unknown): value is Signup {
++  return (
++    isRecord(value) &amp;&amp;
++    signupTextFields.every((key) =&gt; typeof value[key] === 'string') &amp;&amp;
++    signupStatuses.some((status) =&gt; status === value.status) &amp;&amp;
++    (value.checkedInAt === null || typeof value.checkedInAt === 'string')
++  )
++}
++
+ /** One row of GET /api/events/:id/signups: a sign-up and the volunteer's contact details */
+ function isRosterEntry(value: unknown): value is RosterEntry {
+   return (
+-    isRecord(value) &amp;&amp;
+-    signupTextFields.every((key) =&gt; typeof value[key] === 'string') &amp;&amp;
+-    signupStatuses.some((status) =&gt; status === value.status) &amp;&amp;
+-    (value.checkedInAt === null || typeof value.checkedInAt === 'string') &amp;&amp;
++    isSignup(value) &amp;&amp;
++    'volunteer' in value &amp;&amp;
+     isRecord(value.volunteer) &amp;&amp;
+     typeof value.volunteer.id === 'string' &amp;&amp;</code></pre>
+                    </div>
+                    <p>After <code>isSignup(value)</code>, TypeScript knows <code>value</code> is a <code>Signup</code>, which has no <code>volunteer</code>; <code>'volunteer' in value</code> narrows it again so the next lines may read it. Now the helper you saw earlier: <code>postSignIn</code> already sent JSON, so it becomes the helper's first user:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> }
+ 
+-/** POST /api/auth/sign-in. A wrong email or password is an ApiError with status 401. */
+-export async function postSignIn(credentials: SignInRequest): Promise&lt;Session&gt; {
+-  const response = await request('/auth/sign-in', {
+-    method: 'POST',
++/** Send JSON with POST or PATCH, and check the JSON that comes back */
++async function sendJSON&lt;T&gt;(
++  method: 'POST' | 'PATCH',
++  path: string,
++  body: unknown,
++  isT: (value: unknown) =&gt; value is T,
++): Promise&lt;T&gt; {
++  const response = await request(path, {
++    method,
+     headers: { 'Content-Type': 'application/json' },
+-    body: JSON.stringify(credentials),
++    body: JSON.stringify(body),
+   })
+   const data: unknown = await response.json()
+-  if (!isSignInResponse(data)) {
+-    throw new Error('Unexpected data from POST /api/auth/sign-in')
++  if (!isT(data)) {
++    throw new Error(`Unexpected data from ${method} /api${path}`)
+   }
+   return data
++}
++
++/** POST /api/auth/sign-in. A wrong email or password is an ApiError with status 401. */
++export function postSignIn(credentials: SignInRequest): Promise&lt;Session&gt; {
++  return sendJSON('POST', '/auth/sign-in', credentials, isSignInResponse)
+ }
+ </code></pre>
+                    </div>
+                    <p>The <code>method</code> parameter is a union of two literal types, so a typo like <code>'PACTH'</code> does not compile. At the end of the file, the three new requests:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   await request('/auth/sign-out', { method: 'POST' })
+ }
++
++/** POST /api/events (organizers). Fields the API rejects are an ApiError with status 400 and fieldErrors. */
++export function postEvent(event: NewEvent): Promise&lt;CleanupEvent&gt; {
++  return sendJSON('POST', '/events', event, isCleanupEvent)
++}
++
++/** PATCH /api/events/:id (organizers): change some fields, such as the status */
++export function patchEvent(id: string, changes: EventChanges): Promise&lt;CleanupEvent&gt; {
++  return sendJSON('PATCH', `/events/${encodeURIComponent(id)}`, changes, isCleanupEvent)
++}
++
++/** PATCH /api/signups/:id (organizers): mark someone as attended, a no-show, or back to confirmed */
++export function patchSignup(id: string, changes: SignupChanges): Promise&lt;Signup&gt; {
++  return sendJSON('PATCH', `/signups/${encodeURIComponent(id)}`, changes, isSignup)
++}</code></pre>
+                    </div>
+                    <p><code>EventChanges</code> is the API's "any of a cleanup's fields" type (<code>Partial</code> of the new-event fields, plus any status), so <code>patchEvent(id, { status: 'cancelled' })</code> type-checks and <code>{ status: 'canceled' }</code> would not.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The mutation factories <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>src/api/mutations.ts</code>, next to <code>queries.ts</code>. It holds one factory per kind of change, plus two small helpers that translate between a sign-up's <code>status</code> and the desk's <code>Mark</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/mutations.ts</div>
+                        <pre data-src="shoreline-hq/src/api/mutations.ts"><code class="language-ts">// Shoreline Crew HQ's changes (Lesson 7.2): one mutationOptions factory per kind of change.
+// Each one says what to send, and which cached answers are out of date afterwards.
+import { mutationOptions } from '@tanstack/react-query'
+import type { Mark } from '../reducers/rosterReducer.ts'
+import { patchEvent, patchSignup, postEvent } from './client.ts'
+import { queryClient, rosterQuery } from './queries.ts'
+import type { NewEvent, SignupStatus } from './types.ts'
+
+/** Plan a cleanup. Waits for the API: the new cleanup's id comes from it. */
+export function createEventMutation() {
+  return mutationOptions({
+    mutationFn: (event: NewEvent) =&gt; postEvent(event),
+    // Every list of cleanups may now be missing one. Returning the promise keeps the
+    // mutation pending until the lists on screen have been fetched again.
+    onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: ['events'] }),
+  })
+}
+
+/** Cancel a scheduled cleanup. Waits for the API: a big change should not look done before it is. */
+export function cancelEventMutation() {
+  return mutationOptions({
+    mutationFn: (eventId: string) =&gt; patchEvent(eventId, { status: 'cancelled' }),
+    onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: ['events'] }),
+  })
+}
+
+/** The mark a sign-up's status stands for: none while the person is still expected */
+export function markOf(status: SignupStatus): Mark | undefined {
+  return status === 'attended' || status === 'no-show' ? status : undefined
+}
+
+/** The status to send for a mark: no mark means confirmed (expected) again */
+export function markStatus(mark: Mark | undefined): SignupStatus {
+  return mark ?? 'confirmed'
+}
+
+/** One change at the check-in desk: a sign-up's new mark (undefined = expected again) */
+export interface MarkChange {
+  signupId: string
+  mark: Mark | undefined
+}
+
+/** Save a check-in mark. Optimistic: the desk shows the new mark at once, and puts the old one
+ * back if the API says no. */
+export function markMutation(eventId: string, viewer: string) {
+  const { queryKey } = rosterQuery(eventId, viewer)
+
+  // Change one sign-up's status in the cached roster (a copy: the cached array is never changed)
+  function setStatus(signupId: string, status: SignupStatus) {
+    queryClient.setQueryData(queryKey, (entries) =&gt;
+      entries?.map((entry) =&gt; (entry.id === signupId ? { ...entry, status } : entry)),
+    )
+  }
+
+  return mutationOptions({
+    mutationFn: ({ signupId, mark }: MarkChange) =&gt;
+      patchSignup(signupId, { status: markStatus(mark) }),
+    // Runs before the request: show the change now, and remember what to put back
+    onMutate: async ({ signupId, mark }) =&gt; {
+      // A refetch already on its way would overwrite the new mark with the old answer
+      await queryClient.cancelQueries({ queryKey })
+      const before = queryClient.getQueryData(queryKey)?.find((entry) =&gt; entry.id === signupId)?.status
+      setStatus(signupId, markStatus(mark))
+      return { before }
+    },
+    // The API said no (or could not be reached): put the old status back
+    onError: (_error, { signupId }, saved) =&gt; {
+      if (saved?.before !== undefined) {
+        setStatus(signupId, saved.before)
+      }
+    },
+    // Either way, ask the API for the truth: the roster, the spots left, a waiting list that moved up.
+    // A volunteer's hours count attended cleanups, so the crew's answers are out of date too.
+    onSettled: () =&gt;
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['events'] }),
+        queryClient.invalidateQueries({ queryKey: ['volunteers'] }),
+      ]),
+  })
+}</code></pre>
+                    </div>
+                    <p>You have read the three factories in the sections above. Two details to notice: <code>markOf</code> returns <code>status</code> itself inside the ternary, and TypeScript accepts it as a <code>Mark</code> because the condition narrowed <code>status</code> to <code>'attended' | 'no-show'</code>; and <code>markMutation</code> takes the <code>eventId</code> and <code>viewer</code> so it can build the same roster key the desk's query uses. Run <code>npx tsc -b</code>: it should print nothing.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Planning that saves <span class="step-time">(10 min)</span></h3>
+                    <p>The planning form keeps its <code>useActionState</code> action from Lesson 3.5; the action becomes <code>async</code> and, after the local checks pass, saves with <code>mutateAsync</code>. In <code>src/components/NewEventForm.tsx</code>, the imports:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">+import { useMutation } from '@tanstack/react-query'
+ import { useActionState, useEffect, useRef } from 'react'
+-import type { NewEvent, Site } from '../api/types.ts'
++import { useNavigate } from 'react-router'
++import { ApiError, describeError } from '../api/client.ts'
++import { createEventMutation } from '../api/mutations.ts'
++import type { Site } from '../api/types.ts'
+ import {
+   emptyValues,</code></pre>
+                    </div>
+                    <p>The form no longer has a "ready" state: success leaves the page. Its state becomes one object with a <code>problem</code> line for failures that are not about a field:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   type FieldErrors,
+ } from '../utils/eventForm.ts'
+-import { formatDate, toDateString } from '../utils/format.ts'
++import { toDateString } from '../utils/format.ts'
+ import { Button } from './Button.tsx'
+ import { FieldError } from './FieldError.tsx'
+ import formStyles from './Form.module.css'
+ 
+-// What the form shows: what the person typed and what to fix, or a cleanup ready to save
+-type FormState =
+-  | { kind: 'editing'; values: EventFormValues; errors: FieldErrors }
+-  | { kind: 'ready'; event: NewEvent }
++// What the form shows: what the person typed, what to fix, and why the API said no
++interface FormState {
++  values: EventFormValues
++  errors: FieldErrors
++  /** A problem that is not about one field (the API is down, the sign-in ended, ...) */
++  problem: string
++}
+ 
+-const initialState: FormState = { kind: 'editing', values: emptyValues, errors: {} }
++const initialState: FormState = { values: emptyValues, errors: {}, problem: '' }
+ 
+ interface NewEventFormProps {</code></pre>
+                    </div>
+                    <p>The action, and the lines that read its state:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> 
+ export function NewEventForm({ sites }: NewEventFormProps) {
++  const createEvent = useMutation(createEventMutation())
++  const navigate = useNavigate()
++
+   // The form's action: React calls it with the previous state and the submitted FormData.
+   // It is inside the component because it checks the site against the sites prop.
+-  function planCleanup(_previous: FormState, formData: FormData): FormState {
++  async function planCleanup(_previous: FormState, formData: FormData): Promise&lt;FormState&gt; {
+     const values = readValues(formData)
+     const errors = validateEvent(values, toDateString(new Date()), sites)
+     if (Object.keys(errors).length &gt; 0) {
+-      return { kind: 'editing', values, errors }
++      return { values, errors, problem: '' }
+     }
+     // The button that submitted the form sends its own name and value
+     const status = formData.get('status') === 'scheduled' ? 'scheduled' : 'draft'
+-    return { kind: 'ready', event: toNewEvent(values, status) }
++    try {
++      const created = await createEvent.mutateAsync(toNewEvent(values, status))
++      await navigate(`/events/${created.id}`)
++      return initialState
++    } catch (error: unknown) {
++      // 400: the API checked the fields too, and its messages go under the same fields
++      if (error instanceof ApiError &amp;&amp; error.fieldErrors !== undefined) {
++        return { values, errors: error.fieldErrors, problem: error.message }
++      }
++      return { values, errors: {}, problem: `Not saved. ${describeError(error)}` }
++    }
+   }
+ 
+   const [state, formAction, isPending] = useActionState(planCleanup, initialState)
+-  const values = state.kind === 'editing' ? state.values : emptyValues
+-  const errors = state.kind === 'editing' ? state.errors : {}
++  const { values, errors } = state
+   const formRef = useRef&lt;HTMLFormElement&gt;(null)
+ 
+   // After every check that found problems, move the focus to the first field to fix
+   useEffect(() =&gt; {
+-    if (state.kind !== 'editing') return
+     const firstInvalid = formRef.current?.querySelector&lt;HTMLElement&gt;('[aria-invalid="true"]')
+     firstInvalid?.focus()</code></pre>
+                    </div>
+                    <p>An <code>async</code> function returns a promise, so its return type is <code>Promise&lt;FormState&gt;</code>; <code>useActionState</code> accepts async actions and keeps <code>isPending</code> true until the promise settles, the save, the refetch and the navigation included. That is why the buttons stay disabled the whole time. The status line now says "Saving…" or the problem:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">     &lt;&gt;
+       &lt;p role="status" className={formStyles.status}&gt;
+-        {state.kind === 'ready' &amp;&amp; (
+-          &lt;&gt;
+-            Ready to save: &lt;strong&gt;{state.event.title}&lt;/strong&gt;,{' '}
+-            {formatDate(state.event.date)}, {state.event.startTime} to {state.event.endTime}, as{' '}
+-            {state.event.status === 'scheduled' ? 'a published cleanup' : 'a draft'}.
+-          &lt;/&gt;
+-        )}
++        {isPending ? 'Saving…' : state.problem}
+       &lt;/p&gt;
+       &lt;form ref={formRef} action={formAction} noValidate className={formStyles.form}&gt;</code></pre>
+                    </div>
+                    <p>Plan a cleanup and press <strong>Publish</strong>. Measured: one <code>POST /api/events</code>, then <code>GET</code> of the new cleanup (its page's loader), and you land on its page; <strong>← All cleanups</strong> then says "Found 18 cleanups: 9 coming up, 7 in the log." The new id is made by the API (something like <code>emwekwuwf5</code>), which is exactly why this save cannot be optimistic. The "For organizers" card on the new page comes in Step 4.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_25/25-published.png" alt="The new cleanup&#x27;s page in Shoreline Crew HQ: heading Dune Grass Cleanup, a Scheduled badge, the date and 09:00 to 11:30, 12 of 12 spots left. A card titled For organizers shows the check-in code and a Cancel cleanup button; below it We bring: Gloves, Bags. and Where to meet: North jetty steps, North Jetty." width="1100" height="1180" loading="lazy">
+                        <figcaption><strong>Publish</strong> sent <code>POST /api/events</code>, and the form went to the new cleanup's page. Its id, check-in code and spot count came from shoreline-api.</figcaption>
+                    </figure>
+                    <p>Now see the API's checks at work. In <code>planCleanup</code>, put <code>//</code> in front of the three lines of the <code>if</code> that returns the local errors (VS Code: select them, <kbd>Ctrl</kbd>+<kbd>/</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>/</kbd> on a Mac), type "Dune" as the title and 500 as the capacity, and press <strong>Publish</strong>: the messages from the figure in "When the API Says No" appear. Remove the <code>//</code> again (the same shortcut), and check that the form shows its own messages once more.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Cancelling, from the cleanup's page <span class="step-time">(12 min)</span></h3>
+                    <p>The Cancel button lives on the cards of the events list since Lesson 4.3. Saving changes that: a cancelled cleanup leaves the "Coming up" list for "Past cleanups", and React sees a card in a different list as a different component (Lesson 3.3's lists). The card that started the cancel, with its dialog, its "Cancelling…" message and the button that had the focus, would vanish mid-save. A cleanup's own page stays put, and it is where an organizer sees everything about the cleanup before deciding. So Cancel moves there, together with the check-in code organizers need on the day. Create <code>src/components/OrganizerTools.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.tsx"><code class="language-tsx">import { useMutation } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
+import { describeError } from '../api/client.ts'
+import { cancelEventMutation } from '../api/mutations.ts'
+import type { CleanupEventDetail } from '../api/types.ts'
+import { Button } from './Button.tsx'
+import cardStyles from './Card.module.css'
+import { ConfirmDialog } from './ConfirmDialog.tsx'
+import styles from './OrganizerTools.module.css'
+
+interface OrganizerToolsProps {
+  event: CleanupEventDetail
+}
+
+// What only organizers see on a cleanup's page: the check-in code, and a way to cancel it
+export function OrganizerTools({ event }: OrganizerToolsProps) {
+  const cancel = useMutation(cancelEventMutation())
+  const [confirming, setConfirming] = useState(false)
+  const statusRef = useRef&lt;HTMLParagraphElement&gt;(null)
+  const scheduled = event.status === 'scheduled'
+
+  function cancelCleanup() {
+    setConfirming(false)
+    cancel.mutate(event.id, {
+      // The Cancel button is gone now: move the focus to the message that took its place
+      onSuccess: () =&gt; statusRef.current?.focus(),
+    })
+  }
+
+  // Nothing to do for drafts and past cleanups (unless this page just cancelled one)
+  if (!scheduled &amp;&amp; cancel.isIdle) {
+    return null
+  }
+
+  return (
+    &lt;section className={cardStyles.card} aria-labelledby="organizer-tools"&gt;
+      &lt;h2 id="organizer-tools"&gt;For organizers&lt;/h2&gt;
+      {scheduled &amp;&amp; event.checkInCode !== undefined &amp;&amp; (
+        &lt;p&gt;
+          Check-in code: &lt;strong className={styles.code}&gt;{event.checkInCode}&lt;/strong&gt;. Volunteers
+          type it to check themselves in on the day.
+        &lt;/p&gt;
+      )}
+      {scheduled &amp;&amp; (
+        &lt;Button aria-haspopup="dialog" disabled={cancel.isPending} onClick={() =&gt; setConfirming(true)}&gt;
+          Cancel cleanup
+        &lt;/Button&gt;
+      )}
+      {/* Always in the page, so screen readers notice when the text changes */}
+      &lt;p role="status" ref={statusRef} tabIndex={-1} className={styles.status}&gt;
+        {cancel.isPending &amp;&amp; 'Cancelling…'}
+        {cancel.isError &amp;&amp; `The cleanup was not cancelled. ${describeError(cancel.error)}`}
+        {cancel.isSuccess &amp;&amp;
+          `Cleanup cancelled. Volunteers signed up: ${event.spotsTaken}. They need to hear about it.`}
+      &lt;/p&gt;
+      {confirming &amp;&amp; (
+        &lt;ConfirmDialog
+          title="Cancel this cleanup?"
+          keepLabel="Keep it"
+          confirmLabel="Cancel the cleanup"
+          onKeep={() =&gt; setConfirming(false)}
+          onConfirm={cancelCleanup}
+        &gt;
+          &lt;p&gt;
+            &lt;strong&gt;{event.title}&lt;/strong&gt;. Volunteers signed up: {event.spotsTaken}. They will need
+            to hear about it.
+          &lt;/p&gt;
+        &lt;/ConfirmDialog&gt;
+      )}
+    &lt;/section&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li>This one waits for the API (no <code>onMutate</code>): the badge says "Cancelled" only when it is true.</li>
+                        <li><code>mutate</code> takes a second argument with callbacks for this one call. They run after the factory's, so by the time <code>onSuccess</code> moves the focus, the cleanup has been fetched again and the Cancel button is gone. Without that line, the focus would fall back to the page body; with it, a screen reader user lands on the message and hears it.</li>
+                        <li>The component does not return <code>null</code> just because the cleanup is no longer scheduled: it checks <code>cancel.isIdle</code> too, so it stays on screen to show its own success message. A component that unmounts takes its mutation state with it.</li>
+                        <li>The <code>p[role="status"]</code> is always rendered, and <code>tabIndex={-1}</code> lets code (not the Tab key) focus it.</li>
+                    </ul>
+                    <p>Create <code>src/components/OrganizerTools.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.module.css"><code class="language-css">.code {
+  font-size: 1.25rem;
+  letter-spacing: 0.1em;
+}
+
+.status:empty {
+  margin: 0;
+}</code></pre>
+                    </div>
+                    <p>In <code>src/pages/EventPage.tsx</code>, import it and show it to organizers under the spots line:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { ImpactSummary } from '../components/ImpactSummary.tsx'
+ import { LoadStatus } from '../components/LoadStatus.tsx'
++import { OrganizerTools } from '../components/OrganizerTools.tsx'
+ import { SitePicture } from '../components/SitePicture.tsx'
+ import { SpotsLine } from '../components/SpotsLine.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">         &lt;/p&gt;
+         &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
++        {isOrganizer &amp;&amp; &lt;OrganizerTools event={event} /&gt;}
+         {checkInDay || completed ? (
+           // A new key for each cleanup: fresh tabs, nothing selected from the last one</code></pre>
+                    </div>
+                    <p>Then take the placeholder out of <code>src/components/EventCard.tsx</code>: the imports, the state and the handler, then the button, the "Nothing is sent" note and the dialog:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { Link } from 'react-router'
+ import type { CleanupEvent, Site } from '../api/types.ts'
+-import { useAuth } from '../auth/AuthContext.ts'
+ import { getAvailability } from '../utils/availability.ts'
+ import { formatDate } from '../utils/format.ts'
+ import { Button } from './Button.tsx'
+ import cardStyles from './Card.module.css'
+-import { ConfirmDialog } from './ConfirmDialog.tsx'
+ import styles from './EventCard.module.css'
+ import { SpotsLine } from './SpotsLine.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> 
+ export function EventCard({ event, site }: EventCardProps) {
+-  const { isOrganizer } = useAuth()
+-  const canCancel = isOrganizer &amp;&amp; event.status === 'scheduled'
+   const [showDetails, setShowDetails] = useState(false)
+-  const [confirming, setConfirming] = useState(false)
+-  const [readyToCancel, setReadyToCancel] = useState(false)
+-
+-  function cancelCleanup() {
+-    setConfirming(false)
+-    setReadyToCancel(true)
+-  }
+ 
+   return (</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">           &lt;VisuallyHidden&gt; for {event.title}&lt;/VisuallyHidden&gt;
+         &lt;/Button&gt;
+-        {canCancel &amp;&amp; (
+-          &lt;Button variant="link" aria-haspopup="dialog" onClick={() =&gt; setConfirming(true)}&gt;
+-            Cancel cleanup&lt;VisuallyHidden&gt; for {event.title}&lt;/VisuallyHidden&gt;
+-          &lt;/Button&gt;
+-        )}
+       &lt;/div&gt;
+       {showDetails &amp;&amp; &lt;p&gt;{event.description}&lt;/p&gt;}
+-      {canCancel &amp;&amp; (
+-        // Always in the page, so screen readers notice when the text appears
+-        &lt;p role="status" className={styles.note}&gt;
+-          {readyToCancel &amp;&amp; 'Ready to cancel. Nothing is sent to shoreline-api yet.'}
+-        &lt;/p&gt;
+-      )}
+-      {confirming &amp;&amp; (
+-        &lt;ConfirmDialog
+-          title="Cancel this cleanup?"
+-          keepLabel="Keep it"
+-          confirmLabel="Cancel the cleanup"
+-          onKeep={() =&gt; setConfirming(false)}
+-          onConfirm={cancelCleanup}
+-        &gt;
+-          &lt;p&gt;
+-            &lt;strong&gt;{event.title}&lt;/strong&gt;, {formatDate(event.date)}. Volunteers signed up:{' '}
+-            {event.spotsTaken}. They will need to hear about it.
+-          &lt;/p&gt;
+-        &lt;/ConfirmDialog&gt;
+-      )}
+     &lt;/article&gt;
+   )</code></pre>
+                    </div>
+                    <p>And the note's style, in <code>src/components/EventCard.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.module.css" data-match="diff"><code class="language-diff-css diff-highlight">   gap: 0.5rem 1.5rem;
+ }
+-
+-.note:empty {
+-  margin: 0;
+-}</code></pre>
+                    </div>
+                    <p>Open Weekend Cove Cleanup, press <strong>Cancel cleanup</strong>, then <strong>Cancel the cleanup</strong>:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_25/25-cancelled.png" alt="Weekend Cove Cleanup&#x27;s page after cancelling: the badge now says Cancelled, and the For organizers card says Cleanup cancelled. Volunteers signed up: 18. They need to hear about it. The Cancel cleanup button and the check-in code are gone." width="976" height="744" loading="lazy">
+                        <figcaption>After the API agreed: <code>onSuccess</code> invalidated <code>['events']</code>, the page's query fetched the cleanup again, and the focus moved to the message.</figcaption>
+                    </figure>
+                    <p>To get the sample data back after experiments like this, restart shoreline-api (<kbd>Ctrl</kbd>+<kbd>C</kbd>, then <code>node server.ts</code>): its data lives in memory. Restarting also forgets every sign-in, so sign in again.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: A check-in desk that saves <span class="step-time">(15 min)</span></h3>
+                    <p>First the reducer, which keeps only the undo history now ("Who Owns the Check-in Marks Now?" explains why). Replace <code>src/reducers/rosterReducer.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/reducers/rosterReducer.ts</div>
+                        <pre data-src="shoreline-hq/src/reducers/rosterReducer.ts"><code class="language-ts">import { assertNever } from '../utils/assertNever.ts'
+
+/** What the check-in desk records about one sign-up today */
+export type Mark = 'attended' | 'no-show'
+
+/** One saved change, remembered so that it can be undone */
+export interface Change {
+  signupId: string
+  before: Mark | undefined
+}
+
+/** The desk's own record: the marks live in shoreline-api now, the undo history stays here */
+export type RosterAction =
+  | { type: 'saved'; change: Change }
+  | { type: 'undone' }
+
+export interface RosterState {
+  /** the changes the API has accepted, newest last */
+  history: readonly Change[]
+}
+
+export const initialRoster: RosterState = { history: [] }
+
+export function rosterReducer(state: RosterState, action: RosterAction): RosterState {
+  switch (action.type) {
+    case 'saved':
+      return { history: [...state.history, action.change] }
+    case 'undone':
+      return { history: state.history.slice(0, -1) }
+    default:
+      return assertNever(action)
+  }
+}</code></pre>
+                    </div>
+                    <p>Save it, and the red underlines show up where the old actions were used: <code>RosterTable</code> and <code>CheckInDesk</code>. The table no longer dispatches reducer actions; it reports "this person's new mark" through a callback prop. In <code>src/components/RosterTable.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/RosterTable.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/RosterTable.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import type { RosterEntry } from '../api/types.ts'
+-import type { Mark, RosterAction } from '../reducers/rosterReducer.ts'
++import type { Mark } from '../reducers/rosterReducer.ts'
+ import { Badge, type BadgeTone } from './Badge.tsx'
+ import { Button } from './Button.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/RosterTable.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/RosterTable.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   entries: RosterRow[]
+   marks: ReadonlyMap&lt;string, Mark&gt;
+-  dispatch: (action: RosterAction) =&gt; void
++  /** Called with the sign-up's new mark (undefined: expected again) */
++  onMark: (signupId: string, mark: Mark | undefined) =&gt; void
+ }
+ 
+-export function RosterTable({ entries, marks, dispatch }: RosterTableProps) {
++export function RosterTable({ entries, marks, onMark }: RosterTableProps) {
+   return (
+     &lt;table className={styles.table}&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/RosterTable.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/RosterTable.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">                 &lt;Button
+                   aria-pressed={mark === 'attended'}
+-                  onClick={() =&gt;
+-                    dispatch(
+-                      mark === 'attended' ? { type: 'clear', signupId } : { type: 'checkIn', signupId },
+-                    )
+-                  }
++                  onClick={() =&gt; onMark(signupId, mark === 'attended' ? undefined : 'attended')}
+                 &gt;
+                   Check in&lt;VisuallyHidden&gt; for {entry.volunteer.name}&lt;/VisuallyHidden&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/RosterTable.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/RosterTable.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">                 &lt;Button
+                   aria-pressed={mark === 'no-show'}
+-                  onClick={() =&gt;
+-                    dispatch(
+-                      mark === 'no-show' ? { type: 'clear', signupId } : { type: 'markNoShow', signupId },
+-                    )
+-                  }
++                  onClick={() =&gt; onMark(signupId, mark === 'no-show' ? undefined : 'no-show')}
+                 &gt;
+                   No-show&lt;VisuallyHidden&gt; for {entry.volunteer.name}&lt;/VisuallyHidden&gt;</code></pre>
+                    </div>
+                    <p>Pressing a pressed toggle still clears the mark, now as <code>undefined</code>. Replace <code>src/components/CheckInDesk.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/CheckInDesk.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/CheckInDesk.tsx"><code class="language-tsx">import { useMutation } from '@tanstack/react-query'
+import { useReducer } from 'react'
+import { describeError } from '../api/client.ts'
+import { markMutation, markOf } from '../api/mutations.ts'
+import type { RosterEntry } from '../api/types.ts'
+import { initialRoster, rosterReducer, type Mark } from '../reducers/rosterReducer.ts'
+import { Button } from './Button.tsx'
+import cardStyles from './Card.module.css'
+import styles from './CheckInDesk.module.css'
+import { RosterTable } from './RosterTable.tsx'
+
+interface CheckInDeskProps {
+  eventId: string
+  viewer: string
+  /** Everyone with a spot today: still expected, checked in, or marked as a no-show */
+  entries: RosterEntry[]
+}
+
+// Today's roster: who is here, who did not come, and an undo for slips of the finger.
+// The marks are saved to shoreline-api; the undo history stays in this desk.
+export function CheckInDesk({ eventId, viewer, entries }: CheckInDeskProps) {
+  const [roster, dispatch] = useReducer(rosterReducer, initialRoster)
+  const save = useMutation(markMutation(eventId, viewer))
+
+  // The marks come from the cached roster: the API's answer, or a change on its way there
+  const marks = new Map&lt;string, Mark&gt;()
+  for (const entry of entries) {
+    const mark = markOf(entry.status)
+    if (mark !== undefined) {
+      marks.set(entry.id, mark)
+    }
+  }
+  const here = entries.filter((entry) =&gt; marks.get(entry.id) === 'attended').length
+  const noShows = entries.filter((entry) =&gt; marks.get(entry.id) === 'no-show').length
+  const expected = entries.length - here - noShows
+  const last = roster.history.at(-1)
+  const notSaved = entries.find((entry) =&gt; entry.id === save.variables?.signupId)
+
+  async function changeMark(signupId: string, mark: Mark | undefined) {
+    const before = marks.get(signupId)
+    try {
+      await save.mutateAsync({ signupId, mark })
+      // Only changes the API accepted can be undone
+      dispatch({ type: 'saved', change: { signupId, before } })
+    } catch {
+      // onError has already put the old mark back, and the alert below says why
+    }
+  }
+
+  // Undo is one more change: send the mark from before, then forget that history entry
+  async function undo() {
+    if (last === undefined || save.isPending) return
+    try {
+      await save.mutateAsync({ signupId: last.signupId, mark: last.before })
+      dispatch({ type: 'undone' })
+    } catch {
+      // As above: the desk shows what shoreline-api has
+    }
+  }
+
+  return (
+    &lt;section className={cardStyles.card} aria-labelledby="check-in-desk"&gt;
+      &lt;h2 id="check-in-desk"&gt;Check-in desk&lt;/h2&gt;
+      &lt;p role="status"&gt;
+        Checked in: {here} of {entries.length}. No-shows: {noShows}. Still expected: {expected}.
+      &lt;/p&gt;
+      {save.isError &amp;&amp; (
+        &lt;p role="alert" className={styles.error}&gt;
+          The mark for {notSaved?.volunteer.name ?? 'that volunteer'} was not saved.{' '}
+          {describeError(save.error)}
+        &lt;/p&gt;
+      )}
+      &lt;RosterTable entries={entries} marks={marks} onMark={changeMark} /&gt;
+      &lt;div className={styles.actions}&gt;
+        &lt;Button aria-disabled={last === undefined || save.isPending} onClick={undo}&gt;
+          Undo last change
+        &lt;/Button&gt;
+      &lt;/div&gt;
+      &lt;p className={styles.note}&gt;Each mark is saved to shoreline-api as you go.&lt;/p&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The marks are worked out from the roster on every render (derived values, Lesson 3.4), so an optimistic write, a rollback and a refetch all show up without any extra code. <code>save.variables</code> holds the last mutation's input, which is how the alert can name the person. In <code>src/components/CheckInDesk.module.css</code>, the note's class gets a name that fits it, and the alert gets a style:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/CheckInDesk.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/CheckInDesk.module.css" data-match="diff"><code class="language-diff-css diff-highlight"> }
+ 
+-.practice {
++.note {
+   margin-bottom: 0;
+   color: var(--text-muted);
+   font-size: 0.9rem;
+ }
++
++.error {
++  color: var(--error);
++  font-weight: 600;
++}</code></pre>
+                    </div>
+                    <p>Last, <code>TodaysDesk</code> in <code>src/pages/EventPage.tsx</code>: the desk must also list the people who are already marked (before, only <code>'confirmed'</code> sign-ups reached it, so a checked-in volunteer would vanish from the desk after a reload), and it passes on what the mutation needs for the roster's key:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">     return &lt;LoadStatus query={roster} what="today's roster" /&gt;
+   }
+-  // The desk is for the people with a spot (not the waiting list or cancellations)
+-  const expected = roster.data.filter((entry) =&gt; entry.status === 'confirmed')
+-  return &lt;CheckInDesk entries={expected} /&gt;
++  // The desk is for the people with a spot (not the waiting list or cancellations),
++  // including the ones already marked today
++  const atTheDesk = roster.data.filter(
++    (entry) =&gt; entry.status === 'confirmed' || entry.status === 'attended' || entry.status === 'no-show',
++  )
++  return &lt;CheckInDesk eventId={eventId} viewer={viewer} entries={atTheDesk} /&gt;
+ }
+ </code></pre>
+                    </div>
+                    <p>Open Tide Pool Morning Cleanup (today's cleanup), check two people in, mark one as a no-show, reload the page: the marks are still there. Press <strong>Undo last change</strong> until it is dashed again.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Watch it happen, slowly and with failures <span class="step-time">(8 min)</span></h3>
+                    <p>In the API's terminal, stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd> and start it slowed down; sign in again afterwards (a restart forgets sign-ins):</p>
+                    <pre class="terminal"><code class="language-bash">node server.ts --latency=1500</code></pre>
+                    <p>Open the browser's DevTools (<kbd>F12</kbd>, or <kbd>⌥ Option</kbd>+<kbd>⌘ Cmd</kbd>+<kbd>I</kbd> on a Mac), choose <strong>Network</strong> and type <code>4000</code> in its filter box:</p>
+                    <ul>
+                        <li>On the desk, tap <strong>Check in</strong>: the badge changes at once; the <code>PATCH</code> finishes 1.5 seconds later, then the <code>GET</code>s of the refetch.</li>
+                        <li>Publish a new cleanup: "Saving…", buttons disabled, then the new page.</li>
+                        <li>Cancel a cleanup: "Cancelling…", then the message.</li>
+                    </ul>
+                    <p>Now make every mark fail. shoreline-api answers 500 to any request with <code>?_status=500</code> in its address (measured on <code>PATCH /api/signups/s088</code>: 500, and the sign-up stayed <code>'confirmed'</code>). In <code>patchSignup</code>, add <code>?_status=500</code> right after <code>${encodeURIComponent(id)}</code> in the path, save, and tap <strong>Check in</strong>: the mark appears, then goes back, with the alert from the figure in "Wait, or Show It Now?". Take the <code>?_status=500</code> out again, restart the API without <code>--latency</code>, and run the checks:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 15ms on 62 files with 150 rules using 20 threads.
+&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 233 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-GYV5aac-.css                             8.91 kB │ gzip:   2.73 kB
+dist/assets/index-8C7yBa9F.js                            426.45 kB │ gzip: 133.76 kB
+
+✓ built in 1.11s</code></pre>
+                    </div>
+                    <p>The JavaScript grew from 421.40 kB to about 426 kB (gzip: from 132.35 to about 134 kB): <code>useMutation</code> is part of the library you already had. Your hashes and timings will differ.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li><code>client.ts</code> has <code>sendJSON</code>, <code>postEvent</code>, <code>patchEvent</code> and <code>patchSignup</code>, and checks <code>checkInCode</code> and sign-ups</li>
+                        <li><code>src/api/mutations.ts</code> has the three factories; each says which keys it invalidates</li>
+                        <li><strong>Publish</strong> and <strong>Save as draft</strong> create the cleanup and open its page; the events list shows it; the API's 400 messages appear under the fields</li>
+                        <li>Organizers see the check-in code and can cancel a scheduled cleanup from its page; the focus lands on the message</li>
+                        <li>Check-in marks survive a reload, show at once with a slow API, and roll back with an alert when the save fails; Undo sends the old mark</li>
+                        <li>No text in the app says that nothing is saved or sent</li>
+                        <li><code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass with no errors or warnings</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, list each change a person can make. For each one, note the request, the keys it makes out of date, and whether it should wait for the server or be optimistic, with one sentence on why.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 12 minutes together, included in the lesson time). Exercise 3 is an optional stretch, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Publish a draft</h3>
+                    <p>Organizers can save a cleanup as a draft, but nothing in the HQ publishes it later. On a draft's page, give organizers a <strong>Publish</strong> button that changes its status to <code>'scheduled'</code>, with "Publishing…", an error message and a done message in the status line, and the focus on that line afterwards.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A fourth factory, almost a copy of <code>cancelEventMutation</code>. In <code>OrganizerTools</code>, a second <code>useMutation</code>, and the early <code>return null</code> must let drafts through.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">/** Publish a draft: volunteers can see it and sign up */
+export function publishEventMutation() {
+  return mutationOptions({
+    mutationFn: (eventId: string) =&gt; patchEvent(eventId, { status: 'scheduled' }),
+    onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: ['events'] }),
+  })
+}</code></pre>
+                        <pre data-snippet><code class="language-tsx">const publish = useMutation(publishEventMutation())
+// ...
+const draft = event.status === 'draft'
+// ...
+function publishDraft() {
+  publish.mutate(event.id, { onSuccess: () =&gt; statusRef.current?.focus() })
+}
+
+// Nothing to do for past cleanups (unless this page just cancelled one)
+if (!scheduled &amp;&amp; !draft &amp;&amp; cancel.isIdle) {
+// ...
+{draft &amp;&amp; (
+  &lt;Button variant="primary" disabled={publish.isPending} onClick={publishDraft}&gt;
+    Publish
+  &lt;/Button&gt;
+)}
+// ...
+{publish.isPending &amp;&amp; 'Publishing…'}
+{publish.isError &amp;&amp; `The draft was not published. ${describeError(publish.error)}`}
+{publish.isSuccess &amp;&amp; 'Published. Volunteers can sign up now.'}</code></pre>
+                        <p>Import <code>publishEventMutation</code> next to <code>cancelEventMutation</code>. Measured on Harbor Kayak Cleanup: <code>PATCH /api/events/e15</code>, then <code>GET /api/events/e15</code>; the badge said Scheduled, the check-in code and <strong>Cancel cleanup</strong> appeared, the focus was on "Published. Volunteers can sign up now.", and the list said "Found 17 cleanups: 9 coming up, 7 in the log." Type-checks and lints cleanly; the course's code continues without it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Which entries go stale?</h3>
+                    <p>Maya has visited the home page, the events list, Weekend Cove Cleanup, today's desk and Aisha Rahman's card in the crew list. She is now on today's desk and checks Diego in. For each cache entry, say whether <code>markMutation</code>'s <code>onSettled</code> makes it stale, and whether it is fetched again right away: (a) <code>['sites']</code>, (b) <code>['events', 'roster', 'e17', 'v01']</code>, (c) <code>['events', 'list', 'perPage=50', 'v01']</code>, (d) <code>['volunteers', 'detail', 'v16', 'v01']</code>, (e) <code>['impact']</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A key is invalidated when it starts with <code>['events']</code> or <code>['volunteers']</code>. Invalidated entries that a component on screen is using are refetched now; the rest wait until something needs them.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>(a) Untouched. (b) Stale and refetched now: the desk shows it (measured: <code>GET /api/events/e17/signups</code> after every mark). (c) Stale, refetched when Maya goes back to the list. (d) Stale, refetched when she opens Aisha's card again. (e) Untouched: the totals come from impact reports. The cleanup's own entry (<code>['events', 'detail', 'e17', 'v01']</code>) is on screen too, which is the <code>GET /api/events/e17</code> you see in the Network tab.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): Delete a draft</h3>
+                    <p>Optional stretch, not counted in the lesson time. shoreline-api's <code>DELETE /api/events/:id</code> deletes a draft and answers 204 with no body. Add a <strong>Delete draft</strong> button for organizers on a draft's page that deletes it and goes to the events list. Think about the deleted cleanup's entry in the cache.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A 204 has no JSON, so the request cannot use <code>sendJSON</code>. <code>queryClient.removeQueries</code> throws an entry away; invalidating it instead would ask the API for a cleanup that no longer exists.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">/** DELETE /api/events/:id (organizers): only drafts can be deleted. The answer is 204, with no body. */
+export async function deleteEvent(id: string): Promise&lt;void&gt; {
+  await request(`/events/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+// ...
+/** Delete a draft: forget its page in the cache, and refresh the lists that showed it */
+export function deleteDraftMutation() {
+  return mutationOptions({
+    mutationFn: (eventId: string) =&gt; deleteEvent(eventId),
+    onSuccess: (_data, eventId) =&gt; {
+      queryClient.removeQueries({ queryKey: ['events', 'detail', eventId] })
+      return queryClient.invalidateQueries({ queryKey: ['events', 'list'] })
+    },
+  })
+}</code></pre>
+                        <pre data-snippet><code class="language-tsx">async function deleteThisDraft() {
+  try {
+    await deleteDraft.mutateAsync(event.id)
+    await navigate('/events')
+  } catch {
+    // The message below says why; the draft is still there
+  }
+}
+// ...
+{draft &amp;&amp; &lt;Button onClick={deleteThisDraft}&gt;Delete draft&lt;/Button&gt;}</code></pre>
+                        <p>Plus <code>useNavigate</code>, the <code>draft</code> constant and the early return from Exercise 1, and a "not deleted" message in the status line. Measured on Beach Reset Day: <code>DELETE /api/events/e16</code>, then the list said "Found 16 cleanups: 8 coming up, 7 in the log."; pressing Back showed "Cleanup not found". Type-checks and lints cleanly. Not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Maya publishes a new cleanup, then presses <strong>← All cleanups</strong> ten seconds after she last saw the list. Why does the list show the new cleanup?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The list was fetched ten seconds ago. Is a ten-second-old entry fresh or stale with the HQ's settings?">
+                                A) The list's entry is older than <code>staleTime</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Mutation answers are not stored in the cache. What does the HQ do after the POST succeeds?">
+                                B) The <code>POST</code>'s answer is added to the cache under the list's key
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The events list has no loader (its search box is in the address). What else could make it ask the API?">
+                                C) The events route's loader runs again
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="createEventMutation's onSuccess invalidates every key starting with events, so the list's entry is stale and is fetched again when the page shows it. Without it, the measured list still said 17.">
+                                D) <code>onSuccess</code> invalidated <code>['events']</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> <code>markMutation</code>'s <code>onMutate</code> returns <code>{ before }</code>. What type does TypeScript give <code>onError</code>'s third parameter?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Can onError run when onMutate never returned? Look at the TS18048 error in Common Mistakes.">
+                                A) <code>{ before: SignupStatus | undefined }</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The type is inferred from what onMutate returns, plus undefined, because the mutation can fail before onMutate finished. That is why the rollback checks saved?.before.">
+                                B) <code>{ before: SignupStatus | undefined } | undefined</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="tsc named the type exactly in its message. Where would unknown come from?">
+                                C) <code>unknown</code>, until you add a type argument
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Error is the first parameter. What does the third one carry?">
+                                D) <code>Error</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Why does cancelling a cleanup wait for the API instead of showing "Cancelled" at once?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Optimistic updates suit small, frequent, easy-to-undo changes. Cancelling affects 18 volunteers; showing it as done before it is true would mislead the organizer if the request failed.">
+                                A) It is a big change that is hard to take back, so the screen should say "Cancelled" only when it is true
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The check-in desk changes the cache before its PATCH is answered. Is there anything different about a PATCH to events?">
+                                B) TanStack Query cannot update a cache entry before a <code>PATCH</code> answers
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Cancelling sends a new status, which the HQ knows in advance. Which save really needs the API's answer to show anything?">
+                                C) The HQ needs the cancelled cleanup's new id from the API
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Mutations are not retried by default, optimistic or not. What is the real reason?">
+                                D) Optimistic mutations are retried, and a cancel must not be sent twice
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> At the desk, Maya checks Diego in, then presses <strong>Undo last change</strong>. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The reducer no longer holds the marks. Where do they live now?">
+                                A) The reducer puts Diego's old mark back, and nothing is sent
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TanStack Query has no undo of its own. What did the HQ write for it?">
+                                B) TanStack Query cancels the first <code>PATCH</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Undo is one more save: markMutation sends Diego's mark from before (confirmed), and when the API accepts it the reducer drops that history entry. Measured: two PATCH requests for s088.">
+                                C) The desk sends a second <code>PATCH</code> with his old status, then the reducer forgets that history entry
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Invalidation refetches what the server has. After the first save, what does the server have?">
+                                D) The roster is invalidated, and the refetch brings back the old mark
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Maya presses <strong>Publish</strong> and the API answers 500. What does the HQ do?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Queries retry server errors. Do mutations, by default?">
+                                A) Tries the <code>POST</code> twice more, as the <code>QueryClient</code>'s <code>retry</code> says
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Mutations do not retry by default (a repeated POST could create the cleanup twice). mutateAsync rejects, the action's catch has no fieldErrors to show, and describeError's sentence goes in the status line; the fields keep what Maya typed.">
+                                B) Shows "Not saved. The server had a problem (500)…" in the form's status line and keeps what she typed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The rollback belongs to markMutation's onMutate. Does createEventMutation have an onMutate?">
+                                C) Rolls back an optimistic copy of the new cleanup
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Navigation comes after the await. What happens to the lines after an await that rejects?">
+                                D) Opens the new cleanup's page anyway
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why not put the <code>POST</code>'s answer in the cache instead of invalidating?</summary>
+                    <p>You can: <code>setQueryData</code> works after a success too, and it saves a request. But the events list is filtered, sorted and paged by the API, and the HQ would have to repeat all of that to know where (or whether) the new cleanup belongs in each cached list. Invalidating asks the one place that knows. Write the answer into the cache when it is the whole entry (a detail page whose key you know) and the request is expensive; invalidate when in doubt.</p>
+                </details>
+                <details>
+                    <summary>When do I use <code>mutate</code>, and when <code>mutateAsync</code>?</summary>
+                    <p><code>mutate</code> when the component only needs the status (<code>isPending</code>, <code>isError</code>) and perhaps a callback for this call, like the cancel button. <code>mutateAsync</code> when the next line depends on the result: the form navigates to the new id, the desk records a change only once it is saved. With <code>mutateAsync</code>, catch the rejection.</p>
+                </details>
+                <details>
+                    <summary>Should every change get an optimistic update?</summary>
+                    <p>No. Optimistic updates cost code (a snapshot, a rollback, a refetch) and they can show something that turns out false. Use them where waiting hurts and being briefly wrong is cheap. Many teams start with "wait and invalidate" everywhere and add optimistic updates where people actually feel the delay.</p>
+                </details>
+                <details>
+                    <summary>Where is the page for editing a cleanup's details?</summary>
+                    <p>It is the same <code>PATCH /api/events/:id</code> as cancelling, with more fields: <code>patchEvent(id, { title, capacity })</code> already accepts them. The form around it is the bigger job, and Module 8 builds forms like it with React Hook Form and Zod.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>While a mark is being saved, show a small "Saving…" next to that person's name. <code>save.isPending</code> and <code>save.variables?.signupId</code> tell the desk which row it is; pass it to <code>RosterTable</code> as a new optional prop. Then try it with <code>--latency=1500</code>, and check what a screen reader would hear (should the row's text be in a live region, or is the desk's count line enough?).</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Follow one tap on <strong>Check in</strong> from start to finish, with the API answering 500: what the screen shows at each moment, which callback runs, what is in the cache, what the reducer records (or does not), and what the person reads. Then write one sentence about a change in an app you use every day that feels instant: do you think it is optimistic?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A mutation runs only when you call it, is not cached and is not retried; <code>mutationOptions</code> factories keep its types and its follow-up together</li>
+                        <li>Write requests send JSON and check what comes back, like reads; a union of method names keeps typos out</li>
+                        <li>After a change, invalidate every key it could have changed; general-to-specific keys make that one short key</li>
+                        <li>An API's 400 <code>fieldErrors</code> can go straight under the form's fields when the form uses the API's field names</li>
+                        <li>Optimistic updates fit small, frequent, easy-to-undo changes: <code>onMutate</code> cancels refetches and writes the cache, <code>onError</code> rolls back, <code>onSettled</code> refetches the truth</li>
+                        <li>Server state lives in the cache; a reducer keeps what only the screen knows, such as an undo history</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>See every endpoint and error the HQ can meet</td><td><a href="api.html">The shoreline-api reference</a></td></tr>
+                            <tr><td>Read TanStack Query's guides on mutations and optimistic updates (choose React and version 5)</td><td><a href="https://tanstack.com/query/latest" target="_blank" rel="noopener">tanstack.com/query</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>Organizers can plan cleanups that really exist, with the API's own messages when something is wrong</li>
+                        <li>Cancelling happens on the cleanup's page, honestly, with the check-in code next to it</li>
+                        <li>The check-in desk saves every mark, feels instant on a slow connection, and recovers from a failed save</li>
+                        <li>Every change tells the cache what is out of date, so every page stays true without a reload</li>
+                        <li>You moved state to its rightful owner and made a reducer smaller, a refactor many developers put off</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The HQ's server state is in good hands now. Some state is not server state at all: whether the lists are compact or roomy, a theme choice, things that should survive a reload but never reach the API. In <a href="lesson_26.html"><strong>Lesson 7.3: Client State</strong></a> you will give that kind of state its own small store with Zustand, keep it across reloads, and see how Redux Toolkit, which you will meet on many teams, solves the same problem.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and that shoreline-api runs without <code>--latency</code></li>
+                    <li>List three pieces of state in the HQ that are not server state (look for <code>useState</code> and the reducer), and note which of them you would like to survive a reload</li>
+                    <li>Add the "changes" list for your own project to your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today the HQ crossed the line from a viewer to a tool: things people do in it now happen in the real world of the crew. That brings new kinds of failure (refused input, a server error halfway through a morning of check-ins), and you met each one with a plan instead of hoping it would not happen. Optimistic updates have a reputation for being tricky, and you wrote one that rolls back cleanly, measured why each line is there, and decided where <em>not</em> to use it. That judgment is the part that grows with practice.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_24.html" class="prev-lesson">← Previous: TanStack Query</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_26.html" class="next-lesson">Next: Client State →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

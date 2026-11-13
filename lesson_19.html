@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Measure when React renders, then make it render less: the React DevTools Profiler and the Profiler component, memo, useMemo and useCallback with their types, stable context values, and the React Compiler in a Vite 8 project, with real numbers from Shoreline Crew HQ. React + TypeScript: Build a Modern Web App Lesson 5.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Rendering Performance - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>⚡ Lesson 5.3: Rendering Performance</h1>
+                <p class="lead">Type "pelican" into the HQ's search box and nothing feels slow. Behind the screen, though, React called 560 component functions before the API had even answered, and drew the same fifteen cleanup cards seven times over. Today you learn to see that work, to measure it instead of guessing, and to remove what is wasted: by hand with <code>memo</code>, <code>useMemo</code> and <code>useCallback</code>, and then with the React Compiler, which writes most of that code for you. Every number in this lesson was measured on the HQ you have built, and you will measure your own.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Name the three reasons a component renders, and explain why rendering is not the same as changing the page</li>
+                        <li>Measure renders with the React DevTools Profiler and React's <code>&lt;Profiler&gt;</code> component before you change anything</li>
+                        <li>Use <code>memo</code>, <code>useMemo</code> and <code>useCallback</code> with their TypeScript types, and recognize when they only add noise</li>
+                        <li>Keep a context value from rendering every reader again when nothing in it changed</li>
+                        <li>Turn on the React Compiler in a Vite 8 project, check what it optimized, and decide what you still write by hand</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_18.html">Lesson 5.2: Typed Context</a> (your <code>shoreline-hq</code> with sign-in, drafts for organizers and the live check-in desk)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A measured speed-up for the events page: a render log with React's <code>&lt;Profiler&gt;</code>, a hand-written <code>memo</code>, then the React Compiler for the whole HQ, with numbers before and after</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3, babel-plugin-react-compiler 1.0, oxlint 1.93, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and Chrome (or Edge or Firefox), with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-19-start.zip">lesson-19-start.zip</a> · Finished code: <a href="downloads/lesson-19-end.zip">lesson-19-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#renders" class="toc-link">When React Renders</a></li>
+                        <li><a href="#measure" class="toc-link">Measure First</a></li>
+                        <li><a href="#memo" class="toc-link">memo and useCallback: Skipping a Component</a></li>
+                        <li><a href="#usememo" class="toc-link">useMemo: Skipping a Calculation</a></li>
+                        <li><a href="#context-values" class="toc-link">Context Values That Stay Put</a></li>
+                        <li><a href="#compiler" class="toc-link">The React Compiler</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Measure and Speed Up the Events Page</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="renders" class="lesson-section">
+                <h2>🌊 When React Renders</h2>
+                <p>In Lesson 3.1 you learned that React draws the screen from data: a component is a function, and <strong>rendering</strong> means React calls that function to find out what the screen should look like now. A component renders again for exactly three reasons:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Reason</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Its own state changed</strong> (a <code>set…</code> call or a <code>dispatch</code>)</td><td>Typing in the search box calls <code>setQuery</code>, so <code>EventsPage</code> renders</td></tr>
+                            <tr><td><strong>Its parent rendered</strong> and created it again</td><td><code>EventsPage</code> renders, so <code>EventGroups</code>, two or three <code>EventList</code>s (three for organizers) and every <code>EventCard</code> below render too</td></tr>
+                            <tr><td><strong>A context it reads changed</strong></td><td>Signing out changes <code>AuthContext</code>, so every component that calls <code>useAuth()</code> renders</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The second reason is the one that adds up. Here is what one key press in the search box sets off:</p>
+                <div class="mermaid">
+graph TD
+    A["setQuery('p')"] --> B["EventsPage"]
+    B --> C["EventFilters"]
+    B --> D["EventGroups"]
+    D --> E["EventList x2"]
+    E --> F["EventCard x15"]
+    F --> G["Badge, SpotsLine, ..."]
+</div>
+                <p>Measured on the HQ from Lesson 5.2, as a guest: typing <code>pelican</code> (seven keys, faster than the 300 ms debounce) made React commit seven times and call <strong>560</strong> component functions, 80 per key: <code>EventsPage</code>, <code>EventFilters</code>, <code>EventGroups</code>, two <code>EventList</code>s and, fifteen times each, <code>EventCard</code>, <code>StatusBadge</code>, <code>Badge</code>, <code>SpotsLine</code> and <code>VisuallyHidden</code>. When the debounced search and then the API's answer arrived, two more commits brought the total to 660. Signed in as Maya (17 cleanups, a Drafts list), the same typing took 693 calls before the answer and 814 in all.</p>
+                <p>And yet the page itself barely changed while you typed. React works in two phases: <strong>render</strong> (call the components, compare their output with last time) and <strong>commit</strong> (change the DOM where the output differs). Measured with a <code>MutationObserver</code> watching the page: during the seven key presses, React added the <strong>Clear filters</strong> button and updated the search box, and not one element inside the fifteen cards changed. All that rendering produced the same cards it already had.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the tide chart</h4>
+                    <p>Each render is the crew lead redrawing the whole tide chart from the latest readings, then holding it next to the one on the wall and only repainting the lines that moved. Redrawing is usually quick, so React does it freely and you rarely notice. Performance work is noticing when the redrawing itself gets expensive, a big chart redrawn on every key press, and arranging for the parts that cannot have changed to be skipped.</p>
+                </div>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Re-rendering is not a bug: it is how React stays correct, and most apps never need more than that. But lists grow, phones are slower than your laptop, and "the search box lags on my phone" is a real bug report on a real team. The skill employers look for is not sprinkling <code>memo</code> everywhere; it is measuring, finding the one place that matters, and fixing it with the smallest change. That habit is what this lesson builds.</p>
+                </div>
+            </section>
+
+            <section id="measure" class="lesson-section">
+                <h2>📏 Measure First</h2>
+                <p>Guessing which component is slow is a coin toss; measuring takes two minutes. You have two tools.</p>
+                <h3>The React DevTools Profiler</h3>
+                <p>The React Developer Tools browser extension (free, for Chrome, Edge and Firefox; you met its Components tab in Lesson 3.1) adds a <strong>Profiler</strong> tab to the browser's DevTools. Open your app on the dev server, press <kbd>F12</kbd> (<kbd>⌘ Cmd</kbd>+<kbd>Option</kbd>+<kbd>I</kbd> on a Mac), choose <strong>Profiler</strong>, click the round record button, do the thing you want to measure, and click it again to stop. You get:</p>
+                <ul>
+                    <li>one bar per <strong>commit</strong> at the top (seven key presses, seven bars);</li>
+                    <li>a <strong>flame graph</strong> per commit: every component that rendered, colored by how long it took, and the ones that did not render shown in gray;</li>
+                    <li>a <strong>Ranked</strong> view that sorts the components by render time, slowest first.</li>
+                </ul>
+                <p>Two settings (the gear icon in the React DevTools panel) are worth turning on: <strong>Highlight updates when components render</strong>, which flashes a box around each component as it renders, so you can see the whole event list light up on every key; and <strong>Record why each component rendered while profiling</strong>, which adds "Why did this render?" (for example "The parent component rendered" or "Context changed") to each component in the flame graph. The extension works on the dev server; on a production build it shows minified names, and profiling a build needs a special profiling build of React.</p>
+                <h3>The <code>&lt;Profiler&gt;</code> component</h3>
+                <p>React also has a component for measuring from code, which is handy when you want numbers in the console, or in a test, without clicking. Wrap a part of the tree and give it a callback:</p>
+                <pre data-snippet><code class="language-tsx">// Temporary: how long each render of the list took
+const logRender: ProfilerOnRenderCallback = (id, phase, actualDuration) =&gt; {
+  console.log(`${id} ${phase}: ${actualDuration.toFixed(1)} ms`)
+}</code></pre>
+                <pre data-snippet><code class="language-tsx">&lt;Profiler id="EventGroups" onRender={logRender}&gt;
+  &lt;EventGroups
+    events={events.state.data.items}
+    sites={sites.state.data}
+    filtering={search !== '' || status !== 'all'}
+    showDrafts={isOrganizer}
+  /&gt;
+&lt;/Profiler&gt;</code></pre>
+                <ul>
+                    <li><code>ProfilerOnRenderCallback</code> is the callback's type from <code>@types/react</code>: annotate the variable and TypeScript infers every parameter (<code>id: string</code>, <code>phase: 'mount' | 'update' | 'nested-update'</code>, <code>actualDuration: number</code> and three more you can ignore for now).</li>
+                    <li>React calls it after every commit in which something inside the <code>&lt;Profiler&gt;</code> rendered. <code>actualDuration</code> is the time, in milliseconds, spent rendering that part of the tree in that commit.</li>
+                    <li>It only reports in development. Measured: the same code in <code>npm run build</code> + <code>npm run preview</code> printed nothing at all, because production builds of React leave the profiling out.</li>
+                </ul>
+                <p>You will add exactly this in the project's Step 1. Measured on the dev server while typing <code>pelican</code>: one line per key press, each between 6 and 9 ms. With Chrome's CPU throttled to 4 times slower (DevTools, Performance panel, CPU: 4x slowdown, a common stand-in for a slower phone), every key press took 29 to 35 ms. A screen has about 16 ms to draw each frame, so that is the point where typing can start to feel sticky.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ Development numbers are not production numbers</h4>
+                    <p>The dev server runs React's development build, which checks more and, in Strict Mode, calls every component twice per render. Production is faster. So use development timings to <em>compare</em> (before and after a change, on the same computer), not as a promise about real users. Render <em>counts</em> are the same in both. Every count in this lesson was recorded after each commit from the same information the DevTools Profiler shows (which components React actually called), on the dev server and on the build, and they matched.</p>
+                </div>
+            </section>
+
+            <section id="memo" class="lesson-section">
+                <h2>🧷 memo and useCallback: Skipping a Component</h2>
+                <p><code>memo</code> wraps a component and tells React: if the parent renders but every prop is the same as last time, skip this component and reuse what it drew before. "The same" means <code>Object.is</code> for each prop: equal for strings, numbers and booleans, but for objects, arrays and functions only if it is the <em>same</em> object, not just one that looks alike. Here is a small experiment, a crew note box above a list of supplies. Put it in <code>src/Scratch.tsx</code> and show it from <code>CurrentPage</code> as you did in Lesson 5.2:</p>
+                <pre data-snippet><code class="language-tsx">import { memo, useState } from 'react'
+
+interface SupplyListProps {
+  supplies: string[]
+  onRemove: (supply: string) =&gt; void
+}
+
+// memo: React skips this list when every prop is the same as last time
+const SupplyList = memo(function SupplyList({ supplies, onRemove }: SupplyListProps) {
+  return (
+    &lt;ul&gt;
+      {supplies.map((supply) =&gt; (
+        &lt;li key={supply}&gt;
+          {supply}{' '}
+          &lt;button type="button" onClick={() =&gt; onRemove(supply)}&gt;
+            Remove {supply}
+          &lt;/button&gt;
+        &lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+})
+
+export function SupplyPlanner() {
+  const [note, setNote] = useState('')
+  const [supplies, setSupplies] = useState(['Gloves', 'Bags', 'Grabbers'])
+
+  function removeSupply(supply: string) {
+    setSupplies((current) =&gt; current.filter((item) =&gt; item !== supply))
+  }
+
+  return (
+    &lt;&gt;
+      &lt;label htmlFor="note"&gt;Note for the crew&lt;/label&gt;
+      &lt;input id="note" value={note} onChange={(event) =&gt; setNote(event.target.value)} /&gt;
+      &lt;SupplyList supplies={supplies} onRemove={removeSupply} /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p>TypeScript-wise, <code>memo</code> keeps the props type of the function you give it: <code>SupplyList</code> still takes <code>SupplyListProps</code>, and passing a wrong prop is still a type error. Writing the function with a name inside <code>memo(function SupplyList…)</code> keeps that name in error messages and in the Profiler.</p>
+                <p>Now type <code>gloves</code> into the note. Measured: six key presses, and <code>SupplyList</code> rendered six times anyway, <code>memo</code> or not. Why? <code>supplies</code> is the same array every time, but <code>removeSupply</code> is a new function on every render of <code>SupplyPlanner</code>, so <code>memo</code> sees a changed prop and renders.</p>
+                <p><code>useCallback</code> keeps the same function between renders until something in its dependency array changes:</p>
+                <pre data-snippet><code class="language-tsx">// The same function on every render, so SupplyList's props stay the same
+const removeSupply = useCallback((supply: string) =&gt; {
+  setSupplies((current) =&gt; current.filter((item) =&gt; item !== supply))
+}, [])</code></pre>
+                <p>The updater form <code>setSupplies((current) =&gt; …)</code> means the function needs nothing from the render it was created in, so its dependency array is empty and it can stay the same forever. Its type is inferred from the function: <code>(supply: string) =&gt; void</code>, exactly what <code>onRemove</code> expects. Measured: typing <code>gloves</code> now rendered <code>SupplyPlanner</code> six times and <code>SupplyList</code> zero times; removing Gloves and then Bags still worked and left only Grabbers.</p>
+                <div class="card card-info">
+                    <h4>💡 The pair rule</h4>
+                    <p><code>useCallback</code> on its own does nothing useful: a stable function only matters to someone who compares it, such as a <code>memo</code> component or an effect's dependency array. <code>memo</code> on its own fails as soon as one prop is a fresh object or function. They work as a pair, which is why hand-written memoization spreads through a codebase so quickly.</p>
+                </div>
+            </section>
+
+            <section id="usememo" class="lesson-section">
+                <h2>🧮 useMemo: Skipping a Calculation</h2>
+                <p><code>memo</code> skips a whole component. Sometimes the component has to render, but one expensive calculation inside it does not have to run again. Imagine a report screen with 100,000 debris log entries and a note box:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+interface DebrisLog {
+  category: 'plastic' | 'glass'
+  kg: number
+}
+
+// 100,000 made-up log entries, standing in for a big list from an API
+const sampleLogs: DebrisLog[] = Array.from({ length: 100_000 }, (_, index) =&gt; ({
+  category: index % 3 === 0 ? 'glass' : 'plastic',
+  kg: ((index * 7919) % 1000) / 100,
+}))
+
+// The heaviest entries first: sorting 100,000 items takes real time
+function heaviest(logs: DebrisLog[], count: number): DebrisLog[] {
+  return logs.toSorted((a, b) =&gt; b.kg - a.kg).slice(0, count)
+}
+
+function DebrisReport({ logs }: { logs: DebrisLog[] }) {
+  const [note, setNote] = useState('')
+  const top = heaviest(logs, 3)
+
+  return (
+    &lt;&gt;
+      &lt;label htmlFor="report-note"&gt;Note for the report&lt;/label&gt;
+      &lt;input id="report-note" value={note} onChange={(event) =&gt; setNote(event.target.value)} /&gt;
+      &lt;p&gt;Heaviest finds: {top.map((log) =&gt; `${log.kg} kg of ${log.category}`).join(', ')}&lt;/p&gt;
+    &lt;/&gt;
+  )
+}
+
+export function DebrisDemo() {
+  return &lt;DebrisReport logs={sampleLogs} /&gt;
+}</code></pre>
+                <p>Every key press in the note renders <code>DebrisReport</code>, which sorts all 100,000 entries again to find the same three. Measured with the <code>&lt;Profiler&gt;</code> on the dev server: a median of 30 ms per key press. <code>useMemo</code> remembers a calculated value and only recalculates when a dependency changes:</p>
+                <pre data-snippet><code class="language-tsx">// Sort again only when logs is a different array, not on every keystroke in the note
+const top = useMemo(() =&gt; heaviest(logs, 3), [logs])</code></pre>
+                <p>Measured: 0.5 ms per key press. The result type is inferred from the function (<code>DebrisLog[]</code>), so nothing else changes. The dependency array plays the same role as an effect's: list every value from the component that the calculation reads. Lesson 4.1's <code>react-hooks(exhaustive-deps)</code> lint rule checks <code>useMemo</code> and <code>useCallback</code> too.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ Not for everything</h4>
+                    <p>Filtering 15 cleanups into three groups, as <code>EventGroups</code> does, takes well under a millisecond: wrapping it in <code>useMemo</code> would add code and a dependency array to keep right, and save nothing you could measure. Reach for <code>useMemo</code> when the Profiler shows a slow component, and keep the calculation pure: <code>useMemo</code> is a cache, and React may throw cached values away. Never put a side effect such as a fetch in it.</p>
+                </div>
+            </section>
+
+            <section id="context-values" class="lesson-section">
+                <h2>📡 Context Values That Stay Put</h2>
+                <p>Lesson 5.2 left a note in <code>AuthProvider</code>: <code>value={{ session, isOrganizer, signIn, signOut }}</code> builds a new object on every render, "and Lesson 5.3 measures when it is not fine". Here it is. A units context, as in Lesson 5.2, with a provider whose <em>parent</em> has a note box:</p>
+                <pre data-snippet><code class="language-tsx">function UnitProvider({ children }: { children: ReactNode }) {
+  const [unit, setUnit] = useState&lt;WeightUnit&gt;('kg')
+
+  function toggleUnit() {
+    setUnit((current) =&gt; (current === 'kg' ? 'lb' : 'kg'))
+  }
+
+  return &lt;UnitContext value={{ unit, toggleUnit }}&gt;{children}&lt;/UnitContext&gt;
+}
+
+// memo, and no props at all: surely this never renders again?
+const DayTotal = memo(function DayTotal() {
+  const { unit, toggleUnit } = useUnit()
+  return (
+    &lt;p&gt;
+      Collected today: {unit === 'kg' ? '42 kg' : '92 lb'}{' '}
+      &lt;button type="button" onClick={toggleUnit}&gt;
+        Switch units
+      &lt;/button&gt;
+    &lt;/p&gt;
+  )
+})
+
+export function CrewBoard() {
+  const [note, setNote] = useState('')
+  return (
+    &lt;UnitProvider&gt;
+      &lt;label htmlFor="board-note"&gt;Note for the board&lt;/label&gt;
+      &lt;input id="board-note" value={note} onChange={(event) =&gt; setNote(event.target.value)} /&gt;
+      &lt;DayTotal /&gt;
+    &lt;/UnitProvider&gt;
+  )</code></pre>
+                <p>Type <code>beach</code> in the note. Measured: <code>DayTotal</code> rendered five times out of five. It is wrapped in <code>memo</code> and takes no props, but <code>memo</code> never blocks the third reason to render: when <code>CrewBoard</code> renders, <code>UnitProvider</code> renders (its <code>children</code> prop is new), builds a new value object, and every reader of the context renders, wherever it is. The fix is to make the value the same object until something in it really changes:</p>
+                <pre data-snippet><code class="language-tsx">function UnitProvider({ children }: { children: ReactNode }) {
+  const [unit, setUnit] = useState&lt;WeightUnit&gt;('kg')
+
+  const toggleUnit = useCallback(() =&gt; {
+    setUnit((current) =&gt; (current === 'kg' ? 'lb' : 'kg'))
+  }, [])
+  // A new object only when unit changes, so readers skip renders that change nothing
+  const value = useMemo(() =&gt; ({ unit, toggleUnit }), [unit, toggleUnit])
+
+  return &lt;UnitContext value={value}&gt;{children}&lt;/UnitContext&gt;
+}</code></pre>
+                <p>Measured: typing <code>beach</code> rendered <code>DayTotal</code> zero times, and <strong>Switch units</strong> still rendered it once and showed "92 lb". Both pieces are needed: without <code>useCallback</code>, <code>toggleUnit</code> would be new on every render and so would the memoized value.</p>
+                <p>So is the HQ's <code>AuthProvider</code> a problem? Measured: signing out on the events page rendered <code>AuthProvider</code> once, and <code>Header</code>, <code>Footer</code>, <code>AppLayout</code> and <code>App</code> not at all. <code>App</code> never re-renders, so <code>AuthProvider</code> only renders when the session changes, and then its value <em>should</em> be new. The readers that rendered were the ones that read the context: <code>UserMenu</code>, <code>EventsPage</code> (through <code>useAuth</code> and <code>useApi</code>) and every <code>EventCard</code>, plus what they draw: 82 component calls in the sign-out's commit, before the API's answers brought the 15 public cleanups in later commits. The fix above matters when a provider sits under something that renders often.</p>
+            </section>
+
+            <section id="compiler" class="lesson-section">
+                <h2>🤖 The React Compiler</h2>
+                <p>You have now seen the trouble with hand-written memoization: it comes in pairs, its dependency arrays have to be right, and one forgotten <code>useCallback</code> silently undoes a <code>memo</code>. The <strong>React Compiler</strong> does that work at build time. It reads each component and Hook, works out which values, functions and JSX depend on which props and state, and rewrites the code so each piece is cached and only rebuilt when its inputs change. You keep writing plain components; the browser gets the memoized version.</p>
+                <p>It is a separate build step, not part of React itself: in a Vite 8 project it runs as a Babel preset that <code>@vitejs/plugin-react</code> provides, through the <code>@rolldown/plugin-babel</code> plugin. New projects can start with it: <code>npm create vite@latest</code> offers a <code>react-compiler-ts</code> template, and the project's Step 3 sets up the HQ exactly the way that template does.</p>
+                <p>Measured with the compiler on, using the <em>first</em> versions of today's three experiments (no <code>useCallback</code>, no <code>useMemo</code>, the plain context value):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Experiment</th><th>No compiler</th><th>No compiler, fixed by hand</th><th>Compiler, plain code</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>SupplyList</code> renders while typing <code>gloves</code></td><td>6</td><td>0 (<code>useCallback</code>)</td><td>0</td></tr>
+                            <tr><td><code>DayTotal</code> renders while typing <code>beach</code></td><td>5</td><td>0 (<code>useMemo</code> + <code>useCallback</code>)</td><td>0</td></tr>
+                            <tr><td><code>DebrisReport</code>, median per key press</td><td>30 ms</td><td>0.5 ms (<code>useMemo</code>)</td><td>15 ms</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Two out of three solved without a single Hook. The third is the honest surprise. The compiler did cache the report, but it put the sort in the same cached block as the note's <code>&lt;input&gt;</code>, which depends on <code>note</code>, so every key press still sorted 100,000 entries. (It got faster than without the compiler only because Strict Mode's second call hit the cache.) With the explicit <code>useMemo</code> kept, the compiler respected it: 0.2 ms. The compiler is a very good assistant, not a guarantee, and the Profiler is how you find out which is which.</p>
+                <h3>It only compiles code that follows the rules</h3>
+                <p>The compiler assumes your components follow the <strong>Rules of React</strong>: render is pure (no reading the clock, no changing variables outside the component), props and state are never changed in place, and refs are not read while rendering. When a component breaks one, the compiler leaves that whole component exactly as you wrote it, silently. You already know the warnings: <code>react(purity)</code> from Lesson 3.1, <code>react(immutability)</code> from 3.2, <code>react(refs)</code> from 4.3 are the compiler's own checks, run by oxlint, and their notes say "React Compiler skipped optimizing this component or hook". Because the HQ has kept <code>npm run lint</code> at zero warnings, the compiler optimized every one of its 41 function components and Hooks (checked with the compiler's own log; <code>ErrorBoundary</code> is a class, and classes are never compiled).</p>
+                <h3>What you still write by hand</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Still yours</th><th>Why</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Pure components and zero lint warnings</td><td>A component the compiler skips gets no memoization at all</td></tr>
+                            <tr><td>State kept low, and stable <code>key</code>s</td><td>The compiler caches values; it cannot move state or fix a list that remounts</td></tr>
+                            <tr><td><code>useMemo</code> for a calculation you <em>measured</em> as slow</td><td>As the report showed, the compiler may group it with something that changes more often</td></tr>
+                            <tr><td><code>memo</code>, <code>useMemo</code>, <code>useCallback</code> in projects without the compiler</td><td>Most existing codebases; leave their memoization in place unless you measure</td></tr>
+                            <tr><td>Debouncing, pagination, fewer requests</td><td>The slowest thing in the HQ is still the network, not React</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-info">
+                    <h4>🧩 Version note: the compiler in older tutorials and in plugin-react</h4>
+                    <p>Older tutorials, written for earlier versions of <code>@vitejs/plugin-react</code>, put the compiler inside <code>react({ babel: { plugins: […] } })</code>. Version 6, which Vite 8 uses, has no <code>babel</code> option any more (see Common Mistakes for the error). plugin-react 6 also has an experimental <code>react({ compiler: true })</code> option that runs a Rust port of the compiler (it needs the extra package <code>oxc-transform-react</code>); the course uses the Babel preset, which is what the <code>react-compiler-ts</code> template ships.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ <code>memo</code> on everything, without measuring</h3>
+                    <p><code>memo</code> costs a comparison of every prop on every parent render, and it is easy to defeat. A common case is a component that takes <code>children</code>:</p>
+                    <pre data-snippet><code class="language-tsx">// memo on a component that takes children
+const Panel = memo(function Panel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    &lt;section aria-label={title}&gt;
+      &lt;h2&gt;{title}&lt;/h2&gt;
+      {children}
+    &lt;/section&gt;
+  )
+})</code></pre>
+                    <p>The JSX between <code>&lt;Panel&gt;</code> and <code>&lt;/Panel&gt;</code> is a new object every time the parent renders. Measured without the compiler: typing <code>rain</code> in the parent's note rendered <code>Panel</code> four times out of four. It type-checks and lints cleanly; only a measurement shows that the <code>memo</code> does nothing. (With the compiler on, the parent's JSX is cached and <code>Panel</code> rendered zero times.)</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A missing dependency: the stale value</h3>
+                    <p>Here <code>removeSupply</code> reads <code>supplies</code> directly instead of using the updater form, and the dependency array stays empty:</p>
+                    <pre data-snippet><code class="language-tsx">const removeSupply = useCallback((supply: string) =&gt; {
+  setSupplies(supplies.filter((item) =&gt; item !== supply))
+}, [])</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  ⚠ react-hooks(exhaustive-deps): React Hook useCallback has a missing dependency: 'supplies'
+    ╭─[src/Scratch.tsx:31:6]
+ 29 │   const removeSupply = useCallback((supply: string) =&gt; {
+ 30 │     setSupplies(supplies.filter((item) =&gt; item !== supply))
+    ·                 ────┬───
+    ·                     ╰── useCallback uses `supplies` here
+ 31 │   }, [])
+    ·      ──
+ 32 │
+    ╰────
+  help: Either include it or remove the dependency array.
+
+Found 1 warning and 0 errors.
+Finished in 17ms on 47 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>The function keeps the <code>supplies</code> from the first render forever. Measured: removing Gloves left "Bags, Grabbers", then removing Bags showed "Gloves, Grabbers": Gloves came back. Read the warning as a bug report, and prefer the updater form, which needs no dependency at all. The compiler does not rescue this one: its log said "Existing memoization could not be preserved" and it skipped the component.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Counting renders with a ref</h3>
+                    <p>A tempting way to count renders is a ref that goes up by one each time:</p>
+                    <pre data-snippet><code class="language-tsx">// How many times has this card rendered?
+const renders = useRef(0)
+renders.current += 1
+console.log(`${event.title}: render ${renders.current}`)</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_19/19-ref-counter-lint.png" alt="A terminal after npm run lint. oxlint prints three warnings, each starting with react(refs): Cannot access refs during render, pointing at renders.current in src/components/EventCard.tsx with a code frame, and ends with Found 3 warnings and 0 errors." width="1100" height="860" loading="lazy">
+                        <figcaption>The ref counter from Common Mistakes, as <code>npm run lint</code> reports it. Three warnings for three uses of <code>renders.current</code> while rendering, and each is also a reason for the React Compiler to skip the whole component.</figcaption>
+                    </figure>
+                    <p>It is wrong twice. On the dev server it counts double, because Strict Mode calls the component twice per render (measured: one real render of each matching card printed "render 3" and then "render 4"). And reading <code>renders.current</code> while rendering breaks a rule, so the compiler skipped <code>EventCard</code> entirely. Measured with the compiler on: <strong>Show details</strong> went from 1 component render to 4, and the sign-out's commit on the events page from 19 to 64. Measure with the Profiler instead; it does not change what it measures.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ The compiler set up the old way</h3>
+                    <p>Copying an older tutorial's <code>vite.config.ts</code>, with <code>react({ babel: { plugins: ['babel-plugin-react-compiler'] } })</code>, gives:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>vite.config.ts:8:7 - error TS2353: Object literal may only specify known properties, and 'babel' does not exist in type 'Options'.
+
+8       babel: {
+        ~~~~~
+
+
+Found 1 error in vite.config.ts:8</code></pre>
+                    </div>
+                    <p><code>Options</code> is plugin-react 6's options type, and it has no <code>babel</code> any more. TypeScript checks your config file too (it is part of <code>tsconfig.node.json</code>), which is how this mistake shows up before the build. Use the setup in Step 3.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Measure and Speed Up the Events Page</h2>
+                <p>You will measure the search box on <code>/events</code>, fix the waste by hand, then turn on the React Compiler for the whole HQ and check that it does the same job (and more) without the hand-written code. At the end, the HQ builds with the compiler, and <code>EventsPage.tsx</code> is back to exactly what it was at the start of the lesson.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>). If you tried the experiments, delete <code>src/Scratch.tsx</code> and the line you added to <code>CurrentPage</code>.</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_19/19-typing-pelican.png" alt="The Cleanup events page after typing pelican in the Search cleanups box. A Clear filters button has appeared next to the filters, the status line says Found 3 cleanups: 1 coming up, 2 in the log, and the first cleanup cards at Pelican Point are listed below." width="1100" height="688" loading="lazy">
+                    <figcaption>The scenario this lesson measures: seven key presses in the search box, then the API's answer. On screen, almost nothing changes until the answer arrives.</figcaption>
+                </figure>
+
+                <div class="card">
+                    <h3>Step 1: Measure the search box <span class="step-time">(12 min)</span></h3>
+                    <p>In <code>src/pages/EventsPage.tsx</code>, change the first line to import <code>Profiler</code> and the callback's type:</p>
+                    <pre data-snippet><code class="language-tsx">import { Profiler, useEffect, useRef, useState, type ProfilerOnRenderCallback } from 'react'</code></pre>
+                    <p>Add the logger above <code>isTyping</code> (it is temporary, so a short comment says so):</p>
+                    <pre data-snippet><code class="language-tsx">// Temporary: how long each render of the list took
+const logRender: ProfilerOnRenderCallback = (id, phase, actualDuration) =&gt; {
+  console.log(`${id} ${phase}: ${actualDuration.toFixed(1)} ms`)
+}</code></pre>
+                    <p>and wrap <code>&lt;EventGroups&gt;</code> in the page's JSX:</p>
+                    <pre data-snippet><code class="language-tsx">{sites.state.kind === 'ready' &amp;&amp; events.state.kind === 'ready' ? (
+  &lt;Profiler id="EventGroups" onRender={logRender}&gt;
+    &lt;EventGroups
+      events={events.state.data.items}
+      sites={sites.state.data}
+      filtering={search !== '' || status !== 'all'}
+      showDrafts={isOrganizer}
+    /&gt;
+  &lt;/Profiler&gt;
+) : (
+  &lt;LoadStatus state={waiting.state} what="the cleanups" onRetry={waiting.reload} /&gt;
+)}</code></pre>
+                    <p>Open <code>http://localhost:5173/events</code> with the browser's Console open (<kbd>F12</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>Option</kbd>+<kbd>J</kbd> in Chrome on a Mac). Click the search box, type <code>pelican</code> quickly and wait for "Found 3 cleanups". Measured on the course's computer (your times will differ; the number of lines will not):</p>
+                    <div class="card card-output">
+                        <h4>Console</h4>
+                        <pre><code>EventGroups update: 8.6 ms
+EventGroups update: 8.3 ms
+EventGroups update: 7.5 ms
+EventGroups update: 6.5 ms
+EventGroups update: 6.7 ms
+EventGroups update: 6.8 ms
+EventGroups update: 6.9 ms
+EventGroups update: 8.8 ms
+EventGroups update: 1.7 ms</code></pre>
+                    </div>
+                    <p>Seven lines for seven keys, each re-rendering the whole list for nothing, then one when the debounced search starts and one when the answer arrives. If you have React DevTools, record the same typing in the Profiler tab: each of the first seven commits shows <code>EventGroups</code> and all its cards in color. With <strong>Highlight updates</strong> on, you can watch every card flash on every key.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Skip the list with memo <span class="step-time">(8 min)</span></h3>
+                    <p><code>EventGroups</code> gets four props: the events and sites from <code>useApi</code> (the same arrays until a new answer arrives), <code>filtering</code> and <code>showDrafts</code> (booleans that do not change while you type, because <code>search</code> is debounced). So <code>memo</code> can skip it. Add <code>memo</code> to the import:</p>
+                    <pre data-snippet><code class="language-tsx">import { memo, Profiler, useEffect, useRef, useState, type ProfilerOnRenderCallback } from 'react'</code></pre>
+                    <p>and wrap the function (one line at the top, and <code>})</code> instead of <code>}</code> at its end):</p>
+                    <pre data-snippet><code class="language-tsx">// The cleanups the API found, in three groups. memo: skipped when no prop changed
+const EventGroups = memo(function EventGroups({
+  events,
+  sites,
+  filtering,
+  showDrafts,
+}: EventGroupsProps) {</code></pre>
+                    <pre data-snippet><code class="language-tsx">    &lt;/&gt;
+  )
+})</code></pre>
+                    <p><code>EventGroups</code> is now a constant holding a memoized component, and its props are still checked against <code>EventGroupsProps</code>. Reload, type <code>pelican</code> again:</p>
+                    <div class="card card-output">
+                        <h4>Console</h4>
+                        <pre><code>EventGroups update: 0.0 ms
+EventGroups update: 0.0 ms
+EventGroups update: 0.0 ms
+EventGroups update: 0.0 ms
+EventGroups update: 0.0 ms
+EventGroups update: 0.0 ms
+EventGroups update: 0.0 ms
+EventGroups update: 8.8 ms
+EventGroups update: 1.7 ms</code></pre>
+                    </div>
+                    <p>The <code>&lt;Profiler&gt;</code> still reports each commit (its parent rendered), but nothing inside it rendered: 0.0 ms. Measured with the render count: the seven key presses now cost 14 component calls (<code>EventsPage</code> and <code>EventFilters</code>, seven each) instead of 560, and the whole search 114 instead of 660. One line of code, a 97% cut where it mattered.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Turn on the React Compiler <span class="step-time">(10 min)</span></h3>
+                    <p>First, note what the build looks like without it. In the second terminal, stop the dev server (<kbd>Ctrl</kbd>+<kbd>C</kbd>, also on a Mac) and run:</p>
+                    <pre class="terminal"><code class="language-bash">npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (sizes from the course's run; the time will differ)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 80 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:  0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-CfDMo7UZ.css                             6.97 kB │ gzip:  2.29 kB
+dist/assets/index-6OdvjMRn.js                            252.23 kB │ gzip: 78.51 kB
+
+✓ built in 142ms</code></pre>
+                    </div>
+                    <p>Now install the compiler and the two pieces Vite needs to run it, as development dependencies (they run at build time only):</p>
+                    <pre class="terminal"><code class="language-bash">npm install --save-dev babel-plugin-react-compiler @rolldown/plugin-babel @babel/core@7 @types/babel__core</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>added 45 packages, and audited 75 packages in 3s
+
+15 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities</code></pre>
+                    </div>
+                    <p><code>@babel/core@7</code> asks for the newest Babel 7, the major version the <code>react-compiler-ts</code> template uses (Babel 8 is newer; the course was checked with 7). <code>@types/babel__core</code> gives TypeScript the types the Babel plugin's options refer to. The course was checked with these versions in <code>package.json</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/package.json</div>
+                        <pre data-src="shoreline-hq/package.json" data-match="excerpt"><code class="language-json">"devDependencies": {
+  "@babel/core": "^7.29.13",
+  "@rolldown/plugin-babel": "^0.3.1",
+  "@types/babel__core": "^7.20.5",
+  "@types/node": "^24.19.2",
+  "@types/react": "^19.3.0",
+  "@types/react-dom": "^19.3.0",
+  "@vitejs/plugin-react": "^6.1.2",
+  "babel-plugin-react-compiler": "^1.0.0",
+  "oxlint": "^1.90.0",
+  "typescript": "~7.0.2",
+  "vite": "^8.3.6"</code></pre>
+                    </div>
+                    <p>Then replace <code>vite.config.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                        <pre data-src="shoreline-hq/vite.config.ts"><code class="language-ts">import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
+import { defineConfig } from 'vite'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [
+    react(),
+    // The React Compiler: works out what each component can reuse between renders
+    babel({ presets: [reactCompilerPreset()] }),
+  ],
+})</code></pre>
+                    </div>
+                    <p><code>react()</code> stays (it compiles TSX and runs Fast Refresh); <code>babel(…)</code> adds a second pass that runs only the compiler preset over your source files. Build again:</p>
+                    <pre class="terminal"><code class="language-bash">npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 82 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:  0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-CfDMo7UZ.css                             6.97 kB │ gzip:  2.29 kB
+dist/assets/index-B_WIRHHo.js                            270.77 kB │ gzip: 85.10 kB
+
+✓ built in 853ms</code></pre>
+                    </div>
+                    <figure class="screenshot">
+                        <img src="images/lesson_19/19-build-compiler.png" alt="A terminal after npm run build with the React Compiler on: tsc -b and vite build, 82 modules transformed, then the output files with their sizes; the JavaScript file is about 271 kB, 85 kB gzipped, and the build finished in under a second." width="785" height="369" loading="lazy">
+                        <figcaption>The build with the compiler on. Compare it with Step 3's numbers from before: two more modules and a few kilobytes of compiler runtime and memo code; the timing will differ on your computer.</figcaption>
+                    </figure>
+                    <p>The price, measured: two more modules (React's small compiler runtime), 18.5 kB more JavaScript (6.6 kB gzipped, the size that travels over the network), and a build that took 0.85 s instead of 0.14 s on the course's computer. Start the dev server again with <code>npm run dev</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Let the compiler do it <span class="step-time">(10 min)</span></h3>
+                    <p>Reload <code>/events</code> and type <code>pelican</code> once more, with Step 2's <code>memo</code> still in place. Then take the <code>memo</code> out again (back to <code>function EventGroups(…) {</code>, the closing <code>}</code>, and <code>memo</code> removed from the import) and repeat. Measured, both ways, the console showed only two lines, for example:</p>
+                    <div class="card card-output">
+                        <h4>Console</h4>
+                        <pre><code>EventGroups update: 0.1 ms
+EventGroups update: 0.7 ms</code></pre>
+                    </div>
+                    <p>No line at all while typing: the compiler cached the whole <code>&lt;Profiler&gt;</code> element in <code>EventsPage</code>, so React did not even visit it. The render counts, measured on the dev server and on the build:</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Component renders</th><th>Lesson 5.2's code</th><th><code>memo(EventGroups)</code></th><th>Compiler, no <code>memo</code></th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Typing <code>pelican</code>, before the answer</td><td>560</td><td>14</td><td>14</td></tr>
+                                <tr><td>The whole search, answer included</td><td>660</td><td>114</td><td>28</td></tr>
+                                <tr><td><strong>Show details</strong> on one card</td><td>5</td><td>5</td><td>1</td></tr>
+                                <tr><td>Signing out on <code>/events</code> as Maya (the sign-out's own commit)</td><td>82</td><td>82</td><td>19</td></tr>
+                                <tr><td><strong>Check in</strong> one volunteer on the desk</td><td>23</td><td>23</td><td>23</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>The compiler matched the hand-written <code>memo</code> where you put it and went further everywhere else: when <strong>Show details</strong> opens a card, the card's badges and spots line are cached; when Maya signs out, the cards must render (they read the context), but everything inside them is reused. The check-in desk stayed at 23: the roster's rows are drawn inside one <code>.map</code> that depends on all the marks (Exercise 3 looks at it).</p>
+                    <p>Decision for the HQ: <strong>the compiler stays on, and the hand-written <code>memo</code> goes</strong>. It removed far more wasted work than one <code>memo</code>, cost a few kilobytes and under a second of build time, and every component in the HQ already follows the rules it needs. Now remove the measuring code: in <code>EventsPage.tsx</code>, delete <code>logRender</code>, put <code>&lt;EventGroups … /&gt;</code> back without the <code>&lt;Profiler&gt;</code> around it, and restore the first line:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="excerpt"><code class="language-tsx">import { useEffect, useRef, useState } from 'react'
+// ...
+// The cleanups the API found, in three groups
+function EventGroups({ events, sites, filtering, showDrafts }: EventGroupsProps) {</code></pre>
+                    </div>
+                    <p>The file is now exactly the one Lesson 5.2 left you: the speed-up lives in <code>vite.config.ts</code>, not in your components.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Check it, then try the edges <span class="step-time">(6 min)</span></h3>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 15ms on 46 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>Then use the app as an organizer once: sign in as Maya, search, open details, cancel a cleanup in the dialog (Keep it), open Tide Pool Morning Cleanup and check someone in, sign out. Everything behaves exactly as before; that is the point. The compiler changes how often React does work, never what the app does, as long as the components follow the rules.</p>
+                    <p><strong>Your own project:</strong> pick the screen of your Lesson 11.1 idea that will hold the longest list or the most typing. Write down what you would measure on it (which action, which component, what count or time would worry you), so that you measure before you optimize when you get there.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ You measured the search box with <code>&lt;Profiler&gt;</code> and saw one log line per key press</li>
+                        <li>☐ <code>memo(EventGroups)</code> brought those renders to 0.0 ms, and you can say why it worked</li>
+                        <li>☐ <code>babel-plugin-react-compiler</code>, <code>@rolldown/plugin-babel</code>, <code>@babel/core</code> and <code>@types/babel__core</code> are dev dependencies, and <code>vite.config.ts</code> runs <code>reactCompilerPreset()</code></li>
+                        <li>☐ With the compiler on and the <code>memo</code> removed, typing no longer re-renders the list</li>
+                        <li>☐ <code>EventsPage.tsx</code> has no <code>Profiler</code>, <code>logRender</code> or <code>memo</code> left, and <code>src/Scratch.tsx</code> is deleted</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Predict a sign-out</h3>
+                    <p>Without running anything, answer for the HQ <em>without</em> the compiler (Lesson 5.2's code), then <em>with</em> it: when Maya presses <strong>Sign out</strong> on <code>/events</code>, which of these render: <code>Header</code>, <code>UserMenu</code>, <code>Footer</code>, <code>EventsPage</code>, <code>EventCard</code>, <code>StatusBadge</code>? Why do the cards still render with the compiler on? Then check with the React DevTools Profiler (record, Sign out, stop) and compare with the solution.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Go through the three reasons for each component. Which ones call <code>useAuth()</code> themselves or through <code>useApi</code>? And can any amount of memoization stop the third reason?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Measured in the sign-out's own commit, before the API answered: without the compiler, <code>AuthProvider</code>, <code>UserMenu</code>, <code>EventsPage</code>, <code>EventFilters</code>, <code>EventGroups</code>, two <code>EventList</code>s and 15 <code>EventCard</code>s with everything they draw, including <code>StatusBadge</code>: 82 component calls. <code>Header</code>, <code>Footer</code>, <code>AppLayout</code> and <code>App</code> did not render: they do not read the context, and <code>AuthProvider</code>'s <code>children</code> are the same elements <code>App</code> created once. With the compiler: 19 (<code>AuthProvider</code>, <code>UserMenu</code>, <code>EventsPage</code>, <code>EventGroups</code> and the 15 cards). The cards still render, because they call <code>useAuth()</code> and the context really changed (the third reason, which <code>memo</code> never blocks), but inside each card the badges, spots line and buttons were reused. When the API's answers arrive a moment later, the new event objects render the cards' contents again.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Opt one component out</h3>
+                    <p>The compiler has an escape hatch: the directive <code>'use no memo'</code> as the first statement of a function leaves that function as you wrote it. Add it to <code>EventsPage</code>, then record typing <code>pelican</code> in the React DevTools Profiler. Predict first: does the whole list render again on every key, as in Step 1?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The directive switches off the compiler for <code>EventsPage</code> only. <code>EventGroups</code> is a separate function in the same file.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">export function EventsPage() {
+  'use no memo'
+  const { isOrganizer } = useAuth()</code></pre>
+                        </div>
+                        <p>Measured: during the typing, 21 component renders, not 560: <code>EventsPage</code>, <code>EventFilters</code> and <code>EventGroups</code> seven times each. Without the compiler in <code>EventsPage</code>, nothing caches the <code>&lt;EventGroups&gt;</code> element, so it renders; but <code>EventGroups</code> itself is still compiled, so its lists and cards are reused. The compiler works one function at a time, and the directive is for the rare component you need to debug or that misbehaves when compiled. Remove it again.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A row component for the desk (Stretch)</h3>
+                    <p>Optional stretch, not counted in the lesson time (about 20 minutes).</p>
+                    <p>Checking in one volunteer renders 23 components with or without the compiler, because <code>RosterTable</code> draws every row inside one <code>.map</code> that depends on all the marks. Move one row into its own component, <code>RosterTableRow</code>, in <code>RosterTable.tsx</code>, with props <code>entry</code>, <code>mark</code> (<code>Mark | undefined</code>) and <code>dispatch</code>. Predict how many components render for one check-in now, then measure with the Profiler.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Each row component gets its own mark, so inside it the compiler can cache the badge and the buttons per row. Does the row component itself still render when its parent maps over the entries again?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Move the <code>&lt;tr&gt;</code> and everything in it into the new component, and map to it:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/RosterTable.tsx</div>
+                            <pre data-snippet><code class="language-tsx">interface RosterTableRowProps {
+  entry: RosterRow
+  mark: Mark | undefined
+  dispatch: (action: RosterAction) =&gt; void
+}
+
+// One volunteer's row: its own component, so it can keep its own memoized parts
+function RosterTableRow({ entry, mark, dispatch }: RosterTableRowProps) {
+  const signupId = entry.id
+  const { label, tone } = markBadges[mark ?? 'expected']
+  return (
+// ...
+export function RosterTable({ entries, marks, dispatch }: RosterTableProps) {
+  return (
+    &lt;table className={styles.table}&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;
+          &lt;th scope="col"&gt;Volunteer&lt;/th&gt;
+          &lt;th scope="col"&gt;Check-in&lt;/th&gt;
+        &lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {entries.map((entry) =&gt; (
+          &lt;RosterTableRow
+            key={entry.id}
+            entry={entry}
+            mark={marks.get(entry.id)}
+            dispatch={dispatch}
+          /&gt;
+        ))}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  )
+}</code></pre>
+                        </div>
+                        <p>Measured with the compiler: 10 instead of 23 (<code>CheckInDesk</code>, <code>RosterTable</code>, seven <code>RosterTableRow</code>s and one <code>Badge</code>). The rows still render, because the compiler caches values and JSX but does not wrap components in <code>memo</code>, and <code>RosterTable</code> builds new row elements when the marks change; inside six of the seven rows, though, nothing changed, so their badges and buttons were reused. Seven rows was never slow; this is practice in reading a profile. The course's code keeps the table as it was.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Without the compiler, typing in the search box rendered every <code>EventCard</code>, although no card's data changed. Which reason to render applied to the cards?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Does EventCard hold the search text in its own state?">
+                                A) Their own state changed
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The search text is EventsPage state. When EventsPage renders, it creates EventGroups, the lists and the cards again, and without memo or the compiler React renders them all.">
+                                B) Their parent rendered, so React rendered them too
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Did anything change in AuthContext while typing?">
+                                C) A context they read changed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The API answers once, after the debounce. How many renders happened before that?">
+                                D) The API sent new data for every key press
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> <code>SupplyList</code> is wrapped in <code>memo</code>, yet it renders on every key press in the note box. What is the most likely cause?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="memo works in development and production alike. What does it compare?">
+                                A) <code>memo</code> only works in production builds
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The supplies array comes from useState. Is it a new array on each key press?">
+                                B) The <code>supplies</code> array changes on every key press
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript types do not exist when the code runs. What does memo look at?">
+                                C) <code>SupplyListProps</code> is an interface instead of a type alias
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A function declared in the parent's body is a new function on each render, so memo sees a changed onRemove prop. useCallback, or the React Compiler, keeps it the same.">
+                                D) <code>onRemove</code> gets a new function on every render of the parent
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> You add <code>&lt;Profiler id="EventGroups" onRender={logRender}&gt;</code> and open the app with <code>npm run build</code> and <code>npm run preview</code>. What does the console show while you type?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Is profiling part of React's production build?">
+                                A) The same lines as on the dev server, only with smaller times
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The code type-checks. What happens to profiling code in production?">
+                                B) A type error about <code>ProfilerOnRenderCallback</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Production builds of React leave profiling out, so onRender is never called. Measure on the dev server (or with a special profiling build), and compare numbers on the same setup.">
+                                C) Nothing: production builds of React do not call <code>onRender</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> A component reads <code>ref.current</code> while rendering, and <code>npm run lint</code> shows a <code>react(refs)</code> warning. What does the React Compiler do with that component?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The compiler only optimizes code that follows the Rules of React. It leaves this component exactly as written, without a message in the build; the lint warning, with its note that the compiler skipped the component, is your signal.">
+                                A) It skips the whole component and leaves it as written, without failing the build
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Did npm run build fail for the ref counter in Common Mistakes?">
+                                B) It stops the build with an error
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Can the compiler know which parts of a rule-breaking component are safe?">
+                                C) It optimizes everything except the line that reads the ref
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The compiler never changes what your code does. Would rewriting the ref do that?">
+                                D) It turns the ref into state so the component follows the rules
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> <code>DayTotal</code> is wrapped in <code>memo</code>, takes no props and reads <code>UnitContext</code>. Its provider's parent re-renders on every key press, and <code>DayTotal</code> renders each time. Which fix works without the compiler?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="DayTotal already has memo. Does memo stop renders caused by a context?">
+                                A) Wrap <code>DayTotal</code> in <code>memo</code> a second time
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Where would DayTotal then get the unit from, and would that be any more stable?">
+                                B) Read the unit from <code>localStorage</code> instead of the context
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A Hook cannot sit outside a component. Where is the new object created?">
+                                C) Call <code>useMemo</code> around <code>useUnit()</code> inside <code>DayTotal</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The provider builds a new value object on each render, and every reader renders when the value changes. useCallback for toggleUnit plus useMemo for the object keep the value the same until unit really changes. Measured: zero renders while typing.">
+                                D) In the provider, keep the value the same object with <code>useMemo</code> (and <code>toggleUnit</code> with <code>useCallback</code>)
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should I just wrap every component in memo, to be safe?</summary>
+                    <p>No. Every <code>memo</code> compares all props on every parent render, and as Common Mistakes showed, one new object or <code>children</code> prop quietly turns it into pure overhead. In a project without the compiler, add <code>memo</code> where the Profiler shows a component rendering often and expensively for nothing, like <code>EventGroups</code> in Step 2. With the compiler, you rarely need it at all.</p>
+                </details>
+                <details>
+                    <summary>Can the React Compiler break my app?</summary>
+                    <p>It is designed not to change what correct code does: it only skips work whose result would be the same. Code that breaks the Rules of React is where surprises come from, and the compiler skips the components it can see breaking them. Code that breaks them in ways it cannot see (for example, changing an object it received from a library) can behave differently once some renders are skipped. Zero lint warnings and Strict Mode in development are your safety net, and <code>'use no memo'</code> (Exercise 2) is the switch for one component while you investigate.</p>
+                </details>
+                <details>
+                    <summary>Do I need to remove useMemo and useCallback from code that already has them?</summary>
+                    <p>No. The compiler keeps working with existing <code>memo</code>, <code>useMemo</code> and <code>useCallback</code> (Step 4 measured the same counts with and without the <code>memo</code>), and the report experiment shows an explicit <code>useMemo</code> can still help. Removing them can change what gets cached, so do it file by file with a measurement, as you did in Step 4, or simply leave them.</p>
+                </details>
+                <details>
+                    <summary>What about useTransition and useDeferredValue?</summary>
+                    <p>They solve a different problem: work that cannot be skipped but can wait. <code>useDeferredValue</code> lets React draw the latest typing first and an expensive list from a slightly older value afterwards. The HQ's search already waits on purpose (the 300 ms debounce from Lesson 4.2) because each search is an API request; with a long list filtered in the browser, <code>useDeferredValue</code> would be the tool to try. The React docs cover both.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Find the most expensive render in the HQ. With React DevTools, record the Profiler while you load <code>/sites</code>, open the <strong>Plan a cleanup</strong> form and type in it, and open a cleanup's page. Use the <strong>Ranked</strong> view to find the slowest component in each, and turn on "Record why each component rendered" to read why. Write down whether any of them is worth optimizing, with the number that convinced you either way. (Hint: on a laptop, the honest answer for most of the HQ is "no", and knowing that is a result too.)</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Write the three reasons a component renders, each with one HQ example. Then, in one sentence each, say what <code>memo</code>, <code>useCallback</code>, <code>useMemo</code> and the React Compiler do. Finish with the number from today that surprised you most, and why.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A component renders when its state changes, when its parent renders, or when a context it reads changes; rendering is calling the function, and React then changes only the DOM that differs</li>
+                        <li>Measure before you optimize: the React DevTools Profiler (flame graph, Ranked, "why did this render?") and <code>&lt;Profiler onRender&gt;</code> with <code>ProfilerOnRenderCallback</code>, which only reports in development</li>
+                        <li><code>memo</code> skips a component whose props are all the same (<code>Object.is</code>); a new object, function or <code>children</code> each render defeats it, which is what <code>useCallback</code> and <code>useMemo</code> fix</li>
+                        <li><code>useMemo</code> caches a slow, pure calculation until its dependencies change; the exhaustive-deps warning is a bug report, and the updater form avoids many dependencies</li>
+                        <li><code>memo</code> never blocks a context update: keep a provider's value the same object with <code>useMemo</code> and <code>useCallback</code> when the provider renders for other reasons</li>
+                        <li>The React Compiler memoizes values, functions and JSX at build time (Babel preset + <code>@rolldown/plugin-babel</code> in Vite 8); it skips components that break the Rules of React, so zero lint warnings matter</li>
+                        <li>The HQ keeps the compiler on: typing went from 560 component renders to 14, a whole search from 660 to 28, for 6.6 kB gzipped and under a second of build time</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Look up Hook and callback types</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Read React's reference for <code>memo</code></td><td><a href="https://react.dev/reference/react/memo" target="_blank" rel="noopener">React: memo</a></td></tr>
+                            <tr><td>Read React's reference for <code>useMemo</code> and <code>useCallback</code></td><td><a href="https://react.dev/reference/react/useMemo" target="_blank" rel="noopener">React: useMemo</a> · <a href="https://react.dev/reference/react/useCallback" target="_blank" rel="noopener">React: useCallback</a></td></tr>
+                            <tr><td>Read about the React Compiler</td><td><a href="https://react.dev/learn/react-compiler" target="_blank" rel="noopener">React: React Compiler</a></td></tr>
+                            <tr><td>Read React's reference for <code>&lt;Profiler&gt;</code></td><td><a href="https://react.dev/reference/react/Profiler" target="_blank" rel="noopener">React: Profiler</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You measured the HQ's search box instead of guessing, and found 80 wasted component calls per key press</li>
+                        <li>You fixed it by hand with one <code>memo</code>, and learned why <code>memo</code> needs <code>useCallback</code> and <code>useMemo</code> as partners</li>
+                        <li>You saw a context value re-render a memoized reader, and how to keep it still</li>
+                        <li>You turned on the React Compiler for the whole HQ and checked its work with numbers, including the one case where it did less than a hand-written <code>useMemo</code></li>
+                        <li>You kept an old promise: Lesson 5.2's "measure when it is not fine"</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The events page is fast; next it gets better organized. In <a href="lesson_20.html"><strong>Lesson 5.4: Component Patterns</strong></a> you build components that other components plug into: compound <code>Tabs</code> for the cleanup page (details, roster, impact), a polymorphic <code>Button</code> that can be a link or a button with one typed <code>as</code> prop, and a generic <code>DataList&lt;T&gt;</code> that renders any list you hand it, all typed so that misuse is a compile error.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and <code>EventsPage.tsx</code> has no profiling code left</li>
+                    <li>If you have not yet, install the React Developer Tools extension and record one Profiler session of your own</li>
+                    <li>Keep your "what would I measure" note for your Lesson 11.1 plan</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Performance has a reputation as an expert's topic, full of tricks. Today you saw that it is mostly a habit: look before you change, change one thing, look again. You measured 560 renders, cut them to 14 with one line, then let a compiler do better across the whole app, and you know why each step worked. If <code>memo</code>, <code>useMemo</code> and <code>useCallback</code> still blur together a little, that is normal; the table in the compiler section is there for the day you meet them in someone else's code. Well done.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_18.html" class="prev-lesson">← Previous: Typed Context</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_20.html" class="next-lesson">Next: Component Patterns →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

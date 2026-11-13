@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 3</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 3: Functions, Generics and Typing Real Data</h1>
+    <p class="sub">Your workbook for Session 3: a warm-up, the key ideas of Lessons 2.3 and 2.4, worked examples, the guided labs, predict-then-check practice, the project checklists, a self-check for each lesson and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>2.3–2.4</b></span>
+      <span class="chip">Session <b>3</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Write a function's contract: parameter and return types, optional, default and rest parameters, an options object.</li>
+  <li>Describe functions as values with function types, and write generic functions and types with constraints.</li>
+  <li>Share types between files with <code class="inline">export</code> and <code class="inline">import type</code>.</li>
+  <li>Turn outside data into checked data with type guards, and build types from types with Pick, Omit, Partial and Record.</li>
+  <li>Give Shoreline Crew HQ the API's types, a typed <code class="inline">VITE_API_URL</code> and a client that checks every cleanup it fetches.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up: Session 2 Retrieval</h2><span class="rule"></span></div>
+<p>Answer from memory, then compare with a partner.</p>
+<div class="q"><div class="qn">W1</div><div class="qt"><code class="inline">const flats = { name: 'Sandpiper Flats', terrain: 'marsh' }</code> passed where a <code class="inline">Site</code> is expected gives TS2345 ending in "Type 'string' is not assignable to type 'Terrain'". Why, and the fix?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt"><code class="inline">spotsTaken || 'unknown'</code> with <code class="inline">spotsTaken = 0</code>: what prints, and what should it be?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt"><code class="inline">const meta = JSON.parse(text)</code>: what is its type, and what does the course write instead?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">In <code class="inline">LoadState</code>, which property tells the members apart, and what is it called?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2.3</span><h3>Functions and Generics</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Annotate a function's parameters and return type, and decide when an explicit return type is worth writing</li>
+  <li>Use optional, default and rest parameters and an options object, and read the errors for missing or misplaced arguments</li>
+  <li>Describe a function as a value with a function type, such as (event: CleanupEvent) =&gt; string, and pass typed callbacks</li>
+  <li>Write generic functions and types (first&lt;T&gt;, Page&lt;T&gt;) and let TypeScript infer the type arguments</li>
+  <li>Constrain a type parameter with extends so a generic function can use the properties it needs</li>
+  <li>Read overloaded and generic declarations in TypeScript's own library, such as querySelector and find</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A function's contract:</b> a type after each parameter, one after the parentheses for the return. TS2554 counts arguments; TS2345 checks each one. Write return types on functions other code relies on; <code class="inline">void</code> for functions that only print or save.</li>
+  <li><b>Optional <code class="inline">x?</code></b> (inside: <code class="inline">T | undefined</code>), <b>default <code class="inline">x = 'spots'</code></b> (optional for the caller, never undefined inside), <b>rest <code class="inline">...counts: number[]</code></b>. Optional parameters go last (TS1016).</li>
+  <li><b>An options object</b> destructured with defaults (<code class="inline">{ showStatus = false }: LineOptions = {}</code>) handles many options; a misspelled option is TS2561. React props work exactly like this.</li>
+  <li><b>Function types:</b> <code class="inline">type EventFormatter = (event: CleanupEvent) =&gt; string</code>. Callbacks get their parameter types from the context; a function with fewer parameters fits.</li>
+  <li><b>Generics:</b> <code class="inline">first&lt;T&gt;(items: T[]): T | undefined</code>; <code class="inline">T</code> is inferred from the argument. Generic types: <code class="inline">Page&lt;T&gt;</code>, <code class="inline">Array&lt;T&gt;</code>, <code class="inline">Map&lt;K, V&gt;</code>, later <code class="inline">Promise&lt;T&gt;</code> and <code class="inline">useState&lt;T&gt;</code>.</li>
+  <li><b>Constraints:</b> <code class="inline">T extends { id: string }</code> lets the body use <code class="inline">id</code> and refuses items without one. TypeScript's own declarations (querySelector, find) read the same way.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: a generic and its constraint</div>
+<p><code class="inline">first&lt;T&gt;</code> reads its type from the argument, and keeps every check. With <code class="inline">any</code>, the misspelled <code class="inline">.nmae</code> passed the check and printed <code class="inline">undefined</code>; with the generic:</p>
+<pre class="code"><span class="k">interface</span> Site {
+  id: <span class="k">string</span>
+  name: <span class="k">string</span>
+}
+
+<span class="k">const</span> sites: Site[] = [{ id: <span class="s">'driftwood-cove'</span>, name: <span class="s">'Driftwood Cove'</span> }]
+<span class="k">const</span> bagCounts = [<span class="s">14</span>, <span class="s">9</span>, <span class="s">22</span>]
+
+<span class="k">function</span> first&lt;T&gt;(items: T[]): T | <span class="k">undefined</span> {
+  <span class="k">return</span> items[<span class="s">0</span>]
+}
+
+<span class="k">const</span> site = first(sites)
+<span class="k">const</span> count = first(bagCounts)
+<span class="k">const</span> nobody = first&lt;<span class="k">string</span>&gt;([])
+
+console.log(site?.name ?? <span class="s">'No sites'</span>, count ?? <span class="s">0</span>, nobody ?? <span class="s">'Nobody yet'</span>)
+console.log(site?.nmae)</pre><pre class="out">&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:18:19 - error TS2339: Property 'nmae' does not exist on type 'Site'.
+
+18 console.log(site?.nmae)
+                     ~~~~
+
+
+Found 1 error in scratch.ts:18</pre><p><code class="inline">T</code> became <code class="inline">Site</code>, so <code class="inline">site?.nmae</code> is a real error with a suggestion. And a constraint says what <code class="inline">T</code> must have: <code class="inline">findById&lt;T extends { id: string }&gt;</code> refuses a list without ids, at the call:</p>
+<pre class="out">scratch.ts:22:22 - error TS2345: Argument of type 'number[]' is not assignable to parameter of type '{ id: string; }[]'.
+  Type 'number' is not assignable to type '{ id: string; }'.
+Found 1 error in scratch.ts:22</pre></div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-03/l2_3-functions-and-generics/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code> and <code class="inline">npm run check</code>.</li>
+  <li>Task 1: <code class="inline">HoursOptions</code>, defaults, <code class="inline">= {}</code>, a return type; <code class="inline">...hours</code>. Task 2: <code class="inline">ShiftFormatter</code>.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Test line that must be an error</th><th>Which of my types makes it one?</th></tr></thead>
+<tbody>
+<tr><td><code class="inline">showRol: true</code></td><td></td></tr>
+<tr><td><code class="inline">totalHours(3, '2.5')</code></td><td></td></tr>
+<tr><td>a formatter returning <code class="inline">shift.hours</code></td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Predict first, then run it in <code class="inline">scratch.ts</code>.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict what <code class="inline">npm run check</code> says about the last line; then predict the first two lines Node prints.</div><pre class="code"><span class="k">function</span> bagsLine(bags: <span class="k">number</span>, label = <span class="s">'bags'</span>, note?: <span class="k">string</span>): <span class="k">string</span> {
+  <span class="k">return</span> note === <span class="k">undefined</span> ? <span class="s">`${bags} ${label}`</span> : <span class="s">`${bags} ${label} (${note})`</span>
+}
+console.log(bagsLine(<span class="s">3</span>))
+console.log(bagsLine(<span class="s">1</span>, <span class="s">'bag'</span>, <span class="s">'heavy'</span>))
+console.log(bagsLine())</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict what <code class="inline">npm run check</code> says, then check.</div><pre class="code"><span class="k">function</span> middle&lt;T&gt;(items: T[]): T | <span class="k">undefined</span> {
+  <span class="k">return</span> items[Math.floor(items.length / <span class="s">2</span>)]
+}
+<span class="k">const</span> sites = [<span class="s">'pelican-point'</span>, <span class="s">'driftwood-cove'</span>, <span class="s">'north-jetty'</span>]
+<span class="k">const</span> pick = middle(sites)
+console.log(pick.toUpperCase())</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Crew's Helper Functions</b> (lesson page). In class: Steps 1 and 2. At home: Steps 3 to 6.</p>
+<ul class="tick">
+  <li>☐ Step 1: comment, copied types, sample events and crew</li>
+  <li>☐ Step 2: spotsLeft, pluralize (a default), eventLine (an options object); the check is silent</li>
+  <li>☐ Step 3: EventFormatter, printAll, isOpen with filter</li>
+  <li>☐ Step 4: first, findById (a constraint), groupBy, Page and paginate; <code class="inline">node functions.ts</code> prints twenty lines</li>
+  <li>☐ Step 5: four breaks (TS2339 on T, TS2322 from a formatter, TS2554, TS2741 in paginate) · Step 6: Map.groupBy</li>
+</ul>
+<div class="write"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">What does <code class="inline">node scratch.ts</code> print?</div><pre class="code"><span class="k">function</span> spotsText(left: <span class="k">number</span>, unit = <span class="s">'spots'</span>): <span class="k">string</span> {
+  <span class="k">return</span> <span class="s">`${left} ${unit} left`</span>
+}
+console.log(spotsText(<span class="s">1</span>, <span class="s">'spot'</span>), <span class="s">'/'</span>, spotsText(<span class="s">4</span>))</pre><div class="opts"><div class="opt">A) <code class="inline">1 spots left / 4 spots left</code></div><div class="opt">B) <code class="inline">1 spot left / 4 undefined left</code></div><div class="opt">C) <code class="inline">1 spot left / 4 spots left</code></div><div class="opt">D) Nothing: <code class="inline">npm run check</code> reports TS2554 first</div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">Why does <code class="inline">npm run check</code> reject <code class="inline">function eventLine(town?: string, title: string)</code>?</div><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">With <code class="inline">type EventFormatter = (event: CleanupEvent) =&gt; string</code> and <code class="inline">printAll(list, format: EventFormatter)</code>, which call does <code class="inline">npm run check</code> accept?</div><div class="opts"><div class="opt">A) <code class="inline">printAll(events, (event) =&gt; event.capacity)</code></div><div class="opt">B) <code class="inline">printAll(events, () =&gt; 'one more cleanup')</code></div><div class="opt">C) <code class="inline">printAll(events, (title: string) =&gt; title)</code></div><div class="opt">D) <code class="inline">printAll(events, (event, page: number) =&gt; event.title)</code></div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt"><code class="inline">groupBy&lt;T, K&gt;(items: T[], keyOf: (item: T) =&gt; K): Map&lt;K, T[]&gt;</code> is called as <code class="inline">groupBy(events, (event) =&gt; event.status)</code> with <code class="inline">events: CleanupEvent[]</code>. What does the hover show it returns?</div><div class="opts"><div class="opt">A) <code class="inline">Map&lt;string, CleanupEvent[]&gt;</code></div><div class="opt">B) <code class="inline">Map&lt;K, T[]&gt;</code></div><div class="opt">C) <code class="inline">Map&lt;any, any[]&gt;</code></div><div class="opt">D) <code class="inline">Map&lt;EventStatus, CleanupEvent[]&gt;</code></div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt"><code class="inline">findById&lt;T extends { id: string }&gt;</code> is called with a list of bag counts. tsc prints this. What does it mean?</div><pre class="code">scratch.ts:22:22 - error TS2345: Argument of type 'number[]' is not assignable to parameter of type '{ id: string; }[]'.</pre><div class="opts"><div class="opt">A) The constraint is doing its job: numbers have no <code class="inline">id</code>, so they cannot be searched by id</div><div class="opt">B) <code class="inline">findById</code> needs an explicit type argument: <code class="inline">findById&lt;number&gt;(...)</code></div><div class="opt">C) The constraint must be removed for numbers</div><div class="opt">D) <code class="inline">bagCounts</code> needs an annotation</div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">This <code class="inline">statusLabel</code> gets TS2366 with its <code class="inline">: string</code>. What happens if you delete <code class="inline">: string</code>?</div><pre class="code"><span class="k">type</span> EventStatus = <span class="s">'draft'</span> | <span class="s">'scheduled'</span> | <span class="s">'completed'</span> | <span class="s">'cancelled'</span>
+
+<span class="k">function</span> statusLabel(status: EventStatus): <span class="k">string</span> {
+  <span class="k">if</span> (status === <span class="s">'scheduled'</span>) {
+    <span class="k">return</span> <span class="s">'Scheduled'</span>
+  }
+  <span class="k">if</span> (status === <span class="s">'completed'</span>) {
+    <span class="k">return</span> <span class="s">'Completed'</span>
+  }
+}
+
+console.log(statusLabel(<span class="s">'draft'</span>))</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: explain generics to a friend who knows JavaScript but not TypeScript, in three or four sentences and without the word "generic". Use <code class="inline">first</code> or <code class="inline">findById</code> as your example, and say what goes wrong with <code class="inline">any</code> instead. If the explanation comes out tangled, note which part.</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">2.4</span><h3>Typing Real Data</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Share types between files with export and import type, and explain what verbatimModuleSyntax asks of you</li>
+  <li>Write type predicates (value is EventStatus) that turn unknown data into checked, typed data</li>
+  <li>Build new types from existing ones with Pick, Omit, Partial and Record, and read them in the API's real types</li>
+  <li>Read every line of the tsconfig files Vite created, and switch on noUncheckedIndexedAccess</li>
+  <li>Configure and type an environment variable (VITE_API_URL) and explain why front-end variables are never secret</li>
+  <li>Fetch cleanups from shoreline-api through a reusable, generic, checked client</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Modules:</b> <code class="inline">export</code> once, <code class="inline">import type { … } from './shapes.ts'</code> everywhere. <code class="inline">verbatimModuleSyntax</code> requires <code class="inline">import type</code> for types (TS1484): Node strips them, so there is nothing to import at run time.</li>
+  <li><b>Type guards:</b> a return type <code class="inline">value is EventStatus</code> says what <code class="inline">true</code> means; TypeScript narrows with it like with <code class="inline">typeof</code>, and <code class="inline">filter(guard)</code> narrows the array. A guard is a promise TypeScript cannot check.</li>
+  <li><b>Object guards:</b> <code class="inline">isRecord(value)</code> (an object, not null, not an array), then one check per property, chained with <code class="inline">&amp;&amp;</code>. Missing is not null.</li>
+  <li><b>Utility types:</b> <code class="inline">Pick&lt;T, Keys&gt;</code>, <code class="inline">Omit&lt;T, Keys&gt;</code>, <code class="inline">Partial&lt;T&gt;</code>, <code class="inline">Record&lt;Keys, V&gt;</code> (every key required: lookup tables).</li>
+  <li><b>tsconfig:</b> strict is the default in TypeScript 7; <code class="inline">noUncheckedIndexedAccess</code> makes <code class="inline">items[0]</code> a <code class="inline">T | undefined</code> (loops unaffected).</li>
+  <li><b>Environment variables:</b> <code class="inline">.env.example</code> (in Git) and <code class="inline">.env.local</code> (yours); only <code class="inline">VITE_</code> names reach the code, as text pasted into the build: nothing in the front end is secret. <code class="inline">vite-env.d.ts</code> types them.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: a boolean versus a type predicate</div>
+<p>A type guard says what <code class="inline">true</code> means. With a plain <code class="inline">boolean</code> return type, the value inside the <code class="inline">if</code> is still <code class="inline">unknown</code>:</p>
+<pre class="out">scratch.ts:11:25 - error TS18046: 'value' is of type 'unknown'.
+Found 1 error in scratch.ts:11</pre><p>With <code class="inline">value is EventStatus</code>, the same code checks clean and runs:</p>
+<pre class="out">a status: SCHEDULED
+not a status: finished
+not a status: 42
+[ 'draft', 'scheduled' ]</pre><p>The last line is <code class="inline">filter(isEventStatus)</code>: the result's type is <code class="inline">EventStatus[]</code>. The guard is a promise TypeScript cannot check: it must check every property its type promises.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-03/l2_4-typing-real-data/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code> (it cannot start) and <code class="inline">npm run check</code>.</li>
+  <li>Task 1: one word fixes the import. Task 2: a type predicate, then <code class="inline">isImpactTotals</code> for the whole answer.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>My answer</th></tr></thead>
+<tbody>
+<tr><td>Why can Node not import <code class="inline">DebrisCategory</code> without <code class="inline">type</code>?</td><td></td></tr>
+<tr><td>Which broken answer did my first guard let through?</td><td></td></tr>
+<tr><td>What does my <code class="inline">isImpactTotals</code> promise, and what does it check?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Predict first, then run it in <code class="inline">scratch.ts</code> in ts-lab (the stricter setting is on since Lesson 2.4).</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict what <code class="inline">npm run check</code> says, then check.</div><pre class="code"><span class="k">import</span> <span class="k">type</span> { Volunteer } <span class="k">from</span> <span class="s">'./shapes.ts'</span>
+
+<span class="k">type</span> PhoneEdit = Pick&lt;Volunteer, <span class="s">'id'</span> | <span class="s">'phone'</span>&gt;
+<span class="k">const</span> edit: PhoneEdit = { id: <span class="s">'v03'</span>, phone: <span class="s">'(831) 555-0199'</span>, name: <span class="s">'Hannah Becker'</span> }</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">With <code class="inline">noUncheckedIndexedAccess</code> on, predict what <code class="inline">npm run check</code> says.</div><pre class="code"><span class="k">const</span> towns = [<span class="s">'Port Marisol'</span>, <span class="s">'Calder Bay'</span>, <span class="s">'Seal Rock'</span>]
+<span class="k">const</span> third = towns[<span class="s">2</span>]
+console.log(third.toUpperCase())</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The HQ Meets Its Data</b> (lesson page). In class: Steps 1 to 5. At home: the rest of Step 5 and Step 6.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">src/api/types.ts</code> copied from shoreline-api; two differences from my draft noted</li>
+  <li>☐ Step 2: noUncheckedIndexedAccess; <code class="inline">.env.example</code> and <code class="inline">.env.local</code>; <code class="inline">src/vite-env.d.ts</code></li>
+  <li>☐ Steps 3 and 4: <code class="inline">src/api/client.ts</code> (guards, apiFetch, getJSON, getEvents)</li>
+  <li>☐ Step 5: the console shows <code class="inline">Loaded 10 cleanups. First: Storm Debris Sweep</code>; then the API stopped, and the three breaks</li>
+  <li>☐ Step 6: <code class="inline">npx tsc -b</code> silent, <code class="inline">npm run lint</code> 0 warnings and 0 errors, <code class="inline">npm run build</code> ends with "built in"</li>
+</ul>
+<div class="write"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">In ts-lab you change <code class="inline">import type { CleanupEvent, Volunteer } from './shapes.ts'</code> to <code class="inline">import { CleanupEvent, Volunteer } from './shapes.ts'</code>. What happens?</div><div class="opts"><div class="opt">A) <code class="inline">npm run check</code> reports TS1484 (and TS5097), and <code class="inline">node functions.ts</code> stops with <code class="inline">does not provide an export named 'CleanupEvent'</code></div><div class="opt">B) Nothing: both forms do the same</div><div class="opt">C) Only the editor complains; Node runs it</div><div class="opt">D) <code class="inline">node functions.ts</code> first runs shapes.ts and prints its eight lines</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">What does <code class="inline">node scratch.ts</code> print, and is <code class="inline">npm run check</code> silent?</div><pre class="code"><span class="k">function</span> isText(value: <span class="k">unknown</span>): value <span class="k">is</span> <span class="k">string</span> {
+  <span class="k">return</span> <span class="k">typeof</span> value === <span class="s">'string'</span>
+}
+<span class="k">const</span> words: <span class="k">unknown</span>[] = [<span class="s">'gloves'</span>, <span class="s">3</span>, <span class="s">'bags'</span>, <span class="k">null</span>]
+<span class="k">const</span> texts = words.filter(isText)
+console.log(texts.map((word) =&gt; word.toUpperCase()))</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A guard promises <code class="inline">value is number</code> but its body is <code class="inline">return value !== undefined</code>. What does TypeScript do?</div><div class="opts"><div class="opt">A) Reports TS2322 in the guard's body</div><div class="opt">B) Checks the value at run time and throws</div><div class="opt">C) Compiles without a word, and treats every value that passes (even the text 'twelve') as a number</div><div class="opt">D) Refuses to narrow with a guard it cannot verify</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt"><code class="inline">type StatusLabels = Record&lt;EventStatus, string&gt;</code>, and <code class="inline">const labels: StatusLabels = { draft: 'Draft', scheduled: 'Scheduled', completed: 'Completed' }</code>. What does the check say?</div><div class="opts"><div class="opt">A) Nothing: Record allows any keys</div><div class="opt">B) TS2353: 'cancelled' is an extra property</div><div class="opt">C) Nothing at check time; reading <code class="inline">labels.cancelled</code> crashes later</div><div class="opt">D) An error: property 'cancelled' is missing</div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">With <code class="inline">noUncheckedIndexedAccess</code> on and <code class="inline">const siteIds: string[]</code>, which line is NOT affected?</div><div class="opts"><div class="opt">A) <code class="inline">const firstId = siteIds[0]</code> (its type)</div><div class="opt">B) <code class="inline">for (const id of siteIds) { console.log(id.toUpperCase()) }</code></div><div class="opt">C) <code class="inline">siteIds[2].toUpperCase()</code></div><div class="opt">D) <code class="inline">return items[0]</code> in a function promising <code class="inline">T</code></div></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">You put <code class="inline">API_URL=http://localhost:4000</code> (no prefix) in <code class="inline">.env.local</code> and read <code class="inline">import.meta.env.API_URL</code> in the HQ. What happens?</div><div class="opts"><div class="opt">A) It works: every variable in .env.local reaches the code</div><div class="opt">B) The check reports TS2339 (only <code class="inline">VITE_API_URL</code> is declared), and at run time the value is undefined: Vite passes only <code class="inline">VITE_</code> names</div><div class="opt">C) Vite keeps it secret on the server</div><div class="opt">D) The build fails with a Vite error</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: draw the path of one cleanup from the API's memory to the <code class="inline">console.log</code> in main.tsx, as boxes and arrows. Mark the point where its type changes from <code class="inline">unknown</code> to <code class="inline">CleanupEvent</code>, and write what would happen to bad data there. Then one sentence on how this module changed the way you think about data you did not create.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Write the type of a function that takes a cleanup and returns a line of text.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Why does <code class="inline">findById</code> say <code class="inline">&lt;T extends { id: string }&gt;</code> and not just <code class="inline">&lt;T&gt;</code>?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">What does <code class="inline">getJSON</code> do with data that fails its type guard, and why?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish The Crew's Helper Functions (Steps 3 to 6)</li>
+  <li>☐ Finish The HQ Meets Its Data (Step 5's breaks, Step 6's checks)</li>
+  <li>☐ Exercises 1 and 2 of Lessons 2.3 and 2.4 (Exercise 3 of each is a stretch); delete <code class="inline">scratch.ts</code></li>
+  <li>☐ Both Quick Quizzes</li>
+  <li>☐ Lab 2.3 Task 3; Lab 2.4 Task 3 (and the stretches)</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Prepare for Checkpoint 1 (Session 4): reread the Key Takeaways of Lessons 2.1 to 2.4</li>
+  <li>☐ Bring to Session 4: the HQ at the end of Lesson 2.4, ts-lab with a silent check, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>return type, <code class="inline">void</code></td><td>The type a function promises to return / "returns nothing useful"</td></tr>
+<tr><td>optional, default, rest parameter</td><td><code class="inline">x?: T</code> / <code class="inline">x = value</code> / <code class="inline">...xs: T[]</code></td></tr>
+<tr><td>options object</td><td>One object parameter destructured with defaults, instead of many positional ones</td></tr>
+<tr><td>function type</td><td><code class="inline">(event: CleanupEvent) =&gt; string</code>: the type of a function value</td></tr>
+<tr><td>callback, contextual typing</td><td>A function passed to another / its parameter types read from where it is passed</td></tr>
+<tr><td>generic, type parameter</td><td>A function or type with a placeholder type <code class="inline">T</code>, filled in (usually inferred) at each use</td></tr>
+<tr><td>constraint</td><td><code class="inline">T extends { id: string }</code>: what every T must have</td></tr>
+<tr><td>overload</td><td>Several signatures for one function (querySelector, find): read, rarely written</td></tr>
+<tr><td><code class="inline">import type</code></td><td>An import of types only, removed before the code runs</td></tr>
+<tr><td>type predicate, type guard</td><td>A return type <code class="inline">value is T</code> / a function that has one</td></tr>
+<tr><td>utility type</td><td>A generic type that builds a type from another: Pick, Omit, Partial, Record</td></tr>
+<tr><td><code class="inline">noUncheckedIndexedAccess</code></td><td>The setting that makes <code class="inline">items[0]</code> a <code class="inline">T | undefined</code></td></tr>
+<tr><td>environment variable, <code class="inline">.env.local</code></td><td>A setting that changes between machines / Vite's file for this machine's values</td></tr>
+<tr><td><code class="inline">import.meta.env</code></td><td>Where Vite puts the <code class="inline">VITE_</code> variables in your code</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 3 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

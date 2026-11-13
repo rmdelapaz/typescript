@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 19</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 19: Mutations and Client State</h1>
+    <p class="sub">Your workbook for Session 19: the key ideas of Lessons 7.2 and 7.3, worked examples, the guided labs, predict-then-check practice, a self-check for each lesson and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>7.2–7.3</b></span>
+      <span class="chip">Session <b>19</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Send changes to the API with typed mutation factories, <code class="inline">useMutation</code>, <code class="inline">mutate</code> and <code class="inline">mutateAsync</code>.</li>
+  <li>Decide which cache entries a change makes out of date, and invalidate them.</li>
+  <li>Show the API's 400 field messages under their fields, and decide when an update should be optimistic.</li>
+  <li>Decide where a piece of state belongs, and give client state a typed Zustand store with selectors.</li>
+  <li>Keep a store across reloads, and check what comes back from localStorage before trusting it.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">W1</div><div class="qt">7.1's homework: you pressed Publish on the planning form. What did the HQ say, and what did shoreline-api receive?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Write the key of the events list for Maya searching "pelican". Which short key reaches it and every other cleanup entry?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">Name three pieces of state in the HQ that are NOT server state (7.2's Before the Next Lesson asks for them).</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.2</span><h3>Mutations</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Send typed POST and PATCH requests and check what comes back</li>
+  <li>Write mutationOptions factories and run them with useMutation, mutate and mutateAsync</li>
+  <li>Invalidate the cache by key after a change, and explain which entries a change makes out of date</li>
+  <li>Show an API's 400 fieldErrors under the fields they belong to</li>
+  <li>Decide when an update should be optimistic, and write one with onMutate, a rollback in onError and a refetch in onSettled</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A mutation changes server data</b> (POST, PATCH, DELETE). It runs only when you call it, its answer is not cached, and it is not retried by default (a retried POST could save twice).</li>
+  <li><b><code class="inline">mutationOptions</code> factories</b> (the twin of <code class="inline">queryOptions</code>) carry the types: <code class="inline">mutate</code> takes the mutation function's parameter, <code class="inline">data</code> is its promise's value. <code class="inline">mutate</code> starts and moves on; <code class="inline">mutateAsync</code> returns a promise to await (and catch).</li>
+  <li><b>Invalidation:</b> after a change, ask "what could this have changed?" and call <code class="inline">invalidateQueries</code> with the general key (<code class="inline">['events']</code>); entries on screen refetch now, the others when needed. Return the promise from <code class="inline">onSuccess</code>.</li>
+  <li><b>When the API says no:</b> a 400 with <code class="inline">fieldErrors</code> keyed by the form's field names goes straight under the fields; other failures become one sentence (<code class="inline">describeError</code>).</li>
+  <li><b>Wait or optimistic:</b> big or hard to take back → wait; small, frequent, easy to undo → optimistic: <code class="inline">onMutate</code> (cancelQueries, write the cache, return the old value), <code class="inline">onError</code> (roll back), <code class="inline">onSettled</code> (refetch the truth).</li>
+  <li><b>Server state leaves the reducer:</b> the marks live in the API (read through the cache); the desk's reducer keeps only the undo history of accepted changes.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: a rollback TypeScript insists on</div>
+<p>The rollback in <code class="inline">markMutation</code>, written as if <code class="inline">onMutate</code> always answered:</p>
+<pre class="code">onError: (_error, { signupId }, saved) =&gt; {
+  setStatus(signupId, saved.before)
+},</pre><p><code class="inline">npx tsc -b</code> on the finished Lesson 7.2 code with that line:</p>
+<pre class="out">src/api/mutations.ts:68:27 - error TS18048: 'saved' is possibly 'undefined'.
+
+68       setStatus(signupId, saved.before)
+                             ~~~~~
+
+src/api/mutations.ts:68:27 - error TS2345: Argument of type 'SignupStatus | undefined' is not assignable to parameter of type 'SignupStatus'.
+  Type 'undefined' is not assignable to type 'SignupStatus'.
+
+68       setStatus(signupId, saved.before)
+                             ~~~~~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/api/mutations.ts:68</pre><p>Two errors at the same spot. <b><code class="inline">saved</code> is possibly undefined:</b> <code class="inline">onError</code> also runs when <code class="inline">onMutate</code> itself failed, before it returned anything. <b><code class="inline">before</code> may be undefined:</b> the sign-up was not in the cached roster. The fix answers both: <code class="inline">if (saved?.before !== undefined) { setStatus(signupId, saved.before) }</code>. The types turned a rare failure into a line you cannot forget.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-19/l7_2-mutations/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code> (7 failures) and <code class="inline">npm run typecheck</code>.</li>
+  <li>Task 1: sign up with <code class="inline">useMutation</code>; the status line reads the API's answer.</li>
+  <li>Task 2: after a sign-up, which entries are out of date? Invalidate them.</li>
+  <li>Task 3 (home): cancel a spot optimistically, with a rollback.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Task 1: what does <code class="inline">isSuccess</code> let you read that you could not before?</td><td></td></tr>
+<tr><td>Task 2: which keys did you invalidate, and what would stay wrong without each?</td><td></td></tr>
+<tr><td>Task 3: what does <code class="inline">onMutate</code> return, and who uses it?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write your predictions first. Then check: P1 with the planning form's checks commented out (the lesson's Step 3), P2 with the lesson's Step 6 (and take <code class="inline">?_status=500</code> out again afterwards).</p>
+<div class="q"><div class="qn">P1</div><div class="qt">With the planning form's local checks turned off, an organizer publishes this. Predict the status code and how many fields get a message.</div><pre class="code">POST http://localhost:4000/api/events
+{"title": "Dune", "siteId": "north-jetty", "date": "", "startTime": "",
+ "endTime": "", "capacity": 500, "meetingPoint": "", ...}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">patchSignup's path gets <code class="inline">?_status=500</code>. Predict the API's answer, the badge right after the tap, and the badge two seconds later.</div><pre class="code">PATCH http://localhost:4000/api/signups/s088?_status=500   {"status": "attended"}</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>An HQ That Saves</b> (lesson page, "Project: An HQ That Saves"). In class: Steps 1 and 2. At home: Steps 3 to 6.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">sendJSON</code>, <code class="inline">postEvent</code>, <code class="inline">patchEvent</code>, <code class="inline">patchSignup</code>; checkInCode and sign-ups checked</li>
+  <li>☐ Step 2: <code class="inline">mutations.ts</code> with three factories and <code class="inline">markOf</code> / <code class="inline">markStatus</code>; <code class="inline">npx tsc -b</code> silent</li>
+  <li>☐ Step 3: Publish and Save as draft create the cleanup and open its page; the API's 400 messages under the fields</li>
+  <li>☐ Step 4: OrganizerTools on the cleanup's page (check-in code, Cancel cleanup, focus on the message)</li>
+  <li>☐ Step 5: the reducer keeps only the undo history; marks are saved, survive a reload, roll back on failure</li>
+  <li>☐ Step 6: watched it with <code class="inline">--latency=1500</code> and a forced 500; tsc, lint and build pass</li>
+  <li>☐ My own project: each change a person can make, its request, the keys it makes stale, wait or optimistic</li>
+</ul>
+<div class="write tall"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which of these is true of a mutation and NOT of a query?</div><div class="opts"><div class="opt">A) It runs only when you call mutate or mutateAsync</div><div class="opt">B) Its answer is kept in the cache under a key</div><div class="opt">C) It is retried three times by default</div><div class="opt">D) It runs again when the window regains focus</div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">The lesson hands <code class="inline">useMutation(cancelEventMutation())</code>'s parts to functions that want a number. From tsc's answer: what does <code class="inline">mutate</code> take, and what is <code class="inline">data</code>?</div><pre class="code">src/Scratch.tsx:10:17 - error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+src/Scratch.tsx:11:15 - error TS2345: Argument of type 'CleanupEvent | undefined' is not assignable to parameter of type 'number'.
+src/Scratch.tsx:12:15 - error TS2345: Argument of type 'Error | null' is not assignable to parameter of type 'number'.
+Found 3 errors in the same file, starting at: src/Scratch.tsx:10</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">An organizer marks Diego as checked in. Which keys does the HQ invalidate afterwards?</div><div class="opts"><div class="opt">A) <code class="inline">['events', 'roster', 'e17', 'v01']</code> only</div><div class="opt">B) <code class="inline">['events']</code> only</div><div class="opt">C) <code class="inline">['events']</code> and <code class="inline">['volunteers']</code></div><div class="opt">D) Every key in the cache</div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Which change in the HQ is a good fit for an optimistic update?</div><div class="opts"><div class="opt">A) Publishing a new cleanup</div><div class="opt">B) Cancelling a scheduled cleanup</div><div class="opt">C) Deleting a draft</div><div class="opt">D) A check-in mark at the desk</div></div></div>
+<div class="q" data-sc="5" data-kind="short"><div class="qn">Q5</div><div class="qt">The rollback in markMutation's <code class="inline">onError</code> was written as <code class="inline">setStatus(signupId, saved.before)</code>. Why does tsc refuse it, and what is the fix?</div><pre class="code">src/api/mutations.ts:68:27 - error TS18048: 'saved' is possibly 'undefined'.
+src/api/mutations.ts:68:27 - error TS2345: Argument of type 'SignupStatus | undefined' is not assignable to parameter of type 'SignupStatus'.
+Found 2 errors in the same file, starting at: src/api/mutations.ts:68</pre><div class="write"></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">markMutation's onMutate does not call cancelQueries. The API is slow; Maya checks in Diego, then Grace a second later. What can happen to Grace's badge?</div><div class="opts"><div class="opt">A) Nothing: optimistic updates cannot conflict</div><div class="opt">B) It flips Checked in → Expected → Checked in, when a refetch started by Diego's save lands</div><div class="opt">C) It stays Expected until the API answers</div><div class="opt">D) The second PATCH is cancelled</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: follow one tap on Check in from start to finish, with the API answering 500: what the screen shows at each moment, which callback runs, what is in the cache, what the reducer records (or does not), and what the person reads. Then one sentence about a change in an app you use every day that feels instant: is it optimistic?</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">7.3</span><h3>Client State</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Decide where a piece of state belongs: the query cache, the URL, a component, a reducer, or an app-wide store</li>
+  <li>Create a typed Zustand store with state and actions, and read it with selectors that re-render only what changed</li>
+  <li>Keep a store across reloads with the persist middleware, and check the saved data before trusting it</li>
+  <li>Use a store outside React (getState, subscribe) for page-wide effects like a theme</li>
+  <li>Read Redux Toolkit code (slices, typed hooks, a Provider) and compare it with Zustand on size, code and tooling</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Where state lives:</b> server data → the query cache; what a link should reproduce → the URL; one component's business → useState or a reducer; the session → the session store; app-wide preferences that outlive the tab → an app store. Keep state as close as possible to where it is used (colocation).</li>
+  <li><b>Zustand:</b> <code class="inline">create&lt;UiState&gt;()(…)</code> makes a store of values and actions outside React; <code class="inline">set</code> merges and never changes the old object. The extra <code class="inline">()</code> lets you give the type while TypeScript infers the middleware's.</li>
+  <li><b>Selectors decide re-renders:</b> a component re-renders when its selector's answer changes (Object.is). Select one value or a derived boolean; a selector that builds an object needs <code class="inline">useShallow</code> (or React gives up).</li>
+  <li><b>persist</b> saves to localStorage under a <code class="inline">name</code>; what comes back is <code class="inline">unknown</code>: a <code class="inline">merge</code> checks each field and falls back to the default.</li>
+  <li><b>Outside React:</b> <code class="inline">useUiStore.getState()</code> and <code class="inline">subscribe((state, previous) =&gt; …)</code>: the theme goes on <code class="inline">&lt;html data-theme&gt;</code> from main.tsx.</li>
+  <li><b>Redux Toolkit</b> (slices, <code class="inline">PayloadAction</code>, typed Hooks, a Provider) solves the same problem with named actions and DevTools; reach for it when the codebase already uses it.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: typed selectors</div>
+<p>The lesson's Scratch.tsx reads two values from the display store with no type arguments, then makes two mistakes:</p>
+<pre class="code"><span class="k">import</span> { useUiStore } <span class="k">from</span> <span class="s">'./state/uiStore.ts'</span>
+
+<span class="k">export</span> <span class="k">function</span> Scratch() {
+  <span class="k">const</span> density = useUiStore((state) =&gt; state.density)
+  <span class="k">const</span> setTheme = useUiStore((state) =&gt; state.setTheme)
+  <span class="k">const</span> small = density === <span class="s">'cozy'</span>
+  <span class="k">return</span> &lt;button onClick={() =&gt; setTheme(<span class="s">'purple'</span>)}&gt;{small ? <span class="s">'Small'</span> : <span class="s">'Large'</span>}&lt;/button&gt;
+}</pre><p><code class="inline">npx tsc -b</code> on the finished Lesson 7.3 code:</p>
+<pre class="out">src/Scratch.tsx:6:17 - error TS2367: This comparison appears to be unintentional because the types '"compact" | "roomy"' and '"cozy"' have no overlap.
+
+6   const small = density === 'cozy'
+                  ~~~~~~~~~~~~~~~~~~
+
+src/Scratch.tsx:7:42 - error TS2345: Argument of type '"purple"' is not assignable to parameter of type '"dark" | "light" | "system"'.
+
+7   return &lt;button onClick={() =&gt; setTheme('purple')}&gt;{small ? 'Small' : 'Large'}&lt;/button&gt;
+                                           ~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/Scratch.tsx:6</pre><p>The store's interface flows into every selector: <code class="inline">density</code> is <code class="inline">"compact" | "roomy"</code>, so comparing it with <code class="inline">'cozy'</code> can never be true (TS2367), and <code class="inline">setTheme</code> accepts only the three themes (TS2345). These are Module 2's checks, now reaching across the whole app through one store.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-19/l7_3-client-state/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code> (7 failures) and <code class="inline">npm run typecheck</code>.</li>
+  <li>Task 1: <code class="inline">togglePin</code> with a new array. Task 2: persist and a checking merge. Task 3: selectors, counted with React's Profiler.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Task 2: what did your merge do with <code class="inline">"seal-rock"</code>, <code class="inline">42</code> and a second <code class="inline">"north-jetty"</code>?</td><td></td></tr>
+<tr><td>Task 3: how many buttons re-rendered before your change, and after?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write your predictions, then check in DevTools: Application › Local storage (Firefox: Storage) for P3; the lesson's measured render counts for P4.</p>
+<div class="q"><div class="qn">P3</div><div class="qt">A first visit to the HQ: is there a <code class="inline">shoreline-hq-ui</code> key in localStorage? After choosing Dark, what JSON is stored under it?</div><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Fifteen event cards, each with <code class="inline">useUiStore((state) =&gt; state.density === 'compact')</code>. How many re-render when the person chooses Dark? And Compact?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Display Choices That Stick</b> (lesson page, "Project: Display Choices That Stick"). In class: Steps 1 to 3. At home: Steps 4 and 5.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">zustand</code> installed; <code class="inline">src/state/uiStore.ts</code> with persist and a merge that checks each saved value</li>
+  <li>☐ Step 2: <code class="inline">light-dark()</code> tokens, <code class="inline">color-scheme</code> per <code class="inline">data-theme</code>; main.tsx shows the theme and subscribes</li>
+  <li>☐ Step 3: two labeled radio groups (Theme, Lists) in the footer, working with the keyboard</li>
+  <li>☐ Step 4: compact lists through DataList; compact event cards leave out the meeting point and supplies</li>
+  <li>☐ Step 5: choices survive a reload and a new tab; nonsense in localStorage falls back to the defaults; tsc, lint, build</li>
+  <li>☐ My own project: the state homes table for my app</li>
+</ul>
+<div class="write tall"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Maya wants the HQ light on her tablet, whatever the tablet says. Where does that choice live?</div><div class="opts"><div class="opt">A) In TanStack Query's cache</div><div class="opt">B) In the URL's search params</div><div class="opt">C) In a Zustand store, persisted to localStorage</div><div class="opt">D) In sessionStorage, next to the session</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">A teammate wrote <code class="inline">create&lt;UiState&gt;(persist(…))</code>. tsc starts like this. What is missing?</div><pre class="code">src/Scratch.ts:10:3 - error TS2345: Argument of type 'StateCreator&lt;UiState, [], [["zustand/persist", UiState]]&gt;' is not assignable to parameter of type 'StateCreator&lt;UiState, [], []&gt;'.
+  Type 'StateCreator&lt;UiState, [], [["zustand/persist", UiState]]&gt;' is not assignable to type '{ $$storeMutators?: [] | undefined; }'.
+    Types of property '$$storeMutators' are incompatible.
+      Type '[["zustand/persist", UiState]] | undefined' is not assignable to type '[] | undefined'.
+        Type '[["zustand/persist", UiState]]' is not assignable to type '[]'.
+          Source has 1 element(s) but target allows only 0.</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">EventCard reads the density with <code class="inline">const { density } = useUiStore()</code> (no selector). Fifteen cards are on screen and the person chooses Dark. How many cards re-render?</div><div class="opts"><div class="opt">A) 15</div><div class="opt">B) 0</div><div class="opt">C) 1</div><div class="opt">D) Only the cards whose density changed</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">DisplaySettings reads both values with one selector that builds an object. What happens on the dev server?</div><pre class="code"><span class="k">const</span> { theme, density } = useUiStore((state) =&gt; ({ theme: state.theme, density: state.density }))</pre><div class="opts"><div class="opt">A) It works, one re-render per change</div><div class="opt">B) tsc refuses the destructuring</div><div class="opt">C) Only the first value updates</div><div class="opt">D) React keeps re-rendering and gives up: Maximum update depth exceeded</div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Someone stores <code class="inline">{oops</code> (not JSON at all) under shoreline-hq-ui and reloads. What does the HQ start with?</div><div class="opts"><div class="opt">A) A crash on the first render</div><div class="opt">B) Match my device and Roomy, with no error in the console</div><div class="opt">C) The last valid choices, kept somewhere else</div><div class="opt">D) A purple theme</div></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">Which is a good reason to reach for Redux Toolkit instead of Zustand?</div><div class="opts"><div class="opt">A) The codebase already uses it, or the team wants every change named and replayable</div><div class="opt">B) It has persistence built in</div><div class="opt">C) It adds fewer packages</div><div class="opt">D) It makes server data easier to cache</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: Module 7 is done. Draw the HQ's state as a map: the API and the query cache, the URL, the session store, the display store, and the components with their own state and the desk's reducer. Draw an arrow for each way data moves between them. Which part would you explain first to a new teammate, and which part are you still unsure about?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Name one change in the HQ that waits for the API and one that is optimistic, with a reason each.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">After a check-in mark, which keys are invalidated, and why <code class="inline">['volunteers']</code>?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Write a selector for "is the list compact?"</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish An HQ That Saves (Steps 3 to 6) and Display Choices That Stick (Steps 4 and 5), with both checklists</li>
+  <li>☐ 7.2 Exercises 1 and 2; 7.3 Exercises 1 and 2 (each Exercise 3 is a stretch)</li>
+  <li>☐ Both Quick Quizzes on the lesson pages</li>
+  <li>☐ Lab 7.2 Task 3; Lab 7.3's stretch</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Before Session 20: tsc, lint and build pass; I counted the places in the HQ that describe a valid cleanup</li>
+  <li>☐ Bring: the course folder, internet for <code class="inline">npm install</code>, a JPEG or PNG photo, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>mutation</td><td>A change to server data (POST, PATCH, DELETE), run when you call it, not cached</td></tr>
+<tr><td><code class="inline">mutationOptions</code></td><td>The mutation twin of <code class="inline">queryOptions</code>: one factory per kind of change, with its types</td></tr>
+<tr><td><code class="inline">useMutation</code></td><td>Runs a mutation in a component: <code class="inline">mutate</code>, <code class="inline">mutateAsync</code>, status flags, <code class="inline">data</code>, <code class="inline">error</code>, <code class="inline">variables</code></td></tr>
+<tr><td>invalidation</td><td>Marking cached entries stale after a change (<code class="inline">invalidateQueries</code> by key prefix)</td></tr>
+<tr><td>optimistic update</td><td>Showing a change before the API answers, and rolling it back if it says no</td></tr>
+<tr><td><code class="inline">onMutate</code> / <code class="inline">onError</code> / <code class="inline">onSettled</code></td><td>Before the request (return what to put back) / after a failure / after either</td></tr>
+<tr><td><code class="inline">cancelQueries</code></td><td>Stops refetches already on their way, so they cannot overwrite an optimistic change</td></tr>
+<tr><td><code class="inline">setQueryData</code></td><td>Changes a cache entry by hand (typed through the factory's key)</td></tr>
+<tr><td>client state, colocation</td><td>State only this browser knows / keep state as close as possible to where it is used</td></tr>
+<tr><td>Zustand, store, selector</td><td>A small app-wide state library / its values and actions / a function from the state to the part a component needs</td></tr>
+<tr><td><code class="inline">useShallow</code></td><td>Compares an object selector's values instead of the object itself</td></tr>
+<tr><td><code class="inline">persist</code>, <code class="inline">merge</code></td><td>Zustand middleware that saves to localStorage / where you check what comes back</td></tr>
+<tr><td><code class="inline">light-dark()</code>, <code class="inline">color-scheme</code></td><td>A CSS function that picks a light or dark value / the property that decides which</td></tr>
+<tr><td>Redux Toolkit, slice</td><td>The official modern Redux / one part of the store with its reducers and actions</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 19 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

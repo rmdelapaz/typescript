@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Test Shoreline Crew HQ in a real browser with Playwright against the real shoreline-api server: a guest's search, planning a cleanup, the check-in desk and an impact report with a real photo, plus automated axe accessibility checks in both themes and a clear answer to which test belongs where. React + TypeScript: Build a Modern Web App Lesson 9.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>End-to-End and Accessibility Tests - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🎭 Lesson 9.3: End-to-End and Accessibility Tests</h1>
+                <p class="lead">Your 46 tests run the HQ in a pretend browser against the API's code inside the test run, and they are fast because of it. But no organizer has ever used the HQ in jsdom. Today the tests leave the training beach: a real Chromium opens the real build, talks to the real shoreline-api server, uploads a real photo from your disk and reloads the page to prove the server kept what it was sent. Then a robot accessibility checker reads every key page, in light mode and in dark mode, and you finish Module 9 with a clear answer to the question every team argues about: which test belongs where?</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Set up Playwright so one command builds the HQ, starts or reuses shoreline-api and the preview server, and runs the tests in Chromium</li>
+                        <li>Write end-to-end tests with locators by role and label, auto-waiting actions and web-first assertions, and read their failures</li>
+                        <li>Keep tests that share one real server independent: a reset before every test, one test at a time, and a clean API afterwards</li>
+                        <li>Run axe accessibility checks on the HQ's key pages in both themes, and explain what automated checks can and cannot find</li>
+                        <li>Decide for any behavior whether it needs a unit, component or end-to-end test, and why most of a suite should not be end-to-end</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 135 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_30.html">Lesson 9.2: Interactions and Async</a> (your <code>shoreline-hq</code> with 46 Vitest tests, and shoreline-api)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> Playwright and axe in shoreline-hq: four journeys through the real app and server (a guest's search, planning a cleanup, the check-in desk, an impact report with a real photo) and accessibility checks on seven pages in both themes, 19 tests behind <code>npm run test:e2e</code></li>
+                    <li><span class="meta-label">🧩 Stack</span> Playwright 1.65 (Chromium), axe-core 4.14 with @axe-core/playwright, Vite 8.3, React 19.3, TypeScript 7.0 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api running in a second terminal as usual (Playwright reuses it)</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-31-start.zip">lesson-31-start.zip</a> · Finished code: <a href="downloads/lesson-31-end.zip">lesson-31-end.zip</a>. Each folder has a README with the commands to run it. The finished code includes the photo the tests upload, in <code>e2e/files</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#real-browser" class="toc-link">Why a Real Browser</a></li>
+                        <li><a href="#playwright" class="toc-link">Playwright in Five Ideas</a></li>
+                        <li><a href="#one-server" class="toc-link">One Real Server, a Fresh Beach for Every Test</a></li>
+                        <li><a href="#axe" class="toc-link">Automated Accessibility Checks with axe</a></li>
+                        <li><a href="#where" class="toc-link">What to Test Where</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The HQ in a Real Browser</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="real-browser" class="lesson-section">
+                <h2>🌐 Why a Real Browser</h2>
+                <p>Lesson 9.2 ended with two honest gaps. jsdom could not send a real file through Node's <code>fetch</code>, so the upload test answered for itself, and it did not know the <code>&lt;search&gt;</code> element that browsers have had for a while. Neither gap is jsdom's fault: it is a pretend browser. It has no layout (nothing has a size), it downloads no pictures, it does not apply your CSS colors, and it never talks to a server that keeps data after the test. An <strong>end-to-end test</strong> (e2e for short) closes those gaps by running the whole system the way a person meets it: a real browser, the real build of the app, the real API server.</p>
+                <div class="card card-info">
+                    <h3>💡 Mental model: the dress rehearsal on the real beach</h3>
+                    <p>Lesson 9.2's mock API was the training beach: same rules, safe, reset in a second. Before the big Coastal Cleanup Day the crew still walks the real beach once: the real parking lot, the real tide, the real sign-in table with the real clipboard. Nobody does that walk for every small decision, because it takes a morning. But it is the only way to find out that the gate is locked on Saturdays. End-to-end tests are that walk: few, slow, and the only tests that see the whole thing.</p>
+                </div>
+                <div class="mermaid">
+graph TD
+    A["Playwright test in Node"] --> B["Chromium"]
+    B --> C["vite preview :4173"]
+    B --> D["shoreline-api :4000"]
+    A -. "POST /api/_reset" .-> D
+                </div>
+                <p>Your test code runs in Node, and it remote-controls a real Chromium. The browser loads the HQ's production build from <code>vite preview</code> and sends its requests to <code>node server.ts</code>, the same server you have run since Lesson 1.2. The dashed line is new: before each test, the test itself asks the API to put its sample data back.</p>
+                <div class="card card-info">
+                    <h4>🌱 Why this matters</h4>
+                    <p>"We had tests, and it still broke in production" usually means the tests never ran the real thing together: the build, the browser, the server. A handful of end-to-end tests on the journeys that make the money (or, for the crew, that get the bags counted) is standard practice on professional teams, and Playwright is one of the most common tools for it. If the first run feels slow or a test fails for a reason you do not understand yet, that is normal: e2e tests have more moving parts, so their failure messages tell you more. Read them slowly.</p>
+                </div>
+            </section>
+
+            <section id="playwright" class="lesson-section">
+                <h2>🎭 Playwright in Five Ideas</h2>
+                <p>Playwright's test runner, <code>@playwright/test</code>, looks familiar after Vitest: <code>test()</code>, <code>expect()</code>, <code>beforeEach()</code>. What is different is what a test gets and how it waits. Here is the whole first journey of the project, a guest searching for a cleanup:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/e2e/browse.spec.ts</div>
+                    <pre data-src="shoreline-hq/e2e/browse.spec.ts" data-match="excerpt"><code class="language-ts">import { expect, test } from '@playwright/test'
+// ...
+test('a guest finds a cleanup by searching', async ({ page }) =&gt; {
+  await page.goto('/')
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Events' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Cleanup events' })).toBeVisible()
+
+  await page.getByLabel('Search cleanups').fill('pelican')
+  await expect(page.getByText('Found 3 cleanups: 1 coming up, 2 in the log.')).toBeVisible()
+  await expect(page).toHaveURL(/\?q=pelican$/)
+
+  await page.getByRole('link', { name: 'Pelican Point Beach Sweep' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pelican Point Beach Sweep')
+  await expect(page.getByRole('heading', { name: 'Where to meet' })).toBeVisible()
+})</code></pre>
+                </div>
+                <ol>
+                    <li><strong>Fixtures.</strong> A test asks for what it needs by name: <code>async ({ page }) =&gt; …</code>. <code>page</code> is a fresh browser tab in a fresh, empty browser profile (no cookies, no storage), made for this test and thrown away after it. <code>request</code> (used below to reset the API) sends HTTP requests from Node. The type of each fixture comes with the package: hover <code>page</code> in VS Code and you see <code>Page</code>.</li>
+                    <li><strong>Locators.</strong> <code>page.getByRole('link', { name: 'Pelican Point Beach Sweep' })</code> is the same idea as Testing Library's queries, by role and accessible name, and you can chain them: the <em>Events</em> link inside the navigation named "Main". A locator is a description, not an element: it finds the element again each time it is used, so it never goes stale when React re-renders.</li>
+                    <li><strong>Actions wait.</strong> <code>click()</code> and <code>fill()</code> wait until the element exists, is visible, is stable and can receive the action, for up to the test's timeout. There is no <code>findBy</code> and no <code>waitFor</code> to remember.</li>
+                    <li><strong>Web-first assertions retry.</strong> <code>await expect(locator).toBeVisible()</code> keeps checking for up to 5 seconds until it is true. That is how the test waits out the search's 300 ms pause and the API's answer. The <code>await</code> is required: these assertions return a <code>Promise</code>.</li>
+                    <li><strong>The config.</strong> <code>playwright.config.ts</code> says where the tests are, which address <code>page.goto('/')</code> means, and how to start the servers (Step 2).</li>
+                </ol>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>In Vitest + Testing Library (9.1, 9.2)</th><th>In Playwright</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>screen.getByRole('button', { name })</code></td><td><code>page.getByRole('button', { name })</code></td></tr>
+                            <tr><td><code>screen.getByLabelText('Email')</code></td><td><code>page.getByLabel('Email')</code></td></tr>
+                            <tr><td><code>await user.click(…)</code>, <code>await user.type(…)</code></td><td><code>await locator.click()</code>, <code>await locator.fill('text')</code></td></tr>
+                            <tr><td><code>await screen.findByText(…)</code></td><td><code>await expect(page.getByText(…)).toBeVisible()</code></td></tr>
+                            <tr><td><code>expect(el).toHaveAttribute(…)</code> (checks once)</td><td><code>await expect(locator).toHaveAttribute(…)</code> (retries)</td></tr>
+                            <tr><td><code>user.upload(input, file)</code> with a made-up <code>File</code></td><td><code>locator.setInputFiles('path/to/photo.jpg')</code> with a real file</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Same names, same philosophy ("find it the way a person would"), so everything you learned about roles and accessible names carries over. The selectors you will <em>not</em> see in this lesson are CSS classes and test ids: the HQ's CSS Module class names are hashed in the build anyway, and a role with a name is both sturdier and a free accessibility check.</p>
+            </section>
+
+            <section id="one-server" class="lesson-section">
+                <h2>🏖️ One Real Server, a Fresh Beach for Every Test</h2>
+                <p>A real server keeps what it is sent. That is the point (the check-in test reloads the page to prove it), and it is also the trap: a test that plans a cleanup leaves 18 cleanups behind, and the next test that expects 17 fails, or passes only when it happens to run first. Tests must not depend on each other's leftovers. The HQ's tests follow three rules:</p>
+                <ul>
+                    <li><strong>Reset before every test.</strong> shoreline-api has a development endpoint for exactly this, <code>POST /api/_reset</code>, which puts the sample data back (the same thing a server restart does). Every spec file starts with <code>test.beforeEach</code> calling <code>resetApi(request)</code> from a small shared file.</li>
+                    <li><strong>One test at a time.</strong> Playwright normally runs test files in parallel, in several worker processes. With one shared server, a reset in one worker would wipe the data another worker's test is in the middle of using. <code>workers: 1</code> in the config keeps them in a line. (Big teams give each worker its own server or its own account instead; for 19 tests, a line is simpler.)</li>
+                    <li><strong>Leave the beach as you found it.</strong> After the last test, a <code>globalTeardown</code> file resets the API once more, so the server you develop against does not keep "Dune Grass Cleanup" from the last run.</li>
+                </ul>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/e2e/helpers.ts</div>
+                    <pre data-src="shoreline-hq/e2e/helpers.ts" data-match="excerpt"><code class="language-ts">/** Where shoreline-api listens while the end-to-end tests run */
+export const API_URL = 'http://localhost:4000'
+
+/** Put the API's sample data back, so every test starts on the same beach */
+export async function resetApi(request: APIRequestContext): Promise&lt;void&gt; {
+  const response = await request.post(`${API_URL}/api/_reset`)
+  expect(response.ok()).toBe(true)
+}
+
+/** Sign in through the real form, the way an organizer does */
+export async function signIn(page: Page, email = 'maya.okafor@example.com'): Promise&lt;void&gt; {
+  await page.goto('/sign-in')
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Password').fill('shoreline-demo')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible()
+}</code></pre>
+                </div>
+                <p><code>APIRequestContext</code> is the type of the <code>request</code> fixture: Playwright's own HTTP client, which runs in Node, not in the page. <code>signIn</code> uses the real form on purpose: it is the same three steps a person takes, and every test that signs in tests the sign-in a little more.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ The tests reset YOUR running API</h4>
+                    <p>Playwright reuses a shoreline-api that is already running (Step 2), which is convenient and fast. It also means a test run puts the sample data back in the server you have open: if you had planned a cleanup by hand to try something, it is gone after <code>npm run test:e2e</code>. The data is sample data and lives only in memory anyway (Lesson 1.2), so nothing real is lost.</p>
+                </div>
+                <p>One more thing a real browser brings: a time zone. The HQ works out "today" from the browser's clock and time zone, and shoreline-api works it out in the crew's time zone, America/Los_Angeles (Lesson 9.2's FAQ). Playwright can give the browser any time zone, so the config sets <code>timezoneId: 'America/Los_Angeles'</code> and the two always agree, even if you live in Manila or Berlin. That is why these tests may use today's cleanup, Tide Pool Morning Cleanup, which the Vitest tests avoided.</p>
+            </section>
+
+            <section id="axe" class="lesson-section">
+                <h2>♿ Automated Accessibility Checks with axe</h2>
+                <p>In Lesson 3.6 you checked the HQ by hand with Lighthouse or the axe DevTools extension, and the lesson promised the same engine in automated tests. Here it is. <strong>axe-core</strong> is an open-source accessibility checker from Deque: injected into a page, it reads the rendered result (the real DOM, the real computed colors) and reports rule violations such as a field without a label, a button without a name, text without enough contrast, an <code>aria-*</code> attribute with a wrong value or two elements with the same <code>id</code>. <code>@axe-core/playwright</code> injects it into Playwright's page for you:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/e2e/helpers.ts</div>
+                    <pre data-src="shoreline-hq/e2e/helpers.ts" data-match="excerpt"><code class="language-ts">/** Run axe on the page as it is now and fail with one readable line per problem */
+export async function expectNoAxeViolations(page: Page): Promise&lt;void&gt; {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze()
+  const problems = results.violations.map(
+    (violation) =&gt; `${violation.id}: ${violation.help} (${violation.nodes.length})`,
+  )
+  expect(problems).toEqual([])
+}</code></pre>
+                </div>
+                <ul>
+                    <li><strong><code>withTags([…])</code></strong> limits the scan to the WCAG rules (2.0, 2.1 and 2.2, levels A and AA), the standard most accessibility laws and policies point to. Without tags, axe also runs its "best practice" rules, which are good advice but not requirements.</li>
+                    <li><strong>The <code>map</code></strong> turns axe's large result objects into one line each, such as <code>color-contrast: Elements must meet minimum color contrast ratio thresholds (3)</code>. Comparing that list with <code>[]</code> gives a failure message you can read at a glance (Step 7 shows one).</li>
+                    <li><strong>Both themes.</strong> Colors are the most common thing to break in dark mode, and only a real browser computes them. Playwright's <code>colorScheme</code> option makes the browser report "dark" to the page, so <code>prefers-color-scheme</code> and the HQ's <code>light-dark()</code> colors switch exactly as on a phone set to dark mode.</li>
+                </ul>
+                <div class="card card-info">
+                    <h4>💡 A floor, not a ceiling</h4>
+                    <p>Automated tools find only part of what makes a page hard to use, often estimated at around a third to a half of real issues. axe can tell that a picture has no <code>alt</code>; it cannot tell whether the <code>alt</code> text says anything useful. It can tell that a button has a name; it cannot tell whether the focus goes somewhere sensible after the dialog closes, or whether the page makes sense read aloud. Keep the manual checks from Lesson 3.6 before every release: the keyboard alone (<kbd>Tab</kbd>, <kbd>Enter</kbd>, <kbd>Space</kbd>, <kbd>Esc</kbd>), the focus always visible, one journey with a screen reader (NVDA on Windows, VoiceOver on a Mac with <kbd>⌘ Cmd</kbd>+<kbd>F5</kbd>), and the page zoomed to 200 percent. What axe gives you is that the problems it <em>can</em> find never come back unnoticed.</p>
+                </div>
+                <p>A scan only checks what is on the screen at that moment, so the HQ's accessibility tests first wait for each page's heading (not the "Loading…" message), and one test opens the impact report form's error summary before scanning, because error states are where contrast and labeling go wrong most often.</p>
+            </section>
+
+            <section id="where" class="lesson-section">
+                <h2>🧭 What to Test Where</h2>
+                <p>You now have three kinds of tests, and the same behavior could often be tested at any of them. The question is what each one costs and what it can see. Measured on the HQ: the 46 Vitest tests run in about 2 seconds together; the 19 Playwright tests take about 15 seconds, build included, when shoreline-api is already running.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Kind</th><th>Runs</th><th>Can see</th><th>Cannot see</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Unit</strong> (9.1)</td><td>One function, in Node, milliseconds</td><td>Every rule and edge case of that function</td><td>Anything on screen</td><td>schemas, <code>listErrors</code>, <code>getAvailability</code>, the reducer</td></tr>
+                            <tr><td><strong>Component</strong> (9.1, 9.2)</td><td>A component or page in jsdom, with the API's code inside the test</td><td>Roles, names, focus, clicks, requests sent and not sent, cache, error answers you choose</td><td>Layout, colors, real files, real browser elements, a server that keeps data</td><td>the edit form, the guards, uploads with 413/415, the optimistic rollback</td></tr>
+                            <tr><td><strong>End-to-end</strong> (9.3)</td><td>The build in Chromium against the real server, seconds each</td><td>The whole journey: real bytes, pictures, CSS, reloads, axe on real colors</td><td>Rare errors (hard to cause), every combination (too slow)</td><td>search, plan, check-in, impact report with a photo, axe in both themes</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The old picture for this is the <strong>testing pyramid</strong>: many unit tests at the bottom, fewer integration tests, a few end-to-end tests on top. Many React teams now describe a <strong>testing trophy</strong> instead, where the widest part is the middle, component and integration tests like Lesson 9.2's, because they test what people do at a cost close to unit tests. Both shapes agree on the top: end-to-end tests are few and chosen. A rule of thumb for any new behavior:</p>
+                <ol>
+                    <li>Is it a rule with many cases (a date check, a total, a permission rule)? <strong>Unit test</strong> it, every case.</li>
+                    <li>Is it what someone sees or does on one screen, including errors and "nothing must be sent"? <strong>Component test</strong> with MSW.</li>
+                    <li>Does it only work when everything is real together (files, layout, a reload, the deployed build, a critical journey)? <strong>One end-to-end test</strong> for the main path, and leave its edge cases to the levels below.</li>
+                </ol>
+                <p>That is why the e2e impact test checks one good report with one good photo, and not the GIF or the 413: Lesson 9.2 already pinned those down faster.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A locator that matches more than one element</h3>
+                    <pre data-snippet><code class="language-ts">await expect(page.getByText('Pelican Point')).toBeVisible()</code></pre>
+                    <p>"Pelican Point" is in a cleanup's title, in the meeting point of every cleanup at that beach and in a button's hidden label. Measured:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('Pelican Point')
+    Expected: visible
+    Error: strict mode violation: getByText('Pelican Point') resolved to 5 elements:
+        1) &lt;p&gt;Pelican Point Beach: Lifeguard tower 3&lt;/p&gt; aka getByText('Pelican Point Beach:').first()
+        2) &lt;p&gt;Pelican Point Beach: Lifeguard tower 3&lt;/p&gt; aka getByText('Pelican Point Beach:').nth(1)
+        3) &lt;a href="/events/e04" data-discover="true"&gt;Pelican Point Beach Sweep&lt;/a&gt; aka getByRole('link', { name: 'Pelican Point Beach Sweep' })
+        4) &lt;p&gt;Pelican Point Beach: Lifeguard tower 3&lt;/p&gt; aka getByText('Pelican Point Beach:').nth(2)
+        5) &lt;span class="_hidden_11rrh_2"&gt;for Pelican Point Beach Sweep&lt;/span&gt; aka getByRole('button', { name: 'Show details for Pelican' })</code></pre>
+                    </div>
+                    <p>Playwright's locators are <strong>strict</strong>: an action or assertion that could mean several elements fails instead of guessing. Make the locator say which one you mean: a role and a full name (<code>getByRole('link', { name: 'Pelican Point Beach Sweep' })</code>), <code>{ exact: true }</code>, or a narrower starting point such as <code>page.getByRole('main')</code>. The error lists what it found, which is often the fastest way to pick the right locator.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Checking once instead of waiting</h3>
+                    <pre data-snippet><code class="language-ts">expect(await page.getByText('Found 3 cleanups').isVisible()).toBe(true)</code></pre>
+                    <p>Measured, right after typing into the search box:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false</code></pre>
+                    </div>
+                    <p><code>isVisible()</code> answers "is it visible <em>right now</em>?", and right now the search is still in its 300 ms pause. Use the web-first assertion, <code>await expect(locator).toBeVisible()</code>, which keeps checking. The same goes for <code>waitForTimeout(1000)</code> ("wait a second, then look"): it is slow when the app is fast and flaky when the machine is slow. Wait for what you expect to see, never for a number of milliseconds.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Browser types in a Node file</h3>
+                    <pre data-snippet><code class="language-ts">await expect.poll(() =&gt; picture.evaluate((img: HTMLImageElement) =&gt; img.naturalWidth)).toBe(1200)</code></pre>
+                    <p><code>evaluate</code> runs its function <em>inside the browser</em>, so this looks reasonable. Measured with <code>npx tsc -b</code>:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>e2e/browse.spec.ts:29:52 - error TS2304: Cannot find name 'HTMLImageElement'.
+
+29     await expect.poll(() =&gt; picture.evaluate((img: HTMLImageElement) =&gt; img.naturalWidth)).toBe(1200)
+                                                      ~~~~~~~~~~~~~~~~
+</code></pre>
+                    </div>
+                    <p>The e2e files are checked by <code>tsconfig.node.json</code>, whose <code>lib</code> is <code>ES2023</code> without <code>DOM</code>: from TypeScript's point of view these files run in Node, which has no <code>HTMLImageElement</code>. TypeScript is right about the file and Playwright is right about the function. Prefer Playwright's own assertions, which need no browser types: <code>await expect(picture).toHaveJSProperty('naturalWidth', 1200)</code> reads the property in the browser and retries. (Adding <code>"DOM"</code> to that tsconfig's <code>lib</code> would also work, but then TypeScript would let you use <code>document</code> in Node code by mistake.)</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Vitest picking up the Playwright files</h3>
+                    <p>Lesson 9.1's <code>include: ['src/**/*.test.{ts,tsx}']</code> in <code>vite.config.ts</code> looked like a detail. Measured without it, <code>npx vitest run</code> also finds <code>e2e/*.spec.ts</code> (Vitest's default pattern includes <code>.spec</code> files):</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code> ❯ e2e/check-in.spec.ts (0 test)
+ ❯ e2e/browse.spec.ts (0 test)
+ ❯ e2e/plan.spec.ts (0 test)
+ ❯ e2e/impact.spec.ts (0 test)
+ ❯ e2e/accessibility.spec.ts (0 test)
+...
+ FAIL  e2e/browse.spec.ts [ e2e/browse.spec.ts ]
+Error: Playwright Test did not expect test.beforeEach() to be called here.
+Most common reasons include:
+- You are calling test.beforeEach() in a configuration file.
+- You are calling test.beforeEach() in a file that is imported by the configuration file.
+...
+ Test Files  5 failed | 12 passed (17)
+      Tests  46 passed (46)</code></pre>
+                    </div>
+                    <p>Two test runners, two folders, and each one told where to look: Vitest in <code>src</code>, Playwright in <code>e2e</code> (its <code>testDir</code>).</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ No browser installed</h3>
+                    <p>The npm package is Playwright's code; the browsers are a separate download. Measured with the package installed but no browsers:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>  ✘  1 e2e/plan.spec.ts:13:1 › an organizer plans a cleanup and finds it in the list (35ms)
+...
+    Error: browserType.launch: Executable doesn't exist at ~/.cache/ms-playwright/chromium_headless_shell-1254/chrome-headless-shell-linux64/chrome-headless-shell
+    ╔════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright was just installed or updated.       ║
+    ║ Please run the following command to download new browsers: ║
+    ║                                                            ║
+    ║     npx playwright install                                 ║
+    ║                                                            ║
+    ║ &lt;3 Playwright Team                                         ║
+    ╚════════════════════════════════════════════════════════════╝</code></pre>
+                    </div>
+                    <p>Do what the box says: <code>npx playwright install chromium</code> (Step 1). Each Playwright version needs its own browser build, so you will see this message again after updating <code>@playwright/test</code>.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The HQ in a Real Browser</h2>
+                <p>Step 1 installs Playwright, axe and Chromium, Step 2 writes the config and the shared helpers, Steps 3 to 6 test four journeys, Step 7 adds the accessibility checks and breaks a color on purpose, and Step 8 runs everything and reads Playwright's report. Keep shoreline-api running in its own terminal, as always.</p>
+
+                <div class="card">
+                    <h3>Step 1: Install Playwright, axe and a browser <span class="step-time">(12 min)</span></h3>
+                    <p>In <code>shoreline-hq</code>, install the two packages as development dependencies:</p>
+                    <pre class="terminal"><code class="language-bash">npm install --save-dev @playwright/test @axe-core/playwright</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>added 5 packages, and audited 197 packages in 941ms
+
+46 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities</code></pre>
+                    </div>
+                    <p>The course was checked with <code>@playwright/test</code> 1.65.0 and <code>@axe-core/playwright</code> 4.14.0 (which brings axe-core 4.14). Then download the browser this Playwright version drives:</p>
+                    <pre class="terminal"><code class="language-bash">npx playwright install chromium</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>Downloading Chrome for Testing 158.0.8127.18 (playwright chromium v1254) from https://cdn.playwright.dev/builds/cft/158.0.8127.18/linux64/chrome-linux64.zip
+197.8 MiB [====================] 100% 0.0s
+Chrome for Testing 158.0.8127.18 (playwright chromium v1254) downloaded to ~/.cache/ms-playwright/chromium-1254
+Downloading FFmpeg (playwright ffmpeg v1013) from https://cdn.playwright.dev/dbazure/download/playwright/builds/ffmpeg/1013/ffmpeg-linux.zip
+2.2 MiB [====================] 100% 0.0s
+FFmpeg (playwright ffmpeg v1013) downloaded to ~/.cache/ms-playwright/ffmpeg-1013
+Downloading Chrome Headless Shell 158.0.8127.18 (playwright chromium-headless-shell v1254) from https://cdn.playwright.dev/builds/cft/158.0.8127.18/linux64/chrome-headless-shell-linux64.zip
+125.9 MiB [====================] 100% 0.0s
+Chrome Headless Shell 158.0.8127.18 (playwright chromium-headless-shell v1254) downloaded to ~/.cache/ms-playwright/chromium_headless_shell-1254</code></pre>
+                    </div>
+                    <p>About 330 MB to download (Chromium and a lighter "headless shell" that runs without a window), stored once per computer in Playwright's cache folder (<code>~/.cache/ms-playwright</code> on Linux, <code>~/Library/Caches/ms-playwright</code> on a Mac, <code>%USERPROFILE%\AppData\Local\ms-playwright</code> on Windows), not in your project. On Linux, if Chromium later complains about missing system libraries, <code>npx playwright install-deps chromium</code> installs them (it asks for your administrator password). Finally, add the script that runs the tests, in <code>package.json</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/package.json</div>
+                        <pre data-src="shoreline-hq/package.json" data-match="diff"><code class="language-diff-json diff-highlight">     "lint": "oxlint",
+     "preview": "vite preview",
+-    "test": "vitest"
++    "test": "vitest",
++    "test:e2e": "playwright test"
+   },
+   "dependencies": {</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The config, the helpers and a clean exit <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>playwright.config.ts</code> next to <code>vite.config.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/playwright.config.ts</div>
+                        <pre data-src="shoreline-hq/playwright.config.ts"><code class="language-ts">import { defineConfig } from '@playwright/test'
+import { API_URL } from './e2e/helpers.ts'
+
+export default defineConfig({
+  testDir: './e2e',
+  // One shoreline-api serves every test, and the tests change its data: one test at a time
+  workers: 1,
+  // A forgotten test.only must not hide the other tests on a CI service
+  forbidOnly: !!process.env.CI,
+  // After the last test, put the API's sample data back
+  globalTeardown: './e2e/global-teardown.ts',
+  reporter: [['list'], ['html', { open: 'never' }]],
+  use: {
+    baseURL: 'http://localhost:4173',
+    // The crew's time zone, so the browser's "today" is the API's "today"
+    timezoneId: 'America/Los_Angeles',
+    // Keep a step-by-step recording of every test that fails
+    trace: 'retain-on-failure',
+  },
+  // Playwright starts both servers (or reuses them if they are already running)
+  webServer: [
+    {
+      command: 'node server.ts --quiet',
+      cwd: '../shoreline-api',
+      url: `${API_URL}/api`,
+      reuseExistingServer: true,
+    },
+    {
+      command: 'npm run build &amp;&amp; npm run preview -- --strictPort',
+      url: 'http://localhost:4173',
+      env: { VITE_API_URL: API_URL },
+      reuseExistingServer: true,
+    },
+  ],
+})</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong><code>webServer</code></strong> is a list of servers Playwright needs. For each, it checks the <code>url</code>; if something answers, it uses that server (<code>reuseExistingServer: true</code>), otherwise it runs the <code>command</code>, waits for the <code>url</code>, and stops the server after the tests. So <code>npm run test:e2e</code> works whether or not your API is running.</li>
+                        <li><strong>The app is built first</strong> (<code>npm run build &amp;&amp; npm run preview</code>): end-to-end tests check what you would deploy, not the dev server. <code>env</code> gives the build the API's address, like <code>test.env</code> did for Vitest, so a missing or different <code>.env.local</code> cannot change what the tests talk to. <code>--strictPort</code> makes preview fail loudly instead of quietly moving to another port. One thing to know: a preview you left running is reused <em>as it is</em>, without a new build. Stop old preview servers before an e2e run.</li>
+                        <li><strong><code>reporter</code></strong>: <code>list</code> prints each test in the terminal; <code>html</code> writes a report you can open in a browser (Step 8). <code>trace: 'retain-on-failure'</code> records every failing test step by step.</li>
+                        <li><strong><code>forbidOnly</code></strong>: <code>test.only</code> runs one test while you work on it. Left in by accident, it would silently skip all the others, so on a CI service (which sets the <code>CI</code> environment variable, Lesson 10.2) it becomes an error.</li>
+                    </ul>
+                    <p>Create <code>e2e/helpers.ts</code> with the three helpers from "One Real Server" and "Automated Accessibility Checks" (the complete file is in the finished code), and the teardown:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/e2e/global-teardown.ts</div>
+                        <pre data-src="shoreline-hq/e2e/global-teardown.ts"><code class="language-ts">// Runs once after the last test: leave the beach as you found it. The API you develop against
+// gets its sample data back instead of keeping whatever the tests created.
+import { request } from '@playwright/test'
+import { resetApi } from './helpers.ts'
+
+export default async function globalTeardown(): Promise&lt;void&gt; {
+  const api = await request.newContext()
+  await resetApi(api)
+  await api.dispose()
+}</code></pre>
+                    </div>
+                    <p>The teardown runs outside any test, so it has no <code>request</code> fixture: <code>request.newContext()</code> makes an HTTP client by hand, and <code>dispose()</code> closes it. TypeScript checks the e2e files like <code>vite.config.ts</code>, with the Node settings, so add them to <code>tsconfig.node.json</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/tsconfig.node.json</div>
+                        <pre data-src="shoreline-hq/tsconfig.node.json" data-match="diff"><code class="language-diff-json diff-highlight">     "noFallthroughCasesInSwitch": true
+   },
+-  "include": ["vite.config.ts"]
++  "include": ["vite.config.ts", "playwright.config.ts", "e2e"]
+ }</code></pre>
+                    </div>
+                    <p>Playwright writes results (<code>test-results</code>) and the report (<code>playwright-report</code>) into the project; they do not belong in Git. In <code>.gitignore</code>, after <code>*.local</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/.gitignore</div>
+                        <pre data-src="shoreline-hq/.gitignore" data-match="diff"><code class="language-diff diff-highlight"> *.local
+ 
++# Playwright's results and reports
++test-results
++playwright-report
++
+ # Editor directories and files
+ .vscode/*</code></pre>
+                    </div>
+                    <p>Vitest stays out of <code>e2e</code> thanks to the <code>include</code> line from Lesson 9.1 (Common Mistakes shows what happens without it). Run <code>npx tsc -b</code> and <code>npm run lint</code>: both clean.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: A guest finds a cleanup <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>e2e/browse.spec.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/e2e/browse.spec.ts</div>
+                        <pre data-src="shoreline-hq/e2e/browse.spec.ts"><code class="language-ts">import { expect, test } from '@playwright/test'
+import { resetApi } from './helpers.ts'
+
+test.beforeEach(async ({ request }) =&gt; {
+  await resetApi(request)
+})
+
+test('a guest finds a cleanup by searching', async ({ page }) =&gt; {
+  await page.goto('/')
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Events' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Cleanup events' })).toBeVisible()
+
+  await page.getByLabel('Search cleanups').fill('pelican')
+  await expect(page.getByText('Found 3 cleanups: 1 coming up, 2 in the log.')).toBeVisible()
+  await expect(page).toHaveURL(/\?q=pelican$/)
+
+  await page.getByRole('link', { name: 'Pelican Point Beach Sweep' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pelican Point Beach Sweep')
+  await expect(page.getByRole('heading', { name: 'Where to meet' })).toBeVisible()
+})
+
+test('the beach sites show their real pictures', async ({ page }) =&gt; {
+  await page.goto('/sites')
+  const pictures = page.getByRole('main').getByRole('img')
+  await expect(pictures).toHaveCount(6)
+  // A real browser downloads and decodes each picture: naturalWidth is its real width in pixels
+  for (const picture of await pictures.all()) {
+    await picture.scrollIntoViewIfNeeded()
+    await expect(picture).toHaveJSProperty('naturalWidth', 1200)
+  }
+})</code></pre>
+                    </div>
+                    <p>The first test is the search from "Playwright in Five Ideas", plus <code>toHaveURL</code>: the filter really is in the address bar (Lesson 6.2). The second does something no jsdom test could: it waits for each of the six site pictures to be downloaded from shoreline-api and decoded by the browser at its real width of 1200 pixels. A broken image URL would leave <code>naturalWidth</code> at 0. Run just this file:</p>
+                    <pre class="terminal"><code class="language-bash">npx playwright test e2e/browse.spec.ts</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 2 tests using 1 worker
+
+  ✓  1 e2e/browse.spec.ts:8:1 › a guest finds a cleanup by searching (651ms)
+  ✓  2 e2e/browse.spec.ts:22:1 › the beach sites show their real pictures (361ms)
+
+  2 passed (4.4s)
+
+To open last HTML report run:
+
+  npx playwright show-report</code></pre>
+                    </div>
+                    <p>The <code>[WebServer]</code> lines are the build's own output: the 500 kB warning is Lesson 8.1's, and Lesson 10.1 fixes it. If the build fails, the tests do not start, and the build's error is what you read.</p>
+                    <div class="card card-info">
+                        <h4>🧩 Version note: the first run can be slow</h4>
+                        <p>Measured on the machine this course was checked on (Windows with WSL): the first run in a freshly installed copy of the project took two to two and a half minutes before the first test started, even with shoreline-api running. Runs while shoreline-api was <em>not</em> running took as long, because Playwright's "is something already on port 4000?" check hung there before it started the API itself. Every later run took about 4 seconds per file plus the build, and the whole suite about 15 seconds. If a first run seems stuck before "Running…", give it a few minutes, and keep shoreline-api running in its terminal.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Maya plans a cleanup <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>e2e/plan.spec.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/e2e/plan.spec.ts</div>
+                        <pre data-src="shoreline-hq/e2e/plan.spec.ts"><code class="language-ts">import { expect, test } from '@playwright/test'
+import { resetApi, signIn } from './helpers.ts'
+
+test.beforeEach(async ({ request }) =&gt; {
+  await resetApi(request)
+})
+
+/** A date four weeks from now as YYYY-MM-DD: far enough ahead that time zones never matter */
+function fourWeeksFromNow(): string {
+  return new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
+test('an organizer plans a cleanup and finds it in the list', async ({ page }) =&gt; {
+  await signIn(page)
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Events' }).click()
+  await page.getByRole('link', { name: 'Plan a cleanup' }).click()
+
+  await page.getByLabel('Title (5 to 80 characters)').fill('Dune Grass Cleanup')
+  await page.getByLabel('Beach site').selectOption({ label: 'Long Strand Beach' })
+  await page.getByLabel('Date').fill(fourWeeksFromNow())
+  await page.getByLabel('Starts').fill('09:00')
+  await page.getByLabel('Ends').fill('11:30')
+  await page.getByLabel('Volunteers needed (1 to 200)').fill('12')
+  await page.getByLabel('Meeting point').fill('North end of the boardwalk')
+  await page.getByRole('button', { name: 'Publish' }).click()
+
+  // The app moves on to the new cleanup's own page
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Dune Grass Cleanup')
+  await expect(page).toHaveTitle('Dune Grass Cleanup · Shoreline Crew HQ')
+  await expect(page.getByText('North end of the boardwalk')).toBeVisible()
+
+  // ...and the real API kept it: the list now has 18 cleanups
+  await page.getByRole('link', { name: '← All cleanups' }).click()
+  await expect(page.getByText(/^Found 18 cleanups/)).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Dune Grass Cleanup' })).toBeVisible()
+})</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>selectOption({ label })</code> picks an option by its visible text, and <code>fill()</code> on a date input takes <code>YYYY-MM-DD</code>, whatever format the browser shows.</li>
+                        <li>The date is four weeks ahead, computed in the test, so the form's "today or later" rule never depends on when the test runs. (Converting to UTC can shift the date by a day; four weeks ahead, that does not matter.)</li>
+                        <li>The journey ends where a person would check: the new page (heading and the browser tab's title), then the list, which now says 18 because the real API saved the cleanup. The next test's reset brings it back to 17.</li>
+                    </ul>
+                    <div class="card card-output">
+                        <h4>Expected output (from <code>npx playwright test e2e/plan.spec.ts</code>)</h4>
+                        <pre><code>[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 1 test using 1 worker
+
+  ✓  1 e2e/plan.spec.ts:13:1 › an organizer plans a cleanup and finds it in the list (632ms)
+
+  1 passed (3.9s)
+
+To open last HTML report run:
+
+  npx playwright show-report</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The check-in desk survives a reload <span class="step-time">(6 min)</span></h3>
+                    <p>Create <code>e2e/check-in.spec.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/e2e/check-in.spec.ts</div>
+                        <pre data-src="shoreline-hq/e2e/check-in.spec.ts"><code class="language-ts">import { expect, test } from '@playwright/test'
+import { resetApi, signIn } from './helpers.ts'
+
+test.beforeEach(async ({ request }) =&gt; {
+  await resetApi(request)
+})
+
+test('an organizer checks a volunteer in, and the mark survives a reload', async ({ page }) =&gt; {
+  await signIn(page)
+  await page.goto('/events/e17')
+  // Today's cleanup opens on the check-in desk
+  await expect(page.getByRole('tab', { name: 'Check-in desk' })).toHaveAttribute('aria-selected', 'true')
+
+  const checkIn = page.getByRole('button', { name: 'Check in for Diego Herrera' })
+  await checkIn.click()
+  await expect(checkIn).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('Checked in: 1 of 7.')).toBeVisible()
+
+  // A reload throws away everything the browser remembered: what comes back, the API saved
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Check in for Diego Herrera' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(page.getByText('Checked in: 1 of 7.')).toBeVisible()
+})</code></pre>
+                    </div>
+                    <p>Lesson 7.2's check-in is optimistic: the button is pressed at once, before the API answers. In Lesson 9.2 a test proved the rollback. Here, <code>page.reload()</code> proves the other half: the page is thrown away and loaded fresh, the cache is empty, and the mark comes back from the server. Only the session survives the reload, because <code>sessionStorage</code> lasts as long as the tab (Lesson 5.2). Expected output: <code>1 passed</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: An impact report with a real photo <span class="step-time">(10 min)</span></h3>
+                    <p>Put a JPEG in <code>e2e/files/</code>: the finished code has <code>bags-at-the-stairs.jpg</code> (800 by 600 pixels, 15 KB), and any photo of your own under 5 MB works if you change the file name and the width in the test. Then create <code>e2e/impact.spec.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/e2e/impact.spec.ts</div>
+                        <pre data-src="shoreline-hq/e2e/impact.spec.ts"><code class="language-ts">import { expect, test } from '@playwright/test'
+import { resetApi, signIn } from './helpers.ts'
+
+test.beforeEach(async ({ request }) =&gt; {
+  await resetApi(request)
+})
+
+test('an organizer reports today\'s impact with a photo and sees the new totals', async ({ page }) =&gt; {
+  await signIn(page)
+  await page.goto('/impact')
+  await expect(page.getByRole('definition').filter({ hasText: 'kg' })).toHaveText('176.2 kg')
+
+  await page.goto('/events/e17')
+  await page.getByRole('link', { name: 'Report the impact' }).click()
+  await page.getByLabel('Volunteers who came').fill('11')
+  await page.getByLabel('Bags filled').fill('6')
+  await page.getByLabel('Weight (kg)').fill('18.5')
+  await page.getByLabel('Pieces, row 1').fill('40')
+
+  // A real file from disk, sent to the real API as multipart form data
+  await page.getByLabel(/^Add a photo/).setInputFiles('e2e/files/bags-at-the-stairs.jpg')
+  const preview = page.getByRole('listitem').filter({ hasText: 'bags-at-the-stairs.jpg' }).locator('img')
+  // The API stored the bytes and serves them back: the browser decodes an 800 x 600 picture
+  await expect(preview).toHaveJSProperty('naturalWidth', 800)
+
+  await page.getByRole('button', { name: 'Save the report' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tide Pool Morning Cleanup')
+  await page.getByRole('tab', { name: 'Impact' }).click()
+  await expect(page.getByText('Volunteers: 11. Bags: 6. Weight: 18.5 kg.')).toBeVisible()
+  await expect(page.getByText('Photos uploaded with the report: 1.')).toBeVisible()
+
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Impact' }).click()
+  await expect(page.getByRole('definition').filter({ hasText: 'kg' })).toHaveText('194.7 kg')
+})</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong><code>setInputFiles(path)</code></strong> chooses a real file from your disk, relative to where you run Playwright (<code>shoreline-hq</code>). The browser reads the bytes, the HQ's <code>postPhoto</code> sends them as multipart form data, and shoreline-api stores them: the upload Lesson 9.2 could not do.</li>
+                        <li><strong>The preview check</strong> closes the loop: the <code>&lt;img&gt;</code> in the list loads the photo back from the API, and the browser decodes it at 800 pixels wide. The preview has <code>alt=""</code> (the file name beside it says what it is, Lesson 8.2), so it has no <code>img</code> role; the test finds it inside the list item that has the file name.</li>
+                        <li><strong>The totals</strong> are checked before and after on the public impact page: 176.2 kg in the sample data, 194.7 kg after this report's 18.5 kg. <code>getByRole('definition')</code> finds a <code>&lt;dd&gt;</code>, and <code>filter({ hasText: 'kg' })</code> keeps the one with the weight.</li>
+                    </ul>
+                    <div class="card card-output">
+                        <h4>Expected output (from <code>npx playwright test e2e/impact.spec.ts</code>)</h4>
+                        <pre><code>[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 1 test using 1 worker
+
+  ✓  1 e2e/impact.spec.ts:8:1 › an organizer reports today's impact with a photo and sees the new totals (676ms)
+
+  1 passed (4.0s)
+
+To open last HTML report run:
+
+  npx playwright show-report</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 7: axe on seven pages, light and dark <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>e2e/accessibility.spec.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/e2e/accessibility.spec.ts</div>
+                        <pre data-src="shoreline-hq/e2e/accessibility.spec.ts"><code class="language-ts">import { expect, test } from '@playwright/test'
+import { expectNoAxeViolations, resetApi, signIn } from './helpers.ts'
+
+/** Pages anyone can open, and the heading that says each one has loaded */
+const publicPages = [
+  { path: '/', heading: 'Shoreline Crew HQ' },
+  { path: '/events', heading: 'Cleanup events' },
+  { path: '/events/e17', heading: 'Tide Pool Morning Cleanup' },
+  { path: '/sites', heading: 'Beach sites' },
+  { path: '/impact', heading: 'Our impact' },
+  { path: '/sign-in', heading: 'Sign in' },
+]
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test.describe(`${colorScheme} theme`, () =&gt; {
+    test.use({ colorScheme })
+
+    test.beforeEach(async ({ request }) =&gt; {
+      await resetApi(request)
+    })
+
+    for (const { path, heading } of publicPages) {
+      test(`${path} has no axe violations`, async ({ page }) =&gt; {
+        await page.goto(path)
+        // Scan the page with its data, not the loading message
+        await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
+        await expectNoAxeViolations(page)
+      })
+    }
+
+    test('the impact report form with its error summary has no axe violations', async ({ page }) =&gt; {
+      await signIn(page)
+      await page.goto('/events/e17/impact')
+      await page.getByLabel('Pieces, row 1').clear()
+      await page.getByRole('button', { name: 'Save the report' }).click()
+      await expect(page.getByRole('region', { name: /^Fix these/ })).toBeFocused()
+      await expectNoAxeViolations(page)
+    })
+  })
+}</code></pre>
+                    </div>
+                    <p>Two loops write the tests: for each theme, a <code>describe</code> group with <code>test.use({ colorScheme })</code>, and inside it one test per page. <code>as const</code> keeps <code>'light'</code> and <code>'dark'</code> as literal types, which is what <code>colorScheme</code> accepts (a plain <code>string</code> would be a type error). Fourteen tests, all passing:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (from <code>npx playwright test e2e/accessibility.spec.ts</code>)</h4>
+                        <pre><code>[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 14 tests using 1 worker
+
+  ✓   1 e2e/accessibility.spec.ts:23:7 › light theme › / has no axe violations (578ms)
+  ✓   2 e2e/accessibility.spec.ts:23:7 › light theme › /events has no axe violations (676ms)
+  ✓   3 e2e/accessibility.spec.ts:23:7 › light theme › /events/e17 has no axe violations (521ms)
+  ✓   4 e2e/accessibility.spec.ts:23:7 › light theme › /sites has no axe violations (541ms)
+  ✓   5 e2e/accessibility.spec.ts:23:7 › light theme › /impact has no axe violations (518ms)
+  ✓   6 e2e/accessibility.spec.ts:23:7 › light theme › /sign-in has no axe violations (483ms)
+  ✓   7 e2e/accessibility.spec.ts:31:5 › light theme › the impact report form with its error summary has no axe violations (736ms)
+  ✓   8 e2e/accessibility.spec.ts:23:7 › dark theme › / has no axe violations (481ms)
+  ✓   9 e2e/accessibility.spec.ts:23:7 › dark theme › /events has no axe violations (624ms)
+  ✓  10 e2e/accessibility.spec.ts:23:7 › dark theme › /events/e17 has no axe violations (491ms)
+  ✓  11 e2e/accessibility.spec.ts:23:7 › dark theme › /sites has no axe violations (513ms)
+  ✓  12 e2e/accessibility.spec.ts:23:7 › dark theme › /impact has no axe violations (505ms)
+  ✓  13 e2e/accessibility.spec.ts:23:7 › dark theme › /sign-in has no axe violations (507ms)
+  ✓  14 e2e/accessibility.spec.ts:31:5 › dark theme › the impact report form with its error summary has no axe violations (803ms)
+
+  14 passed (11.5s)
+
+To open last HTML report run:
+
+  npx playwright show-report</code></pre>
+                    </div>
+                    <p>Now break something only a browser can see. A teammate "tidies up" <code>src/index.css</code> by using the light theme's gray for muted text in dark mode too. Change the dark value of <code>--text-muted</code> from <code>#a9b4c0</code> to <code>var(--muted)</code>, and run the file again:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_31/31-axe-dark.png" alt="A terminal in shoreline-hq running npx playwright test on accessibility.spec.ts after the dark value of the muted text color was changed. The seven light theme tests have green check marks; the seven dark theme tests have red crosses. The first failure shows Expected an empty array and Received an array with one line: color-contrast, Elements must meet minimum color contrast ratio thresholds, 1 element." width="1100" height="876" loading="lazy">
+                        <figcaption>One faint gray in dark mode: every light-theme scan passes, every dark-theme scan fails, and axe names the rule and how many elements break it.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>  ✘   8 e2e/accessibility.spec.ts:23:7 › dark theme › / has no axe violations (561ms)
+...
+  1) e2e/accessibility.spec.ts:23:7 › dark theme › / has no axe violations ─────────────────────────
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "color-contrast: Elements must meet minimum color contrast ratio thresholds (1)",
+...
+  7 failed
+...
+  7 passed (15.3s)</code></pre>
+                    </div>
+                    <p>Every light test still passes, every dark test fails, and each failure names the rule and how many elements break it. Nothing else would have caught this: <code>tsc</code> and oxlint do not read colors, jsdom does not compute them, and on your own screen in light mode the HQ looks exactly the same. Put <code>#a9b4c0</code> back.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 8: Run everything, and read the report <span class="step-time">(7 min)</span></h3>
+                    <p>Run the whole suite, then the unit and component tests to confirm they did not change:</p>
+                    <pre class="terminal"><code class="language-bash">npm run test:e2e
+npx vitest run</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_31/31-e2e-pass.png" alt="A terminal in shoreline-hq running npm run test:e2e. Playwright prints the build&#x27;s chunk size warning from its web server, then Running 19 tests using 1 worker and nineteen green check marks: fourteen accessibility scans in the light and dark themes, the guest search and the site pictures, the check-in that survives a reload, the impact report with a photo and the planned cleanup. Summary: 19 passed." width="1100" height="876" loading="lazy">
+                        <figcaption>Nineteen tests in a real Chromium against the real shoreline-api: four journeys and fourteen accessibility scans.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened, from <code>npm run test:e2e</code>)</h4>
+                        <pre><code>Running 19 tests using 1 worker
+
+  ✓   1 e2e/accessibility.spec.ts:23:7 › light theme › / has no axe violations (548ms)
+...
+  ✓  19 e2e/plan.spec.ts:13:1 › an organizer plans a cleanup and finds it in the list (545ms)
+...
+  19 passed (13.9s)</code></pre>
+                    </div>
+                    <p>Vitest still reports 12 files and 46 tests: nothing from <code>e2e</code>. Your times will differ. Then open the report Playwright wrote:</p>
+                    <pre class="terminal"><code class="language-bash">npx playwright show-report</code></pre>
+                    <p>It starts a small server and opens the report in your browser; stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal. After a run with failures (try the dark-mode color again), each failing test in the report shows the error, the code line and the steps, with a <strong>trace</strong> to open:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_31/31-report.png" alt="Playwright&#x27;s HTML report in a browser, showing the failed test dark theme, /events has no axe violations, from accessibility.spec.ts. The Errors section shows the expected empty array and the received color-contrast line for 16 elements, with the code of helpers.ts around line 31 and a caret under toEqual. A View Trace link is at the top right, next to the test&#x27;s time." width="1100" height="688" loading="lazy">
+                        <figcaption>The report of the failing run: the same error as in the terminal, the code line, and a trace to replay the test step by step.</figcaption>
+                    </figure>
+                    <p>Click <strong>View Trace</strong> to open Playwright's trace viewer: every action of the test on a timeline, with a snapshot of the page before and after each one, the console and the network requests. When an e2e test fails on a CI service where you cannot watch the browser, the trace is how you see what happened. Put the color back and run once more so the report is green.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li><code>@playwright/test</code> and <code>@axe-core/playwright</code> are dev dependencies, Chromium is installed, and <code>npm run test:e2e</code> runs <code>playwright test</code></li>
+                        <li><code>playwright.config.ts</code> builds and previews the app, starts or reuses shoreline-api, runs one worker in the crew's time zone and keeps traces of failures</li>
+                        <li>Every spec resets the API before each test, and the global teardown leaves it clean</li>
+                        <li>Four journeys pass against the real server: a guest's search (and the real site pictures), planning a cleanup, a check-in that survives a reload, an impact report with a real photo and the new totals</li>
+                        <li>axe finds no WCAG A/AA violations on seven pages in light and dark mode, and you saw it catch a dark-mode contrast problem</li>
+                        <li>The 46 Vitest tests, <code>npx tsc -b</code> and <code>npm run lint</code> still pass, and Vitest ignores the <code>e2e</code> folder</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, list its three most important journeys (the ones that, if broken, make the app useless) and, next to each, the one thing only a real browser could prove (a file, a reload, a picture, a color, a real server). Those three are your end-to-end tests; everything else goes to the faster levels.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercise 1 is part of the lesson (about 6 minutes, included in the lesson time). Exercises 2 and 3 are optional stretches, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: The events page on a phone, in the dark</h3>
+                    <p>Write <code>e2e/phone.spec.ts</code>: at 390 by 844 pixels in dark mode, the events page's search still works, the page cannot be scrolled sideways (nothing is wider than the screen), and axe finds no violations.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>test.use({ viewport: { width: 390, height: 844 }, colorScheme: 'dark' })</code> at the top of the file applies to every test in it. A page that cannot be scrolled sideways has an <code>&lt;html&gt;</code> element whose <code>scrollWidth</code> equals its <code>clientWidth</code>. Read one with <code>locator.evaluate((element) =&gt; element.clientWidth)</code> (the parameter's type comes from Playwright, so no browser types are needed), then assert the other with <code>toHaveJSProperty</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">import { expect, test } from '@playwright/test'
+import { expectNoAxeViolations, resetApi } from './helpers.ts'
+
+test.use({ viewport: { width: 390, height: 844 }, colorScheme: 'dark' })
+
+test.beforeEach(async ({ request }) =&gt; {
+  await resetApi(request)
+})
+
+test('the events page fits a phone and passes axe in the dark', async ({ page }) =&gt; {
+  await page.goto('/events')
+  await page.getByLabel('Search cleanups').fill('pelican')
+  await expect(page.getByText('Found 3 cleanups: 1 coming up, 2 in the log.')).toBeVisible()
+
+  // Nothing wider than the screen: the page cannot be scrolled sideways
+  const html = page.locator('html')
+  const clientWidth = await html.evaluate((element) =&gt; element.clientWidth)
+  await expect(html).toHaveJSProperty('scrollWidth', clientWidth)
+  await expectNoAxeViolations(page)
+})</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output</h4>
+                            <pre><code>[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 1 test using 1 worker
+
+  ✓  1 e2e/phone.spec.ts:10:1 › the events page fits a phone and passes axe in the dark (957ms)
+
+  1 passed (4.3s)
+
+To open last HTML report run:
+
+  npx playwright show-report</code></pre>
+                        </div>
+                        <p>Measured: passes, type-checks and lints cleanly. The course's code continues without it. (The course's own checks measure every HQ page at 390 pixels in dark mode too: Lesson 3.6 made the layout fit.)</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A signed-in page as a fixture (optional stretch)</h3>
+                    <p>Optional stretch, not counted in the lesson time. Three of your spec files start with the same reset and sign-in. Make Playwright do it: write <code>e2e/fixtures.ts</code> that exports a <code>test</code> with an extra fixture, <code>organizerPage</code>, a page where the API was reset and Maya has signed in. Use it in a new test where Theo Nakamura is marked as a no-show at today's desk.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>base.extend&lt;CrewFixtures&gt;({ organizerPage: async ({ page, request }, provide) =&gt; { … await provide(page) } })</code>, where <code>base</code> is Playwright's <code>test</code> and <code>CrewFixtures</code> an interface describing your fixture's type. The second parameter hands the fixture to the test: everything before that call is setup, everything after it is cleanup. A test then asks for it by name: <code>async ({ organizerPage: page }) =&gt; …</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">// e2e/fixtures.ts: a `test` that can hand out a page where Maya is already signed in
+import { test as base, type Page } from '@playwright/test'
+import { resetApi, signIn } from './helpers.ts'
+
+interface CrewFixtures {
+  organizerPage: Page
+}
+
+export const test = base.extend&lt;CrewFixtures&gt;({
+  // Playwright's docs name the second parameter `use`; oxlint's React Hooks rule would mistake
+  // a call to `use` for React's use(), so it is called `provide` here
+  organizerPage: async ({ page, request }, provide) =&gt; {
+    await resetApi(request)
+    await signIn(page)
+    await provide(page)
+  },
+})
+
+export { expect } from '@playwright/test'</code></pre>
+                        <pre data-snippet><code class="language-ts">import { expect, test } from './fixtures.ts'
+
+test('the desk counts a no-show', async ({ organizerPage: page }) =&gt; {
+  await page.goto('/events/e17')
+  await page.getByRole('button', { name: 'No-show for Theo Nakamura' }).click()
+  await expect(page.getByText('No-shows: 1.')).toBeVisible()
+})</code></pre>
+                        <p>Measured: passes, type-checks and lints cleanly; not in the course's code. Playwright's own documentation calls that second parameter <code>use</code>. In the HQ, measured with <code>npm run lint</code>, that name meets oxlint's React Hooks rule, which takes any call to <code>use</code> for React 19's <code>use()</code>:</p>
+                        <div class="card card-output">
+                            <h4>Expected output (shortened)</h4>
+                            <pre><code>  × react-hooks(rules-of-hooks): React Hook "use" is called in function "Anonymous" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".
+...
+Found 0 warnings and 1 error.</code></pre>
+                        </div>
+                        <p>The rule is wrong here (it is not React's <code>use</code>), and renaming the parameter is the simplest fix. Fixtures are Playwright's answer to the "page objects" you may read about: shared setup that each test asks for by name, with types.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): The check-in desk without a mouse</h3>
+                    <p>Optional stretch, not counted in the lesson time. Write a test that reaches Diego Herrera's <strong>Check in</strong> button with <kbd>Tab</kbd> alone, presses <kbd>Space</kbd>, and checks the mark and the count. It is a test of the focus order that axe cannot do.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>page.keyboard.press('Tab')</code> moves the focus; <code>await expect(locator).toBeFocused()</code> checks where it is. Press <kbd>Tab</kbd> in a loop until the button has the focus, with an upper limit so a broken focus order fails instead of looping forever. <code>locator.evaluate((button) =&gt; button.matches(':focus'))</code> answers "does it have the focus now?" without browser types.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">import { expect, test } from '@playwright/test'
+import { resetApi, signIn } from './helpers.ts'
+
+test.beforeEach(async ({ request }) =&gt; {
+  await resetApi(request)
+})
+
+test('the check-in desk works with the keyboard alone', async ({ page }) =&gt; {
+  await signIn(page)
+  await page.goto('/events/e17')
+  const checkIn = page.getByRole('button', { name: 'Check in for Diego Herrera' })
+  await expect(checkIn).toBeVisible()
+
+  // Tab until the button has the focus, as a keyboard user would (at most 40 presses)
+  for (let presses = 0; presses &lt; 40; presses++) {
+    if (await checkIn.evaluate((button) =&gt; button.matches(':focus'))) break
+    await page.keyboard.press('Tab')
+  }
+  await expect(checkIn).toBeFocused()
+  await page.keyboard.press('Space')
+  await expect(checkIn).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByText('Checked in: 1 of 7.')).toBeVisible()
+})</code></pre>
+                        <p>Measured: passes, type-checks and lints cleanly; not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Right after <code>fill('pelican')</code>, a test runs <code>expect(await page.getByText('Found 3 cleanups').isVisible()).toBe(true)</code> and fails. Why?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The text does appear a moment later in a real browser. What does isVisible do about a moment later?">
+                                A) Playwright cannot read text in the main area of the page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The API is running and answers quickly. When did the test look?">
+                                B) The search needs the API to be restarted first
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="isVisible checks once, at that instant, and the search is still in its 300 ms pause. await expect(locator).toBeVisible() keeps checking until the text appears or the timeout ends.">
+                                C) <code>isVisible()</code> checks once, while the search is still waiting; a web-first assertion would keep checking
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Why does the HQ's config say <code>workers: 1</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="All tests share one shoreline-api, and each test resets its data first. Two tests at once would reset or change the data the other one is using, so they run one after another.">
+                                A) All tests share one real API whose data each test resets and changes, so two at once would get in each other's way
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Playwright runs several browsers happily. What do the tests share?">
+                                B) Chromium can only open one tab at a time
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Speed goes the other way: more workers are faster. What would go wrong with more?">
+                                C) One worker makes the tests faster
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> After a teammate's CSS change, the light-theme axe tests pass and the dark-theme ones fail with <code>color-contrast</code>. Which is true?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="axe read real computed colors in a real browser. Would a different theme give a different result?">
+                                A) axe is unreliable in dark mode, so the dark tests should be removed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="tsc and oxlint read code, not colors on a screen. Which tool computed the colors?">
+                                B) <code>npx tsc -b</code> or <code>npm run lint</code> would have caught it too
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="jsdom does not compute colors at all. Where were these checks run?">
+                                C) A Vitest test with jsdom would have shown the same failure
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Only a real browser computes the colors each theme produces. In dark mode the text no longer has enough contrast with its background, which is a real problem for people using dark mode, and only the dark scan can see it.">
+                                D) Some text in dark mode really is too faint, and only a real browser rendering the dark theme could find it
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> A new rule: a photo bigger than 5 MB must be refused with the API's message. Where does its test belong?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That works, but it is slow and needs a real 5 MB file. Is a real browser needed to see a message?">
+                                A) An end-to-end test that uploads a real 6 MB photo
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="It is an error case on one screen: a component test with an MSW override answering 413 (as in Lesson 9.2) checks the message quickly and reliably. End-to-end tests are kept for the main journeys.">
+                                B) A component test with an MSW override that answers 413
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Automated accessibility checks look at markup and colors. Do they know the API's size limit?">
+                                C) An axe scan of the impact report page
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> What does the check-in test's <code>page.reload()</code> prove that Lesson 9.2's tests could not?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A reload empties the page and the query cache, so the pressed button that comes back was loaded from shoreline-api. That shows the real server saved the mark, which no in-memory test can show.">
+                                A) The mark came back from the real server after the page and its cache were thrown away, so the API really saved it
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="sessionStorage survives a reload in the same tab, and the test does not check it. What does the button show after the reload?">
+                                B) The session is cleared by a reload
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Lesson 9.2 already tested the optimistic update and its rollback. What is different after a reload?">
+                                C) The check-in is optimistic
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should the tests also run in Firefox and Safari's engine?</summary>
+                    <p>Playwright can drive Chromium, Firefox and WebKit (the engine behind Safari): add a <code>projects</code> list to the config with one entry per browser (Playwright's <code>devices</code> has ready-made settings such as <code>devices['Desktop Firefox']</code>) and install those browsers with <code>npx playwright install firefox webkit</code>. Every test then runs once per browser, so the time multiplies. Many teams run Chromium on every change and all three before a release. The course checks Chromium only.</p>
+                </details>
+                <details>
+                    <summary>Why test the production build instead of the dev server?</summary>
+                    <p>Because that is what organizers get. The build can differ from the dev server: code is bundled and minified, CSS is processed differently (Lesson 7.3's <code>light-dark()</code> is rewritten by the build), environment variables are fixed at build time. Testing <code>npm run dev</code> is faster to start and fine while you write a test, but the run that decides should use the build.</p>
+                </details>
+                <details>
+                    <summary>Can I save the sign-in once and reuse it, as Playwright's docs show?</summary>
+                    <p>Playwright's <code>storageState</code> saves a signed-in browser's cookies and <code>localStorage</code> to a file that other tests start from. The HQ keeps its session in <code>sessionStorage</code> (Lesson 5.2), which <code>storageState</code> does not save, and shoreline-api forgets sessions when it resets anyway. Signing in through the form takes well under a second here, so the course keeps it simple; Exercise 2's fixture removes the repetition.</p>
+                </details>
+                <details>
+                    <summary>What about Cypress?</summary>
+                    <p>Cypress is the other popular end-to-end tool, with a different style (commands that queue up instead of <code>await</code>, a test runner inside the browser). Both are good; the ideas in this lesson (real journeys, locators by role, waiting for what you expect, resetting data, few tests on the main paths) apply to both. Playwright is the course's choice because it is free and open source in full, runs every major engine, and its <code>async</code>/<code>await</code> style matches the rest of your TypeScript.</p>
+                </details>
+                <details>
+                    <summary>How do these tests run on a CI service like GitHub Actions?</summary>
+                    <p>That is Lesson 10.2. The short version: the service installs the packages with <code>npm ci</code>, installs Chromium (with <code>npx playwright install --with-deps chromium</code>), and runs <code>npm run test:e2e</code>; the config already starts both servers, and <code>forbidOnly</code> switches on because the service sets <code>CI</code>. Whether every change should wait for the e2e run, or only some, is a decision that lesson makes with you.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Run <code>npx playwright codegen http://localhost:4173</code> with the preview running: Playwright opens a browser and writes test code while you click through the HQ. Record the "cancel a cleanup" journey (an organizer cancels Weekend Cove Cleanup through the confirm dialog), then compare the generated code with what you would write: which locators did it choose, which assertions are missing, and what would you rename? Generated code is a good first draft, never the final test.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Look back at the two journeys you wrote down after Lesson 9.2, the ones that "only make sense in a real browser". Did today's tests cover them? Then draw the HQ's tests as a shape (pyramid, trophy, or something else) with the real numbers: 46 Vitest tests and 19 Playwright tests. Is that the shape you would want if the HQ went into real use, and what would you add first?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>End-to-end tests run the real build in a real browser against the real server: they see files, pictures, colors, reloads and the deployed code, and they are slow, so they are few</li>
+                        <li>Playwright: fixtures (<code>page</code>, <code>request</code>), locators by role and label (strict: one element), actions that wait, and <code>await expect(locator)…</code> assertions that retry</li>
+                        <li><code>webServer</code> builds and previews the app and starts or reuses the API; <code>env</code> fixes the API address; <code>timezoneId</code> makes the browser's today the API's today</li>
+                        <li>Shared server, independent tests: <code>POST /api/_reset</code> before each test, <code>workers: 1</code>, and a <code>globalTeardown</code> that leaves the API clean</li>
+                        <li>axe with WCAG tags on every key page in both themes catches what tsc, lint and jsdom cannot; it is a floor, so keep the manual keyboard and screen-reader checks</li>
+                        <li>What to test where: rules in unit tests, screens and errors in component tests, a few critical journeys end to end</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Review the manual accessibility checks</td><td><a href="lesson_12.html">Lesson 3.6: Styling and Accessible Components</a></td></tr>
+                            <tr><td>Review the component tests and MSW</td><td><a href="lesson_30.html">Lesson 9.2: Interactions and Async</a></td></tr>
+                            <tr><td>See every endpoint, including <code>_reset</code></td><td><a href="api.html">The shoreline-api reference</a></td></tr>
+                            <tr><td>Look up locators and assertions</td><td><a href="https://playwright.dev/docs/locators" target="_blank" rel="noopener">playwright.dev: Locators</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>The HQ is tested the way organizers use it: in a real browser, on the production build, against the real shoreline-api</li>
+                        <li>A real photo travels from your disk through the browser to the API and back as a decoded picture</li>
+                        <li>Seven pages pass automated WCAG checks in both themes, and you watched them catch a dark-mode contrast bug nobody would have seen in light mode</li>
+                        <li>You can say, for any new behavior, which kind of test it needs and why</li>
+                        <li>Module 9 is complete: 46 unit and component tests plus 19 end-to-end tests guard the HQ</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Module 10 ships the HQ. In <a href="lesson_32.html"><strong>Lesson 10.1: Performance and the Build</strong></a> you finally deal with the 500 kB warning your e2e runs have been printing: you look inside the build, split it so guests never download the organizer forms, and measure the difference. Your new tests are the safety net for that work: after splitting, <code>npm run test:e2e</code> proves every journey still loads its code. Then Lesson 10.2 deploys the HQ and makes a CI service run your type check, lint and tests on every change.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npm run test:e2e</code> (19 tests), <code>npx vitest run</code> (46), <code>npx tsc -b</code> and <code>npm run lint</code> all pass</li>
+                    <li>Note how long <code>npm run build</code> takes and the size of the JavaScript file it prints: Lesson 10.1 starts from those numbers</li>
+                    <li>Add your three most important journeys (and what only a real browser can prove for each) to your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Three lessons ago the HQ had no tests at all. Now it has a suite with a shape you chose on purpose: fast tests for every rule, interaction tests for every screen that matters, and a few real-browser journeys on top, with accessibility checked automatically in both themes. Many professional codebases have less. If end-to-end tests still feel fiddly, that is their nature: more moving parts, more ways to fail. You now know how to read those failures, and that skill is worth more than any single test.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_30.html" class="prev-lesson">← Previous: Interactions and Async</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_32.html" class="next-lesson">Next: Performance and the Build →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

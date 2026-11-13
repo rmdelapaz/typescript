@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 21</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 21: Testing Components</h1>
+    <p class="sub">Answers and reasoning for every Session 21 item: Checkpoint 3's model answer and rubric, both self-checks, the lab's reference tests and planted bugs, the lesson page's own quiz and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>21</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Checkpoint 3: Model Answer</h2><span class="rule"></span></div>
+<p>The tests are the specification for C1 and C2; the model solution is <code class="inline">labs/module-21/checkpoint-3/solution/</code>. Every output below is a real run of <code class="inline">labs/check_labs.py</code> (a fresh copy of the folder, Node 24, a learner's terminal).</p>
+<div class="blk"><div class="h">C1: src/schemas.ts</div>
+<pre class="code"><span class="k">import</span> { z } <span class="k">from</span> <span class="s">'zod'</span>
+
+<span class="k">const</span> HOURS = <span class="s">'Hours must be a whole number from 1 to 12.'</span>
+
+<span class="c">/** C1: the "Add a shift" form. Every value arrives as text; the output is ready for the API */</span>
+<span class="k">export</span> <span class="k">const</span> shiftFormSchema = z.object({
+  volunteer: z.string().trim().min(<span class="s">2</span>, <span class="s">'Add a name (2 letters or more).'</span>),
+  date: z.string().regex(/^\d{<span class="s">4</span>}-\d{<span class="s">2</span>}-\d{<span class="s">2</span>}$/, <span class="s">'Pick a date.'</span>),
+  hours: z.coerce.number&lt;<span class="k">string</span>&gt;({ error: HOURS }).int(HOURS).min(<span class="s">1</span>, HOURS).max(<span class="s">12</span>, HOURS),
+})
+
+<span class="c">/** What the form holds (text) and what the schema hands on (a number of hours) */</span>
+<span class="k">export</span> <span class="k">type</span> ShiftFormValues = z.input&lt;<span class="k">typeof</span> shiftFormSchema&gt;
+<span class="k">export</span> <span class="k">type</span> ShiftFormData = z.output&lt;<span class="k">typeof</span> shiftFormSchema&gt;</pre><p><code class="inline">z.coerce.number&lt;string&gt;(...)</code> says the input is text, so <code class="inline">ShiftFormValues</code> has <code class="inline">hours: string</code> and <code class="inline">ShiftFormData</code> <code class="inline">hours: number</code>. The <code class="inline">{ error: HOURS }</code> option gives the not-a-number case (<code class="inline">'lots'</code>) the same message as the other three checks.</p>
+</div>
+<div class="blk"><div class="h">C2: src/queries.ts</div>
+<pre class="code"><span class="k">import</span> { mutationOptions, QueryClient, queryOptions } <span class="k">from</span> <span class="s">'@tanstack/react-query'</span>
+<span class="k">import</span> { getShifts, postShift } <span class="k">from</span> <span class="s">'./api.ts'</span>
+<span class="k">import</span> <span class="k">type</span> { NewShift } <span class="k">from</span> <span class="s">'./types.ts'</span>
+
+<span class="k">export</span> <span class="k">const</span> queryClient = <span class="k">new</span> QueryClient({ defaultOptions: { queries: { retry: <span class="k">false</span> } } })
+
+<span class="c">/** C2: one site's shifts. Keys go from general to specific: every list of shifts starts with 'shifts' */</span>
+<span class="k">export</span> <span class="k">function</span> shiftsQuery(siteId: <span class="k">string</span>) {
+  <span class="k">return</span> queryOptions({
+    queryKey: [<span class="s">'shifts'</span>, siteId],
+    queryFn: () =&gt; getShifts(siteId),
+  })
+}
+
+<span class="c">/** C2: add a shift, then mark every list of shifts out of date */</span>
+<span class="k">export</span> <span class="k">function</span> addShiftMutation() {
+  <span class="k">return</span> mutationOptions({
+    mutationFn: (shift: NewShift) =&gt; postShift(shift),
+    onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: [<span class="s">'shifts'</span>] }),
+  })
+}</pre><p>Invalidating <code class="inline">['shifts']</code> (not <code class="inline">['shifts', siteId]</code>) marks every site's list out of date: the test checks Driftwood Cove's list after a Pelican Point shift.</p>
+</div>
+<div class="blk lab"><div class="h">The runs</div>
+<p>As shipped (<code class="inline">npm test</code> in <code class="inline">starter/</code>, the first failure):</p>
+<pre class="out"> FAIL  src/checkpoint.test.ts &gt; C1 shiftFormSchema &gt; turns the form text into data for the API
+ZodError: [
+  {
+    "code": "custom",
+    "path": [],
+    "message": "TODO C1: shiftFormSchema is not written yet"</pre><pre class="out"> Test Files  1 failed (1)
+      Tests  8 failed (8)</pre><p>The model solution (and <code class="inline">npm run typecheck</code> prints nothing after its two <code class="inline">&gt;</code> lines):</p>
+<pre class="out"> Test Files  1 passed (1)
+      Tests  8 passed (8)</pre></div>
+<div class="blk"><div class="h">W1 to W4: model answers</div>
+<ol class="steps">
+  <li><b>W1</b> Both pages read the same cache entry (the same query key), and the mutation invalidated ['events'], so every query under that key refetches (or reads the updated entry): one source of truth (Lessons 7.1 and 7.2).</li>
+  <li><b>W2</b> cancelQueries for the affected key, save the previous value (getQueryData), write the new value (setQueryData); onError writes the saved value back (then invalidate on settle). Lesson 7.2's check-in mark.</li>
+  <li><b>W3</b> Any two of: no refetch or invalidation (stale after a mutation elsewhere), no loading or error state, no deduplication of requests, data survives sign-out unless cleared by hand, a second source of truth that drifts from the cache. Zustand is for client state such as theme and density (Lesson 7.3).</li>
+  <li><b>W4</b> Without when, Zod skips a refine until every other field is valid, so the organizer would not see the time problem until the rest was fixed. when says which fields the check needs, so it runs as soon as those two are valid.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Rubric</div>
+<table class="rubric">
+<thead><tr><th>Criterion</th><th>2 · met</th><th>1 · partly</th><th>0 · not yet</th></tr></thead>
+<tbody>
+<tr><td class="crit">C1 schema: types</td><td>Input text, output number; z.input/z.output exported and used</td><td>Works, but types are loose (any, casts)</td><td>Missing or wrong</td></tr>
+<tr><td class="crit">C1 schema: messages</td><td>Each field's own message, the one hours message for every bad value (0, 13, 2.5, lots)</td><td>Most cases right</td><td>Generic or no messages</td></tr>
+<tr><td class="crit">C2 query factory</td><td>queryOptions, key ['shifts', siteId] general to specific, getShifts</td><td>Right data, key order or shape off</td><td>Missing</td></tr>
+<tr><td class="crit">C2 mutation</td><td>postShift, then invalidates every key starting with 'shifts' (both sites)</td><td>Invalidates only the current site</td><td>No invalidation</td></tr>
+<tr><td class="crit">W1 to W4</td><td>All four correct in their own words, naming the mechanism</td><td>Two or three correct</td><td>One or none</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>9.1 · Testing Components: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which test follows "test what people see and do" best?</div><div class="opts"><div class="opt">A) The header calls <code class="inline">useAuth()</code> exactly once</div><div class="opt">B) <code class="inline">EventCard</code> receives a <code class="inline">site</code> prop</div><div class="opt">C) The header's nav has the CSS Module class <code class="inline">nav</code></div><div class="opt correct">D) An organizer's navigation has a link named Volunteers</div></div><div class="why"><b>Why:</b> A person (and a screen reader) meets roles and names, never Hooks, props or class names. A test about the link named Volunteers survives any rewrite of the header; one about how often useAuth runs breaks on a refactor that changes nothing a person sees (Lesson 9.1, Why Tests).<br><b>A</b> is wrong: That is how the code works inside: refactoring breaks it although nothing visible changed.<br><b>B</b> is wrong: Props are internals; Testing Library deliberately gives you no way to read them.<br><b>C</b> is wrong: CSS Module names are hashed in the build and say nothing about what a person gets.</div></div>
+  <div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">You changed <code class="inline">Jul</code> to <code class="inline">July</code> in the first formatDate test on purpose. Vitest prints this. Who is wrong, the test or the app?</div><pre class="code"> FAIL  src/utils/format.test.ts &gt; formatDate &gt; shows a day of the crew calendar with its weekday
+AssertionError: expected 'Sat, Jul 4, 2026' to be 'Sat, July 4, 2026' // Object.is equality
+Expected: "Sat, July 4, 2026"
+Received: "Sat, Jul 4, 2026"</pre><div class="opts"><div class="opt">A) The app: formatDate should write July</div><div class="opt correct">B) The test: the app writes short month names on purpose</div><div class="opt">C) Vitest: the two strings are the same</div><div class="opt">D) jsdom: it cannot format dates</div></div><div class="why"><b>Why:</b> Read a failure like a bug report (which test, expected, received, the line), then ask the question every failure deserves. Here the expected value is the mistake: Lesson 3.4 chose short months. Changing the app's month: 'short' to 'long' instead fails two tests, and then the test is right.<br><b>A</b> is wrong: The app's short month names are a deliberate choice from Lesson 3.4.<br><b>C</b> is wrong: Vitest highlights exactly the letters that differ.<br><b>D</b> is wrong: formatDate runs Intl.DateTimeFormat in Node; jsdom is not involved.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">A test must say "the error summary is not on the page". Which line?</div><div class="opts"><div class="opt">A) <code class="inline">expect(screen.getByRole('region')).not.toBeInTheDocument()</code></div><div class="opt">B) <code class="inline">expect(screen.getAllByRole('region')).toHaveLength(0)</code></div><div class="opt">C) <code class="inline">expect(await screen.findByRole('region')).toBeNull()</code></div><div class="opt correct">D) <code class="inline">expect(screen.queryByRole('region')).not.toBeInTheDocument()</code></div></div><div class="why"><b>Why:</b> queryBy returns null when nothing matches, so the check can run. getBy throws before expect runs; findBy waits and then rejects; getAllBy throws on zero matches too (Lesson 9.1, the query table and Common Mistakes).<br><b>A</b> is wrong: getByRole throws "Unable to find" first: the test fails although the summary really is gone.<br><b>B</b> is wrong: getAllBy throws when there are no matches, like getBy.<br><b>C</b> is wrong: findBy rejects after a second when nothing appears; it never resolves to null.</div></div>
+  <div class="q" data-sc="4" data-kind="short"><div class="qn">Q4</div><div class="qt">With one line commented out of the setup file, the whole suite ends like this. Which line, and why does a test that passed alone now fail?</div><pre class="code"> Test Files  3 failed | 4 passed (7)
+      Tests  8 failed | 21 passed (29)</pre><div class="opts"><div class="opt correct"><code class="inline">cleanup()</code> in afterEach: every render stays on the page, so queries find the component twice ("Found multiple elements")</div></div><div class="why"><b>Why:</b> This project imports describe/it/expect instead of using Vitest's globals, so Testing Library cannot register its own cleanup; setup.ts calls it. The tell: "Found multiple elements" in a test that worked alone (Lesson 9.1, Common Mistakes, measured: 8 of 29).</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">A teammate writes <code class="inline">makeEvent({ capacity: '12' })</code> in a test. Vitest runs it happily. What does <code class="inline">npx tsc -b</code> say?</div><div class="opts"><div class="opt">A) Nothing: tests are not type-checked</div><div class="opt correct">B) error TS2322: the string is not assignable to number</div><div class="opt">C) A warning, because tests may use any data</div><div class="opt">D) error TS2741: capacity is missing</div></div><div class="why"><b>Why:</b> factories.ts takes <code class="inline">Partial&lt;CleanupEvent&gt;</code>, so every property you pass must still have the right type. Vitest strips types without checking them (like Node in Lesson 1.1); tsc -b checks the test files too, because they live in src. That is why the build still matters when the tests are green.<br><b>A</b> is wrong: tsc -b checks every file in src, test files included.<br><b>C</b> is wrong: TypeScript has no warnings, only errors; and test data gets no exemption.<br><b>D</b> is wrong: Partial makes capacity optional; it is the TYPE of the value that is wrong.</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt"><code class="inline">getByRole('button', { name: 'Show details for Tide Pool Morning Cleanup' })</code> failed and listed a button named "Show detailsfor Tide Pool Morning Cleanup". The right response?</div><div class="opts"><div class="opt">A) Switch to <code class="inline">getByTestId</code> so the name no longer matters</div><div class="opt">B) Expect "Show detailsfor" in the test</div><div class="opt correct">C) Move the space outside the visually hidden text</div><div class="opt">D) Delete the test: jsdom is wrong</div></div><div class="why"><b>Why:</b> The test found a fragile spot: tools differ on a space at the start of hidden text. Putting it where nobody can lose it ({' '} before the hidden text) gives every tool the same name, and the test stays a check on what screen readers announce (Lesson 9.1, Reading a query's error; Lab 9.1's planted bug 4 is the same pattern).<br><b>A</b> is wrong: That hides an accessibility question instead of answering it.<br><b>B</b> is wrong: That pins the wrong name down forever.<br><b>D</b> is wrong: The test was right to fail: the markup really is fragile.</div></div>
+
+  <div class="sec"><h2>Modules 7 and 8 review: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">In the HQ, which query key fits a volunteer's sign-ups, seen by the signed-in viewer (Lesson 7.1)?</div><div class="opts"><div class="opt">A) <code class="inline">['signups', viewerId(session), volunteerId]</code></div><div class="opt correct">B) <code class="inline">['volunteers', volunteerId, 'signups', viewerId(session)]</code></div><div class="opt">C) <code class="inline">[viewerId(session), 'volunteers']</code></div><div class="opt">D) <code class="inline">['volunteerSignups']</code></div></div><div class="why"><b>Why:</b> Keys go from general to specific, with the viewer LAST on viewer-dependent data: then invalidateQueries({ queryKey: ['volunteers'] }) reaches it, and signing in or out gives a separate cache entry (Lesson 7.1, queries.ts).<br><b>A</b> is wrong: The viewer in the middle breaks the general-to-specific order.<br><b>C</b> is wrong: Starting with the viewer means invalidating ['volunteers'] never matches it.<br><b>D</b> is wrong: One key for every volunteer and viewer: they would overwrite each other.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">A mutation succeeded. Which call makes every list of cleanups fetch again the next time it is shown?</div><div class="opts"><div class="opt correct">A) <code class="inline">queryClient.invalidateQueries({ queryKey: ['events'] })</code></div><div class="opt">B) <code class="inline">queryClient.clear()</code></div><div class="opt">C) <code class="inline">queryClient.setQueryData(['events'], [])</code></div><div class="opt">D) <code class="inline">window.location.reload()</code></div></div><div class="why"><b>Why:</b> invalidateQueries marks every query whose key STARTS with ['events'] as out of date: active ones refetch now, the others on their next use. Checkpoint 3's C2 asks for exactly this with ['shifts'].<br><b>B</b> is wrong: clear() throws away every query in the cache, sessions' data included.<br><b>C</b> is wrong: That writes an empty list as if it came from the API.<br><b>D</b> is wrong: A reload throws away the whole app state for one list.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">The check-in desk marks Diego as attended at once, before the API answers. If the PATCH fails, what must the mutation have done first (Lesson 7.2)?</div><div class="opts"><div class="opt correct">A) Cancel the running roster queries and keep the old entry, so onError can put it back</div><div class="opt">B) Nothing: React Query rolls back by itself</div><div class="opt">C) Invalidate the roster before sending</div><div class="opt">D) Retry the PATCH until it succeeds</div></div><div class="why"><b>Why:</b> An optimistic update cancels in-flight queries (so they cannot overwrite the new mark), saves the previous entry, writes the new one, and onError writes the saved one back; afterwards it invalidates. Lesson 9.2 tests exactly this rollback.<br><b>B</b> is wrong: There is no automatic rollback: the cache only knows what you wrote.<br><b>C</b> is wrong: Invalidating first triggers a refetch that races the optimistic write.<br><b>D</b> is wrong: Retrying a refused change forever is not a rollback.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">Which value belongs in the Zustand store rather than the TanStack Query cache (Lesson 7.3)?</div><div class="opts"><div class="opt">A) The list of cleanups</div><div class="opt">B) The signed-in organizer's roster</div><div class="opt correct">C) The compact or roomy list density</div><div class="opt">D) The impact totals</div></div><div class="why"><b>Why:</b> Client state is what only this browser knows and the API never sends: theme, density, open panels. Server state (anything the API owns) belongs in the query cache, with its loading, refetching and invalidation.<br><b>A</b> is wrong: The API owns the cleanups: server state.<br><b>B</b> is wrong: The roster comes from the API: server state.<br><b>D</b> is wrong: Totals are computed by the API: server state.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">In <code class="inline">const schema = z.object({ capacity: z.coerce.number&lt;string&gt;() })</code>, what are <code class="inline">z.input&lt;typeof schema&gt;</code> and <code class="inline">z.output&lt;typeof schema&gt;</code>?</div><div class="opts"><div class="opt correct">A) <code class="inline">{ capacity: string }</code> and <code class="inline">{ capacity: number }</code></div><div class="opt">B) <code class="inline">{ capacity: number }</code> both</div><div class="opt">C) <code class="inline">{ capacity: unknown }</code> and <code class="inline">{ capacity: number }</code></div><div class="opt">D) <code class="inline">{ capacity: string }</code> both</div></div><div class="why"><b>Why:</b> The form holds text (the input type) and the schema hands on a number (the output type); <code class="inline">coerce.number&lt;string&gt;()</code> says which text it accepts. React Hook Form's values use the input type, the API call the output type (Lesson 8.1).<br><b>B</b> is wrong: The form's field values are text until the schema converts them.<br><b>C</b> is wrong: <code class="inline">&lt;string&gt;</code> narrows the input to string; without it the input would be unknown.<br><b>D</b> is wrong: The output is converted: that is what coerce does.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">In the impact form's debris field array (Lesson 8.2), what must each row's React key be?</div><div class="opts"><div class="opt">A) The row's index</div><div class="opt">B) The category name</div><div class="opt correct">C) The <code class="inline">id</code> that useFieldArray gives each row</div><div class="opt">D) A random number made while rendering</div></div><div class="why"><b>Why:</b> useFieldArray gives every row a stable id; removing row 2 then keeps row 3's input (and its value and focus) instead of shifting everything up. Indexes move when rows are removed; categories can be empty or repeated while typing; random keys remount every render.<br><b>A</b> is wrong: Indexes shift on remove, so React reuses the wrong inputs.<br><b>B</b> is wrong: A category can be empty or chosen twice while the organizer types.<br><b>D</b> is wrong: A new key on every render throws every input away.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output is real: the lab runs exactly as <code class="inline">labs/check_labs.py</code> runs it (Node 24, a learner's terminal, a fresh copy of the lab folder). Vitest's per-test times are left out.</p>
+<div class="blk lab"><div class="h">Lab 9.1: labs/module-21/l9_1-testing-components/starter → solution</div>
+<p>As shipped, <code class="inline">npm test</code>:</p>
+<pre class="out"> Test Files  2 failed (2)
+      Tests  3 failed (3)</pre><p>Task 1, <code class="inline">src/test/factories.ts</code> and <code class="inline">src/hours.test.ts</code>:</p>
+<pre class="code"><span class="c">// Sample data for tests: complete, correctly typed objects. A test passes only the parts it is about.</span>
+<span class="k">import</span> <span class="k">type</span> { Shift } <span class="k">from</span> <span class="s">'../types.ts'</span>
+
+<span class="c">/** A worked 3-hour shift at Pelican Point Beach */</span>
+<span class="k">export</span> <span class="k">function</span> makeShift(changes: Partial&lt;Shift&gt; = {}): Shift {
+  <span class="k">return</span> {
+    id: <span class="s">'sh1'</span>,
+    volunteer: <span class="s">'v04'</span>,
+    site: <span class="s">'Pelican Point Beach'</span>,
+    date: <span class="s">'2026-07-04'</span>,
+    hours: <span class="s">3</span>,
+    status: <span class="s">'worked'</span>,
+    ...changes,
+  }
+}</pre><pre class="code"><span class="k">import</span> { describe, expect, it } <span class="k">from</span> <span class="s">'vitest'</span>
+<span class="k">import</span> { badgeFor, formatHours, hoursWorked } <span class="k">from</span> <span class="s">'./hours.ts'</span>
+<span class="k">import</span> { makeShift } <span class="k">from</span> <span class="s">'./test/factories.ts'</span>
+
+describe(<span class="s">'hoursWorked'</span>, () =&gt; {
+  it(<span class="s">'adds up the hours of the worked shifts'</span>, () =&gt; {
+    <span class="k">const</span> shifts = [makeShift({ hours: <span class="s">3</span> }), makeShift({ id: <span class="s">'sh2'</span>, hours: <span class="s">2.5</span> })]
+    expect(hoursWorked(shifts)).toBe(<span class="s">5.5</span>)
+  })
+
+  it.each([<span class="s">'planned'</span>, <span class="s">'missed'</span>] <span class="k">as</span> <span class="k">const</span>)(<span class="s">'counts a %s shift as 0 hours'</span>, (status) =&gt; {
+    expect(hoursWorked([makeShift({ status })])).toBe(<span class="s">0</span>)
+  })
+
+  it(<span class="s">'is 0 with no shifts at all'</span>, () =&gt; {
+    expect(hoursWorked([])).toBe(<span class="s">0</span>)
+  })
+})
+
+describe(<span class="s">'badgeFor'</span>, () =&gt; {
+  it.each([
+    [<span class="s">0</span>, <span class="s">'none'</span>],
+    [<span class="s">9.5</span>, <span class="s">'none'</span>],
+    [<span class="s">10</span>, <span class="s">'bronze'</span>],
+    [<span class="s">24.5</span>, <span class="s">'bronze'</span>],
+    [<span class="s">25</span>, <span class="s">'silver'</span>],
+    [<span class="s">50</span>, <span class="s">'gold'</span>],
+  ] <span class="k">as</span> <span class="k">const</span>)(<span class="s">'gives %s hours the badge %s'</span>, (hours, badge) =&gt; {
+    expect(badgeFor(hours)).toBe(badge)
+  })
+})
+
+describe(<span class="s">'formatHours'</span>, () =&gt; {
+  it(<span class="s">'writes one hour in the singular'</span>, () =&gt; {
+    expect(formatHours(<span class="s">1</span>)).toBe(<span class="s">'1 hour'</span>)
+  })
+
+  it(<span class="s">'writes every other amount in the plural'</span>, () =&gt; {
+    expect(formatHours(<span class="s">2.5</span>)).toBe(<span class="s">'2.5 hours'</span>)
+  })
+})</pre><p>Run alone:</p>
+<pre class="out"> ✓ src/hours.test.ts (12 tests)
+   ✓ hoursWorked (4)
+     ✓ adds up the hours of the worked shifts
+     ✓ counts a planned shift as 0 hours
+     ✓ counts a missed shift as 0 hours
+     ✓ is 0 with no shifts at all
+   ✓ badgeFor (6)
+     ✓ gives 0 hours the badge none
+     ✓ gives 9.5 hours the badge none
+     ✓ gives 10 hours the badge bronze
+     ✓ gives 24.5 hours the badge bronze
+     ✓ gives 25 hours the badge silver
+     ✓ gives 50 hours the badge gold
+   ✓ formatHours (2)
+     ✓ writes one hour in the singular
+     ✓ writes every other amount in the plural
+ Test Files  1 passed (1)
+      Tests  12 passed (12)</pre><p>Task 2, <code class="inline">src/test/render.tsx</code> and <code class="inline">src/VolunteerCard.test.tsx</code>:</p>
+<pre class="code"><span class="c">// Render a component inside the providers the app puts around it (here: the crew's name)</span>
+<span class="k">import</span> { render } <span class="k">from</span> <span class="s">'@testing-library/react'</span>
+<span class="k">import</span> <span class="k">type</span> { ReactElement } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> { CrewProvider } <span class="k">from</span> <span class="s">'../CrewContext.tsx'</span>
+
+<span class="k">export</span> <span class="k">interface</span> RenderOptions {
+  <span class="c">/** The crew whose name the card thanks you in (default: Shoreline Crew) */</span>
+  crewName?: <span class="k">string</span>
+}
+
+<span class="k">export</span> <span class="k">function</span> renderWithCrew(ui: ReactElement, { crewName = <span class="s">'Shoreline Crew'</span> }: RenderOptions = {}) {
+  <span class="k">return</span> render(&lt;CrewProvider crewName={crewName}&gt;{ui}&lt;/CrewProvider&gt;)
+}</pre><pre class="code"><span class="k">import</span> { render, screen } <span class="k">from</span> <span class="s">'@testing-library/react'</span>
+<span class="k">import</span> { describe, expect, it } <span class="k">from</span> <span class="s">'vitest'</span>
+<span class="k">import</span> { makeShift } <span class="k">from</span> <span class="s">'./test/factories.ts'</span>
+<span class="k">import</span> { renderWithCrew } <span class="k">from</span> <span class="s">'./test/render.tsx'</span>
+<span class="k">import</span> { VolunteerCard } <span class="k">from</span> <span class="s">'./VolunteerCard.tsx'</span>
+
+<span class="k">const</span> theo = { volunteerId: <span class="s">'v04'</span>, name: <span class="s">'Theo Nakamura'</span> }
+
+describe(<span class="s">'VolunteerCard'</span>, () =&gt; {
+  it(<span class="s">'is an article named after the volunteer'</span>, () =&gt; {
+    renderWithCrew(&lt;VolunteerCard {...theo} shifts={[]} /&gt;)
+    expect(screen.getByRole(<span class="s">'article'</span>, { name: <span class="s">'Theo Nakamura'</span> })).toBeInTheDocument()
+    expect(screen.getByRole(<span class="s">'heading'</span>, { level: <span class="s">3</span>, name: <span class="s">'Theo Nakamura'</span> })).toBeInTheDocument()
+  })
+
+  it(<span class="s">'thanks the volunteer for the hours worked, in the crew name'</span>, () =&gt; {
+    renderWithCrew(&lt;VolunteerCard {...theo} shifts={[makeShift({ hours: <span class="s">12</span> })]} /&gt;, {
+      crewName: <span class="s">'Pelican Point Friends'</span>,
+    })
+    expect(screen.getByText(<span class="s">'12 hours worked with Pelican Point Friends'</span>)).toBeInTheDocument()
+    expect(screen.getByText(<span class="s">'Bronze helper'</span>)).toBeInTheDocument()
+  })
+
+  it(<span class="s">'shows no badge and no missed shifts for a new volunteer'</span>, () =&gt; {
+    renderWithCrew(&lt;VolunteerCard {...theo} shifts={[makeShift({ status: <span class="s">'planned'</span> })]} /&gt;)
+    expect(screen.getByText(<span class="s">'0 hours worked with Shoreline Crew'</span>)).toBeInTheDocument()
+    expect(screen.queryByText(/helper$/)).not.toBeInTheDocument()
+    expect(screen.queryByRole(<span class="s">'list'</span>, { name: <span class="s">'Missed shifts'</span> })).not.toBeInTheDocument()
+  })
+
+  it(<span class="s">'lists each missed shift with its date and beach'</span>, () =&gt; {
+    <span class="k">const</span> shifts = [makeShift(), makeShift({ id: <span class="s">'sh2'</span>, status: <span class="s">'missed'</span>, date: <span class="s">'2026-07-11'</span>, site: <span class="s">'Driftwood Cove'</span> })]
+    renderWithCrew(&lt;VolunteerCard {...theo} shifts={shifts} /&gt;)
+    <span class="k">const</span> missed = screen.getByRole(<span class="s">'list'</span>, { name: <span class="s">'Missed shifts'</span> })
+    expect(missed).toHaveTextContent(<span class="s">'2026-07-11 at Driftwood Cove'</span>)
+    expect(screen.getAllByRole(<span class="s">'listitem'</span>)).toHaveLength(<span class="s">1</span>)
+  })
+
+  it(<span class="s">'links to the profile with a name a screen reader can read'</span>, () =&gt; {
+    renderWithCrew(&lt;VolunteerCard {...theo} shifts={[]} /&gt;)
+    expect(screen.getByRole(<span class="s">'link'</span>, { name: <span class="s">'Profile of Theo Nakamura'</span> })).toHaveAttribute(<span class="s">'href'</span>, <span class="s">'/volunteers/v04'</span>)
+  })
+
+  it(<span class="s">'says so when it is rendered without its provider'</span>, () =&gt; {
+    expect(() =&gt; render(&lt;VolunteerCard {...theo} shifts={[]} /&gt;)).toThrow(<span class="s">'useCrewName must be used inside &lt;CrewProvider&gt;'</span>)
+  })
+})</pre><p>The whole suite, then the type check prints nothing after its two <code class="inline">&gt;</code> lines:</p>
+<pre class="out"> Test Files  2 passed (2)
+      Tests  18 passed (18)</pre><p>Accept other test names and other sample values, as long as each rule is pinned down: the 10-hour boundary, planned AND missed counting 0, absence checked with queryBy, the link's full accessible name. The throw test needs no helper: rendering without the provider is the point.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 9.1 Task 3: the planted bugs</div>
+<p><code class="inline">debug_hours.ts</code> counts planned shifts (<code class="inline">!== 'missed'</code> instead of <code class="inline">=== 'worked'</code>) and gives bronze only ABOVE 10 hours. With the solution's tests:</p>
+<pre class="out">× counts a planned shift as 0 hours
+× gives 10 hours the badge bronze
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 10 passed (12)</pre><p><code class="inline">debug_VolunteerCard.tsx</code> always renders the Missed shifts list (<code class="inline">&gt;= 0</code>) and puts the space inside the hidden text, so jsdom names the link <code class="inline">Profileof Theo Nakamura</code>, the lesson's own finding:</p>
+<pre class="out">× shows no badge and no missed shifts for a new volunteer
+× links to the profile with a name a screen reader can read
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed (6)</pre><p>A learner whose tests miss a bug has a missing test: the 10-hour boundary (a table without exactly 10), planned shifts (only missed tested), the empty list (absence never checked) or the name (a regex such as <code class="inline">/Profile/</code> instead of the full name).</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Page's Own Quick Quiz</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 9.1 · Testing Components</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="9.1">
+  <li><b>B</b> An organizer's navigation has a link named Volunteers: A role and an accessible name are what a person (and a screen reader) meets on the page, so the test survives any rewrite of the header that keeps the same result.</li>
+  <li><b>D</b> expect(screen.queryByRole('region')).not.toBeInTheDocument(): queryByRole returns null when nothing matches instead of throwing, so the expect can check that the summary is not in the document.</li>
+  <li><b>A</b> The display store kept the compact setting from the earlier test: The display store is module state shared by every test in the file. The compact test changed it, and without a reset in afterEach the next test still sees compact lists.</li>
+  <li><b>C</b> tsc -b reports an error: the key's type says the data must be a whole ImpactReport: The key made by eventImpactQuery is typed with ImpactReport, so setQueryData expects a whole report. tsc -b (and npm run build) report the missing properties, even though Vitest alone would run the test.</li>
+  <li><b>B</b> Move the space outside the visually hidden text, so every tool computes the same name: The name is part of what people hear, so the test pointed at a fragile spot: a space at the start of hidden text, which some accessibility engines drop. Moving the space outside the hidden text gives the same name everywhere.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Warm-up and Exit Ticket</h2><span class="rule"></span></div>
+<p>The warm-up's answers are in the Facilitator Guide (Opening Segment).</p>
+<ol class="steps">
+  <li><b>Three sizes:</b> unit, component, end-to-end. Only end-to-end sees the real browser, the build and the server together: layout, colors, real files, reloads (Lesson 9.3).</li>
+  <li><b>getBy / queryBy / findBy:</b> here now (throws when missing) / not here (null) / soon (waits up to a second).</li>
+  <li><b>Passes alone, fails together:</b> shared state from an earlier test: the query cache, the session, the display store, storage, or a component that was not cleaned up. Reset it in afterEach (setup.ts).</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q2 A (the app is wrong).</b> Trusts the test over the code by default. Run the <code class="inline">month: 'long'</code> break: now two tests fail and the test is right.</li>
+  <li><b>Q3 A or D.</b> Has not internalized that getBy and getAllBy throw. Have them run it and read the message.</li>
+  <li><b>Q5 A.</b> Thinks green tests mean correct types. Show Exercise 2's TS2322 on <code class="inline">weightKg: '18.5'</code>.</li>
+  <li><b>Q7 A or C.</b> The viewer goes last on viewer-dependent keys; invalidation matches prefixes.</li>
+  <li><b>Q10 B.</b> Confuses "data the organizer sees" with "data the browser owns". Ask: who sends it?</li>
+  <li><b>Q12 A.</b> Index keys: remove row 2 live in the impact form and watch row 3's value jump.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 21 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

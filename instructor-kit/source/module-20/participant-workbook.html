@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 20</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 20: React Hook Form + Zod and Complex Forms</h1>
+    <p class="sub">Your workbook for Session 20: the key ideas of Lessons 8.1 and 8.2, worked examples, the guided labs, predict-then-check practice, a self-check for each lesson and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>8.1–8.2</b></span>
+      <span class="chip">Session <b>20</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Write a Zod schema that is both a type and its checks, and tell its input type from its output type.</li>
+  <li>Build a form with React Hook Form and zodResolver, with no type arguments.</li>
+  <li>Put the API's 400 field messages under their fields with setError, after a type predicate.</li>
+  <li>Describe a list in a schema with a rule on the right row, and build rows with useFieldArray and good focus.</li>
+  <li>Build an error summary and upload a file with FormData, checked before sending.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">W1</div><div class="qt">Lesson 7.3's homework: how many places in the HQ describe a valid cleanup? Name them.</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">In Lesson 3.5's form, what kept a field's message linked to its box for screen readers?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">After the API answers 400 with fieldErrors, where did Lesson 7.2 put the messages?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.1</span><h3>React Hook Form + Zod</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Write a Zod 4 schema that is both a TypeScript type and the checks behind it, with messages people understand</li>
+  <li>Tell a schema's input type from its output type (z.input, z.output) and give useForm the right generics</li>
+  <li>Build a form with React Hook Form: register, handleSubmit, formState and zodResolver</li>
+  <li>Show the API's 400 field errors under the right fields with setError, and a form-wide message with a root error</li>
+  <li>Decide when a form needs a library and when React 19's form actions are enough, and say why</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A Zod schema</b> is one value that checks data and gives TypeScript types: <code class="inline">z.object</code>, <code class="inline">z.string().trim().min(5, …)</code>, <code class="inline">z.enum</code>, <code class="inline">.refine</code>, <code class="inline">z.coerce.number&lt;string&gt;()</code>, an object refine with <code class="inline">path</code> and <code class="inline">when</code>.</li>
+  <li><b>Two types:</b> <code class="inline">z.input</code> (what the boxes hold: text) and <code class="inline">z.output</code> (what a successful check gives: numbers). <code class="inline">z.infer</code> is the output.</li>
+  <li><b>safeParse</b> returns a union on <code class="inline">success</code>; <code class="inline">z.flattenError(error).fieldErrors</code> gives field → messages.</li>
+  <li><b>React Hook Form:</b> <code class="inline">useForm({ resolver: zodResolver(schema), defaultValues })</code> with no type arguments; <code class="inline">register(name)</code>, <code class="inline">handleSubmit(save)</code>, <code class="inline">formState.errors</code>, <code class="inline">isSubmitting</code>, <code class="inline">setError</code>.</li>
+  <li><b>The API's 400:</b> <code class="inline">setError</code> each key a type predicate accepts (the first one focused) and <code class="inline">'root.server'</code> for the form-wide message. The form is a courtesy; the API is the lock.</li>
+  <li><b>Two forms, one schema:</b> Plan a cleanup keeps useActionState with <code class="inline">safeParse</code>; the edit form uses RHF. Zod stays out of client.ts for the bundle's sake (Lesson 10.1).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: the schema with Node</div>
+<p>The lesson's quick look at the schema, run with Node (<code class="inline">node src/try-schema.ts</code>):</p>
+<pre class="code"><span class="c">// A quick look at the schema with Node. Delete this file when you are done.</span>
+<span class="k">import</span> { z } <span class="k">from</span> <span class="s">'zod'</span>
+<span class="k">import</span> { eventFormSchema } <span class="k">from</span> <span class="s">'./api/schemas.ts'</span>
+
+<span class="k">const</span> typed = {
+  title: <span class="s">'  Dune Grass Cleanup '</span>,
+  siteId: <span class="s">'north-jetty'</span>,
+  date: <span class="s">'2099-06-14'</span>,
+  startTime: <span class="s">'09:00'</span>,
+  endTime: <span class="s">'11:30'</span>,
+  capacity: <span class="s">'12'</span>,
+  meetingPoint: <span class="s">'North jetty steps'</span>,
+  description: <span class="s">''</span>,
+}
+console.log(eventFormSchema.parse(typed))
+
+<span class="k">const</span> result = eventFormSchema.safeParse({ ...typed, title: <span class="s">'Dune'</span>, capacity: <span class="s">'lots'</span>, endTime: <span class="s">'08:00'</span> })
+<span class="k">if</span> (!result.success) {
+  console.log(z.flattenError(result.error).fieldErrors)
+}</pre><pre class="out">{
+  title: 'Dune Grass Cleanup',
+  siteId: 'north-jetty',
+  date: '2099-06-14',
+  startTime: '09:00',
+  endTime: '11:30',
+  capacity: 12,
+  meetingPoint: 'North jetty steps',
+  description: ''
+}
+{
+  title: [ 'Use at least 5 characters for the title.' ],
+  capacity: [ 'Capacity must be a whole number from 1 to 200.' ],
+  endTime: [ 'The end time must be after the start time.' ]
+}</pre><p>Read it twice. <b>The first object</b> is the checked data: the title lost its spaces, capacity is <code class="inline">12</code>, a number (the output type). <b>The second</b> is <code class="inline">z.flattenError(...).fieldErrors</code>: one list of messages per field, the shape the HQ's FieldError already shows, and the end-time message arrives with the others because the object refine has <code class="inline">when</code>.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-20/l8_1-react-hook-form-zod/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code>, then <code class="inline">npm test</code> and <code class="inline">npm run typecheck</code>.</li>
+  <li>Task 1: the schema (the table in TASKS.md). Task 2: the form. Task 3 (home): the API's 400.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Task 1: what are the hours' input and output types?</td><td></td></tr>
+<tr><td>Task 2: which line makes the name box point at its message?</td><td></td></tr>
+<tr><td>Task 3: why not <code class="inline">name as JoinField</code>?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write the prediction first, then try it in the HQ (Step 5) with the Network tab open.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Weekend Cove Cleanup is full (18 of 18). An organizer saves capacity 10. The schema accepts it: what does the API answer?</div><pre class="code">PATCH http://localhost:4000/api/events/e08   {"capacity": 10}</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Edit a Cleanup's Details</b> (lesson page). In class: Steps 1 and 2. At home: Steps 3 to 5.</p>
+<ul class="tick">
+  <li>☐ Step 1: the three libraries; schemas.ts; try-schema.ts run, then deleted</li>
+  <li>☐ Step 2: eventForm.ts types from the schema; Plan a cleanup checks with safeParse</li>
+  <li>☐ Step 3: updateEventMutation; editEventLoader (organizersOnly first); the route</li>
+  <li>☐ Step 4: EditEventForm and EditEventPage</li>
+  <li>☐ Step 5: Edit details in OrganizerTools; tried the 400, a guest and a volunteer; tsc, lint, build</li>
+  <li>☐ My own project: my forms, their input and output types, server-only rules</li>
+</ul>
+<div class="write tall"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Lesson 7.3 asked you to count the places that describe a valid cleanup. What does a Zod schema change?</div><div class="opts"><div class="opt">A) Nothing for the types: you still write EventFormValues by hand</div><div class="opt">B) The rules and their messages are written once, and the form's types are read from the same schema</div><div class="opt">C) The API no longer needs to check anything</div><div class="opt">D) The client's response guards (isCleanupEvent) disappear</div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">The lesson puts the wrong thing in each of the schema's two types. What are capacity's input and output types?</div><pre class="code">src/Scratch.ts:4:14 - error TS2322: Type 'number' is not assignable to type 'string'.
+src/Scratch.ts:5:14 - error TS2322: Type 'string' is not assignable to type 'number'.
+Found 2 errors in the same file, starting at: src/Scratch.ts:4</pre><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">What does the when option on the end-time refine do?</div><div class="opts"><div class="opt">A) Runs the rule only on the first submit</div><div class="opt">B) Skips the rule when the times are empty</div><div class="opt">C) Runs the rule as soon as the two times have no problem, whatever the other fields say</div><div class="opt">D) Turns the rule into a warning</div></div></div>
+<div class="q" data-sc="4" data-kind="short"><div class="qn">Q4</div><div class="qt">Where does the list of eight names in this error come from? Nobody wrote a type argument.</div><pre class="code">src/Scratch.tsx:7:19 - error TS2345: Argument of type '"titel"' is not assignable to parameter of type '"capacity" | "date" | "description" | "endTime" | "meetingPoint" | "siteId" | "startTime" | "title"'.
+Found 1 error in src/Scratch.tsx:7</pre><div class="write"></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Why does EditEventForm check isEventField(name) before setError, instead of writing name as EventField?</div><div class="opts"><div class="opt">A) setError is slower with a cast</div><div class="opt">B) The cast does not compile</div><div class="opt">C) Object.entries returns numbers</div><div class="opt">D) The API could send a key the form does not have, and its message would vanish into an error nobody displays</div></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">Why does the HQ keep its hand-written response guards in client.ts instead of Zod schemas?</div><div class="opts"><div class="opt">A) Zod would add about 25 kB gzip to every visitor's download, while only organizers open the forms</div><div class="opt">B) Zod cannot check API responses</div><div class="opt">C) The guards are faster at run time</div><div class="opt">D) TypeScript cannot compare a schema with types.ts</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: explain input and output types to someone who has never used Zod, with the capacity box as your example. Then look at the TS2322 message from Common Mistakes again: which line would you read first next time, and why?</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">8.2</span><h3>Complex Forms</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Describe a list inside a form with a Zod array schema, including a rule about the whole list that puts its message on the right row</li>
+  <li>Build rows people can add and remove with React Hook Form's useFieldArray, with stable keys, typed field paths and sensible focus</li>
+  <li>Build an error summary that takes the focus after a failed save and links to every field with a problem</li>
+  <li>Upload a file with FormData: check it in the browser, send it without breaking the request, and explain the API's 413 and 415 answers</li>
+  <li>Save with PUT and refresh every cached answer the save changes</li>
+  <li>Decide when a long form should become steps, and how to check one step at a time</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>A list in a schema:</b> <code class="inline">z.array(rowSchema)</code>; counts check the text (regex) and then <code class="inline">transform(Number)</code>: an empty box is a message, not 0.</li>
+  <li><b>A rule about the list:</b> <code class="inline">.superRefine</code> with <code class="inline">context.addIssue({ path: [index, 'category'], … })</code> puts the message on the repeated row; <code class="inline">when</code> lets it run while a count is wrong.</li>
+  <li><b>useFieldArray:</b> <code class="inline">fields</code> (key by <code class="inline">field.id</code>), <code class="inline">append(row, { focusName })</code>, <code class="inline">remove(index)</code> then focus something; paths like <code class="inline">items.${index}.count</code> are typed.</li>
+  <li><b>Error summary:</b> <code class="inline">key={submitCount}</code>, takes the focus, links that focus each field; <code class="inline">shouldFocusError: false</code>; messages under the fields stay.</li>
+  <li><b>Uploads:</b> check type and size first (<code class="inline">accept</code> is a hint); <code class="inline">FormData</code> without a Content-Type header; the API answers 413/415; upload first, keep the id.</li>
+  <li><b>Save with PUT,</b> write the answer with <code class="inline">setQueryData</code>, invalidate what else changed. <b>Steps</b> only when the parts are separate tasks.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: a rule on the right row</div>
+<p>The lesson's report check with Node (<code class="inline">node src/try-impact.ts</code>): a duplicate row and an empty box.</p>
+<pre class="code"><span class="c">// The report schema with Node: a duplicate row and an empty box</span>
+<span class="k">import</span> { z } <span class="k">from</span> <span class="s">'zod'</span>
+<span class="k">import</span> { impactReportSchema } <span class="k">from</span> <span class="s">'./api/schemas.ts'</span>
+
+<span class="k">const</span> result = impactReportSchema.safeParse({
+  volunteersAttended: <span class="s">'11'</span>,
+  bags: <span class="s">''</span>,
+  weightKg: <span class="s">'18.5'</span>,
+  items: [
+    { category: <span class="s">'plastic-bottles'</span>, count: <span class="s">'40'</span> },
+    { category: <span class="s">'glass'</span>, count: <span class="s">'lots'</span> },
+    { category: <span class="s">'plastic-bottles'</span>, count: <span class="s">'3'</span> },
+  ],
+  notes: <span class="s">''</span>,
+})
+<span class="k">if</span> (!result.success) {
+  <span class="k">for</span> (<span class="k">const</span> issue <span class="k">of</span> result.error.issues) {
+    console.log(issue.path.join(<span class="s">'.'</span>), <span class="s">'→'</span>, issue.message)
+  }
+  console.log(z.flattenError(result.error).fieldErrors)
+}</pre><pre class="out">bags → Bags must be a whole number from 0 to 500.
+items.1.count → Count must be a whole number from 0 to 100000.
+items.2.category → Plastic bottles is already in the list: add to its count.
+{
+  bags: [ 'Bags must be a whole number from 0 to 500.' ],
+  items: [
+    'Count must be a whole number from 0 to 100000.',
+    'Plastic bottles is already in the list: add to its count.'
+  ]
+}</pre><p>Each issue's path says exactly where it belongs: <code class="inline">items.2.category</code> is row 3's menu (rows count from 0). The flattened object at the end lost the rows: for nested data, use the paths (React Hook Form's resolver does).</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-20/l8_2-complex-forms/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code>, then <code class="inline">npm test</code> and <code class="inline">npm run typecheck</code>.</li>
+  <li>Task 1: counts and the each-item-once rule. Task 2: rows that come and go. Task 3: the signed sheet.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Task 1: which path did your duplicate issue get?</td><td></td></tr>
+<tr><td>Task 2: where does the focus go after Add, and after Remove?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Predict first; your instructor shows the API's answers.</p>
+<div class="q"><div class="qn">P2</div><div class="qt">A GIF sent to the photo endpoint as a raw body. Predict the status code and the message.</div><pre class="code">POST http://localhost:4000/api/photos   Content-Type: image/gif</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">The same endpoint, with a hand-written <code class="inline">Content-Type: multipart/form-data</code> header (no boundary). Predict the status and which field the API says is missing.</div><pre class="code">POST http://localhost:4000/api/photos   Content-Type: multipart/form-data</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Impact Report</b> (lesson page). In class: Steps 1 to 3. At home: Steps 4 to 6.</p>
+<ul class="tick">
+  <li>☐ Step 1: utils/debris.ts; the report schema; try-impact.ts run, then deleted</li>
+  <li>☐ Step 2: putImpact, postPhoto; saveImpactMutation and uploadPhotoMutation</li>
+  <li>☐ Step 3: formErrors.ts and ErrorSummary</li>
+  <li>☐ Step 4: PhotoUpload (checks before sending, 413/415 messages)</li>
+  <li>☐ Step 5: impactForm.ts, ImpactReportForm, the loader, the route, the organizer card</li>
+  <li>☐ Step 6: tried everything; tsc, lint, build</li>
+  <li>☐ My own project: line items, files, one page or steps</li>
+</ul>
+<div class="write tall"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">The lesson runs this comparison with Node. Why do the impact report's counts not use z.coerce.number()?</div><pre class="code">0
+Enter a whole number.
+12</pre><div class="write"></div></div>
+<div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">Row 3 repeats Plastic bottles. Which path does the superRefine give its issue, so the message lands on the right box?</div><div class="opts"><div class="opt">A) <code class="inline">['items']</code></div><div class="opt">B) <code class="inline">['items', 'category']</code></div><div class="opt">C) <code class="inline">['items', 2, 'category']</code> (the path relative to the list is [2, 'category'])</div><div class="opt">D) <code class="inline">['plastic-bottles']</code></div></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A keyboard user presses Remove on row 1 and the code does nothing about focus. Where is the focus afterwards?</div><div class="opts"><div class="opt">A) On the next row's Remove button</div><div class="opt">B) On the page's body: the next Tab starts again from the top</div><div class="opt">C) On the error summary</div><div class="opt">D) Still on the removed button</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">The photo box has accept="image/jpeg,image/png,image/webp". Why does the HQ still check the file before uploading?</div><div class="opts"><div class="opt">A) accept makes the request slower</div><div class="opt">B) The API does not check files</div><div class="opt">C) TypeScript requires it</div><div class="opt">D) accept is only a hint to the picker: "All files", drag and drop and a 40 MB photo all get past it</div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">saveImpactMutation writes the PUT's answer with setQueryData before invalidating ['events'] and ['impact']. What does that buy?</div><div class="opts"><div class="opt">A) The Impact tab shows the new numbers at once, instead of the old ones for a moment</div><div class="opt">B) It saves the PUT</div><div class="opt">C) It stops the dashboard from updating</div><div class="opt">D) Nothing: invalidation alone does the same</div></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">The error summary's links focus their field with a click handler instead of a plain href="#bags". Why?</div><div class="opts"><div class="opt">A) Plain # links do not work in any browser</div><div class="opt">B) A # link adds #bags to the address and a history entry, so Back first undoes the jump</div><div class="opt">C) Click handlers are faster</div><div class="opt">D) TypeScript cannot type href</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: today's form decided where the focus goes four times: after a failed Save, after following a summary link, after adding a row and after removing one. For each, write where it goes and what would go wrong for a keyboard or screen reader user without it. Which of them would you have forgotten a month ago?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Capacity's input and output types?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Where does the duplicate-row message go, and how does it get there?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Why no Content-Type header on a photo upload?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish Edit a Cleanup's Details (Steps 3 to 5) and The Impact Report (Steps 4 to 6), with both checklists</li>
+  <li>☐ 8.1 and 8.2 Exercises 1 and 2 (each Exercise 3 is a stretch)</li>
+  <li>☐ Both Quick Quizzes</li>
+  <li>☐ Lab 8.1 Task 3; Lab 8.2's stretch</li>
+  <li>☐ Both journal entries</li>
+  <li>☐ Revise Modules 7 and 8 for Checkpoint 3 (Session 21)</li>
+  <li>☐ Bring: the course folder, internet, three things I would hate to break</li>
+  <li>☐ At home: <code class="inline">npm install</code> in <code class="inline">labs/module-21/checkpoint-3/starter</code> and <code class="inline">labs/module-21/l9_1-testing-components/starter</code>; check <code class="inline">npm test</code> shows the TODO failures</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>schema, Zod</td><td>A value that checks data and gives types / the schema library the course uses (version 4)</td></tr>
+<tr><td><code class="inline">safeParse</code> / <code class="inline">parse</code></td><td>Check and return a success-or-error union / check and throw</td></tr>
+<tr><td><code class="inline">z.input</code> / <code class="inline">z.output</code></td><td>What a schema accepts / what a successful check gives back (<code class="inline">z.infer</code>)</td></tr>
+<tr><td><code class="inline">refine</code>, <code class="inline">superRefine</code>, <code class="inline">when</code></td><td>A rule of your own / one that adds issues with paths / which issues it can run despite</td></tr>
+<tr><td>React Hook Form, <code class="inline">register</code></td><td>The form library / connects a box to the form</td></tr>
+<tr><td><code class="inline">zodResolver</code></td><td>Runs a Zod schema whenever React Hook Form checks</td></tr>
+<tr><td><code class="inline">setError</code>, root error</td><td>Adds an error by hand / a form-wide one (<code class="inline">root.server</code>)</td></tr>
+<tr><td>field array, <code class="inline">useFieldArray</code></td><td>Rows people add and remove / React Hook Form's Hook for them</td></tr>
+<tr><td>field path</td><td><code class="inline">items.2.count</code>: where a value lives; typed with template literal types</td></tr>
+<tr><td>error summary</td><td>A box at the top of a form that lists every problem with a link to its field</td></tr>
+<tr><td><code class="inline">FormData</code>, multipart/form-data</td><td>Builds a file upload body / its format, parts separated by a boundary</td></tr>
+<tr><td>413 / 415</td><td>Payload Too Large / Unsupported Media Type</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 20 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

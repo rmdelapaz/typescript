@@ -63,10 +63,11 @@ function reinitMermaid(theme) {
     const isDark = theme === 'dark';
     mermaid.initialize({
         startOnLoad: false,
-        theme: isDark ? 'dark' : 'default',
+        theme: 'base',                  /* themeVariables only apply to the base theme */
+        darkMode: isDark,
         themeVariables: isDark
-            ? { primaryColor: '#334155', primaryTextColor: '#e2e8f0', primaryBorderColor: '#6366f1', lineColor: '#94a3b8', secondaryColor: '#1e293b', tertiaryColor: '#0f172a' }
-            : { primaryColor: '#eff6ff', primaryTextColor: '#1e293b', primaryBorderColor: '#3b82f6', lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#f1f5f9' }
+            ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+            : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
     });
 
     // Re-render all diagrams
@@ -82,9 +83,8 @@ function reinitMermaid(theme) {
         el.removeAttribute('data-processed');
         // Render straight from the source STRING. Assigning innerHTML = src would re-parse
         // the source as HTML, turning label content like <<abstract>> (classDiagram
-        // stereotypes), <T> generics, or <form>/<table> tags into phantom elements and
-        // corrupting the diagram. Passing the string to mermaid.render() lets Mermaid's own
-        // parser handle <br/>, <<...>>, <tag>, etc.
+        // stereotypes) or <code> into phantom elements and corrupting the diagram. Passing
+        // the string to mermaid.render() lets Mermaid's own parser handle <br/>, <<...>>, etc.
         mermaid.render('mmd-' + Date.now() + '-' + i, el.dataset.src)
             .then(({ svg }) => { el.innerHTML = svg; })
             .catch(() => {});
@@ -96,7 +96,7 @@ function reinitMermaid(theme) {
    =========================== */
 
 function initProgressIndicator() {
-    const bar = document.querySelector('.progress-indicator .progress-bar');
+    const bar = document.querySelector('.progress-bar');
     if (!bar) return;
 
     const update = () => {
@@ -291,6 +291,8 @@ function initLessonProgress() {
     progress[page] = { visited: true, lastVisited: new Date().toISOString(), scrollPosition: 0 };
     localStorage.setItem('lessonProgress', JSON.stringify(progress));
 
+    if (page === 'index') updateProgressIndicators(progress);
+
     // Save scroll on leave
     window.addEventListener('beforeunload', () => {
         progress[page].scrollPosition = window.scrollY;
@@ -300,6 +302,32 @@ function initLessonProgress() {
     // Restore scroll
     const saved = progress[page]?.scrollPosition;
     if (saved > 0) setTimeout(() => window.scrollTo(0, saved), 100);
+}
+
+function updateProgressIndicators(progress) {
+    const links = document.querySelectorAll('.lesson-link');
+    let done = 0;
+    links.forEach(link => {
+        const name = link.getAttribute('href')?.replace('.html', '');
+        if (progress[name]?.visited) {
+            link.classList.add('visited');
+            done++;
+            if (!link.querySelector('.checkmark')) {
+                const cm = document.createElement('span');
+                cm.className = 'checkmark';
+                cm.textContent = ' ✓';
+                link.appendChild(cm);
+            }
+        }
+    });
+    const total = links.length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    const el = document.getElementById('overall-progress');
+    if (el) {
+        el.innerHTML = `<h3>Your Progress</h3>
+            <div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%"></div></div>
+            <p>${done} of ${total} lessons completed (${pct}%)</p>`;
+    }
 }
 
 /* ===========================
@@ -408,4 +436,21 @@ function throttle(fn, ms) {
 }
 
 // Expose for other scripts
-window.courseEnhancements = { debounce, throttle, applyTheme, reinitMermaid };
+window.courseEnhancements = { debounce, throttle, applyTheme, reinitMermaid, updateProgressIndicators };
+
+/* Prism's diff-highlight leaves a lone prefix space at the end of an unchanged block when the
+   embedded language (JSX) keeps the newline in its last token; with block-level +/- lines that
+   shows as an empty line. Drop that trailing prefix once highlighting has run. */
+(function () {
+  function tidyDiffs() {
+    document.querySelectorAll('code .token.unchanged:not(.prefix)').forEach(function (u) {
+      var next = u.nextElementSibling;
+      if (!next || !/\b(deleted|inserted)\b/.test(next.className) || !/\n $/.test(u.textContent)) return;
+      var prefixes = u.querySelectorAll('.token.prefix.unchanged');
+      var last = prefixes[prefixes.length - 1];
+      if (last && last.textContent === ' ') last.remove();
+    });
+  }
+  if (window.Prism && Prism.hooks) Prism.hooks.add('complete', function () { setTimeout(tidyDiffs, 0); });
+  window.addEventListener('load', tidyDiffs);
+})();

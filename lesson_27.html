@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Build Shoreline Crew HQ's Edit cleanup details page with React Hook Form and one Zod 4 schema: a type and its checks written once, input and output types, the resolver's generics, the API's 400 field errors under the right fields, and the same schema checking the Plan a cleanup form. React + TypeScript: Build a Modern Web App Lesson 8.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>React Hook Form + Zod - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>📝 Lesson 8.1: React Hook Form + Zod</h1>
+                <p class="lead">Luis planned the Boardwalk and Mudflats cleanup for 16 volunteers, then the marsh ranger offered a second parking lot and Luis wants room for 20. Today the HQ cannot help him: organizers can create and cancel a cleanup, but not fix a typo in its title. In this lesson you build that missing page with the tools most React teams use for serious forms, React Hook Form and Zod. Along the way you pay off a debt from Lesson 7.3: you counted how many places describe a valid cleanup. After today, the form's rules live in one schema that both forms share, and TypeScript reads the form's types from it.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Write a Zod 4 schema that is both a TypeScript type and the checks behind it, with messages people understand</li>
+                        <li>Tell a schema's input type from its output type (<code>z.input</code>, <code>z.output</code>) and give <code>useForm</code> the right generics</li>
+                        <li>Build a form with React Hook Form: <code>register</code>, <code>handleSubmit</code>, <code>formState</code> and <code>zodResolver</code></li>
+                        <li>Show the API's 400 field errors under the right fields with <code>setError</code>, and a form-wide message with a root error</li>
+                        <li>Decide when a form needs a library and when React 19's form actions are enough, and say why</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_26.html">Lesson 7.3: Client State</a> (your <code>shoreline-hq</code> with queries, mutations and the display store), the Plan a cleanup form from <a href="lesson_11.html">Lesson 3.5</a> and the guard routes from <a href="lesson_23.html">Lesson 6.3</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> An Edit cleanup details page for organizers (React Hook Form and a Zod schema, saved with PATCH), and the Plan a cleanup form checked by the same schema</li>
+                    <li><span class="meta-label">🧩 Stack</span> React Hook Form 7.92, Zod 4.6, @hookform/resolvers 7.0, React 19.3, TypeScript 7.0, Vite 8.3, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and the browser, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-27-start.zip">lesson-27-start.zip</a> · Finished code: <a href="downloads/lesson-27-end.zip">lesson-27-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#one-description" class="toc-link">One Description of a Valid Cleanup</a></li>
+                        <li><a href="#zod" class="toc-link">Zod 4: A Type and Its Checks</a></li>
+                        <li><a href="#input-output" class="toc-link">Input and Output Types</a></li>
+                        <li><a href="#rhf" class="toc-link">React Hook Form</a></li>
+                        <li><a href="#server" class="toc-link">When the API Says No</a></li>
+                        <li><a href="#which-form" class="toc-link">Two Forms, One Schema</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Edit a Cleanup's Details</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="one-description" class="lesson-section">
+                <h2>🧾 One Description of a Valid Cleanup</h2>
+                <p>Lesson 7.3 asked you to count how many places in the HQ describe a valid cleanup. Here is what you probably found:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Where</th><th>What it describes</th><th>Written as</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>utils/eventForm.ts</code>: <code>EventField</code>, <code>EventFormValues</code></td><td>The form's fields and their types</td><td>TypeScript types (gone when the code runs)</td></tr>
+                            <tr><td><code>utils/eventForm.ts</code>: <code>validateEvent</code>, <code>toNewEvent</code></td><td>The rules (5 to 80 characters, 1 to 200 volunteers…) and turning text into the API's types</td><td>Hand-written <code>if</code> statements</td></tr>
+                            <tr><td><code>api/client.ts</code>: <code>isCleanupEvent</code></td><td>The shape of a cleanup the API sends back</td><td>A type predicate</td></tr>
+                            <tr><td>shoreline-api's <code>core/api.ts</code></td><td>The rules again, plus ones only the server can check</td><td>The API's own code</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The first two rows are the problem. The type says "capacity is a string the person typed", the rules say "and it must be a whole number from 1 to 200", and nothing connects them: add a field to one and TypeScript cannot remind you about the other. A second form (the edit page you build today) would need both again. That is the job of a <strong>schema library</strong>: you describe the data once, as a value your program can run, and the library gives you both the checks and the TypeScript type.</p>
+                <div class="card card-info">
+                    <h3>💡 Mental model: the crew's sign-up sheet template</h3>
+                    <p>Shoreline Crew prints its sign-up sheets from one template. The template decides which boxes the sheet has (the type) and the notes beside them, such as "phone: digits only" (the rules). Every sheet printed from it matches, and changing the template changes every sheet. A Zod schema is that template: one object that says what the fields are and what counts as filled in correctly. React Hook Form is the clipboard that holds the sheet while someone fills it in, and checks it against the template when they hand it back.</p>
+                </div>
+                <p>The last two rows stay. The API is the authority (Lesson 3.5): it checks everything again, and some rules, such as "18 people already signed up, so capacity cannot drop to 10", only it can check. And <code>isCleanupEvent</code> describes something different, the shape of data coming <em>back</em>; "Two Forms, One Schema" explains why the HQ keeps it as it is.</p>
+                <div class="card card-info">
+                    <h4>🌱 Why learn two libraries for something you can already do?</h4>
+                    <p>You built a complete form by hand in Lesson 3.5, and that was the right first step: you know what <code>FormData</code>, field errors, focus and <code>aria-invalid</code> are, so nothing today is magic. On a team, though, forms are where bugs collect, and React Hook Form and Zod are two of the libraries you are most likely to find in an existing React codebase or a job ad. Learning them on top of what you already understand is the fast way in.</p>
+                </div>
+            </section>
+
+            <section id="zod" class="lesson-section">
+                <h2>🛡️ Zod 4: A Type and Its Checks</h2>
+                <p><strong>Zod</strong> builds schemas from small pieces: <code>z.string()</code>, <code>z.number()</code>, <code>z.object({ … })</code>. Each piece can carry rules (<code>.min(5)</code>, <code>.max(80)</code>) and changes (<code>.trim()</code>). Here is the schema for a cleanup's details, the one file both forms will share:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/schemas.ts</div>
+                    <pre data-src="shoreline-hq/src/api/schemas.ts" data-match="excerpt"><code class="language-ts">// The rules for a cleanup's details, shared by the Plan a cleanup and Edit forms.
+// The API checks the same rules (and a few only it can check); most messages match its own.
+export const eventFormSchema = z
+  .object({
+    title: z
+      .string()
+      .trim()
+      // error can be a function: one rule, a message that fits what was typed
+      .min(5, {
+        error: (issue) =&gt;
+          issue.input === '' ? 'Add a title.' : 'Use at least 5 characters for the title.',
+      })
+      .max(80, 'Keep the title to 80 characters or fewer.'),
+    siteId: z.string().min(1, 'Choose one of the cleanup sites.'),
+    date: z.string().refine(isTodayOrLater, {
+      error: (issue) =&gt; (issue.input === '' ? 'Pick a date.' : 'Pick today or a later date.'),
+    }),
+    startTime: z.string().min(1, 'Pick a start time.'),
+    endTime: z.string().min(1, 'Pick an end time.'),
+    // The box holds text; the API wants a number. coerce turns '12' into 12 (and '' into 0).
+    capacity: z.coerce
+      .number&lt;string&gt;({ error: capacityRule })
+      .refine((count) =&gt; Number.isInteger(count) &amp;&amp; count &gt;= 1 &amp;&amp; count &lt;= 200, capacityRule),
+    meetingPoint: z
+      .string()
+      .trim()
+      .min(3, 'Say where volunteers meet (at least 3 characters).')
+      .max(120, 'Keep the meeting point to 120 characters or fewer.'),
+    description: z.string().trim().max(2000, 'Keep the description to 2000 characters or fewer.'),
+  })
+// ...</code></pre>
+                </div>
+                <ul>
+                    <li>The second argument of a rule is its message: <code>.min(1, 'Choose one of the cleanup sites.')</code>. The messages are the ones the Plan a cleanup form has shown since Lesson 3.5, so nothing changes for the people using it.</li>
+                    <li>A message can also be a function of the problem: <code>{ error: (issue) =&gt; … }</code>. <code>issue.input</code> is the value that failed, so one rule can say "Add a title." for an empty box and "Use at least 5 characters for the title." for a short one. <code>error</code> is Zod 4's name for this option (see the version note below).</li>
+                    <li><code>.trim()</code> changes the value before the rules run, so <code>'   '</code> counts as empty and the checked title has no stray spaces.</li>
+                    <li><code>.refine(check, message)</code> adds a rule of your own. <code>isTodayOrLater</code> compares with today when the check runs, not when the file loaded.</li>
+                    <li><code>z.coerce.number()</code> turns the text <code>'12'</code> into the number <code>12</code> before checking it. The next section is about what that does to the types.</li>
+                </ul>
+                <p>One rule involves two fields: the end time must be after the start time. A field's rules only see their own field, so this rule goes on the whole object, with <code>path</code> saying which field gets the message:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/schemas.ts</div>
+                    <pre data-src="shoreline-hq/src/api/schemas.ts" data-match="excerpt"><code class="language-ts">// A rule about two fields belongs to the object; path puts its message under endTime
+.refine((event) =&gt; event.endTime &gt; event.startTime, {
+  path: ['endTime'],
+  error: 'The end time must be after the start time.',
+  // An object's refine normally waits until EVERY field is valid. This one only needs the
+  // two times to be valid, so its message appears together with the others.
+  when: ({ issues }) =&gt;
+    issues.every((issue) =&gt; issue.path?.[0] !== 'startTime' &amp;&amp; issue.path?.[0] !== 'endTime'),
+})</code></pre>
+                </div>
+                <p>The <code>when</code> option needs a word. Zod normally runs an object's <code>refine</code> only when every field is valid, because the function receives the whole object and could trip over a bad value. That would hide "The end time must be after the start time." until everything else was fixed (Common Mistakes shows it). <code>when</code> says this rule only needs the two times: it runs whenever neither of them has a problem.</p>
+                <p>A schema checks data with <code>safeParse</code>, which never throws. It returns a <strong>discriminated union</strong> (Lesson 2.2) on <code>success</code>: either <code>{ success: true, data }</code> with the checked data, or <code>{ success: false, error }</code> with every problem. <code>z.flattenError(error).fieldErrors</code> turns the problems into the shape the HQ already uses: field name to a list of messages. (<code>parse</code> does the same but throws instead of returning <code>success: false</code>.)</p>
+                <pre data-snippet><code class="language-ts">// A quick look at the schema with Node. Delete this file when you are done.
+import { z } from 'zod'
+import { eventFormSchema } from './api/schemas.ts'
+
+const typed = {
+  title: '  Dune Grass Cleanup ',
+  siteId: 'north-jetty',
+  date: '2099-06-14',
+  startTime: '09:00',
+  endTime: '11:30',
+  capacity: '12',
+  meetingPoint: 'North jetty steps',
+  description: '',
+}
+console.log(eventFormSchema.parse(typed))
+
+const result = eventFormSchema.safeParse({ ...typed, title: 'Dune', capacity: 'lots', endTime: '08:00' })
+if (!result.success) {
+  console.log(z.flattenError(result.error).fieldErrors)
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>{
+  title: 'Dune Grass Cleanup',
+  siteId: 'north-jetty',
+  date: '2099-06-14',
+  startTime: '09:00',
+  endTime: '11:30',
+  capacity: 12,
+  meetingPoint: 'North jetty steps',
+  description: ''
+}
+{
+  title: [ 'Use at least 5 characters for the title.' ],
+  capacity: [ 'Capacity must be a whole number from 1 to 200.' ],
+  endTime: [ 'The end time must be after the start time.' ]
+}</code></pre>
+                </div>
+                <p>Look at the first object: the title lost its spaces and <code>capacity</code> is <code>12</code> without quotes, a number. The second object has one message per field, ready for <code>FieldError</code>. You will run this file yourself in Step 1.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: Zod 4</h4>
+                    <p>Zod 4 renamed the options that set messages: one <code>error</code> option (a string or a function) replaces Zod 3's <code>message</code>, <code>required_error</code>, <code>invalid_type_error</code> and <code>errorMap</code> (<code>message</code> still works but is deprecated). <code>error.flatten()</code> became <code>z.flattenError(error)</code>, and string formats moved to the top level: <code>z.email()</code> instead of <code>z.string().email()</code>. Tutorials written before Zod 4 use the old forms; Common Mistakes shows what <code>tsc</code> says about one of them.</p>
+                </div>
+            </section>
+
+            <section id="input-output" class="lesson-section">
+                <h2>🔀 Input and Output Types</h2>
+                <p>A Zod schema has <em>two</em> TypeScript types. Its <strong>input</strong> type is what you may hand it; its <strong>output</strong> type is what comes back after a successful check. For most schemas they are the same, but <code>.trim()</code>, <code>coerce</code>, <code>.transform()</code> and <code>.default()</code> can make them differ. The cleanup schema has one such field: the capacity box holds text, and the checked data holds a number.</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/schemas.ts</div>
+                    <pre data-src="shoreline-hq/src/api/schemas.ts" data-match="excerpt"><code class="language-ts">/** What the form's fields hold: text, as typed */
+export type EventFormValues = z.input&lt;typeof eventFormSchema&gt;
+
+/** What a successful check gives back: trimmed, with capacity as a number, ready to send */
+export type EventFormData = z.output&lt;typeof eventFormSchema&gt;</code></pre>
+                </div>
+                <p><code>z.input&lt;typeof eventFormSchema&gt;</code> reads the input type out of the schema value (<code>typeof</code> turns a value into its type, Lesson 7.3), and <code>z.output</code> the output type. (<code>z.infer</code>, which you will see in many tutorials, is another name for <code>z.output</code>.) To see them, ask TypeScript to put the wrong thing in each:</p>
+                <pre data-snippet><code class="language-ts">import type { EventFormData, EventFormValues } from './api/schemas.ts'
+
+// What the capacity box holds, and what the checked data holds
+export const typed: EventFormValues['capacity'] = 12
+export const checked: EventFormData['capacity'] = '12'</code></pre>
+                <figure class="screenshot">
+                    <img src="images/lesson_27/27-input-output.png" alt="A terminal in shoreline-hq. npx tsc -b reports two TS2322 errors in src/Scratch.ts: Type number is not assignable to type string for the variable typed, and Type string is not assignable to type number for the variable checked. Found 2 errors in the same file." width="803" height="347" loading="lazy">
+                    <figcaption>Two types from one schema: the capacity box holds a <code>string</code> (<code>z.input</code>), the checked data holds a <code>number</code> (<code>z.output</code>).</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.ts:4:14 - error TS2322: Type 'number' is not assignable to type 'string'.
+
+4 export const typed: EventFormValues['capacity'] = 12
+               ~~~~~
+
+src/Scratch.ts:5:14 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+5 export const checked: EventFormData['capacity'] = '12'
+               ~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/Scratch.ts:4</code></pre>
+                </div>
+                <p>Why <code>z.coerce.number&lt;string&gt;()</code> and not just <code>z.coerce.number()</code>? A coerced schema accepts <em>anything</em> it can try to turn into a number, so its input type is <code>unknown</code> by default. The type argument narrows the input to <code>string</code>, which is true for a form box and keeps the form's types honest: every field's value is text, exactly like Lesson 3.5's <code>EventFormValues</code>. The difference between the two types is the point of the schema. The form works with what people type; the code after the check works with what the API wants.</p>
+                <div class="card card-info">
+                    <h4>💡 Why this matters for forms</h4>
+                    <p>A form library holds the <em>input</em> type while people type and hands your submit function the <em>output</em> type after the check. Giving it the wrong one is the most common TypeScript error with React Hook Form and Zod, and it is in Common Mistakes. Remember the rule: <strong>fields hold the input, the submit function gets the output</strong>.</p>
+                </div>
+            </section>
+
+            <section id="rhf" class="lesson-section">
+                <h2>🎣 React Hook Form</h2>
+                <p><strong>React Hook Form</strong> (RHF) is a library that keeps a form's values, errors and status for you. Like the Plan a cleanup form, it uses <strong>uncontrolled</strong> inputs (Lesson 3.5): each box keeps its own value, and RHF reads it through a ref when it needs to check or submit. You get one Hook, <code>useForm</code>, and it gives back the tools:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/EditEventForm.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/EditEventForm.tsx" data-match="excerpt"><code class="language-tsx">// The resolver runs the schema: its input type is the fields' type, its output what save gets
+const {
+  register,
+  handleSubmit,
+  setError,
+  formState: { errors, isSubmitting },
+} = useForm({
+  resolver: zodResolver(eventFormSchema),
+  defaultValues: toFormValues(event),
+})</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Part</th><th>What it does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>resolver: zodResolver(eventFormSchema)</code></td><td>Runs the schema whenever RHF checks the form, and turns Zod's problems into RHF's errors</td></tr>
+                            <tr><td><code>defaultValues</code></td><td>What the boxes start with: here the saved cleanup as text. Read once, when the form is created</td></tr>
+                            <tr><td><code>register('title')</code></td><td>Returns <code>name</code>, <code>ref</code>, <code>onChange</code> and <code>onBlur</code> to spread on a box, so RHF can read it and follow its changes</td></tr>
+                            <tr><td><code>handleSubmit(save)</code></td><td>An <code>onSubmit</code> handler: stops the page load, runs the resolver, then calls <code>save</code> with the checked data, or shows the errors and focuses the first bad field</td></tr>
+                            <tr><td><code>formState.errors</code></td><td>One error per field (<code>errors.title?.message</code>), plus <code>errors.root</code> for the whole form</td></tr>
+                            <tr><td><code>formState.isSubmitting</code></td><td><code>true</code> while <code>save</code> runs (it is <code>async</code>, so that includes the request)</td></tr>
+                            <tr><td><code>setError</code></td><td>Adds an error by hand, for example one the API sent</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>There are no type arguments: <code>zodResolver</code>'s return type carries the schema's input and output types, and <code>useForm</code> infers both from it. Hover <code>useForm</code> in VS Code and you will see <code>UseFormReturn</code> with the input type first and the output type last. Everything else follows: <code>register</code> accepts only the schema's eight field names, <code>errors</code> has a property for each, and <code>save</code> must accept the output type, <code>EventFormData</code>, with <code>capacity: number</code>.</p>
+                <pre data-snippet><code class="language-tsx">import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { eventFormSchema } from './api/schemas.ts'
+
+export function useTitleField() {
+  const { register } = useForm({ resolver: zodResolver(eventFormSchema) })
+  return register('titel')
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:7:19 - error TS2345: Argument of type '"titel"' is not assignable to parameter of type '"capacity" | "date" | "description" | "endTime" | "meetingPoint" | "siteId" | "startTime" | "title"'.
+
+7   return register('titel')
+                    ~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:7</code></pre>
+                </div>
+                <p>Compare that with Lesson 3.5, where <code>EventField</code> had to be written by hand to catch the same typo. Now it comes from the schema. If you prefer to see the types written out, the explicit form is <code>useForm&lt;EventFormValues, unknown, EventFormData&gt;</code>: field values, a "context" you will not need, and the type after the resolver (this type-checks too).</p>
+                <p>Each field gets its props from a small helper, like Lesson 3.5's <code>fieldProps</code>, with <code>register</code> spread in:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/EditEventForm.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/EditEventForm.tsx" data-match="excerpt"><code class="language-tsx">// What every field needs: register's name, ref and handlers, plus a link to its message
+function fieldProps(field: EventField) {
+  const invalid = errors[field] !== undefined
+  return {
+    id: field,
+    ...register(field),
+    'aria-invalid': invalid,
+    'aria-describedby': invalid ? `${field}-error` : undefined,
+  }
+}
+
+// React Hook Form keeps one message per field; FieldError takes a list
+function messagesFor(field: EventField) {
+  const message = errors[field]?.message
+  return message === undefined ? undefined : [message]
+}</code></pre>
+                </div>
+                <p><strong>When does it check?</strong> By default (<code>mode: 'onSubmit'</code>), nothing is checked until the first Save. After that, every change to a field is checked again (<code>reValidateMode: 'onChange'</code>), so a message disappears as soon as the field is fixed. Other modes are <code>'onBlur'</code>, <code>'onTouched'</code> (after leaving a field, then on every change; Exercise 1), <code>'onChange'</code> and <code>'all'</code>. Checking while someone is still typing their first attempt feels like being told off, which is why the default waits.</p>
+                <p><strong>How often does it re-render?</strong> Measured on the dev server with a React <code>Profiler</code> around the form: typing " steps" into the meeting point re-rendered the form <strong>0</strong> times; after a failed Save, typing into a field that was already valid still re-rendered it 0 times, and fixing the title re-rendered it 2 times, when its message changed. RHF re-renders only when something the component reads from <code>formState</code> changes. That works with the React Compiler from Lesson 5.3: <code>npm run lint</code> reports nothing, and every message in this lesson was measured with the compiler on.</p>
+                <div class="mermaid">
+graph TD
+    A["Save changes"] --> B["Resolver runs the schema"]
+    B --> C{"Any problems?"}
+    C -->|"yes"| D["Messages + focus"]
+    C -->|"no"| E["save(checked data)"]
+    E --> F["PATCH the cleanup"]
+    F --> G{"API answer"}
+    G -->|"400"| H["setError per field"]
+    G -->|"200"| I["Invalidate, go to page"]
+                </div>
+            </section>
+
+            <section id="server" class="lesson-section">
+                <h2>📨 When the API Says No</h2>
+                <p>The schema catches mistakes before anything is sent. The API still has the last word, and some of its rules need data the form does not have. Weekend Cove Cleanup is full, with 18 volunteers signed up; the schema happily accepts a capacity of 10, and shoreline-api answers 400 with <code>fieldErrors</code>: <code>{ "capacity": ["18 volunteers already hold a spot: capacity cannot be lower."] }</code>. Lesson 7.2 showed those messages with <code>FieldError</code> in the Plan a cleanup form. With RHF, <code>setError</code> puts them into <code>formState.errors</code>, and the same markup shows them:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/EditEventForm.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/EditEventForm.tsx" data-match="excerpt"><code class="language-tsx">// handleSubmit calls this only when the schema found nothing to fix
+async function save(changes: EventFormData) {
+  try {
+    await update.mutateAsync({ eventId: event.id, changes })
+    await navigate(`/events/${event.id}`)
+  } catch (error: unknown) {
+    if (error instanceof ApiError &amp;&amp; error.fieldErrors !== undefined) {
+      // 400: the API's own rules said no. Its messages go under the same fields as ours.
+      let first = true
+      for (const [name, messages] of Object.entries(error.fieldErrors)) {
+        if (isEventField(name)) {
+          setError(name, { type: 'server', message: messages.join(' ') }, { shouldFocus: first })
+          first = false
+        }
+      }
+      setError('root.server', { message: error.message })
+    } else {
+      setError('root.server', { message: `Not saved. ${describeError(error)}` })
+    }
+  }
+}</code></pre>
+                </div>
+                <ul>
+                    <li><code>setError(name, { type, message }, { shouldFocus })</code> marks a field invalid with a message. The first field gets the focus, as the schema's errors do.</li>
+                    <li>The API's <code>fieldErrors</code> keys are plain strings (it is JSON from outside). <code>setError</code> only takes the form's field names, so <code>isEventField</code>, a type predicate in <code>eventForm.ts</code>, checks each key first. Leave it out and <code>tsc</code> says so (Common Mistakes).</li>
+                    <li><code>'root.server'</code> is a <strong>root error</strong>: a message for the whole form, read from <code>errors.root?.server?.message</code>. The status line above the form shows it, or "Saving…" while <code>isSubmitting</code>. React Hook Form's documentation says root errors do not carry over to the next submit.</li>
+                    <li>Anything else (the API is down, a 500) becomes one sentence from <code>describeError</code>. Measured with a forced 500: one PATCH (mutations do not retry, Lesson 7.2), "Not saved. The server had a problem (500). Try again in a moment.", and the typed title still in its box.</li>
+                </ul>
+                <p>One measured detail: after the API's capacity message appeared, changing the capacity to 15 made the message disappear, because RHF checked the field again with the schema, and the schema has no objection to 15. Saving again brought the API's message back. That is the right split: the form clears what it cannot judge, and the API judges again on every save.</p>
+                <div class="card card-danger">
+                    <h4>🛑 The form is a courtesy, the API is the lock</h4>
+                    <p>Everything the schema checks, someone can skip: DevTools, <code>curl</code>, an old version of the app. The edit page's guard (organizers only) and the schema make the HQ pleasant and fast; shoreline-api's own checks of the token, the role and every field are what keep the data safe. Never remove a server check because "the form already does it".</p>
+                </div>
+            </section>
+
+            <section id="which-form" class="lesson-section">
+                <h2>⚖️ Two Forms, One Schema</h2>
+                <p>The HQ now has two cleanup forms. Should the Plan a cleanup form move to React Hook Form too? The honest answer for this app is <strong>no, not today</strong>, and the reasons are worth naming because you will face the same choice on real projects:</p>
+                <ul>
+                    <li><strong>The real problem was the duplicated rules, and the schema already fixed it.</strong> In the project, Plan a cleanup's action calls <code>eventFormSchema.safeParse(values)</code> instead of <code>validateEvent</code>. The rules, the messages and the types now live in one place for both forms.</li>
+                    <li><strong>It already works, and it is React's own tool.</strong> <code>useActionState</code> with a form action (Lesson 3.5) has no dependency and does what this form needs: check on submit, show messages, keep the values, call the API (Lesson 7.2). Rewriting working code is a cost; do it when the form outgrows its tool.</li>
+                    <li><strong>The edit form needed things RHF gives for free</strong>: starting values from saved data (<code>defaultValues</code>), errors that clear as people fix them, and (Exercises 1 and 3) knowing which fields changed. Those are the signs a form wants a library.</li>
+                    <li><strong>You will meet both.</strong> Form actions are the direction React and frameworks such as Next.js are going; React Hook Form is in most existing codebases. Seeing one schema serve both is the useful lesson.</li>
+                </ul>
+                <p>The cost: the two forms repeat about fifty lines of field markup. If they keep growing together, a shared fields component (or moving Plan a cleanup to RHF) becomes worth it; Lesson 8.2's longer forms are where that decision gets made.</p>
+                <p><strong>And <code>isCleanupEvent</code>?</strong> Zod can check API responses too, and Exercise 2 has you try it. The HQ keeps its hand-written guards for now, for a measured reason. Zod is the biggest thing this lesson adds to the build:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Build of the HQ</th><th>JavaScript</th><th>gzip</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>After Lesson 7.3</td><td>431.11 kB</td><td>135.60 kB</td></tr>
+                            <tr><td>After this lesson (React Hook Form, Zod, the resolver, two forms)</td><td>561.81 kB (+130.7)</td><td>175.81 kB (+40.2)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Built on their own, Zod's full API came to about 103 kB (25 kB gzip), React Hook Form about 46 kB (14 kB gzip) and the resolver about 6 kB (measured with a one-line test file each). Only organizers open the two forms. In Lesson 10.1 you will load pages like these only when someone visits them, so guests browsing cleanups never download Zod. If <code>client.ts</code> used Zod for every response, every visitor would need it. The guards stay small and hand-written, and the schemas stay with the forms. (Exercise 2 measures what a response schema adds today: almost nothing, because Zod is already in this build.)</p>
+                <p>Notice also that the build now prints a warning: one JavaScript file is over 500 kB. It is a warning, not an error; the build succeeds. It is Vite suggesting the code splitting that Lesson 10.1 teaches.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ <code>useForm&lt;z.infer&lt;typeof schema&gt;&gt;</code> with a schema that changes types</h3>
+                    <p>Many tutorials write <code>type FormValues = z.infer&lt;typeof schema&gt;</code> and pass it to <code>useForm</code>. With a schema whose input and output differ, that is wrong: <code>z.infer</code> is the output (capacity a number), but the fields hold the input (capacity text).</p>
+                    <pre data-snippet><code class="language-tsx">import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import type { z } from 'zod'
+import { eventFormSchema } from './api/schemas.ts'
+
+export function useEventForm() {
+  // z.infer is the OUTPUT type (capacity: number), but the fields hold the INPUT (capacity: string)
+  return useForm&lt;z.infer&lt;typeof eventFormSchema&gt;&gt;({
+    resolver: zodResolver(eventFormSchema),
+  })
+}</code></pre>
+                    <p>The first line of the error names two long <code>Resolver</code> types; the end of the message says what differs:</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>...
+  Types of parameters 'values' and 'values' are incompatible.
+    Type '{ title: string; siteId: string; date: string; startTime: string; endTime: string; capacity: number; meetingPoint: string; description: string; }' is not assignable to type '{ title: string; siteId: string; date: string; startTime: string; endTime: string; capacity: string; meetingPoint: string; description: string; }'.
+      Types of property 'capacity' are incompatible.
+        Type 'number' is not assignable to type 'string'.
+
+9     resolver: zodResolver(eventFormSchema),
+      ~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:9</code></pre>
+                    </div>
+                    <p>The fix: no type argument at all (let <code>zodResolver</code> decide), or all three: <code>useForm&lt;EventFormValues, unknown, EventFormData&gt;</code>. Read the message from the bottom up: "Types of property 'capacity' are incompatible" is the whole story.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A two-field rule that waits for everything else</h3>
+                    <p>Without <code>when</code>, the end-time rule on the object runs only when <em>every</em> field is valid. Running the Step 1 test file with that version of the schema, the second object came out without the end-time message:</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>...
+{
+  title: [ 'Use at least 5 characters for the title.' ],
+  capacity: [ 'Capacity must be a whole number from 1 to 200.' ]
+}</code></pre>
+                    </div>
+                    <p>The end time 08:00 is still before 09:00; nobody is told until the title and capacity are fixed and Save is pressed again. With <code>when</code>, all three messages arrive together.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Passing the API's field names straight to <code>setError</code></h3>
+                    <p>Remove the <code>isEventField</code> check from the loop in <code>save</code>, and:</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/components/EditEventForm.tsx:45:20 - error TS2345: Argument of type 'string' is not assignable to parameter of type '"capacity" | "date" | "description" | "endTime" | "meetingPoint" | "siteId" | "startTime" | "title" | ErrorNamespacePath'.
+
+45           setError(name, { type: 'server', message: messages.join(' ') }, { shouldFocus: first })
+                      ~~~~
+
+
+Found 1 error in src/components/EditEventForm.tsx:45</code></pre>
+                    </div>
+                    <p><code>Object.entries</code> gives <code>string</code> keys, and <code>setError</code> wants one of the form's names (or a <code>root.</code> name). Do not silence it with <code>as EventField</code>: the API could send a key the form does not have, such as <code>suppliesProvided</code>, and that message would vanish into an error nobody displays. The type predicate checks it for real.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A child loader that forgets the guard</h3>
+                    <p>The edit route sits inside the organizers-only route group from Lesson 6.3, so it looks protected. But a parent route's loader and a child route's loader run <em>at the same time</em>. With <code>organizersOnly(args)</code> removed from <code>editEventLoader</code>, a guest opening <code>/events/e08/edit</code> was still sent to the sign-in page, but the browser had already sent <code>GET /events/e08</code> and <code>GET /sites</code> (measured). Here the API would refuse anything private; elsewhere that could leak data or waste requests. Child loaders under a guard call the guard first.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Zod 3 code from older tutorials</h3>
+                    <pre data-snippet data-legacy><code class="language-ts">import { z } from 'zod'
+
+// Zod 3 style, as many older tutorials write it
+export const title = z
+  .string({ required_error: 'Add a title.' })
+  .min(5, { message: 'Use at least 5 characters for the title.' })
+export const email = z.string().email()</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/Scratch.ts:5:13 - error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Object literal may only specify known properties, and 'required_error' does not exist in type '$ZodStringParams'.
+
+5   .string({ required_error: 'Add a title.' })
+              ~~~~~~~~~~~~~~
+...
+Found 1 error in src/Scratch.ts:5</code></pre>
+                    </div>
+                    <p><code>required_error</code> is gone (use <code>error</code>), while <code>{ message: … }</code> and <code>z.string().email()</code> still compile but are deprecated: VS Code draws them struck through. Write <code>.min(5, 'Use at least…')</code> or <code>{ error: … }</code>, and <code>z.email()</code>.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Edit a Cleanup's Details</h2>
+                <p>Step 1 installs the libraries and writes the schema, Step 2 moves Plan a cleanup onto it, Step 3 adds the save and the route, Step 4 builds the form and its page, and Step 5 adds the way in and tries everything, including the API saying no. Keep shoreline-api and <code>npm run dev</code> running, and sign in as an organizer (<code>maya.okafor@example.com</code>, password <code>shoreline-demo</code>).</p>
+
+                <div class="card">
+                    <h3>Step 1: Install the libraries and write the schema <span class="step-time">(12 min)</span></h3>
+                    <p>In a third terminal, in <code>shoreline-hq</code>:</p>
+                    <pre class="terminal"><code class="language-bash">npm install react-hook-form zod @hookform/resolvers</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>added 4 packages, and audited 85 packages in 2s
+
+19 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities</code></pre>
+                    </div>
+                    <p>Three libraries, plus one small helper the resolver uses (this course was checked with React Hook Form 7.92.0, Zod 4.6.7 and @hookform/resolvers 7.0.6; your timing will differ). <code>@hookform/resolvers</code> connects React Hook Form to schema libraries; you will import it from <code>@hookform/resolvers/zod</code>. Create <code>src/api/schemas.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/schemas.ts</div>
+                        <pre data-src="shoreline-hq/src/api/schemas.ts"><code class="language-ts">// Shoreline Crew HQ's Zod schemas (Lesson 8.1): each one is a type AND its checks, written once.
+import { z } from 'zod'
+import { toDateString } from '../utils/format.ts'
+
+// Compared when the check runs, so a form left open overnight uses the new date
+function isTodayOrLater(date: string): boolean {
+  return date &gt;= toDateString(new Date())
+}
+
+const capacityRule = 'Capacity must be a whole number from 1 to 200.'
+
+// The rules for a cleanup's details, shared by the Plan a cleanup and Edit forms.
+// The API checks the same rules (and a few only it can check); most messages match its own.
+export const eventFormSchema = z
+  .object({
+    title: z
+      .string()
+      .trim()
+      // error can be a function: one rule, a message that fits what was typed
+      .min(5, {
+        error: (issue) =&gt;
+          issue.input === '' ? 'Add a title.' : 'Use at least 5 characters for the title.',
+      })
+      .max(80, 'Keep the title to 80 characters or fewer.'),
+    siteId: z.string().min(1, 'Choose one of the cleanup sites.'),
+    date: z.string().refine(isTodayOrLater, {
+      error: (issue) =&gt; (issue.input === '' ? 'Pick a date.' : 'Pick today or a later date.'),
+    }),
+    startTime: z.string().min(1, 'Pick a start time.'),
+    endTime: z.string().min(1, 'Pick an end time.'),
+    // The box holds text; the API wants a number. coerce turns '12' into 12 (and '' into 0).
+    capacity: z.coerce
+      .number&lt;string&gt;({ error: capacityRule })
+      .refine((count) =&gt; Number.isInteger(count) &amp;&amp; count &gt;= 1 &amp;&amp; count &lt;= 200, capacityRule),
+    meetingPoint: z
+      .string()
+      .trim()
+      .min(3, 'Say where volunteers meet (at least 3 characters).')
+      .max(120, 'Keep the meeting point to 120 characters or fewer.'),
+    description: z.string().trim().max(2000, 'Keep the description to 2000 characters or fewer.'),
+  })
+  // A rule about two fields belongs to the object; path puts its message under endTime
+  .refine((event) =&gt; event.endTime &gt; event.startTime, {
+    path: ['endTime'],
+    error: 'The end time must be after the start time.',
+    // An object's refine normally waits until EVERY field is valid. This one only needs the
+    // two times to be valid, so its message appears together with the others.
+    when: ({ issues }) =&gt;
+      issues.every((issue) =&gt; issue.path?.[0] !== 'startTime' &amp;&amp; issue.path?.[0] !== 'endTime'),
+  })
+
+/** What the form's fields hold: text, as typed */
+export type EventFormValues = z.input&lt;typeof eventFormSchema&gt;
+
+/** What a successful check gives back: trimmed, with capacity as a number, ready to send */
+export type EventFormData = z.output&lt;typeof eventFormSchema&gt;</code></pre>
+                    </div>
+                    <p>Now try it the way you tried TypeScript in Module 2: with Node, which runs TypeScript files by removing their types. Create <code>src/try-schema.ts</code> with the test file from "Zod 4: A Type and Its Checks" (the one that starts with <code>// A quick look at the schema with Node</code>), then run it:</p>
+                    <pre class="terminal"><code class="language-bash">node src/try-schema.ts</code></pre>
+                    <p>You should see the two objects from that section. Change a value or two (a title of 81 characters, a capacity of <code>0</code>) and run it again. When you are done, <strong>delete <code>src/try-schema.ts</code></strong>: it is not part of the app.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Plan a cleanup checks with the schema <span class="step-time">(10 min)</span></h3>
+                    <p><code>utils/eventForm.ts</code> keeps what is about reading forms, and loses the rules. The types now come from the schema; two small helpers are new: <code>isEventField</code> for the API's field names (Step 4) and <code>toFormValues</code>, which turns a saved cleanup into form text. Replace the whole file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/eventForm.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/eventForm.ts"><code class="language-ts">// Reading the cleanup forms (Lessons 3.5 and 8.1).
+// The rules live in ONE place, eventFormSchema in api/schemas.ts; the types come from it too.
+import type { EventFormValues } from '../api/schemas.ts'
+import type { CleanupEvent } from '../api/types.ts'
+
+// The form's fields: the schema's keys, so a new field in the schema is a new field here
+export type EventField = keyof EventFormValues
+
+// The API's fieldErrors shape (field name: messages), with names TypeScript can check
+export type FieldErrors = Partial&lt;Record&lt;EventField, string[]&gt;&gt;
+
+export const emptyValues: EventFormValues = {
+  title: '',
+  siteId: '',
+  date: '',
+  startTime: '',
+  endTime: '',
+  capacity: '',
+  meetingPoint: '',
+  description: '',
+}
+
+/** Is this name one of the form's fields? (The API's fieldErrors use plain strings.) */
+export function isEventField(name: string): name is EventField {
+  return Object.hasOwn(emptyValues, name)
+}
+
+// formData.get() returns a string, a File (from a file input) or null (no such field)
+function readText(formData: FormData, name: EventField): string {
+  const value = formData.get(name)
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export function readValues(formData: FormData): EventFormValues {
+  return {
+    title: readText(formData, 'title'),
+    siteId: readText(formData, 'siteId'),
+    date: readText(formData, 'date'),
+    startTime: readText(formData, 'startTime'),
+    endTime: readText(formData, 'endTime'),
+    capacity: readText(formData, 'capacity'),
+    meetingPoint: readText(formData, 'meetingPoint'),
+    description: readText(formData, 'description'),
+  }
+}
+
+/** A saved cleanup as the text the form shows (the edit form starts from these) */
+export function toFormValues(event: CleanupEvent): EventFormValues {
+  return {
+    title: event.title,
+    siteId: event.siteId,
+    date: event.date,
+    startTime: event.startTime,
+    endTime: event.endTime,
+    capacity: String(event.capacity),
+    meetingPoint: event.meetingPoint,
+    description: event.description,
+  }
+}</code></pre>
+                    </div>
+                    <p><code>validateEvent</code> and <code>toNewEvent</code> are gone, so <code>NewEventForm</code> no longer compiles. That is TypeScript giving you the list of places to change. In <code>src/components/NewEventForm.tsx</code>, change the imports:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { useActionState, useEffect, useRef } from 'react'
+ import { useNavigate } from 'react-router'
++import { z } from 'zod'
+ import { ApiError, describeError } from '../api/client.ts'
+ import { createEventMutation } from '../api/mutations.ts'
++import { eventFormSchema, type EventFormValues } from '../api/schemas.ts'
+ import type { Site } from '../api/types.ts'
+-import {
+-  emptyValues,
+-  readValues,
+-  toNewEvent,
+-  validateEvent,
+-  type EventField,
+-  type EventFormValues,
+-  type FieldErrors,
+-} from '../utils/eventForm.ts'
+-import { toDateString } from '../utils/format.ts'
++import { emptyValues, readValues, type EventField, type FieldErrors } from '../utils/eventForm.ts'
+ import { Button } from './Button.tsx'
+ import { FieldError } from './FieldError.tsx'</code></pre>
+                    </div>
+                    <p>and the action:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> 
+   // The form's action: React calls it with the previous state and the submitted FormData.
+-  // It is inside the component because it checks the site against the sites prop.
++  // It is inside the component because it uses the mutation and navigate.
+   async function planCleanup(_previous: FormState, formData: FormData): Promise&lt;FormState&gt; {
+     const values = readValues(formData)
+-    const errors = validateEvent(values, toDateString(new Date()), sites)
+-    if (Object.keys(errors).length &gt; 0) {
+-      return { values, errors, problem: '' }
++    // The same schema as the Edit form: text in, checked data (capacity a number) out
++    const result = eventFormSchema.safeParse(values)
++    if (!result.success) {
++      return { values, errors: z.flattenError(result.error).fieldErrors, problem: '' }
+     }
+     // The button that submitted the form sends its own name and value
+     const status = formData.get('status') === 'scheduled' ? 'scheduled' : 'draft'
+     try {
+-      const created = await createEvent.mutateAsync(toNewEvent(values, status))
++      const created = await createEvent.mutateAsync({ ...result.data, status })
+       await navigate(`/events/${created.id}`)
+       return initialState</code></pre>
+                    </div>
+                    <p><code>z.flattenError(…).fieldErrors</code> has exactly the shape of <code>FieldErrors</code>, so <code>FormState</code> did not change. After the check, <code>result.data</code> is the output type: <code>{ ...result.data, status }</code> is a complete <code>NewEvent</code> (TypeScript checks it), which is why <code>toNewEvent</code> could go. One check moved: the old code compared the site with the loaded sites; the schema only asks for a choice, since the menu only offers real sites, and the API checks the rest.</p>
+                    <p>Open <strong>Plan a cleanup</strong>, type <code>Dune</code> as the title, set the times to 10:00 and 08:00, and press <strong>Publish</strong>. Measured: six messages (title, site, date, end time, capacity, meeting point), the same words as before, the focus in the title box, and no request to the API.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Save edits, load the page, add the route <span class="step-time">(10 min)</span></h3>
+                    <p>Saving is a mutation like Lesson 7.2's. <code>client.ts</code> already has <code>patchEvent(id, changes)</code>, and <code>EventChanges</code> (from <code>types.ts</code>) accepts any of the details. In <code>src/api/mutations.ts</code>, update the import and add a factory after <code>cancelEventMutation</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/mutations.ts</div>
+                        <pre data-src="shoreline-hq/src/api/mutations.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> import { patchEvent, patchSignup, postEvent } from './client.ts'
+ import { queryClient, rosterQuery } from './queries.ts'
+-import type { NewEvent, SignupStatus } from './types.ts'
++import type { EventChanges, NewEvent, SignupStatus } from './types.ts'
+ 
+ /** Plan a cleanup. Waits for the API: the new cleanup's id comes from it. */</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/mutations.ts</div>
+                        <pre data-src="shoreline-hq/src/api/mutations.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   return mutationOptions({
+     mutationFn: (eventId: string) =&gt; patchEvent(eventId, { status: 'cancelled' }),
++    onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: ['events'] }),
++  })
++}
++
++/** Which cleanup to change, and the new values of its details */
++export interface EventUpdate {
++  eventId: string
++  changes: EventChanges
++}
++
++/** Save an organizer's edits. Waits for the API: it has rules the form cannot check. */
++export function updateEventMutation() {
++  return mutationOptions({
++    mutationFn: ({ eventId, changes }: EventUpdate) =&gt; patchEvent(eventId, changes),
++    // The cleanup's page and every list that shows it are out of date now
+     onSuccess: () =&gt; queryClient.invalidateQueries({ queryKey: ['events'] }),
+   })</code></pre>
+                    </div>
+                    <p>It waits for the API (not optimistic): edits can be refused, and Lesson 7.2's table puts "might be refused" on the waiting side. The schema's output, <code>EventFormData</code>, fits <code>EventChanges</code> without any conversion: every field is there with the API's type. Next, a loader for the new route. In <code>src/pages/loaders.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/loaders.ts</div>
+                        <pre data-src="shoreline-hq/src/pages/loaders.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> import { ApiError, readSession } from '../api/client.ts'
+ import { eventQuery, impactTotalsQuery, queryClient, sitesQuery, viewerId } from '../api/queries.ts'
++import { organizersOnly } from '../auth/guards.ts'
+ 
+ /** /sites: the six beach sites */</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/loaders.ts</div>
+                        <pre data-src="shoreline-hq/src/pages/loaders.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   return null
+ }
++
++/** /events/:eventId/edit: organizers only; the cleanup and the sites must be in the cache */
++export async function editEventLoader(args: LoaderFunctionArgs) {
++  // The guard route's loader runs at the same time as this one: check first, so a guest
++  // is sent to sign in before any request goes out
++  organizersOnly(args)
++  const [ids] = await Promise.all([
++    eventLoader(args),
++    queryClient.query({ ...sitesQuery(), staleTime: 'static' }),
++  ])
++  return ids
++}</code></pre>
+                    </div>
+                    <p><code>organizersOnly(args)</code> first (the rule from Lesson 6.3: a child loader runs at the same time as its guard). Then <code>eventLoader</code> does everything it does for the cleanup's page, including the "Cleanup not found" 404, and the sites load at the same time, because the form's menu needs them. Last, the route, inside the organizers-only group in <code>src/App.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { signInAction } from './auth/signInAction.ts'
+ import { AppLayout } from './components/AppLayout.tsx'
++import { EditEventPage } from './pages/EditEventPage.tsx'
+ import { ErrorPage } from './pages/ErrorPage.tsx'
+ import { EventPage } from './pages/EventPage.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { HomePage } from './pages/HomePage.tsx'
+ import { ImpactPage } from './pages/ImpactPage.tsx'
+-import { eventLoader, impactLoader, sitesLoader } from './pages/loaders.ts'
++import { editEventLoader, eventLoader, impactLoader, sitesLoader } from './pages/loaders.ts'
+ import { NewEventPage } from './pages/NewEventPage.tsx'
+ import { NotFoundPage } from './pages/NotFoundPage.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">             children: [
+               { path: 'events/new', element: &lt;NewEventPage /&gt; },
++              // A child loader runs in parallel with the guard's: editEventLoader checks again first
++              { path: 'events/:eventId/edit', element: &lt;EditEventPage /&gt;, loader: editEventLoader },
+               {
+                 path: 'volunteers',</code></pre>
+                    </div>
+                    <p><code>EditEventPage</code> does not exist yet, so <code>tsc</code> complains about the import until Step 4. That is fine: it is your to-do list.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The edit form and its page <span class="step-time">(15 min)</span></h3>
+                    <p>Create <code>src/components/EditEventForm.tsx</code>. You have read every part of it in the sections above; the markup below the status line is the Plan a cleanup form's, with <code>fieldProps</code> now spreading <code>register</code>, and one submit button:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EditEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EditEventForm.tsx"><code class="language-tsx">import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation } from '@tanstack/react-query'
+import { useForm } from 'react-hook-form'
+import { Link, useNavigate } from 'react-router'
+import { ApiError, describeError } from '../api/client.ts'
+import { updateEventMutation } from '../api/mutations.ts'
+import { eventFormSchema, type EventFormData } from '../api/schemas.ts'
+import type { CleanupEvent, Site } from '../api/types.ts'
+import { isEventField, toFormValues, type EventField } from '../utils/eventForm.ts'
+import { Button } from './Button.tsx'
+import { FieldError } from './FieldError.tsx'
+import formStyles from './Form.module.css'
+
+interface EditEventFormProps {
+  /** The cleanup as it is saved now: the form starts from its values */
+  event: CleanupEvent
+  /** The beach sites to choose from */
+  sites: Site[]
+}
+
+export function EditEventForm({ event, sites }: EditEventFormProps) {
+  const update = useMutation(updateEventMutation())
+  const navigate = useNavigate()
+  // The resolver runs the schema: its input type is the fields' type, its output what save gets
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: toFormValues(event),
+  })
+
+  // handleSubmit calls this only when the schema found nothing to fix
+  async function save(changes: EventFormData) {
+    try {
+      await update.mutateAsync({ eventId: event.id, changes })
+      await navigate(`/events/${event.id}`)
+    } catch (error: unknown) {
+      if (error instanceof ApiError &amp;&amp; error.fieldErrors !== undefined) {
+        // 400: the API's own rules said no. Its messages go under the same fields as ours.
+        let first = true
+        for (const [name, messages] of Object.entries(error.fieldErrors)) {
+          if (isEventField(name)) {
+            setError(name, { type: 'server', message: messages.join(' ') }, { shouldFocus: first })
+            first = false
+          }
+        }
+        setError('root.server', { message: error.message })
+      } else {
+        setError('root.server', { message: `Not saved. ${describeError(error)}` })
+      }
+    }
+  }
+
+  // What every field needs: register's name, ref and handlers, plus a link to its message
+  function fieldProps(field: EventField) {
+    const invalid = errors[field] !== undefined
+    return {
+      id: field,
+      ...register(field),
+      'aria-invalid': invalid,
+      'aria-describedby': invalid ? `${field}-error` : undefined,
+    }
+  }
+
+  // React Hook Form keeps one message per field; FieldError takes a list
+  function messagesFor(field: EventField) {
+    const message = errors[field]?.message
+    return message === undefined ? undefined : [message]
+  }
+
+  return (
+    &lt;&gt;
+      &lt;p role="status" className={formStyles.status}&gt;
+        {isSubmitting ? 'Saving…' : errors.root?.server?.message}
+      &lt;/p&gt;
+      &lt;form onSubmit={handleSubmit(save)} noValidate className={formStyles.form}&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="title"&gt;Title (5 to 80 characters)&lt;/label&gt;
+          &lt;input type="text" {...fieldProps('title')} /&gt;
+          &lt;FieldError id="title-error" messages={messagesFor('title')} /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="siteId"&gt;Beach site&lt;/label&gt;
+          &lt;select {...fieldProps('siteId')}&gt;
+            &lt;option value=""&gt;Choose a site&lt;/option&gt;
+            {sites.map((site) =&gt; (
+              &lt;option key={site.id} value={site.id}&gt;
+                {site.name}
+              &lt;/option&gt;
+            ))}
+          &lt;/select&gt;
+          &lt;FieldError id="siteId-error" messages={messagesFor('siteId')} /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.row}&gt;
+          &lt;div className={formStyles.field}&gt;
+            &lt;label htmlFor="date"&gt;Date&lt;/label&gt;
+            &lt;input type="date" {...fieldProps('date')} /&gt;
+            &lt;FieldError id="date-error" messages={messagesFor('date')} /&gt;
+          &lt;/div&gt;
+          &lt;div className={formStyles.field}&gt;
+            &lt;label htmlFor="startTime"&gt;Starts&lt;/label&gt;
+            &lt;input type="time" {...fieldProps('startTime')} /&gt;
+            &lt;FieldError id="startTime-error" messages={messagesFor('startTime')} /&gt;
+          &lt;/div&gt;
+          &lt;div className={formStyles.field}&gt;
+            &lt;label htmlFor="endTime"&gt;Ends&lt;/label&gt;
+            &lt;input type="time" {...fieldProps('endTime')} /&gt;
+            &lt;FieldError id="endTime-error" messages={messagesFor('endTime')} /&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="capacity"&gt;Volunteers needed (1 to 200)&lt;/label&gt;
+          &lt;input type="number" min={1} max={200} {...fieldProps('capacity')} /&gt;
+          &lt;FieldError id="capacity-error" messages={messagesFor('capacity')} /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="meetingPoint"&gt;Meeting point&lt;/label&gt;
+          &lt;input type="text" {...fieldProps('meetingPoint')} /&gt;
+          &lt;FieldError id="meetingPoint-error" messages={messagesFor('meetingPoint')} /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="description"&gt;Description (optional)&lt;/label&gt;
+          &lt;textarea rows={4} {...fieldProps('description')} /&gt;
+          &lt;FieldError id="description-error" messages={messagesFor('description')} /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.actions}&gt;
+          &lt;Button type="submit" variant="primary" disabled={isSubmitting}&gt;
+            Save changes
+          &lt;/Button&gt;
+          &lt;Button as={Link} to={`/events/${event.id}`}&gt;
+            Back without saving
+          &lt;/Button&gt;
+        &lt;/div&gt;
+      &lt;/form&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>onSubmit={handleSubmit(save)}</code>, not <code>action</code>: RHF uses the classic submit event. So React 19's form reset (and Lesson 3.5's <code>key</code> fix for the <code>&lt;select&gt;</code>) does not apply here; RHF keeps the values.</li>
+                        <li><code>noValidate</code> keeps the browser's own bubbles out of the way, as in Lesson 3.5, so the schema's messages are the only ones.</li>
+                        <li>The second button is a link styled as a button (<code>Button as={Link}</code> from Lesson 5.4). It is called "Back without saving" because "Cancel" next to a cleanup would be ambiguous: cancel the edit, or the cleanup?</li>
+                        <li>After a successful save, <code>mutateAsync</code> resolves only once <code>['events']</code> has been fetched again (the factory returns the invalidation's promise), so the cleanup's page shows the new details straight away.</li>
+                    </ul>
+                    <p>Now the page. Create <code>src/pages/EditEventPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EditEventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EditEventPage.tsx"><code class="language-tsx">import { useSuspenseQuery } from '@tanstack/react-query'
+import { Link, useLoaderData } from 'react-router'
+import { eventQuery, sitesQuery } from '../api/queries.ts'
+import { EditEventForm } from '../components/EditEventForm.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import type { editEventLoader } from './loaders.ts'
+import styles from './Page.module.css'
+
+// The route is events/:eventId/edit: editEventLoader has checked the organizer and filled the cache
+export function EditEventPage() {
+  const { eventId, viewer } = useLoaderData&lt;typeof editEventLoader&gt;()
+  const { data: event } = useSuspenseQuery(eventQuery(eventId, viewer))
+  const { data: sites } = useSuspenseQuery(sitesQuery())
+  useDocumentTitle(`Edit ${event.title}`)
+  // Completed and cancelled cleanups are history: their details stay as they were
+  const editable = event.status === 'draft' || event.status === 'scheduled'
+
+  return (
+    &lt;&gt;
+      &lt;p&gt;
+        &lt;Link to={`/events/${event.id}`}&gt;← {event.title}&lt;/Link&gt;
+      &lt;/p&gt;
+      &lt;h1&gt;Edit cleanup details&lt;/h1&gt;
+      {editable ? (
+        &lt;&gt;
+          &lt;p className={styles.lead}&gt;
+            Volunteers who signed up see the new details on the cleanup's page.
+          &lt;/p&gt;
+          &lt;EditEventForm event={event} sites={sites} /&gt;
+        &lt;/&gt;
+      ) : (
+        &lt;p&gt;Only drafts and scheduled cleanups can be edited. This one is {event.status}.&lt;/p&gt;
+      )}
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The same pattern as <code>EventPage</code> (Lesson 7.1): the loader filled the cache, so <code>useSuspenseQuery</code> has the cleanup and the sites at once, with types (<code>CleanupEventDetail</code>, <code>Site[]</code>) and no loading state. Completed and cancelled cleanups are history, so the page says so instead of showing a form. Run <code>npx tsc -b</code>: it should print nothing.</p>
+                    <p>Type the address <code>/events/e09/edit</code> into the browser:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_27/27-edit-form.png" alt="The Edit cleanup details page in Shoreline Crew HQ: a back link named Boardwalk and Mudflats, the heading, and the form filled with the cleanup&#x27;s saved details: title Boardwalk and Mudflats, beach site Sandpiper Flats, a date, 10:00 to 12:30, 16 volunteers needed, meeting point Visitor center front porch, and a description. Below: Save changes and Back without saving." width="1100" height="942" loading="lazy">
+                        <figcaption>The form starts from the saved cleanup: <code>defaultValues</code> came from <code>toFormValues(event)</code>, and the loader had the cleanup and the sites in the cache before the page appeared.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: A way in, and try everything <span class="step-time">(10 min)</span></h3>
+                    <p>Organizers reach the page from the cleanup's own page, in the "For organizers" card from Lesson 7.2. Drafts can be edited too, so the card now appears for drafts as well, with Edit details but no Cancel. In <code>src/components/OrganizerTools.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { useMutation } from '@tanstack/react-query'
+ import { useRef, useState } from 'react'
++import { Link } from 'react-router'
+ import { describeError } from '../api/client.ts'
+ import { cancelEventMutation } from '../api/mutations.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   const statusRef = useRef&lt;HTMLParagraphElement&gt;(null)
+   const scheduled = event.status === 'scheduled'
++  const editable = scheduled || event.status === 'draft'
+ 
+   function cancelCleanup() {</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   }
+ 
+-  // Nothing to do for drafts and past cleanups (unless this page just cancelled one)
+-  if (!scheduled &amp;&amp; cancel.isIdle) {
++  // Nothing to do for past cleanups (unless this page just cancelled one)
++  if (!editable &amp;&amp; cancel.isIdle) {
+     return null
+   }</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">         &lt;/p&gt;
+       )}
+-      {scheduled &amp;&amp; (
+-        &lt;Button aria-haspopup="dialog" disabled={cancel.isPending} onClick={() =&gt; setConfirming(true)}&gt;
+-          Cancel cleanup
+-        &lt;/Button&gt;
++      {editable &amp;&amp; (
++        &lt;div className={styles.actions}&gt;
++          &lt;Button as={Link} to={`/events/${event.id}/edit`}&gt;
++            Edit details
++          &lt;/Button&gt;
++          {scheduled &amp;&amp; (
++            &lt;Button aria-haspopup="dialog" disabled={cancel.isPending} onClick={() =&gt; setConfirming(true)}&gt;
++              Cancel cleanup
++            &lt;/Button&gt;
++          )}
++        &lt;/div&gt;
+       )}
+       {/* Always in the page, so screen readers notice when the text changes */}</code></pre>
+                    </div>
+                    <p>(Also update the comment above the component to say "ways to edit or cancel it".) The two buttons sit in a row; in <code>src/components/OrganizerTools.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.module.css" data-match="diff"><code class="language-diff-css diff-highlight"> }
+ 
++.actions {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 1rem;
++}
++
+ .status:empty {
+   margin: 0;</code></pre>
+                    </div>
+                    <p>Now try it all:</p>
+                    <ol>
+                        <li>Open <strong>Events</strong>, then <strong>Boardwalk and Mudflats</strong>, and press <strong>Edit details</strong>.</li>
+                        <li>Empty the title and the capacity, set the end time to 08:00, and press <strong>Save changes</strong>. Three messages, the focus in the title box, and (in DevTools' <strong>Network</strong> panel) no request:
+                            <figure class="screenshot">
+                                <img src="images/lesson_27/27-client-errors.png" alt="The edit form after Save changes with problems: the empty title box has a red border and the message Add a title. The end time 08:00 has the message The end time must be after the start time. The empty capacity box says Capacity must be a whole number from 1 to 200. The title box has the focus." width="656" height="540" loading="lazy">
+                                <figcaption>The schema's messages, before any request: <code>handleSubmit</code> ran the resolver, found three problems, and moved the focus to the first one.</figcaption>
+                            </figure>
+                        </li>
+                        <li>Type <code>Board</code> into the title: its message disappears as you type. Fix the other two (capacity <code>20</code>, end time 12:00), make the title <code>Boardwalk and Mudflats Sweep</code>, and save. Measured: one <code>PATCH /events/e09</code> with <code>"capacity": 20</code> as a number, then <code>GET /events/e09</code>, and the cleanup's page with the new title and "13 of 20 spots left":
+                            <figure class="screenshot">
+                                <img src="images/lesson_27/27-saved.png" alt="The cleanup&#x27;s page after saving: heading Boardwalk and Mudflats Sweep, a Scheduled badge, the date and times, 13 of 20 spots left, and the For organizers card with the check-in code and two buttons, Edit details and Cancel cleanup." width="976" height="744" loading="lazy">
+                                <figcaption>After the PATCH: <code>onSuccess</code> invalidated <code>['events']</code>, the cleanup was fetched again, and the form went back to its page with the new title and capacity.</figcaption>
+                            </figure>
+                        </li>
+                        <li>Go back to <strong>All cleanups</strong>: the list shows the new title too (the invalidation reached it).</li>
+                        <li>Open <code>/events/e08/edit</code> (Weekend Cove Cleanup, full), set the capacity to <code>10</code> and save:
+                            <figure class="screenshot">
+                                <img src="images/lesson_27/27-server-error.png" alt="The edit form for Weekend Cove Cleanup after Save changes. A status box above the form says Some fields need attention. The capacity box, holding 10, has a red border and the message 18 volunteers already hold a spot: capacity cannot be lower." width="976" height="744" loading="lazy">
+                                <figcaption>A rule only shoreline-api can check: the schema accepted 10, the API answered 400, and <code>setError</code> put its message under the capacity field and in the status line.</figcaption>
+                            </figure>
+                        </li>
+                        <li>Sign out and open <code>/events/e08/edit</code> again: the sign-in page, with <code>?next=</code> pointing back to the edit page. Sign in as a volunteer (<code>theo.nakamura@example.com</code>) and you get "Organizers only".</li>
+                    </ol>
+                    <figure class="screenshot">
+                        <img src="images/lesson_27/27-phone-dark.png" alt="The edit form on a phone in dark mode: the title box has a light red border and the message Add a title. in light red under it; the other fields stack in one column." width="390" height="844" loading="lazy">
+                        <figcaption>The same form at 390 pixels wide in dark mode: the shared form styles from Lesson 3.6 needed no change.</figcaption>
+                    </figure>
+                    <p>Finally, the checks:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 16ms on 67 files with 150 rules using 20 threads.
+&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 341 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-DDE0Zb2J.css                            10.00 kB │ gzip:   2.90 kB
+dist/assets/index-rAUBxkxE.js                            561.81 kB │ gzip: 175.81 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.17s</code></pre>
+                    </div>
+                    <p><code>tsc</code> prints nothing, lint is clean, and the build succeeds with the 500 kB warning from "Two Forms, One Schema". Your hashes and timings will differ.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li><code>react-hook-form</code>, <code>zod</code> and <code>@hookform/resolvers</code> are in <code>package.json</code>, and <code>src/api/schemas.ts</code> holds <code>eventFormSchema</code> with its input and output types</li>
+                        <li><code>validateEvent</code> and <code>toNewEvent</code> are gone; Plan a cleanup shows the same messages, now from the schema</li>
+                        <li>Organizers see <strong>Edit details</strong> on drafts and scheduled cleanups, and <code>/events/:eventId/edit</code> starts filled in with the saved details</li>
+                        <li>Problems show under their fields before any request; a save sends one PATCH and lands on the updated cleanup's page</li>
+                        <li>The API's capacity message appears under the capacity field; guests are sent to sign in, volunteers get "Organizers only"</li>
+                        <li><code>npx tsc -b</code> and <code>npm run lint</code> pass with no errors or warnings, and <code>npm run build</code> succeeds</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, list its forms. For each one, write its fields with their input type (what the box holds) and output type (what your code or API wants), and mark the rules only a server can check. That list is the first draft of your schemas.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 12 minutes together, included in the lesson time). Exercise 3 is an optional stretch, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Friendlier timing, no empty saves</h3>
+                    <p>Two changes to <code>EditEventForm</code>: check each field when the person leaves it (not only at the first Save), and when nothing was changed, make <strong>Save changes</strong> go back to the cleanup without sending a request.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>One option of <code>useForm</code> sets when it checks. <code>formState</code> also has <code>isDirty</code>: <code>true</code> once any field differs from its <code>defaultValues</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">const {
+  register,
+  handleSubmit,
+  setError,
+  formState: { errors, isSubmitting, isDirty },
+} = useForm({
+  resolver: zodResolver(eventFormSchema),
+  defaultValues: toFormValues(event),
+  // Check a field when the person leaves it, then again as they fix it
+  mode: 'onTouched',
+})
+// ...
+// handleSubmit calls this only when the schema found nothing to fix
+async function save(changes: EventFormData) {
+  // Nothing changed: no request, just go back
+  if (!isDirty) {
+    await navigate(`/events/${event.id}`)
+    return
+  }</code></pre>
+                        <p>Measured: emptying the title showed nothing until <kbd>Tab</kbd> left the box, then "Add a title."; putting the title back and saving sent no request and went back to <code>/events/e09</code>. Type-checks and lints cleanly; the course's code continues without it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Check a cleanup from the API with Zod</h3>
+                    <p>Replace the hand-written <code>isCleanupEvent</code> in <code>client.ts</code> with a Zod schema, <code>eventSchema</code>, in <code>schemas.ts</code>. Make TypeScript compare the schema with <code>CleanupEvent</code> from <code>types.ts</code>, then delete <code>spotsTaken</code> from the schema to see that it does.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>This schema describes the response's shape, so no form rules: <code>z.string()</code>, <code>z.number()</code>, <code>z.enum([…])</code>, <code>z.array(z.string())</code>. For the comparison, <code>z.ZodType&lt;CleanupEvent&gt;</code> is "a schema whose output is a <code>CleanupEvent</code>": write a small function that takes one and returns a type predicate.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>In <code>src/api/schemas.ts</code>:</p>
+                        <pre data-snippet><code class="language-ts">// What the API sends for each cleanup: its SHAPE (types), not the form's rules
+export const eventSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  siteId: z.string(),
+  status: z.enum(['draft', 'scheduled', 'completed', 'cancelled']),
+  date: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  capacity: z.number(),
+  spotsTaken: z.number(),
+  meetingPoint: z.string(),
+  description: z.string(),
+  suppliesProvided: z.array(z.string()),
+  leadOrganizerId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})</code></pre>
+                        <p>In <code>src/api/client.ts</code>, import <code>type { z }</code> and <code>eventSchema</code>, delete <code>eventTextFields</code> and the old function, and add:</p>
+                        <pre data-snippet><code class="language-ts">/** A Zod schema as a type predicate. The type argument makes TypeScript compare the
+ * schema with the API's type, so the two cannot drift apart. */
+function matches&lt;T&gt;(schema: z.ZodType&lt;T&gt;) {
+  return (value: unknown): value is T =&gt; schema.safeParse(value).success
+}
+
+export const isCleanupEvent = matches&lt;CleanupEvent&gt;(eventSchema)</code></pre>
+                        <p>Measured: the events list still says "Found 15 cleanups" with no console errors, and the build grew by only 0.18 kB, because Zod is already in this build. Without <code>spotsTaken</code>:</p>
+                        <div class="card card-output">
+                            <h4>Expected output</h4>
+                            <pre><code>src/api/client.ts:55:53 - error TS2345: Argument of type 'ZodObject&lt;{ id: ZodString; title: ZodString; siteId: ZodString; status: ZodEnum&lt;{ cancelled: "cancelled"; completed: "completed"; draft: "draft"; scheduled: "scheduled"; }&gt;; ... 9 more ...; updatedAt: ZodString; }, $strip&gt;' is not assignable to parameter of type 'ZodType&lt;CleanupEvent, unknown, $ZodTypeInternals&lt;CleanupEvent, unknown&gt;&gt;'.
+  The types of '_zod.output' are incompatible between these types.
+    Property 'spotsTaken' is missing in type '{ id: string; title: string; siteId: string; status: "cancelled" | "completed" | "draft" | "scheduled"; date: string; startTime: string; endTime: string; capacity: number; meetingPoint: string; ... 4 more ...; updatedAt: string; }' but required in type 'CleanupEvent'.
+
+55 export const isCleanupEvent = matches&lt;CleanupEvent&gt;(eventSchema)
+                                                       ~~~~~~~~~~~
+
+  src/api/types.ts:66:3 - 'spotsTaken' is declared here.
+    66   spotsTaken: number
+         ~~~~~~~~~~
+
+
+Found 1 error in src/api/client.ts:55</code></pre>
+                        </div>
+                        <p>The API's types and the schema cannot drift apart: the type argument makes <code>tsc</code> compare them. Not in the course's code ("Two Forms, One Schema" explains why).</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): Send only what changed</h3>
+                    <p>Optional stretch, not counted in the lesson time. Make the PATCH carry only the fields the person changed, so two organizers editing different details of the same cleanup do not overwrite each other's work.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>formState.dirtyFields</code> has <code>true</code> for each changed field. Filter the checked data's entries with it (and <code>isEventField</code>), then build an object with <code>Object.fromEntries</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Read <code>dirtyFields</code> from <code>formState</code>, then in <code>save</code>:</p>
+                        <pre data-snippet><code class="language-tsx">// Only the fields the person changed (dirtyFields has true for each of them)
+const changed = Object.fromEntries(
+  Object.entries(changes).filter(([name]) =&gt; isEventField(name) &amp;&amp; dirtyFields[name] === true),
+)
+await update.mutateAsync({ eventId: event.id, changes: changed })</code></pre>
+                        <p>Measured: changing only Weekend Cove Cleanup's title sent <code>{"title":"Weekend Cove Big Cleanup"}</code> and nothing else. Type-checks and lints cleanly. A side effect worth knowing: with only the title sent, the API's capacity rule never runs for that save. Not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> In <code>eventFormSchema</code>, capacity is <code>z.coerce.number&lt;string&gt;()</code> with a refine. What are its input and output types?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="A form box holds text. What does coerce do to that text before the check?">
+                                A) number and number
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The type argument makes the input string (what the box holds), and coerce turns it into a number before the rules run, so the output is number. tsc showed both with TS2322.">
+                                B) string in, number out
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Without the type argument the input would be unknown. What does the type argument change?">
+                                C) unknown in, number out
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Check what the try-schema file printed for capacity: were there quotes?">
+                                D) string in, string out
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A teammate writes <code>useForm&lt;z.infer&lt;typeof eventFormSchema&gt;&gt;({ resolver: zodResolver(eventFormSchema) })</code> and gets TS2322 about <code>Resolver</code>. What is the best fix?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That hides the message, and handleSubmit would then promise the wrong type. What is actually different between the two Resolver types?">
+                                A) Add <code>as any</code> after <code>zodResolver(eventFormSchema)</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Then the API receives a string capacity. Is the schema wrong, or the type argument?">
+                                B) Remove <code>coerce</code> from the schema
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="z.output is the same type as z.infer. Which type do the fields hold?">
+                                C) Change <code>z.infer</code> to <code>z.output</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="z.infer is the output type, but the fields hold the input. Either let zodResolver infer both (no type argument) or give all three: input, context, output.">
+                                D) Drop the type argument, or write <code>useForm&lt;EventFormValues, unknown, EventFormData&gt;</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> An organizer sets Weekend Cove Cleanup's capacity to 10. The schema accepts it; shoreline-api answers 400 with a <code>capacity</code> message. What does the HQ do?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="save catches the ApiError, checks each key with isEventField, and calls setError, which shows the message under the capacity field and focuses it. The root error fills the status line.">
+                                A) <code>setError('capacity', …)</code> shows the API's message under the field and moves the focus there
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Mutations do not retry by default (Lesson 7.2). Would asking again change the answer?">
+                                B) TanStack Query retries the PATCH twice, then shows a general error
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="handleSubmit only knows about the schema. Who tells the form about the API's answer?">
+                                C) React Hook Form shows it automatically, because the resolver calls the API
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The API refused the change. What did it save?">
+                                D) It goes to the cleanup's page, which shows the new capacity
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Without the <code>when</code> option, someone enters the title Dune, an empty capacity, and an end time before the start time. Which messages appear?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="An object refine normally waits for something. What was still wrong?">
+                                A) All three
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The field rules do not depend on the object refine. Which ones fail on their own?">
+                                B) Only the end-time message
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="An object's refine runs only when every field is valid, so the end-time rule waited behind the title and capacity. Measured with the test file: two messages. when lets the rule run as soon as both times are valid.">
+                                C) The title and capacity messages; the end-time message waits until they are fixed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="safeParse never throws. What does it return when checks fail?">
+                                D) None: the schema throws an error
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Why does the Plan a cleanup form keep <code>useActionState</code> in this lesson instead of moving to React Hook Form?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="zodResolver is one way to use a schema. What does the action call instead?">
+                                A) Zod schemas only work with React Hook Form
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The duplicated rules were the real problem, and safeParse with the shared schema fixed that. The action form works, has no dependency, and needs none of RHF's extras such as defaultValues from saved data or dirty fields.">
+                                B) The shared schema already removed the duplicated rules, and the form needs nothing more that RHF adds
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Both forms ran with the compiler on, and lint reported nothing. Is the reason technical?">
+                                C) React Hook Form does not work with the React Compiler
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The edit form PATCHes the same API. Does RHF care which method the request uses?">
+                                D) React Hook Form cannot send POST requests
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Could the API and the app share one Zod schema?</summary>
+                    <p>Yes, when both are written in TypeScript and live in one repository or package, and many teams do that. shoreline-api is deliberately dependency-free and the HQ copies only its <code>types.ts</code> (Lesson 2.4), so the HQ's schema repeats the rules. The messages match the API's, and the API checks again anyway, so a difference would show up as an API message under a field, not as bad data.</p>
+                </details>
+                <details>
+                    <summary>What is <code>zod/mini</code>?</summary>
+                    <p>A second way to use Zod 4 with plain functions instead of chained methods (<code>z.string().check(z.minLength(5))</code>), so a build can drop everything you do not use. Measured with the same one-line test file: about 16 kB (5 kB gzip) against about 103 kB (25 kB gzip) for the full API. It works with <code>zodResolver</code> too. The course uses the full API because it is what most code and documentation use; reach for mini when every kilobyte counts.</p>
+                </details>
+                <details>
+                    <summary>What about <code>Controller</code> and <code>watch</code>?</summary>
+                    <p><code>register</code> works for anything that behaves like a native input. <code>Controller</code> (or <code>useController</code>) connects components that do not, such as a date picker library that only offers <code>value</code> and <code>onChange</code>. <code>watch</code> (or <code>useWatch</code>) reads a value while the person types, for example to show "Ends 2 hours after it starts". React's compiler-aware lint rules warn about <code>watch</code> as a function whose results cannot be memoized safely, so <code>useWatch</code> is the safer choice in compiled components. The HQ needs neither yet.</p>
+                </details>
+                <details>
+                    <summary>Why not use the browser's <code>required</code> and <code>min</code> attributes?</summary>
+                    <p>Lesson 3.5 answered this for the action form, and it still holds: the browser's bubbles have their own wording, disappear quickly and are hard to style. <code>noValidate</code> keeps them out, and the schema's messages, linked with <code>aria-describedby</code>, are the ones people see and screen readers read. The <code>min</code>/<code>max</code> on the number box stay because they set the arrow keys' range.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Warn before losing edits: if someone has changed fields (<code>isDirty</code>) and clicks a link away from the edit page, ask "Leave without saving?" first. React Router's <code>useBlocker</code> returns a blocker with a <code>state</code> of <code>'unblocked'</code>, <code>'blocked'</code> or <code>'proceeding'</code>; show the HQ's <code>ConfirmDialog</code> (Lesson 4.3) while it is blocked, and call <code>proceed()</code> or <code>reset()</code>. Make sure a successful save does not trigger the warning.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Explain input and output types to someone who has never used Zod, with the capacity box as your example. Then look at the TS2322 message from Common Mistakes again: which line would you read first next time, and why?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A Zod schema is a value that checks data and a source of TypeScript types; write the rules and their messages once and derive the types from it</li>
+                        <li>Schemas have an input type and an output type; for forms, the fields hold the input and the submit function receives the output</li>
+                        <li>Let <code>zodResolver</code> infer <code>useForm</code>'s types, or give all three; <code>useForm&lt;z.infer&lt;…&gt;&gt;</code> breaks as soon as a field changes type</li>
+                        <li>React Hook Form gives <code>register</code>, <code>handleSubmit</code>, <code>formState</code> and <code>setError</code>; it checks on submit, then on every change, and re-renders only when what you read changes</li>
+                        <li>The API's 400 field errors go under their fields with <code>setError</code> after a type predicate checks the names; the API stays the final check</li>
+                        <li>Choose the form tool per form: a shared schema can serve React 19 actions and React Hook Form alike</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Review form actions and <code>useActionState</code></td><td><a href="lesson_11.html">Lesson 3.5: Forms and Actions</a></td></tr>
+                            <tr><td>Read Zod's own documentation</td><td><a href="https://zod.dev/" target="_blank" rel="noopener">zod.dev</a></td></tr>
+                            <tr><td>Read React Hook Form's documentation</td><td><a href="https://react-hook-form.com/" target="_blank" rel="noopener">react-hook-form.com</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>Organizers can fix a cleanup's title, time, site or capacity, from a page only they can open</li>
+                        <li>The rules for a valid cleanup live in one schema, shared by both forms, with the types read from it</li>
+                        <li>You can read and fix the most common React Hook Form type error instead of hiding it</li>
+                        <li>The API's refusals land under the right field, and the form clears them as people fix their entries</li>
+                        <li>You made a library decision with measured numbers: where the schema goes, and where it does not, yet</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Both cleanup forms are one flat list of fields. Real forms grow: a list of debris counts where organizers add and remove rows, steps that split a long form into pages, photos to upload, and an error summary at the top so nobody misses a message below the fold. In <a href="lesson_28.html"><strong>Lesson 8.2: Complex Forms</strong></a> you will build the impact report for a completed cleanup with exactly those pieces, using React Hook Form's field arrays and another Zod schema.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code> and <code>npm run lint</code> pass, and that <code>src/try-schema.ts</code> is deleted</li>
+                    <li>Open Storm Debris Sweep (a completed cleanup) and its Impact tab: note which numbers an organizer would have to type in after a cleanup</li>
+                    <li>Add your list of forms (fields, input and output types, server-only rules) to your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today you met a TypeScript error several lines long, with type names that run off the screen, and you learned to read it from the bottom: "Types of property 'capacity' are incompatible". That habit is worth more than any single library. Libraries change their APIs (Zod just did), but the skill of reading what the compiler is telling you carries from version to version. If the input and output types still feel slippery, that is normal: they click the first time a form in your own project needs one.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_26.html" class="prev-lesson">← Previous: Client State</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_28.html" class="next-lesson">Next: Complex Forms →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

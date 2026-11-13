@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 16</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 16: Data Loading and Protected Routes</h1>
+    <p class="sub">Your workbook for Session 16: a warm-up, the key ideas of Lesson 6.3, a worked example, the guided lab, predict-then-check practice, a self-check, the Part 2 project kickoff page and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lesson <b>6.3</b></span>
+      <span class="chip">Session <b>16</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Explain render then fetch and load then render, and when each fits.</li>
+  <li>Write typed loaders and read them with <code class="inline">useLoaderData&lt;typeof loader&gt;()</code>; turn expected failures into route answers with <code class="inline">data()</code> and show them in one ErrorPage.</li>
+  <li>Protect routes with guard loaders: a safe <code class="inline">?next=</code> for guests, a 403 for the wrong role; the API stays the lock.</li>
+  <li>Keep the session in a store that loaders, actions and React all read (<code class="inline">useSyncExternalStore</code>), and sign in with a route action.</li>
+  <li>Start the Part 2 project, Basalt Peak Climbing Gym: know its requirements, run it with two terminals, plan the first milestone.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up: From Session 15</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Three questions, then compare with a neighbor</div>
+<div class="q"><div class="qn">W1</div><div class="qt">Before today you were asked to open <code class="inline">/events/new</code> signed out by typing the address. What appeared, and what actually stops a guest from creating a cleanup?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">In Lesson 6.2, what type does <code class="inline">searchParams.get('status')</code> have, and how did the HQ make it safe?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">Where does a child route render, and what happens to its parent when only the child changes?</div><div class="write"></div></div>
+</div>
+
+  <div class="sec"><h2>Lesson</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">6.3</span><h3>Data Loading and Protected Routes</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain the difference between rendering then fetching and loading then rendering, and when each fits</li>
+  <li>Write typed route loaders and read their data with useLoaderData&lt;typeof loader&gt;()</li>
+  <li>Turn failures while loading into route answers with data(), and show them with useRouteError and isRouteErrorResponse</li>
+  <li>Protect routes with guard loaders that redirect to sign-in with a safe ?next= address, and answer 403 to people without the right role</li>
+  <li>Handle a form with a route action, &lt;Form&gt;, useActionData and a redirect</li>
+  <li>Keep a session that React and the router both read, with useSyncExternalStore, and sign out automatically on a 401</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Load then render:</b> a loader runs when someone navigates to its route; the router shows the page once it finishes, and the old page stays meanwhile. <code class="inline">useNavigation().state</code> is <code class="inline">'loading'</code> (or <code class="inline">'submitting'</code> for an action).</li>
+  <li><b>Typed data:</b> <code class="inline">useLoaderData&lt;typeof loader&gt;()</code> with an <code class="inline">import type</code>; without the type argument the data is <code class="inline">any</code>. Loaders live in their own <code class="inline">.ts</code> files.</li>
+  <li><b>Route answers:</b> throw <code class="inline">data(message, { status, statusText })</code> for expected failures and <code class="inline">redirect()</code> to send people elsewhere; one <code class="inline">errorElement</code> reads them with <code class="inline">useRouteError()</code> (unknown) and <code class="inline">isRouteErrorResponse</code>.</li>
+  <li><b>Await or a promise:</b> await what the page cannot do without; return a promise for what can follow, and <code class="inline">use()</code> it inside Suspense.</li>
+  <li><b>Guards are loaders:</b> guests get a redirect with a safe <code class="inline">?next=</code> (only paths inside the app), the wrong role gets a 403 answer; a pathless route guards many pages; parent and child loaders run at the same time. The API's 401 and 403 remain the lock.</li>
+  <li><b>A store outside React</b> (<code class="inline">readSession</code>, <code class="inline">saveSession</code>, <code class="inline">onSessionChange</code>) read with <code class="inline">useSyncExternalStore</code>; a route action handles the sign-in <code class="inline">&lt;Form&gt;</code>, returns why a try failed, throws a redirect on success.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: what each Hook returns, and a guard</div>
+<p>The lesson's trick: ask TypeScript what each Hook returns by putting the result where a number is expected.</p>
+<pre class="code"><span class="k">import</span> { useActionData, useLoaderData } <span class="k">from</span> <span class="s">'react-router'</span>
+<span class="k">import</span> <span class="k">type</span> { signInAction } <span class="k">from</span> <span class="s">'./auth/signInAction.ts'</span>
+<span class="k">import</span> <span class="k">type</span> { eventLoader, sitesLoader } <span class="k">from</span> <span class="s">'./pages/loaders.ts'</span>
+
+<span class="c">// Ask TypeScript what each Hook returns: put the answer where a number is expected</span>
+<span class="k">export</span> <span class="k">function</span> Scratch() {
+  <span class="k">const</span> sites: <span class="k">number</span> = useLoaderData&lt;<span class="k">typeof</span> sitesLoader&gt;()
+  <span class="k">const</span> page: <span class="k">number</span> = useLoaderData&lt;<span class="k">typeof</span> eventLoader&gt;()
+  <span class="k">const</span> result: <span class="k">number</span> = useActionData&lt;<span class="k">typeof</span> signInAction&gt;()
+  <span class="k">const</span> untyped: <span class="k">number</span> = useLoaderData()
+  <span class="k">return</span> &lt;p&gt;{sites}{page}{result}{untyped}&lt;/p&gt;
+}</pre><pre class="code">npx tsc -b</pre>
+<pre class="out">src/Scratch.tsx:7:9 - error TS2322: Type 'Site[]' is not assignable to type 'number'.
+
+7   const sites: number = useLoaderData&lt;typeof sitesLoader&gt;()
+          ~~~~~
+
+src/Scratch.tsx:8:9 - error TS2322: Type '{ event: CleanupEventDetail; impact: Promise&lt;ImpactReport&gt; | null; }' is not assignable to type 'number'.
+
+8   const page: number = useLoaderData&lt;typeof eventLoader&gt;()
+          ~~~~
+
+src/Scratch.tsx:9:9 - error TS2322: Type 'SignInResult | undefined' is not assignable to type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+
+9   const result: number = useActionData&lt;typeof signInAction&gt;()
+          ~~~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:7</pre><p>Three exact types, and NOTHING for line 10: without a type argument <code class="inline">useLoaderData()</code> is <code class="inline">any</code>. The loader that makes the first line work is three lines long; the router calls it before the page renders:</p>
+<div class="codefile">shoreline-hq/src/pages/loaders.ts</div>
+<pre class="code" data-src="shoreline-hq/src/pages/loaders.ts" data-stage="lesson_23" data-match="excerpt"><span class="c">/** /sites: the six beach sites */</span>
+<span class="k">export</span> <span class="k">function</span> sitesLoader({ request }: LoaderFunctionArgs) {
+  <span class="c">// request.signal: leaving the page before the answer arrives cancels the request</span>
+  <span class="k">return</span> getSites(request.signal)
+}</pre><p>And the guard: a loader whose job is to throw. A redirect for guests (with the way back in <code class="inline">?next=</code>), a 403 answer for the wrong role:</p>
+<div class="codefile">shoreline-hq/src/auth/guards.ts</div>
+<pre class="code" data-src="shoreline-hq/src/auth/guards.ts" data-stage="lesson_23" data-match="excerpt"><span class="c">/** For pages with contact details and planning tools: guests sign in first, volunteers are turned away */</span>
+<span class="k">export</span> <span class="k">function</span> organizersOnly({ request }: LoaderFunctionArgs) {
+  <span class="k">const</span> session = readSession()
+  <span class="k">if</span> (session === <span class="k">null</span>) {
+    <span class="c">// Remember the page (and its ?search) so the sign-in page can send people back to it</span>
+    <span class="k">const</span> { pathname, search } = <span class="k">new</span> URL(request.url)
+    <span class="k">throw</span> redirect(<span class="s">`/sign-in?next=${encodeURIComponent(pathname + search)}`</span>)
+  }
+  <span class="k">if</span> (session.user.role !== <span class="s">'organizer'</span>) {
+    <span class="k">const</span> message = <span class="s">"This page has the crew's contact details and planning tools, so only organizers can open it."</span>
+    <span class="k">throw</span> data(message, { status: <span class="s">403</span>, statusText: <span class="s">'Organizers only'</span> })
+  }
+  <span class="k">return</span> <span class="k">null</span>
+}</pre></div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-16/l6_3-data-loading-and-protected-routes/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code> (all 8 fail) and <code class="inline">npm run typecheck</code> (1 error: Task 1's type test).</li>
+  <li>Task 1 (first lab block): <code class="inline">siteLoader</code>, the 404 as a route answer, <code class="inline">useLoaderData&lt;typeof siteLoader&gt;()</code>, the ErrorPage.</li>
+  <li>Task 2 (after the second demo): <code class="inline">nextPath</code>, <code class="inline">crewOnly</code>, the guard route, the child loader that checks first. Task 3 (home): the sign-in action.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Why is Site not found not an alert, and the failed request is?</td><td></td></tr>
+<tr><td>With the guard only on the parent route, which request slipped through, and why?</td><td></td></tr>
+<tr><td>After a wrong password, what was the address?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write your prediction first, then run it. A wrong prediction you can explain is worth more than a right guess.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict what <code class="inline">npx tsc -b</code> says, then try it in a scratch file. (The lesson's mistake: no type argument.)</div><pre class="code"><span class="k">import</span> { useLoaderData } <span class="k">from</span> <span class="s">'react-router'</span>
+
+<span class="c">// No type argument: useLoaderData() returns any, so this typo compiles</span>
+<span class="k">export</span> <span class="k">function</span> Scratch() {
+  <span class="k">const</span> sites = useLoaderData()
+  <span class="k">return</span> &lt;p&gt;{sites[<span class="s">0</span>].nmae}&lt;/p&gt;
+}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict each line Node prints, then run it. (The stage's nextPath on what a ?next= might hold (run with Node, it needs only URL).)</div><pre class="code"><span class="c">// nextPath, copied from src/auth/guards.ts: it needs nothing but URL</span>
+<span class="k">export</span> <span class="k">function</span> nextPath(url: URL): <span class="k">string</span> {
+  <span class="k">const</span> next = url.searchParams.get(<span class="s">'next'</span>)
+  <span class="k">if</span> (next === <span class="k">null</span> || !next.startsWith(<span class="s">'/'</span>) || next.startsWith(<span class="s">'//'</span>) || next.startsWith(<span class="s">'/\\'</span>)) {
+    <span class="k">return</span> <span class="s">'/'</span>
+  }
+  <span class="k">return</span> next
+}
+
+<span class="c">// What the guard puts in ?next=: an address inside an address, so it is encoded</span>
+console.log(encodeURIComponent(<span class="s">'/volunteers?skill=first-aid'</span>))
+
+<span class="k">for</span> (<span class="k">const</span> next <span class="k">of</span> [<span class="s">'/volunteers?skill=first-aid'</span>, <span class="s">'events'</span>, <span class="s">'//example.com'</span>, <span class="s">'https://elsewhere.example'</span>, <span class="s">'/\\elsewhere.example'</span>]) {
+  <span class="k">const</span> url = <span class="k">new</span> URL(<span class="s">`http://localhost:5173/sign-in?next=${encodeURIComponent(next)}`</span>)
+  console.log(next.padEnd(<span class="s">28</span>), <span class="s">'-&gt;'</span>, nextPath(url))
+}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the status code and the message, then check it in the Network panel. (Signed in as Theo (a volunteer), the crew list asked for directly.)</div><pre class="code">http://localhost:4000/api/volunteers</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Guarded, Preloaded HQ</b> (lesson page, "Project: Guarded, Preloaded HQ"). In class: Steps 1 and 2. At home: Steps 3 to 6. Between Steps 2 and 5 the app is half-wired (pages that read loader data show the error page): expected.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">src/pages/loaders.ts</code> (sitesLoader, eventLoader), <code class="inline">src/pages/ErrorPage.tsx</code>, SitesPage reads its loader</li>
+  <li>☐ Step 2: EventPage reads <code class="inline">useLoaderData&lt;typeof eventLoader&gt;()</code>; ImpactSummary <code class="inline">use()</code>s a promise; <code class="inline">eventPromises.ts</code> deleted; <code class="inline">npx tsc -b</code> clean</li>
+  <li>☐ Step 3: the session store in client.ts, the automatic sign-out on a 401, AuthProvider with <code class="inline">useSyncExternalStore</code></li>
+  <li>☐ Step 4: <code class="inline">src/auth/guards.ts</code>, <code class="inline">src/auth/signInAction.ts</code>, the new SignInPage</li>
+  <li>☐ Step 5: App.tsx (loaders, the guard route, the action), AppLayout (pending sign, revalidate), VolunteersPage</li>
+  <li>☐ Step 6: tried as a guest, Maya and Theo, and after an API restart; <code class="inline">npx tsc -b</code>, <code class="inline">npm run lint</code> and <code class="inline">npm run build</code> pass</li>
+</ul>
+<div class="write tall"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Measured with the API slowed down (--latency=1500): 300 ms after clicking a cleanup in the events list of the finished HQ, what is on screen?</div><div class="opts"><div class="opt">A) The events list, a little faded, the address still /events, and a small "Loading…" sign at the bottom</div><div class="opt">B) The cleanup page with "Loading the cleanup…" where the details will go</div><div class="opt">C) A blank main area until the cleanup arrives</div><div class="opt">D) The address /events/e17 with the old list still under it</div></div></div>
+<div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">These lines are in a scratch file in the finished HQ. Which line does <code class="inline">npx tsc -b</code> NOT report?</div><pre class="code">  <span class="k">const</span> sites: <span class="k">number</span> = useLoaderData&lt;<span class="k">typeof</span> sitesLoader&gt;()
+  <span class="k">const</span> page: <span class="k">number</span> = useLoaderData&lt;<span class="k">typeof</span> eventLoader&gt;()
+  <span class="k">const</span> result: <span class="k">number</span> = useActionData&lt;<span class="k">typeof</span> signInAction&gt;()
+  <span class="k">const</span> untyped: <span class="k">number</span> = useLoaderData()</pre><div class="opts"><div class="opt">A) The sites line</div><div class="opt">B) The event page line</div><div class="opt">C) The sign-in result line</div><div class="opt">D) The untyped line</div></div></div>
+<div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">After Step 3 of the project (the session store, signIn removed from the context), tsc prints this. Is it bad news, and what fixes it?</div><pre class="code">src/pages/SignInPage.tsx:50:20 - error TS2339: Property 'signIn' does not exist on type 'AuthValue'.
+Found 1 error in src/pages/SignInPage.tsx:50</pre><div class="write"></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">A loader for a cleanup's page can await a request or return it as a promise. Which one should it AWAIT?</div><div class="opts"><div class="opt">A) The impact report, so the Impact tab never says Loading</div><div class="opt">B) Nothing: awaiting in a loader blocks the browser</div><div class="opt">C) The cleanup itself: the page makes no sense without it, and a 404 must decide the answer</div><div class="opt">D) Both, always, so the page appears complete</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Why does the HQ's ErrorPage write <code class="inline">answer?.statusText || 'Something went wrong on this page'</code> with <code class="inline">||</code> and not <code class="inline">??</code>?</div><div class="opts"><div class="opt">A) <code class="inline">??</code> does not work after optional chaining</div><div class="opt">B) <code class="inline">statusText</code> is a number</div><div class="opt">C) A response without a status text has <code class="inline">''</code>, which should fall back too; <code class="inline">??</code> only falls back for null and undefined</div><div class="opt">D) <code class="inline">||</code> narrows <code class="inline">unknown</code>, <code class="inline">??</code> does not</div></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">The HQ's <code class="inline">nextPath</code> gets the address <code class="inline">/sign-in?next=%2F%2Fexample.com</code>. What does it return?</div><pre class="code"><span class="k">export</span> <span class="k">function</span> nextPath(url: URL): <span class="k">string</span> {
+  <span class="k">const</span> next = url.searchParams.get(<span class="s">'next'</span>)
+  <span class="k">if</span> (next === <span class="k">null</span> || !next.startsWith(<span class="s">'/'</span>) || next.startsWith(<span class="s">'//'</span>) || next.startsWith(<span class="s">'/\\'</span>)) {
+    <span class="k">return</span> <span class="s">'/'</span>
+  }
+  <span class="k">return</span> next
+}</pre><div class="opts"><div class="opt">A) <code class="inline">//example.com</code></div><div class="opt">B) <code class="inline">/</code></div><div class="opt">C) <code class="inline">/example.com</code></div><div class="opt">D) It throws, and the sign-in page shows the error page</div></div></div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Theo (a volunteer) is signed in and opens /events/new. Why does the guard answer 403 "Organizers only" instead of redirecting him to sign in?</div><div class="opts"><div class="opt">A) Signing in again would not help him: he is signed in, just not allowed, so a redirect would only loop</div><div class="opt">B) A redirect cannot be thrown from a loader</div><div class="opt">C) The API answers 403, and the guard copies it</div><div class="opt">D) 403 pages are faster than redirects</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt">Someone writes organizersOnly with the Hook they already have. tsc is quiet; oxlint says this. Why, and what does the HQ do instead?</div><pre class="code">  × react-hooks(rules-of-hooks): React Hook "useAuth" is called in function "organizersOnly" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".</pre><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">The guard route has NO shouldRevalidate. As Maya on /volunteers you type "mra", move the cursor two places left and type "a". What happens (measured)?</div><div class="opts"><div class="opt">A) Nothing unusual: the guard is instant</div><div class="opt">B) npx tsc -b reports that the route needs shouldRevalidate</div><div class="opt">C) oxlint warns about the guard route</div><div class="opt">D) The box shows "mara" but the cursor jumps to position 4 instead of 2</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">Exercise 3 gives the nested :volunteerId route its own volunteerLoader, but WITHOUT calling organizersOnly(args) inside it. A guest opens /volunteers/v16. What happens?</div><div class="opts"><div class="opt">A) The card appears: the child loader ran first</div><div class="opt">B) The error page shows "Organizers only"</div><div class="opt">C) The guest ends on the sign-in page, but the browser has already sent GET /api/volunteers/v16 (answered 401)</div><div class="opt">D) Nothing is sent: the parent guard always runs before the child loader</div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">Maya types a wrong password into the HQ's sign-in page (a React Router <code class="inline">&lt;Form&gt;</code> with signInAction). Without the lesson's passwordRef effect, what would the password box hold afterwards?</div><div class="opts"><div class="opt">A) Nothing: React resets every form after an action</div><div class="opt">B) The wrong password she typed: a router Form keeps what was typed</div><div class="opt">C) The text "Email or password is incorrect."</div><div class="opt">D) Her previous, correct password from sessionStorage</div></div></div>
+<div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt"><code class="inline">useSyncExternalStore(onSessionChange, readSession)</code>: why does <code class="inline">readSession()</code> return the saved variable instead of reading and parsing sessionStorage on each call?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: trace one visit from start to finish: a guest opens <code class="inline">/events/new</code>, signs in as Maya and lands on the form. Write each function that runs, in order (guard, redirect, action, store, listeners, guard again), and what it hands to the next. Then one sentence: which piece would you look at first if a guest could suddenly see the form again?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Part 2 Project: Basalt Peak Climbing Gym</h2><span class="rule"></span></div>
+<p>Your instructor hands out <code class="inline">labs/projects/part2-basalt-peak-routes/</code>: <code class="inline">BRIEF.md</code> (the client's email, R1 to R6, the setup, the milestones, the rules, the hand-in), <code class="inline">TASKS.md</code> (the TODOs in order), <code class="inline">RUBRIC.md</code> and <code class="inline">starter/</code>. The client:</p>
+<div class="blk"><div class="h">From Dana Okonkwo-Reyes, head route setter</div>
+<p>Hi there! I'm Dana Okonkwo-Reyes, head route setter at Basalt Peak Climbing Gym in Millbrook. We reset our four walls every week, and
+right now the only way to know what is up is the whiteboard by the front desk (which nobody can read from the
+parking lot). Climbers keep asking us two things: what is on each wall this week, and where the V4s are. We would
+love a small web app: the routes by wall and grade, a page for each route that we can text to people, and a way
+for us setters to log a new route from a phone while we are still on the ladder. Only setters should be able to
+log routes; the front-desk staff can sign in and look, but please don't let them log anything. Our volunteer
+developer already built us a tiny API for the data (it is in the folder). Thanks a ton! Dana Okonkwo-Reyes, head route setter</p>
+</div>
+<table class="timing">
+<thead><tr><th>Requirement</th><th>Lessons</th><th>What Meets asks, in my words</th></tr></thead>
+<tbody>
+<tr><td><b>R1</b> Routing</td><td>6.1, 6.2</td><td></td></tr>
+<tr><td><b>R2</b> Data layer and errors</td><td>4.1, 4.2, 6.3</td><td></td></tr>
+<tr><td><b>R3</b> The address holds the filters</td><td>6.2</td><td></td></tr>
+<tr><td><b>R4</b> Typed context and the protected route</td><td>5.2, 6.3</td><td></td></tr>
+<tr><td><b>R5</b> The reducer and the write</td><td>5.1, 4.2</td><td></td></tr>
+<tr><td><b>R6</b> Quality</td><td>all of Part 2, 3.6</td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>☐ <code class="inline">starter/</code> copied NEXT TO <code class="inline">shoreline-hq/</code> (for example <code class="inline">shoreline/basalt-peak/</code>), opened in VS Code, <code class="inline">npm install</code> done</li>
+  <li>☐ Terminal 1: <code class="inline">npm run api</code> (port 4400); terminal 2: <code class="inline">npm run dev</code>; the home page shows the layout and a TODO</li>
+  <li>☐ Signed in as <code class="inline">dana@basaltpeak.example</code> (setter) and <code class="inline">sam@basaltpeak.example</code> (staff), password <code class="inline">basalt-demo</code></li>
+  <li>☐ <code class="inline">npm test</code>: 12 tests, all failing with a TODO (expected); <code class="inline">BRIEF.md</code>, <code class="inline">TASKS.md</code> and <code class="inline">RUBRIC.md</code> read</li>
+  <li>☐ R1 started tonight: the route list in <code class="inline">src/routes.tsx</code></li>
+</ul>
+<table class="timing">
+<thead><tr><th>Milestone</th><th>When</th><th>What</th></tr></thead>
+<tbody>
+<tr><td>Kickoff</td><td>Tonight</td><td>Both terminals running, BRIEF and TASKS read, R1 started</td></tr>
+<tr><td>Check-in</td><td>Session 17</td><td>R1 and R2 working (the walls, the list and a route's page come from the API), R3 started; <code class="inline">npm test</code> and <code class="inline">npx tsc -b</code> shown; one question; the rubric row that worries me</td></tr>
+<tr><td>Hand-in</td><td>One week after Session 17</td><td>Everything; zip without <code class="inline">node_modules</code> and <code class="inline">dist</code>, <code class="inline">tests.txt</code>, <code class="inline">build.txt</code>, <code class="inline">NOTES.md</code></td></tr>
+</tbody>
+</table>
+<p><b>Part 2 met</b> = the project complete under its rubric (no row at 0) AND the Part 2 assessment in Session 17 met (written, closed book, 45 minutes, 20 points; 14 or more is met).</p>
+<table class="timing">
+<thead><tr><th></th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>I work alone / with:</td><td></td></tr>
+<tr><td>The requirement I expect to be hardest, and why:</td><td></td></tr>
+<tr><td>My question for the Session 17 check-in:</td><td></td></tr>
+</tbody>
+</table>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes. Write your answers, hand them in or keep them: they tell you and your instructor what to revisit.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">A guest opens <code class="inline">/volunteers?skill=first-aid</code>. Name the function that runs first and the address the browser ends on.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Name one failure a loader should turn into a route answer with <code class="inline">data()</code>, and one it should simply let through to the error page.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Your first Part 2 project milestone, and who you work with.</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish Guarded, Preloaded HQ (Steps 3 to 6)</li>
+  <li>☐ Lesson 6.3 Exercises 1 and 2 (Exercise 3 is a stretch)</li>
+  <li>☐ The Quick Quiz on the lesson page</li>
+  <li>☐ Lab 6.3 Task 3 and the stretch</li>
+  <li>☐ The journal entry</li>
+  <li>☐ Before the next lesson: the three checks pass; a cleanup opened twice sends two identical requests</li>
+  <li>☐ Part 2 project: R1 and R2 working, R3 started; one question written down</li>
+  <li>☐ Bring to Session 17: the project at its first milestone and one question, the HQ at the end of 6.3, this workbook, a charged laptop</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>render then fetch / load then render</td><td>The page fetches after it appears ("Loading…") / the router fetches before it shows the page</td></tr>
+<tr><td>loader, <code class="inline">LoaderFunctionArgs</code></td><td>A function on a route that the router calls on navigation, with <code class="inline">params</code> and the <code class="inline">request</code> (url, signal)</td></tr>
+<tr><td><code class="inline">useLoaderData&lt;typeof loader&gt;()</code></td><td>Reads the route's loader data, typed from the loader; <code class="inline">any</code> without the type argument</td></tr>
+<tr><td><code class="inline">useNavigation()</code></td><td>The navigation in progress: <code class="inline">'idle'</code>, <code class="inline">'loading'</code> (loaders) or <code class="inline">'submitting'</code> (an action)</td></tr>
+<tr><td><code class="inline">data()</code> (route answer)</td><td>Thrown from a loader or action: a status, a status text and a message for the error page</td></tr>
+<tr><td><code class="inline">redirect()</code></td><td>Thrown from a loader or action: the router goes to another address before anything renders</td></tr>
+<tr><td><code class="inline">useRouteError</code>, <code class="inline">isRouteErrorResponse</code></td><td>What the error element reads (<code class="inline">unknown</code>), and the predicate that narrows it to a route answer</td></tr>
+<tr><td>deferred data</td><td>A promise in loader data that the router does not wait for; the page <code class="inline">use()</code>s it inside Suspense</td></tr>
+<tr><td>guard, protected route</td><td>A loader that decides who may open a page, and the routes below it</td></tr>
+<tr><td><code class="inline">?next=</code>, open redirect</td><td>The way back after sign-in; sending people to any address it names (never do it: only paths inside the app)</td></tr>
+<tr><td>401 / 403</td><td>"Who are you?" (sign in) / "I know who you are, and no"</td></tr>
+<tr><td><code class="inline">shouldRevalidate</code></td><td>Tells the router when it may skip a route's loader (the HQ: when only the search changed)</td></tr>
+<tr><td>action, <code class="inline">&lt;Form&gt;</code>, <code class="inline">useActionData</code></td><td>A route function for a submitted form; the router's form; the action's last result</td></tr>
+<tr><td>external store, <code class="inline">useSyncExternalStore</code></td><td>A value outside React with a subscribe function; the Hook that reads it and re-renders on change</td></tr>
+<tr><td>automatic sign-out</td><td><code class="inline">request()</code> forgets the session when the API answers 401 to a request that carried a token</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 16 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

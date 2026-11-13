@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Build Shoreline Crew HQ's impact report form: a debris list with React Hook Form's useFieldArray and a Zod array schema, an accessible error summary, a photo upload with FormData and the API's 413 and 415 answers, a PUT that refreshes every cached answer it changes, and when a long form should become steps. React + TypeScript: Build a Modern Web App Lesson 8.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Complex Forms - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>📋 Lesson 8.2: Complex Forms</h1>
+                <p class="lead">This morning's Tide Pool Morning Cleanup is over. Eleven volunteers filled six bags, Maya has a tally sheet with forty plastic bottles and a hundred and twenty plastic bags on it, and somebody took a good photo of the bags lined up by the stairs. The HQ can show an impact report, but nobody can write one: the numbers on the Impact page stop at the last cleanup the sample data knows about. Today you build the form that closes that gap, and it is the first form in the course that is more than a flat list of boxes: a list that grows and shrinks, a file to upload, and enough fields that a message can hide below the fold.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Describe a list inside a form with a Zod array schema, including a rule about the whole list that puts its message on the right row</li>
+                        <li>Build rows people can add and remove with React Hook Form's <code>useFieldArray</code>, with stable keys, typed field paths and sensible focus</li>
+                        <li>Build an error summary that takes the focus after a failed save and links to every field with a problem</li>
+                        <li>Upload a file with <code>FormData</code>: check it in the browser, send it without breaking the request, and explain the API's 413 and 415 answers</li>
+                        <li>Save with <code>PUT</code> and refresh every cached answer the save changes</li>
+                        <li>Decide when a long form should become steps, and how to check one step at a time</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 160 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_27.html">Lesson 8.1: React Hook Form + Zod</a> (your <code>shoreline-hq</code> with the edit page, <code>schemas.ts</code> and the mutations from <a href="lesson_25.html">Lesson 7.2</a>)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> The impact report page for organizers: totals, a debris list that grows and shrinks, photos uploaded to the API, an error summary, and a save that updates the Impact tab and the dashboard</li>
+                    <li><span class="meta-label">🧩 Stack</span> React Hook Form 7.92, Zod 4.6, TanStack Query 5.107, React 19.3, TypeScript 7.0, Vite 8.3, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and the browser, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-28-start.zip">lesson-28-start.zip</a> · Finished code: <a href="downloads/lesson-28-end.zip">lesson-28-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>. For the uploads, any JPEG or PNG photo from your own computer will do.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#report" class="toc-link">What an Impact Report Needs</a></li>
+                        <li><a href="#lists" class="toc-link">A List in a Schema</a></li>
+                        <li><a href="#field-arrays" class="toc-link">Rows with useFieldArray</a></li>
+                        <li><a href="#summary-pattern" class="toc-link">An Error Summary</a></li>
+                        <li><a href="#uploads" class="toc-link">Uploading a Photo</a></li>
+                        <li><a href="#steps" class="toc-link">Should It Be Steps?</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Impact Report</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="report" class="lesson-section">
+                <h2>🧾 What an Impact Report Needs</h2>
+                <p>shoreline-api already knows what an impact report is. Its type, <code>NewImpactReport</code> in <code>types.ts</code> (the copy you made in Lesson 2.4), is what <code>PUT /api/events/:id/impact</code> accepts:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/types.ts</div>
+                    <pre data-src="shoreline-hq/src/api/types.ts" data-match="excerpt"><code class="language-ts">export interface NewImpactReport {
+  volunteersAttended: number
+  bags: number
+  weightKg: number
+  items: DebrisCount[]
+  notes?: string
+  photoIds?: string[]
+}</code></pre>
+                </div>
+                <p>Three numbers, notes, and two lists. <code>items</code> is a list of <code>{ category, count }</code> rows, as long as the crew needs: one cleanup counts bottles and bags, another counts ten kinds of debris. <code>photoIds</code> is a list too, but of ids, not pictures: a photo is uploaded on its own first (<code>POST /api/photos</code>), and the report only points at it. Each of those needs something your two cleanup forms never did:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>The report has…</th><th>So the form needs…</th><th>Section</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A list of rows of unknown length</td><td>An array in the schema, and rows people can add and remove</td><td>A List in a Schema; Rows with useFieldArray</td></tr>
+                            <tr><td>A dozen boxes, some far down the page</td><td>One place that lists every problem</td><td>An Error Summary</td></tr>
+                            <tr><td>Pictures</td><td>A file input, checks before sending, and a different kind of request</td><td>Uploading a Photo</td></tr>
+                            <tr><td>Quite a lot to fill in</td><td>A decision: one page, or steps?</td><td>Should It Be Steps?</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-info">
+                    <h3>💡 Mental model: the tally sheet on the clipboard</h3>
+                    <p>After a cleanup, the crew leader fills in a tally sheet. The top has the fixed boxes (people, bags, weight). Below is a table with blank lines: one line per kind of debris, as many lines as needed, and a line crossed out when it was a mistake. Photos are clipped to the back, each one with a number written on it. A <strong>field array</strong> is that table of lines; the <strong>error summary</strong> is the note the office clips on top ("line 3: bottles counted twice"); and the photo ids are the numbers on the clipped photos.</p>
+                </div>
+                <div class="card card-info">
+                    <h4>🌱 Why this matters</h4>
+                    <p>Line items, attachments and long forms are where real apps spend their form code: invoices, expense claims, job applications, inspection reports. Interviews and code reviews often probe exactly these places, because they are where keys, focus and validation go wrong. If parts of today feel fiddly, that is the material, not you: every piece is something you already know (lists and keys from Lesson 3.3, focus from Lesson 4.3, schemas from Lesson 8.1) meeting another piece.</p>
+                </div>
+            </section>
+
+            <section id="lists" class="lesson-section">
+                <h2>📚 A List in a Schema</h2>
+                <p>A row of the debris list is an object, so it is a <code>z.object</code>; the list is <code>z.array(rowSchema)</code>. The fixed numbers need one decision first. Lesson 8.1 used <code>z.coerce.number&lt;string&gt;()</code> for the capacity box, and that would be a quiet bug here:</p>
+                <pre data-snippet><code class="language-ts">// Why the report's numbers are not z.coerce.number(): an empty box would pass as 0
+import { z } from 'zod'
+
+const coerced = z.coerce.number&lt;string&gt;().int().min(0)
+const digitsOnly = z.string().trim().regex(/^\d+$/, 'Enter a whole number.').transform(Number)
+
+console.log(coerced.safeParse('').data)
+console.log(digitsOnly.safeParse('').error?.issues[0]?.message)
+console.log(digitsOnly.safeParse(' 12 ').data)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>0
+Enter a whole number.
+12</code></pre>
+                </div>
+                <p>Coercion turns an empty box into <code>0</code>, and for capacity that failed the "1 to 200" rule anyway. For a count, <code>0</code> is a valid answer ("no bottles"), so an organizer who skipped a box would report zero without a word. The report's numbers check the text first instead: digits only (a regular expression), then <code>.transform(Number)</code> turns the text into a number. An empty box, <code>-3</code>, <code>2.5</code> or <code>lots</code> all fail with the message. One small function builds all four counts:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/schemas.ts</div>
+                    <pre data-src="shoreline-hq/src/api/schemas.ts" data-match="excerpt"><code class="language-ts">// A count typed into a box: digits only, so an empty box is a message, not a silent 0
+// (z.coerce.number turns '' into 0, which would count as "nothing collected").
+function wholeNumber(max: number, message: string) {
+  return z
+    .string()
+    .trim()
+    .regex(/^\d+$/, message)
+    .transform(Number)
+    .refine((count) =&gt; count &lt;= max, message)
+}</code></pre>
+                </div>
+                <p>Its input type is <code>string</code> and its output type <code>number</code>, the same input/output split as Lesson 8.1's capacity. Now the report itself:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/schemas.ts</div>
+                    <pre data-src="shoreline-hq/src/api/schemas.ts" data-match="excerpt"><code class="language-ts">/** One row of the debris list: a category and how many pieces of it */
+const debrisCountSchema = z.object({
+  category: z.enum(debrisCategories, 'Choose a kind of debris.'),
+  count: wholeNumber(100_000, 'Count must be a whole number from 0 to 100000.'),
+})
+
+// The organizers' report after a cleanup. Messages match shoreline-api's own.
+export const impactReportSchema = z.object({
+  volunteersAttended: wholeNumber(1000, 'Volunteers must be a whole number from 0 to 1000.'),
+  bags: wholeNumber(500, 'Bags must be a whole number from 0 to 500.'),
+  weightKg: z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d+)?$/, weightRule)
+    .transform(Number)
+    .refine((kg) =&gt; kg &lt;= 5000, weightRule),
+  items: z
+    .array(debrisCountSchema)
+    // A rule about the whole list: each kind of debris once. The message goes to the repeated row.
+    .superRefine(
+      (items, context) =&gt; {
+        const seen = new Set&lt;string&gt;()
+        items.forEach((item, index) =&gt; {
+          if (seen.has(item.category)) {
+            context.addIssue({
+              code: 'custom',
+              path: [index, 'category'],
+              message: `${debrisLabels[item.category]} is already in the list: add to its count.`,
+            })
+          }
+          seen.add(item.category)
+        })
+      },
+      // Like the end-time rule: run as soon as every row's category is valid, whatever the counts
+      { when: ({ issues }) =&gt; issues.every((issue) =&gt; issue.path?.[1] !== 'category') },
+    ),
+  notes: z.string().trim().max(2000, 'Keep the notes to 2000 characters or fewer.'),
+})</code></pre>
+                </div>
+                <ul>
+                    <li><code>z.enum(debrisCategories, …)</code> takes the API's ten categories as a list, so a row's category type is the <code>DebrisCategory</code> union, not any string. The list moves from <code>client.ts</code> to a small shared file in Step 1, with the labels the Impact tab already uses.</li>
+                    <li>"Each kind of debris once" is a rule about the <em>whole list</em>, not a single row, so it goes on the array. <code>superRefine</code> is the version of <code>refine</code> that can report problems itself: <code>context.addIssue</code> with a <code>path</code> relative to the list. <code>[index, 'category']</code> puts the message on the repeated row's category, exactly where the organizer has to change something.</li>
+                    <li><code>when</code> is the same idea as the end-time rule in Lesson 8.1: without it, the list rule would wait until every count in every row was valid. Here it only needs the categories.</li>
+                </ul>
+                <p>Try it with Node, as in Lesson 8.1 (Step 1 has you run this file):</p>
+                <pre data-snippet><code class="language-ts">// The report schema with Node: a duplicate row and an empty box
+import { z } from 'zod'
+import { impactReportSchema } from './api/schemas.ts'
+
+const result = impactReportSchema.safeParse({
+  volunteersAttended: '11',
+  bags: '',
+  weightKg: '18.5',
+  items: [
+    { category: 'plastic-bottles', count: '40' },
+    { category: 'glass', count: 'lots' },
+    { category: 'plastic-bottles', count: '3' },
+  ],
+  notes: '',
+})
+if (!result.success) {
+  for (const issue of result.error.issues) {
+    console.log(issue.path.join('.'), '→', issue.message)
+  }
+  console.log(z.flattenError(result.error).fieldErrors)
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>bags → Bags must be a whole number from 0 to 500.
+items.1.count → Count must be a whole number from 0 to 100000.
+items.2.category → Plastic bottles is already in the list: add to its count.
+{
+  bags: [ 'Bags must be a whole number from 0 to 500.' ],
+  items: [
+    'Count must be a whole number from 0 to 100000.',
+    'Plastic bottles is already in the list: add to its count.'
+  ]
+}</code></pre>
+                </div>
+                <p>Every issue has a <strong>path</strong>: <code>['items', 2, 'category']</code> is "row 3's category" (rows count from 0). Look at the last object too: <code>z.flattenError</code>, which served the flat cleanup forms well, keeps only the first part of each path, so the two row messages lose their rows. For nested data the paths are what matter, and React Hook Form's resolver uses them: the duplicate message lands on <code>items.2.category</code>.</p>
+            </section>
+
+            <section id="field-arrays" class="lesson-section">
+                <h2>➕ Rows with useFieldArray</h2>
+                <p>The form's values are the schema's input type. Its <code>items</code> is an array, and React Hook Form has a Hook for arrays in a form, <code>useFieldArray</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/ImpactReportForm.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/ImpactReportForm.tsx" data-match="excerpt"><code class="language-tsx">// The debris rows: fields has one entry per row, with an id to use as its key
+const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+const allListed = fields.length === debrisCategories.length</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Part</th><th>What it does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>control</code></td><td>Connects the Hook to this form (it comes from <code>useForm</code>)</td></tr>
+                            <tr><td><code>name: 'items'</code></td><td>Which array; only names of arrays of objects are allowed, and TypeScript checks it</td></tr>
+                            <tr><td><code>fields</code></td><td>One entry per row, each with a generated <code>id</code>: the rows to draw</td></tr>
+                            <tr><td><code>append(row)</code>, <code>remove(index)</code></td><td>Add a row at the end, remove one (also <code>insert</code>, <code>move</code>, <code>swap</code>, <code>replace</code>)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Each row's boxes are registered under a <strong>path</strong>: <code>items.0.count</code>, <code>items.1.count</code>. Rendering the rows is a list like Lesson 3.3's, with two rules: the key is <code>field.id</code>, and the paths use the index:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/ImpactReportForm.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/ImpactReportForm.tsx" data-match="excerpt"><code class="language-tsx">  {fields.map((field, index) =&gt; {
+    const rowErrors = errors.items?.[index]
+    return (
+      &lt;li key={field.id} className={styles.row}&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor={`items.${index}.category`}&gt;
+            Kind of debris&lt;VisuallyHidden&gt;, row {index + 1}&lt;/VisuallyHidden&gt;
+          &lt;/label&gt;
+          &lt;select {...fieldProps(`items.${index}.category`, rowErrors?.category?.message)}&gt;
+            {debrisCategories.map((category) =&gt; (
+              &lt;option key={category} value={category}&gt;
+                {debrisLabels[category]}
+              &lt;/option&gt;
+            ))}
+          &lt;/select&gt;
+          &lt;FieldError
+            id={`items.${index}.category-error`}
+            messages={messages(rowErrors?.category?.message)}
+          /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor={`items.${index}.count`}&gt;
+            Pieces&lt;VisuallyHidden&gt;, row {index + 1}&lt;/VisuallyHidden&gt;
+          &lt;/label&gt;
+          &lt;input
+            type="number"
+            min={0}
+            {...fieldProps(`items.${index}.count`, rowErrors?.count?.message)}
+          /&gt;
+          &lt;FieldError
+            id={`items.${index}.count-error`}
+            messages={messages(rowErrors?.count?.message)}
+          /&gt;
+        &lt;/div&gt;
+        &lt;Button variant="link" onClick={() =&gt; removeRow(index)}&gt;
+          Remove&lt;VisuallyHidden&gt; row {index + 1}&lt;/VisuallyHidden&gt;
+        &lt;/Button&gt;
+      &lt;/li&gt;
+    )
+  })}
+&lt;/ol&gt;
+&lt;Button ref={addRef} aria-disabled={allListed} onClick={addRow}&gt;
+  Add a row
+&lt;/Button&gt;</code></pre>
+                </div>
+                <ul>
+                    <li><strong>Why <code>field.id</code> and not the index?</strong> The index of a row changes when a row above it is removed; React would then think row 2 <em>became</em> row 1 and reuse its elements. <code>field.id</code> stays with the row's data, which is what a key is for (Lesson 3.3). React Hook Form's documentation asks for <code>field.id</code> as the key too. (Measured here: removing the first of three rows with index keys still showed the right numbers, because React Hook Form writes the values back into its boxes; do not count on that for anything else in a row, such as its own state or the focus.)</li>
+                    <li><strong>Why the index in the paths?</strong> The path says where the value lives in the form's data <em>now</em>: after a removal, the second row's count really is <code>items.0.count</code>.</li>
+                    <li><code>errors.items?.[index]?.count</code> is the same shape as the values: an array of row errors. Optional chaining is needed at every level, because a row with no problem has no entry.</li>
+                    <li>Each label includes "row 1", "row 2" for screen readers (<code>VisuallyHidden</code> from Lesson 3.6): without it, every row's box would just be called "Pieces".</li>
+                </ul>
+                <p>The paths are types, not just strings. Hover <code>register</code> in VS Code and the parameter type lists every path in the form, with <code>`items.${number}.count`</code> standing for every row. A typo is a compile error:</p>
+                <pre data-snippet><code class="language-tsx">// What register accepts for a list: 'items.0.count' is a path, and TypeScript knows every one
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { impactReportSchema } from './api/schemas.ts'
+
+export function TypoRow({ index }: { index: number }) {
+  const { register } = useForm({ resolver: zodResolver(impactReportSchema) })
+  return &lt;input type="number" {...register(`items.${index}.cuont`)} /&gt;
+}</code></pre>
+                <figure class="screenshot">
+                    <img src="images/lesson_28/28-path-typo.png" alt="A terminal in shoreline-hq. npx tsc -b reports error TS2345 in src/Scratch.tsx: the template literal for items index cuont is not assignable to a parameter whose type lists the form&#x27;s field paths, such as items index count and items index category. Found 1 error." width="1100" height="206" loading="lazy">
+                    <figcaption>Field paths are types: <code>register</code> knows every path in the report form, including the rows of the debris list, so a typo in <code>items.${index}.count</code> is a compile error.</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:8:44 - error TS2345: Argument of type '`items.${number}.cuont`' is not assignable to parameter of type '"bags" | "items" | "notes" | "volunteersAttended" | "weightKg" | `items.${number}` | `items.${number}.category` | `items.${number}.count`'.
+
+8   return &lt;input type="number" {...register(`items.${index}.cuont`)} /&gt;
+                                             ~~~~~~~~~~~~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:8</code></pre>
+                </div>
+                <p>That union is React Hook Form's <code>FieldPath&lt;ImpactFormValues&gt;</code>, built from the schema's input type with <strong>template literal types</strong>: a type that describes strings like <code>`items.${number}.count`</code>. The project names it <code>ImpactField</code> and gives it to the <code>fieldProps</code> helper, so every box goes through the check.</p>
+                <p>Adding and removing rows is where focus needs thought. A new row's kind of debris is chosen for you (the first kind not in the list yet), so the cursor should land in its count; a removed row takes its Remove button with it, so the focus needs a new home:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/ImpactReportForm.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/ImpactReportForm.tsx" data-match="excerpt"><code class="language-tsx">
+function addRow() {
+  const category = nextCategory(getValues('items'))
+  if (category === undefined) return
+  // The new row's count box gets the focus: the kind of debris is already chosen
+  append({ category, count: '' }, { focusName: `items.${fields.length}.count` })
+}
+
+function removeRow(index: number) {
+  remove(index)
+  // The Remove button is gone: put the focus somewhere that makes sense
+  addRef.current?.focus()
+}</code></pre>
+                </div>
+                <p><code>append</code> moves the focus into the new row by itself; <code>focusName</code> picks which box (<code>fields.length</code> is the new row's index, since the list is one shorter until the next render). <code>getValues('items')</code> reads what the boxes hold right now; <code>fields</code> only has what each row started with. The Add button uses <code>aria-disabled</code>, not <code>disabled</code>, when all ten kinds are listed: a disabled button cannot hold the focus, and Remove sends the focus there.</p>
+            </section>
+
+            <section id="summary-pattern" class="lesson-section">
+                <h2>🚩 An Error Summary</h2>
+                <p>Your cleanup forms show each message under its field and move the focus to the first one. On a long form that is not enough: the first problem may be the only one on screen, a screen reader user hears one message, and a problem in row 7 is easy to miss. The usual answer, used by government services and big shops alike, is an <strong>error summary</strong>: a box at the top of the form that appears after a failed save, takes the focus, says how many problems there are, and lists each one as a link to its field. The messages under the fields stay, so the summary is a map, not the only copy.</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_28/28-error-summary.png" alt="The form after Save the report with empty boxes. At the top, a box with a red border has the heading Fix these 4 before saving and four links: Volunteers must be a whole number from 0 to 1000, Bags must be a whole number from 0 to 500, Weight must be a number of kilograms from 0 to 5000, and Row 1: Count must be a whole number from 0 to 100000. The same messages appear in red under each field." width="656" height="540" loading="lazy">
+                    <figcaption>The error summary takes the focus after a failed save: every problem in one place, each one a link to its field. The messages under the fields stay, so nothing depends on the summary alone.</figcaption>
+                </figure>
+                <p>The component knows nothing about impact reports. It takes a list of <code>{ id, message }</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/ErrorSummary.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/ErrorSummary.tsx"><code class="language-tsx">import { useEffect, useId, useRef } from 'react'
+import type { ErrorItem } from '../utils/formErrors.ts'
+import styles from './ErrorSummary.module.css'
+
+interface ErrorSummaryProps {
+  errors: ErrorItem[]
+}
+
+// Every problem in one list at the top of a form, each one a link to its field.
+// It takes the focus when it appears: give it a new key on every submit to show it again.
+export function ErrorSummary({ errors }: ErrorSummaryProps) {
+  const summaryRef = useRef&lt;HTMLElement&gt;(null)
+  const headingId = useId()
+
+  useEffect(() =&gt; {
+    summaryRef.current?.focus()
+  }, [])
+
+  if (errors.length === 0) {
+    return null
+  }
+  const count = errors.length === 1 ? 'this' : `these ${errors.length}`
+  return (
+    &lt;section ref={summaryRef} tabIndex={-1} aria-labelledby={headingId} className={styles.summary}&gt;
+      &lt;h2 id={headingId}&gt;Fix {count} before saving&lt;/h2&gt;
+      &lt;ul&gt;
+        {errors.map((error) =&gt; (
+          &lt;li key={error.id}&gt;
+            &lt;a
+              href={`#${error.id}`}
+              onClick={(event) =&gt; {
+                // Focus the field without adding #id to the address (and to the history)
+                event.preventDefault()
+                document.getElementById(error.id)?.focus()
+              }}
+            &gt;
+              {error.message}
+            &lt;/a&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+                </div>
+                <ul>
+                    <li><strong>Taking the focus.</strong> A <code>section</code> with <code>tabIndex={-1}</code> can receive the focus from code (but is not a Tab stop), and <code>aria-labelledby</code> makes its heading its name, so a screen reader says "Fix these 4 before saving" and then reads on. The effect runs once, when the summary appears.</li>
+                    <li><strong>Appearing again.</strong> The form renders it as <code>&lt;ErrorSummary key={submitCount} …&gt;</code>. A new key on every Save makes React create a new summary (the same trick that gives each cleanup's page fresh tabs, Lesson 6.3), so the focus moves to it after every failed Save, but not while someone types: fixing a field only shortens the list.</li>
+                    <li><strong>The links.</strong> Measured in Chromium: a plain <code>href="#bags"</code> does move the focus into the bags box, but it also writes <code>#bags</code> into the address, which adds a history entry: Back would first undo the jump instead of leaving the page. The click handler focuses the field and keeps the address clean, whatever the browser does with <code>#</code> links.</li>
+                </ul>
+                <p>Where does the list come from? React Hook Form's <code>formState.errors</code> is a tree with the same shape as the values: <code>{ bags: { message }, items: [ , { count: { message } } ] }</code>. A small recursive function walks it and builds the paths:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/utils/formErrors.ts</div>
+                    <pre data-src="shoreline-hq/src/utils/formErrors.ts" data-match="excerpt"><code class="language-ts">/** Every field's message, in the order the schema checked them. Field ids are their names:
+ * 'bags', 'items.2.count'. The form-wide root errors are left out (the status line shows those). */
+export function listErrors&lt;T extends FieldValues&gt;(errors: FieldErrors&lt;T&gt;): ErrorItem[] {
+  return collect(errors, '')
+}
+
+// errors is a tree: { bags: { message }, items: [ , { count: { message } } ] }
+function collect(value: unknown, path: string): ErrorItem[] {
+  if (typeof value !== 'object' || value === null) {
+    return []
+  }
+  if ('message' in value &amp;&amp; typeof value.message === 'string') {
+    return [{ id: path, message: value.message }]
+  }
+  return Object.entries(value).flatMap(([key, inner]) =&gt;
+    key === 'root' || key === 'ref' ? [] : collect(inner, path === '' ? key : `${path}.${key}`),
+  )
+}</code></pre>
+                </div>
+                <p>It takes <code>unknown</code> and narrows it, the same skill as Lesson 2.4's API guards: <code>typeof</code> and <code>'message' in value</code> prove the shape before anything is read. Because each field's <code>id</code> is its path, the path is also the id to link to. One more detail makes the summary read well: out of context, "Count must be a whole number" does not say <em>which</em> count, so the impact form adds the row (<code>withRowNumbers</code>, Step 5): "Row 2: Count must be…". Every line in a summary should make sense on its own.</p>
+                <div class="mermaid">
+graph TD
+    A["Save the report"] --> B["Resolver runs the schema"]
+    B --> C{"Any problems?"}
+    C -->|"yes"| D["New summary, takes focus"]
+    D --> E["Link focuses the field"]
+    C -->|"no"| F["PUT the report"]
+    F --> G["Cache updated, go to cleanup"]
+                </div>
+                <p>One option makes room for the summary: <code>shouldFocusError: false</code> in <code>useForm</code>. By default React Hook Form focuses the first bad field after a failed submit, which would fight with the summary for the focus.</p>
+            </section>
+
+            <section id="uploads" class="lesson-section">
+                <h2>📷 Uploading a Photo</h2>
+                <p>A file box, <code>&lt;input type="file"&gt;</code>, does not have a text value. Its <code>files</code> property is a <code>FileList</code>, and each item is a <strong><code>File</code></strong>: a <code>Blob</code> (raw bytes) with a <code>name</code>, a <code>size</code> in bytes and a <code>type</code> such as <code>image/jpeg</code>. TypeScript types <code>input.files</code> as <code>FileList | null</code> and, with <code>noUncheckedIndexedAccess</code> on, <code>input.files?.[0]</code> as <code>File | undefined</code>: no file chosen is a case you must handle.</p>
+                <p>shoreline-api accepts JPEG, PNG and WebP up to 5 MB, and answers <strong>415 Unsupported Media Type</strong> or <strong>413 Payload Too Large</strong> otherwise. The HQ checks both before sending anything:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/PhotoUpload.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/PhotoUpload.tsx" data-match="excerpt"><code class="language-tsx">
+// What shoreline-api accepts (POST /api/photos answers 415 and 413 otherwise)
+const photoTypes = ['image/jpeg', 'image/png', 'image/webp']
+const maxBytes = 5 * 1024 * 1024
+
+/** What is wrong with a chosen file, before anything is sent (null: nothing) */
+function checkPhoto(file: File): string | null {
+  if (!photoTypes.includes(file.type)) {
+    return `${file.name} is not a JPEG, PNG or WebP image.`
+  }
+  if (file.size &gt; maxBytes) {
+    const megabytes = (file.size / 1024 / 1024).toFixed(1)
+    return `${file.name} is ${megabytes} MB. Photos must be 5 MB or smaller.`
+  }
+  return null
+}</code></pre>
+                </div>
+                <p>Why check at all, when the file box has <code>accept="image/jpeg,image/png,image/webp"</code>? Because <code>accept</code> is a hint to the file picker. Most pickers have an "All files" choice, drag and drop ignores it, and nothing stops a 40 MB photo straight off a phone. Measured with the checks removed: a GIF went to the API and came back as 415, "Photos must be JPEG, PNG or WebP images."; a 5.6 MB PNG was sent in full before the API answered 413, "Photos must be 5 MB or smaller.". The browser check gives the same answer at once, without uploading anything.</p>
+                <p>Sending a file is not JSON. The request body is <strong><code>multipart/form-data</code></strong>: several parts, each with a name, separated by a random <em>boundary</em> string. <code>FormData</code> builds it:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                    <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">/** POST /api/photos (signed in): upload one image file as multipart/form-data */
+export async function postPhoto(file: File): Promise&lt;Photo&gt; {
+  const body = new FormData()
+  body.append('photo', file)
+  // No Content-Type header: fetch writes multipart/form-data with the boundary that separates the parts
+  const response = await request('/photos', { method: 'POST', body })
+  const data: unknown = await response.json()
+  if (!isPhoto(data)) {
+    throw new Error('Unexpected data from POST /api/photos')
+  }
+  return data
+}</code></pre>
+                </div>
+                <p>The field name, <code>photo</code>, is the one the API's documentation asks for. Notice what is missing: a <code>Content-Type</code> header. When the body is a <code>FormData</code>, <code>fetch</code> writes <code>multipart/form-data; boundary=…</code> itself, with the boundary it used. Writing the header yourself drops the boundary, and the server cannot find the parts (Common Mistakes has the measured result). The shared <code>request()</code> from Lesson 5.2 still adds the sign-in token: uploads need a signed-in user.</p>
+                <div class="mermaid">
+graph TD
+    A["Choose a file"] --> B{"Type and size OK?"}
+    B -->|"no"| C["Message, nothing sent"]
+    B -->|"yes"| D["POST /api/photos"]
+    D --> E{"API checks again"}
+    E -->|"201"| F["Keep the photo id"]
+    E -->|"413 or 415"| C
+    F --> G["Save: PUT with photoIds"]
+                </div>
+                <p>The photo is uploaded <strong>as soon as it is chosen</strong>, and the report keeps only its id. That is how the API is designed (the phone app in the React Native course uploads photos the same way, sometimes long before the report), and it has a pleasant side effect: by the time the organizer presses Save, the slow part is done. The photo appears in the list from the API's own address, the <code>url</code> in its answer, which also proves the upload worked.</p>
+                <div class="card card-danger">
+                    <h4>🛑 Files are untrusted input</h4>
+                    <p>The browser's check is a courtesy, like the schema (Lesson 8.1): browsers usually work out <code>file.type</code> from the file's name, so a renamed file passes it. The server must check the size and the real content, store uploads away from code, and never trust the file name. shoreline-api checks the type and the size and keeps photos in memory only; a production API would also read the file's first bytes to confirm it is an image. Never put an upload service's secret key in front-end code to "upload directly": anything in the bundle is public (Lesson 2.4).</p>
+                </div>
+            </section>
+
+            <section id="steps" class="lesson-section">
+                <h2>🪜 Should It Be Steps?</h2>
+                <p>Long forms are often split into steps: "1 of 3: Your details". Steps help when the parts are truly separate, when later questions depend on earlier answers, or on a phone, where one long page is tiring. They also cost something: more clicks, a "where was I?" feeling, and more code (checking each step, focus on every change, Back without losing anything).</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Steps fit when…</th><th>One page fits when…</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Each part is a separate task (shipping, then payment)</td><td>People fill it in one sitting from one source (a tally sheet)</td></tr>
+                            <tr><td>Answers decide what is asked next</td><td>Every field is always asked</td></tr>
+                            <tr><td>People need to review before a big commitment</td><td>Saving can be done again (a report can be replaced)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The impact report sits firmly in the right column: an organizer copies one tally sheet at a desk, every field is always there, and a mistake is fixed by saving again. So the HQ keeps it on one page, with the error summary doing the job steps would do for long forms. Splitting it just to practice would be a fake wizard. But you will meet step forms, so here is how they work with React Hook Form (Exercise 3 builds this version, if you want to try):</p>
+                <div class="code-file">
+                    <div class="code-filename">ImpactReportForm.tsx, Exercise 3 version (not in the project)</div>
+                    <pre data-snippet><code class="language-tsx">// Show a step and move the focus to its heading, so keyboard and screen reader users start
+// there (flushSync: React updates the page first, then the heading can take the focus)
+function showStep(number: 1 | 2) {
+  flushSync(() =&gt; setStep(number))
+  stepRef.current?.focus()
+}
+
+// Step 1's fields are checked before step 2 appears (Save checks the whole form again)
+async function next() {
+  if (await trigger(['volunteersAttended', 'bags', 'weightKg'])) {
+    showStep(2)
+  }
+}</code></pre>
+                </div>
+                <ul>
+                    <li><strong>One form, one <code>useForm</code>.</strong> The steps are parts of the same form, shown one at a time, so the values, the schema and the Save stay as they are.</li>
+                    <li><strong><code>trigger(names)</code> checks some fields now</strong> and resolves to <code>true</code> when they are fine: Next only checks step 1's boxes.</li>
+                    <li><strong>Hide, do not unmount.</strong> Each step is a <code>div</code> with the <code>hidden</code> attribute, so its boxes stay registered. A trap measured here: <code>hidden</code> is just <code>display: none</code> in the browser's own styles, and any class that sets <code>display: flex</code> wins over it. With the step's class setting <code>display: flex</code>, both steps showed at once until the CSS Module said <code>.step[hidden] { display: none; }</code>.</li>
+                    <li><strong>Move the focus to the new step's heading</strong>, or keyboard and screen reader users are left on a button that just vanished. <code>flushSync</code> makes React update the page first, so the heading already says "Step 2 of 2" when it takes the focus.</li>
+                </ul>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Writing the <code>Content-Type</code> header for a file upload</h3>
+                    <p>It looks helpful to say what you are sending:</p>
+                    <pre data-snippet><code class="language-ts">const response = await request('/photos', {
+  method: 'POST',
+  headers: { 'Content-Type': 'multipart/form-data' },
+  body,
+})</code></pre>
+                    <p>Measured: the upload answered <strong>400</strong>, and the form said "bags-at-the-stairs.jpg was not uploaded. The server had a problem (400). Try again in a moment." The header has no <code>boundary=…</code>, so shoreline-api cannot split the body into parts and never finds the <code>photo</code> field (its answer says "Attach an image in a field named photo."). Trying again would not help. Leave the header out whenever the body is a <code>FormData</code>: <code>fetch</code> writes the right one.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Removing a row and leaving the focus behind</h3>
+                    <p>Without <code>addRef.current?.focus()</code> in <code>removeRow</code>, the Remove button disappears while it has the focus. Measured: after removing row 1, <code>document.activeElement</code> was the page's <code>&lt;body&gt;</code>. A keyboard user's next <kbd>Tab</kbd> starts again from the top of the page, and a screen reader says nothing at all about what happened. Whenever a click removes the element that was clicked, decide where the focus goes next: a neighbor, the list's heading, or (as here) the button that adds rows.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Invalidating, but not using the answer you already have</h3>
+                    <p><code>PUT</code> answers with the saved report. With only the invalidations (no <code>setQueryData</code>), measured on an API slowed down with <code>--latency=1000</code> after changing Storm Debris Sweep's volunteers from 10 to 12: the Impact tab first showed "Volunteers: 10." from the cache, then "Volunteers: 12." a second later. With the answer written into the cache first, it showed 12 straight away. Invalidation means "this may be out of date, fetch it again"; when the server has just told you the new value, put it in the cache and skip the guessing. Keep the invalidations too: the cleanup's status and the dashboard's totals changed on the server, and only a fetch brings those.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ <code>hidden</code> on something with <code>display</code> set</h3>
+                    <p>The <code>hidden</code> attribute only works through the browser's built-in <code>display: none</code>, and a class with <code>display: flex</code> (or <code>grid</code>, or <code>block</code>) overrides it. Measured in the step version of the form: with the step's class setting <code>display: flex</code> and no other rule, step 2's count box was visible on step 1. Either put <code>hidden</code> on an element without a <code>display</code> rule, or add <code>.step[hidden] { display: none; }</code> to the CSS Module.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Impact Report</h2>
+                <p>Step 1 shares the debris list and writes the schema, Step 2 adds the save and the upload to the API layer, Steps 3 and 4 build the two new pieces (the error summary and the photo upload), Step 5 puts the form on its own page, and Step 6 tries everything. Keep shoreline-api and <code>npm run dev</code> running, and sign in as an organizer (<code>maya.okafor@example.com</code>, password <code>shoreline-demo</code>). No new packages today: React Hook Form and Zod are already installed.</p>
+
+                <div class="card">
+                    <h3>Step 1: Share the debris list, write the schema <span class="step-time">(12 min)</span></h3>
+                    <p>The Impact tab's labels and the API client's category list are about to get a third user, so they move to one file. Create <code>src/utils/debris.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/debris.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/debris.ts"><code class="language-ts">// The API's debris categories and the HQ's words for them (GET /api/meta lists the same ones).
+// Used by the impact report on a cleanup's page and by the form that writes it.
+import type { DebrisCategory } from '../api/types.ts'
+
+/** Every category, in the API's order */
+export const debrisCategories: DebrisCategory[] = [
+  'plastic-bottles', 'plastic-bags', 'food-wrappers', 'bottle-caps', 'cigarette-butts',
+  'fishing-gear', 'glass', 'metal', 'foam', 'other',
+]
+
+/** What the HQ calls each category */
+export const debrisLabels: Record&lt;DebrisCategory, string&gt; = {
+  'plastic-bottles': 'Plastic bottles',
+  'plastic-bags': 'Plastic bags',
+  'food-wrappers': 'Food wrappers',
+  'bottle-caps': 'Bottle caps',
+  'cigarette-butts': 'Cigarette butts',
+  'fishing-gear': 'Fishing line and nets',
+  glass: 'Glass',
+  metal: 'Metal and cans',
+  foam: 'Foam pieces',
+  other: 'Other',
+}</code></pre>
+                    </div>
+                    <p>In <code>src/components/ImpactSummary.tsx</code>, import the labels instead of defining them:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactSummary.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactSummary.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { useSuspenseQuery } from '@tanstack/react-query'
+ import { eventImpactQuery } from '../api/queries.ts'
+-import type { DebrisCategory } from '../api/types.ts'
++import { debrisLabels } from '../utils/debris.ts'
+ import { DataList } from './DataList.tsx'
+-
+-// The API's labels for its debris categories (GET /api/meta lists the same ones)
+-const debrisLabels: Record&lt;DebrisCategory, string&gt; = {
+-  'plastic-bottles': 'Plastic bottles',
+-  'plastic-bags': 'Plastic bags',
+-  'food-wrappers': 'Food wrappers',
+-  'bottle-caps': 'Bottle caps',
+-  'cigarette-butts': 'Cigarette butts',
+-  'fishing-gear': 'Fishing line and nets',
+-  glass: 'Glass',
+-  metal: 'Metal and cans',
+-  foam: 'Foam pieces',
+-  other: 'Other',
+-}
+ 
+ interface ImpactSummaryProps {</code></pre>
+                    </div>
+                    <p>and, while you are there, say when a report came with photos:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactSummary.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactSummary.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">       &lt;/p&gt;
+       {report.notes !== '' &amp;&amp; &lt;p&gt;{report.notes}&lt;/p&gt;}
++      {report.photoIds.length &gt; 0 &amp;&amp; &lt;p&gt;Photos uploaded with the report: {report.photoIds.length}.&lt;/p&gt;}
+       &lt;h3&gt;Pieces counted&lt;/h3&gt;
+       &lt;DataList</code></pre>
+                    </div>
+                    <p>In <code>src/api/client.ts</code>, import the list at the top and delete the old one above <code>isDebrisCount</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight">-// Shoreline Crew HQ's API client (Lessons 2.4, 4.1, 5.2, 5.4, 6.2, 6.3, 7.1 and 7.2).
++// Shoreline Crew HQ's API client (Lessons 2.4, 4.1, 5.2, 5.4, 6.2, 6.3, 7.1, 7.2 and 8.2).
+ // Data from the API is unknown until a check proves its shape.
++import { debrisCategories } from '../utils/debris.ts'
+ import type {
+   ApiErrorBody,</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> }
+ 
+-const debrisCategories: DebrisCategory[] = [
+-  'plastic-bottles', 'plastic-bags', 'food-wrappers', 'bottle-caps', 'cigarette-butts',
+-  'fishing-gear', 'glass', 'metal', 'foam', 'other',
+-]
+-
+ function isDebrisCount(value: unknown): value is DebrisCount {
+   return (</code></pre>
+                    </div>
+                    <p>Now the schema. In <code>src/api/schemas.ts</code>, change the comment and the imports at the top:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/schemas.ts</div>
+                        <pre data-src="shoreline-hq/src/api/schemas.ts" data-match="diff"><code class="language-diff-ts diff-highlight">-// Shoreline Crew HQ's Zod schemas (Lesson 8.1): each one is a type AND its checks, written once.
++// Shoreline Crew HQ's Zod schemas (Lessons 8.1 and 8.2): each one is a type AND its checks, written once.
+ import { z } from 'zod'
++import { debrisCategories, debrisLabels } from '../utils/debris.ts'
+ import { toDateString } from '../utils/format.ts'
+ </code></pre>
+                    </div>
+                    <p>and add everything below at the end of the file (you read each part in "A List in a Schema"):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/schemas.ts</div>
+                        <pre data-src="shoreline-hq/src/api/schemas.ts" data-match="excerpt"><code class="language-ts">// A count typed into a box: digits only, so an empty box is a message, not a silent 0
+// (z.coerce.number turns '' into 0, which would count as "nothing collected").
+function wholeNumber(max: number, message: string) {
+  return z
+    .string()
+    .trim()
+    .regex(/^\d+$/, message)
+    .transform(Number)
+    .refine((count) =&gt; count &lt;= max, message)
+}
+
+const weightRule = 'Weight must be a number of kilograms from 0 to 5000.'
+
+/** One row of the debris list: a category and how many pieces of it */
+const debrisCountSchema = z.object({
+  category: z.enum(debrisCategories, 'Choose a kind of debris.'),
+  count: wholeNumber(100_000, 'Count must be a whole number from 0 to 100000.'),
+})
+
+// The organizers' report after a cleanup. Messages match shoreline-api's own.
+export const impactReportSchema = z.object({
+  volunteersAttended: wholeNumber(1000, 'Volunteers must be a whole number from 0 to 1000.'),
+  bags: wholeNumber(500, 'Bags must be a whole number from 0 to 500.'),
+  weightKg: z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d+)?$/, weightRule)
+    .transform(Number)
+    .refine((kg) =&gt; kg &lt;= 5000, weightRule),
+  items: z
+    .array(debrisCountSchema)
+    // A rule about the whole list: each kind of debris once. The message goes to the repeated row.
+    .superRefine(
+      (items, context) =&gt; {
+        const seen = new Set&lt;string&gt;()
+        items.forEach((item, index) =&gt; {
+          if (seen.has(item.category)) {
+            context.addIssue({
+              code: 'custom',
+              path: [index, 'category'],
+              message: `${debrisLabels[item.category]} is already in the list: add to its count.`,
+            })
+          }
+          seen.add(item.category)
+        })
+      },
+      // Like the end-time rule: run as soon as every row's category is valid, whatever the counts
+      { when: ({ issues }) =&gt; issues.every((issue) =&gt; issue.path?.[1] !== 'category') },
+    ),
+  notes: z.string().trim().max(2000, 'Keep the notes to 2000 characters or fewer.'),
+})
+
+/** What the report form's fields hold: text, as typed */
+export type ImpactFormValues = z.input&lt;typeof impactReportSchema&gt;
+
+/** What a successful check gives back: numbers, ready to send */
+export type ImpactFormData = z.output&lt;typeof impactReportSchema&gt;</code></pre>
+                    </div>
+                    <p>Create <code>src/try-impact.ts</code> with the test file from that section (it starts with <code>// The report schema with Node</code>) and run it:</p>
+                    <pre class="terminal"><code class="language-bash">node src/try-impact.ts</code></pre>
+                    <p>You should see the three messages with their paths. Change <code>'lots'</code> to <code>'5'</code> and the third row's category to <code>'foam'</code>: the duplicate message disappears. When you are done, <strong>delete <code>src/try-impact.ts</code></strong>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Save and upload in the API layer <span class="step-time">(8 min)</span></h3>
+                    <p>In <code>src/api/client.ts</code>, add <code>NewImpactReport</code> and <code>Photo</code> to the type import:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   ImpactTotals,
+   NewEvent,
++  NewImpactReport,
+   PageInfo,
++  Photo,
+   Role,
+   RosterEntry,</code></pre>
+                    </div>
+                    <p>Add a guard for the API's answer to an upload after <code>isImpactTotals</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">/** An uploaded photo, as POST /api/photos sends it back */
+function isPhoto(value: unknown): value is Photo {
+  return (
+    isRecord(value) &amp;&amp;
+    typeof value.id === 'string' &amp;&amp;
+    typeof value.url === 'string' &amp;&amp;
+    typeof value.contentType === 'string' &amp;&amp;
+    typeof value.bytes === 'number'
+  )
+}</code></pre>
+                    </div>
+                    <p>Let <code>sendJSON</code> send a <code>PUT</code> too:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> }
+ 
+-/** Send JSON with POST or PATCH, and check the JSON that comes back */
++/** Send JSON with POST, PATCH or PUT, and check the JSON that comes back */
+ async function sendJSON&lt;T&gt;(
+-  method: 'POST' | 'PATCH',
++  method: 'POST' | 'PATCH' | 'PUT',
+   path: string,
+   body: unknown,</code></pre>
+                    </div>
+                    <p>and add the two requests at the end of the file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">
+/** PUT /api/events/:id/impact (organizers): save or replace a cleanup's impact report */
+export function putImpact(eventId: string, report: NewImpactReport): Promise&lt;ImpactReport&gt; {
+  return sendJSON('PUT', `/events/${encodeURIComponent(eventId)}/impact`, report, isImpactReport)
+}
+
+/** POST /api/photos (signed in): upload one image file as multipart/form-data */
+export async function postPhoto(file: File): Promise&lt;Photo&gt; {
+  const body = new FormData()
+  body.append('photo', file)
+  // No Content-Type header: fetch writes multipart/form-data with the boundary that separates the parts
+  const response = await request('/photos', { method: 'POST', body })
+  const data: unknown = await response.json()
+  if (!isPhoto(data)) {
+    throw new Error('Unexpected data from POST /api/photos')
+  }
+  return data
+}</code></pre>
+                    </div>
+                    <p><code>PUT</code> means "store this as the whole report": sending it twice gives the same result, so saving a corrected report is safe. Now the mutations. In <code>src/api/mutations.ts</code>, update the imports:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/mutations.ts</div>
+                        <pre data-src="shoreline-hq/src/api/mutations.ts" data-match="diff"><code class="language-diff-ts diff-highlight">-// Shoreline Crew HQ's changes (Lessons 7.2 and 8.1): one mutationOptions factory per kind of change.
++// Shoreline Crew HQ's changes (Lessons 7.2, 8.1 and 8.2): one mutationOptions factory per kind of change.
+ // Each one says what to send, and which cached answers are out of date afterwards.
+ import { mutationOptions } from '@tanstack/react-query'
+ import type { Mark } from '../reducers/rosterReducer.ts'
+-import { patchEvent, patchSignup, postEvent } from './client.ts'
+-import { queryClient, rosterQuery } from './queries.ts'
+-import type { EventChanges, NewEvent, SignupStatus } from './types.ts'
++import { patchEvent, patchSignup, postEvent, postPhoto, putImpact } from './client.ts'
++import { eventImpactQuery, queryClient, rosterQuery } from './queries.ts'
++import type { EventChanges, NewEvent, NewImpactReport, SignupStatus } from './types.ts'
+ 
+ /** Plan a cleanup. Waits for the API: the new cleanup's id comes from it. */</code></pre>
+                    </div>
+                    <p>and add two factories after <code>updateEventMutation</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/mutations.ts</div>
+                        <pre data-src="shoreline-hq/src/api/mutations.ts" data-match="excerpt"><code class="language-ts">/** Which cleanup the report is for, and the report */
+export interface ImpactUpdate {
+  eventId: string
+  report: NewImpactReport
+}
+
+/** Save a cleanup's impact report. Waits for the API, then refreshes what the report changes. */
+export function saveImpactMutation() {
+  return mutationOptions({
+    mutationFn: ({ eventId, report }: ImpactUpdate) =&gt; putImpact(eventId, report),
+    onSuccess: (saved, { eventId }) =&gt; {
+      // The API answers with the saved report: put it in the cache, so the Impact tab shows
+      // the new numbers at once instead of the old report while it fetches again
+      queryClient.setQueryData(eventImpactQuery(eventId).queryKey, saved)
+      // ['events']: the cleanup (now completed) and every list; ['impact']: the dashboard's totals
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['events'] }),
+        queryClient.invalidateQueries({ queryKey: ['impact'] }),
+      ])
+    },
+  })
+}
+
+/** Upload one photo. Nothing cached shows photos, so there is nothing to invalidate. */
+export function uploadPhotoMutation() {
+  return mutationOptions({
+    mutationFn: (file: File) =&gt; postPhoto(file),
+  })
+}</code></pre>
+                    </div>
+                    <p>Use Lesson 7.2's question, "what could this change have changed?". The report's own cache entry (<code>['events', 'impact', id]</code>) gets the API's answer directly. The cleanup itself becomes <code>completed</code> when its first report is saved, so every <code>['events']</code> query is out of date, and the dashboard's totals (<code>['impact']</code>, Lesson 7.1) count every report. Lesson 7.2 promised that <code>['impact']</code> would be invalidated by the first change that affects the totals: this is it.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: The error summary <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>src/utils/formErrors.ts</code>, the walker from "An Error Summary":</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/formErrors.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/formErrors.ts"><code class="language-ts">// Turning React Hook Form's errors into one list, for an error summary (Lesson 8.2)
+import type { FieldErrors, FieldValues } from 'react-hook-form'
+
+/** One problem: the message, and the id of the field it belongs to */
+export interface ErrorItem {
+  id: string
+  message: string
+}
+
+/** Every field's message, in the order the schema checked them. Field ids are their names:
+ * 'bags', 'items.2.count'. The form-wide root errors are left out (the status line shows those). */
+export function listErrors&lt;T extends FieldValues&gt;(errors: FieldErrors&lt;T&gt;): ErrorItem[] {
+  return collect(errors, '')
+}
+
+// errors is a tree: { bags: { message }, items: [ , { count: { message } } ] }
+function collect(value: unknown, path: string): ErrorItem[] {
+  if (typeof value !== 'object' || value === null) {
+    return []
+  }
+  if ('message' in value &amp;&amp; typeof value.message === 'string') {
+    return [{ id: path, message: value.message }]
+  }
+  return Object.entries(value).flatMap(([key, inner]) =&gt;
+    key === 'root' || key === 'ref' ? [] : collect(inner, path === '' ? key : `${path}.${key}`),
+  )
+}</code></pre>
+                    </div>
+                    <p><code>FieldErrors&lt;T&gt;</code> is React Hook Form's type for <code>formState.errors</code>; the function is generic, so any form can use it (Exercise 1 does). Then the component: create <code>src/components/ErrorSummary.tsx</code> with the code from that section, and its styles, <code>src/components/ErrorSummary.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ErrorSummary.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/ErrorSummary.module.css"><code class="language-css">.summary {
+  padding: 1rem 1.25rem;
+  border: 2px solid var(--error);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.summary h2 {
+  margin-top: 0;
+  font-size: 1.25rem;
+}
+
+.summary ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.summary a {
+  color: var(--error);
+}</code></pre>
+                    </div>
+                    <p>The red border and red links use the <code>--error</code> token, so dark mode works without another rule.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The photo upload <span class="step-time">(12 min)</span></h3>
+                    <p>Create <code>src/components/PhotoUpload.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/PhotoUpload.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/PhotoUpload.tsx"><code class="language-tsx">import { useMutation } from '@tanstack/react-query'
+import { useState, type ChangeEvent } from 'react'
+import { ApiError, describeError } from '../api/client.ts'
+import { uploadPhotoMutation } from '../api/mutations.ts'
+import { Button } from './Button.tsx'
+import { FieldError } from './FieldError.tsx'
+import formStyles from './Form.module.css'
+import styles from './PhotoUpload.module.css'
+import { VisuallyHidden } from './VisuallyHidden.tsx'
+
+/** A photo the API has saved: its id goes into the report */
+export interface UploadedPhoto {
+  id: string
+  url: string
+  name: string
+}
+
+// What shoreline-api accepts (POST /api/photos answers 415 and 413 otherwise)
+const photoTypes = ['image/jpeg', 'image/png', 'image/webp']
+const maxBytes = 5 * 1024 * 1024
+
+/** What is wrong with a chosen file, before anything is sent (null: nothing) */
+function checkPhoto(file: File): string | null {
+  if (!photoTypes.includes(file.type)) {
+    return `${file.name} is not a JPEG, PNG or WebP image.`
+  }
+  if (file.size &gt; maxBytes) {
+    const megabytes = (file.size / 1024 / 1024).toFixed(1)
+    return `${file.name} is ${megabytes} MB. Photos must be 5 MB or smaller.`
+  }
+  return null
+}
+
+interface PhotoUploadProps {
+  photos: UploadedPhoto[]
+  onUploaded: (photo: UploadedPhoto) =&gt; void
+  onRemove: (id: string) =&gt; void
+}
+
+// Choose a photo, check it, upload it at once, and list what is uploaded
+export function PhotoUpload({ photos, onUploaded, onRemove }: PhotoUploadProps) {
+  const upload = useMutation(uploadPhotoMutation())
+  const [problem, setProblem] = useState&lt;string | null&gt;(null)
+
+  async function choose(event: ChangeEvent&lt;HTMLInputElement&gt;) {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    // Empty the box, so choosing the same file again still counts as a change
+    input.value = ''
+    if (file === undefined) return
+    const tooBad = checkPhoto(file)
+    setProblem(tooBad)
+    if (tooBad !== null) return
+    try {
+      const photo = await upload.mutateAsync(file)
+      onUploaded({ id: photo.id, url: photo.url, name: file.name })
+    } catch (error: unknown) {
+      // 413 and 415 come with a message written for people; anything else gets the usual sentence
+      const refused = error instanceof ApiError &amp;&amp; (error.status === 413 || error.status === 415)
+      setProblem(`${file.name} was not uploaded. ${refused ? error.message : describeError(error)}`)
+    }
+  }
+
+  return (
+    &lt;fieldset className={styles.photos}&gt;
+      &lt;legend&gt;Photos (optional)&lt;/legend&gt;
+      &lt;div className={formStyles.field}&gt;
+        &lt;label htmlFor="photo"&gt;Add a photo: JPEG, PNG or WebP, up to 5 MB&lt;/label&gt;
+        &lt;input
+          id="photo"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          onChange={choose}
+          aria-invalid={problem !== null}
+          aria-describedby={problem === null ? undefined : 'photo-error'}
+        /&gt;
+        &lt;FieldError id="photo-error" messages={problem === null ? undefined : [problem]} /&gt;
+      &lt;/div&gt;
+      &lt;p role="status" className={styles.status}&gt;
+        {upload.isPending &amp;&amp; `Uploading ${upload.variables.name}…`}
+      &lt;/p&gt;
+      {photos.length &gt; 0 &amp;&amp; (
+        &lt;ul className={styles.list}&gt;
+          {photos.map((photo) =&gt; (
+            &lt;li key={photo.id}&gt;
+              {/* The file name beside it says which photo it is: the preview needs no alt text */}
+              &lt;img src={photo.url} alt="" width={96} height={72} /&gt;
+              &lt;span&gt;{photo.name}&lt;/span&gt;
+              &lt;Button variant="link" onClick={() =&gt; onRemove(photo.id)}&gt;
+                Remove&lt;VisuallyHidden&gt; {photo.name}&lt;/VisuallyHidden&gt;
+              &lt;/Button&gt;
+            &lt;/li&gt;
+          ))}
+        &lt;/ul&gt;
+      )}
+    &lt;/fieldset&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>choose</code> runs on the file box's change. It reads the file, then empties the box (<code>input.value = ''</code> is the one value you may set on a file input), so picking the same photo again after an error still counts as a change.</li>
+                        <li>The component owns the upload (its own <code>useMutation</code>) and its message; the list of uploaded photos belongs to the form, which needs their ids for the report. So the photos come in as a prop, and two callbacks report changes: the "lift state up" pattern from Lesson 3.4.</li>
+                        <li>413 and 415 come with a sentence written for people (the API's <code>message</code>), so the HQ shows it; anything else goes through <code>describeError</code>, as everywhere else.</li>
+                        <li>The preview has <code>alt=""</code>: the file name is right beside it, so the picture adds nothing a screen reader user is missing, and repeating the name would only add noise. Remove names the photo too ("Remove bags-at-the-stairs.jpg").</li>
+                        <li>Remove only takes the photo out of this report: the API has no way to delete an upload, and keeps it in memory until it restarts.</li>
+                    </ul>
+                    <p>And <code>src/components/PhotoUpload.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/PhotoUpload.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/PhotoUpload.module.css"><code class="language-css">.photos {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.photos legend {
+  padding: 0 0.25rem;
+  font-weight: 700;
+}
+
+.status:empty {
+  margin: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.list img {
+  border-radius: 0.5rem;
+  object-fit: cover;
+}</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The form, its page and the way in <span class="step-time">(22 min)</span></h3>
+                    <p>First, the small helpers the form and the page share. Create <code>src/utils/impactForm.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/impactForm.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/impactForm.ts"><code class="language-ts">// The impact report form (Lesson 8.2): its starting values and small helpers.
+// The rules live in impactReportSchema (api/schemas.ts).
+import type { FieldPath } from 'react-hook-form'
+import type { ImpactFormValues } from '../api/schemas.ts'
+import type { CleanupEvent, DebrisCategory, ImpactReport } from '../api/types.ts'
+import { debrisCategories } from './debris.ts'
+import type { ErrorItem } from './formErrors.ts'
+import { toDateString } from './format.ts'
+
+/** A field of the report form: 'bags', or a row's field such as 'items.2.count' */
+export type ImpactField = FieldPath&lt;ImpactFormValues&gt;
+
+// Read once, when the app starts (like the check-in desk's date)
+const today = toDateString(new Date())
+
+/** Impact can be reported once a cleanup has taken place: the API has the same rule */
+export function canReportImpact(event: CleanupEvent): boolean {
+  return event.status === 'completed' || (event.status === 'scheduled' &amp;&amp; event.date &lt;= today)
+}
+
+/** The saved report as text for the form, or an empty report with one row to fill in */
+export function toImpactValues(report: ImpactReport | null): ImpactFormValues {
+  if (report === null) {
+    return {
+      volunteersAttended: '',
+      bags: '',
+      weightKg: '',
+      items: [{ category: 'plastic-bottles', count: '' }],
+      notes: '',
+    }
+  }
+  return {
+    volunteersAttended: String(report.volunteersAttended),
+    bags: String(report.bags),
+    weightKg: String(report.weightKg),
+    items: report.items.map((item) =&gt; ({ category: item.category, count: String(item.count) })),
+    notes: report.notes,
+  }
+}
+
+/** The first kind of debris that is not in the list yet (undefined when all of them are) */
+export function nextCategory(items: ImpactFormValues['items']): DebrisCategory | undefined {
+  return debrisCategories.find((category) =&gt; items.every((item) =&gt; item.category !== category))
+}
+
+/** "Row 2: …" for the debris list's messages: in the error summary they appear without their row */
+export function withRowNumbers(errors: ErrorItem[]): ErrorItem[] {
+  return errors.map((error) =&gt; {
+    const row = /^items\.(\d+)\./.exec(error.id)?.[1]
+    if (row === undefined) return error
+    return { ...error, message: `Row ${Number(row) + 1}: ${error.message}` }
+  })
+}</code></pre>
+                    </div>
+                    <p><code>canReportImpact</code> is the API's rule ("a cleanup that has taken place": completed, or scheduled for today or earlier) written once for the HQ. <code>toImpactValues</code> turns a saved report into text for the boxes, like Lesson 8.1's <code>toFormValues</code>; a new report starts with one row. Now the form. Create <code>src/components/ImpactReportForm.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactReportForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactReportForm.tsx"><code class="language-tsx">import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation } from '@tanstack/react-query'
+import { useRef, useState } from 'react'
+import { useFieldArray, useForm } from 'react-hook-form'
+import { Link, useNavigate } from 'react-router'
+import { ApiError, describeError } from '../api/client.ts'
+import { saveImpactMutation } from '../api/mutations.ts'
+import { impactReportSchema, type ImpactFormData } from '../api/schemas.ts'
+import type { CleanupEvent, ImpactReport } from '../api/types.ts'
+import { debrisCategories, debrisLabels } from '../utils/debris.ts'
+import { listErrors } from '../utils/formErrors.ts'
+import { nextCategory, toImpactValues, withRowNumbers, type ImpactField } from '../utils/impactForm.ts'
+import { Button } from './Button.tsx'
+import { ErrorSummary } from './ErrorSummary.tsx'
+import { FieldError } from './FieldError.tsx'
+import formStyles from './Form.module.css'
+import styles from './ImpactReportForm.module.css'
+import { PhotoUpload, type UploadedPhoto } from './PhotoUpload.tsx'
+import { VisuallyHidden } from './VisuallyHidden.tsx'
+
+interface ImpactReportFormProps {
+  event: CleanupEvent
+  /** The saved report, or null: the form starts from it */
+  report: ImpactReport | null
+}
+
+export function ImpactReportForm({ event, report }: ImpactReportFormProps) {
+  const save = useMutation(saveImpactMutation())
+  const navigate = useNavigate()
+  const [photos, setPhotos] = useState&lt;UploadedPhoto[]&gt;([])
+  const addRef = useRef&lt;HTMLButtonElement&gt;(null)
+  const {
+    control,
+    register,
+    handleSubmit,
+    getValues,
+    setError,
+    formState: { errors, isSubmitting, submitCount },
+  } = useForm({
+    resolver: zodResolver(impactReportSchema),
+    defaultValues: toImpactValues(report),
+    // The error summary takes the focus after a failed submit, not the first field
+    shouldFocusError: false,
+  })
+  // The debris rows: fields has one entry per row, with an id to use as its key
+  const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+  const allListed = fields.length === debrisCategories.length
+  // Photos already in a saved report stay in it
+  const keptPhotoIds = report?.photoIds ?? []
+
+  // handleSubmit calls this only when the schema found nothing to fix
+  async function submit(data: ImpactFormData) {
+    const photoIds = [...keptPhotoIds, ...photos.map((photo) =&gt; photo.id)]
+    try {
+      await save.mutateAsync({ eventId: event.id, report: { ...data, photoIds } })
+      await navigate(`/events/${event.id}`)
+    } catch (error: unknown) {
+      // 409: the API's rule that the cleanup must have taken place
+      const message =
+        error instanceof ApiError &amp;&amp; error.status === 409 ? error.message : describeError(error)
+      setError('root.server', { message: `Not saved. ${message}` })
+    }
+  }
+
+  function addRow() {
+    const category = nextCategory(getValues('items'))
+    if (category === undefined) return
+    // The new row's count box gets the focus: the kind of debris is already chosen
+    append({ category, count: '' }, { focusName: `items.${fields.length}.count` })
+  }
+
+  function removeRow(index: number) {
+    remove(index)
+    // The Remove button is gone: put the focus somewhere that makes sense
+    addRef.current?.focus()
+  }
+
+  // What every field needs: register's props, an id, and a link to its message
+  function fieldProps(name: ImpactField, message: string | undefined) {
+    return {
+      id: name,
+      ...register(name),
+      'aria-invalid': message !== undefined,
+      'aria-describedby': message === undefined ? undefined : `${name}-error`,
+    }
+  }
+
+  function messages(message: string | undefined) {
+    return message === undefined ? undefined : [message]
+  }
+
+  const totals = [
+    { name: 'volunteersAttended', label: 'Volunteers who came', error: errors.volunteersAttended },
+    { name: 'bags', label: 'Bags filled', error: errors.bags },
+    { name: 'weightKg', label: 'Weight (kg)', error: errors.weightKg },
+  ] as const
+
+  return (
+    &lt;&gt;
+      &lt;p role="status" className={formStyles.status}&gt;
+        {isSubmitting ? 'Saving…' : errors.root?.server?.message}
+      &lt;/p&gt;
+      &lt;form onSubmit={handleSubmit(submit)} noValidate className={formStyles.form}&gt;
+        {/* A new key on every submit: the summary appears again and takes the focus */}
+        {submitCount &gt; 0 &amp;&amp; (
+          &lt;ErrorSummary key={submitCount} errors={withRowNumbers(listErrors(errors))} /&gt;
+        )}
+        &lt;div className={formStyles.row}&gt;
+          {totals.map(({ name, label, error }) =&gt; (
+            &lt;div key={name} className={formStyles.field}&gt;
+              &lt;label htmlFor={name}&gt;{label}&lt;/label&gt;
+              &lt;input
+                type="number"
+                min={0}
+                step={name === 'weightKg' ? 0.1 : 1}
+                {...fieldProps(name, error?.message)}
+              /&gt;
+              &lt;FieldError id={`${name}-error`} messages={messages(error?.message)} /&gt;
+            &lt;/div&gt;
+          ))}
+        &lt;/div&gt;
+        &lt;fieldset className={styles.debris}&gt;
+          &lt;legend&gt;Pieces counted&lt;/legend&gt;
+          {fields.length === 0 &amp;&amp; &lt;p&gt;No counts yet.&lt;/p&gt;}
+          &lt;ol className={styles.rows}&gt;
+            {fields.map((field, index) =&gt; {
+              const rowErrors = errors.items?.[index]
+              return (
+                &lt;li key={field.id} className={styles.row}&gt;
+                  &lt;div className={formStyles.field}&gt;
+                    &lt;label htmlFor={`items.${index}.category`}&gt;
+                      Kind of debris&lt;VisuallyHidden&gt;, row {index + 1}&lt;/VisuallyHidden&gt;
+                    &lt;/label&gt;
+                    &lt;select {...fieldProps(`items.${index}.category`, rowErrors?.category?.message)}&gt;
+                      {debrisCategories.map((category) =&gt; (
+                        &lt;option key={category} value={category}&gt;
+                          {debrisLabels[category]}
+                        &lt;/option&gt;
+                      ))}
+                    &lt;/select&gt;
+                    &lt;FieldError
+                      id={`items.${index}.category-error`}
+                      messages={messages(rowErrors?.category?.message)}
+                    /&gt;
+                  &lt;/div&gt;
+                  &lt;div className={formStyles.field}&gt;
+                    &lt;label htmlFor={`items.${index}.count`}&gt;
+                      Pieces&lt;VisuallyHidden&gt;, row {index + 1}&lt;/VisuallyHidden&gt;
+                    &lt;/label&gt;
+                    &lt;input
+                      type="number"
+                      min={0}
+                      {...fieldProps(`items.${index}.count`, rowErrors?.count?.message)}
+                    /&gt;
+                    &lt;FieldError
+                      id={`items.${index}.count-error`}
+                      messages={messages(rowErrors?.count?.message)}
+                    /&gt;
+                  &lt;/div&gt;
+                  &lt;Button variant="link" onClick={() =&gt; removeRow(index)}&gt;
+                    Remove&lt;VisuallyHidden&gt; row {index + 1}&lt;/VisuallyHidden&gt;
+                  &lt;/Button&gt;
+                &lt;/li&gt;
+              )
+            })}
+          &lt;/ol&gt;
+          &lt;Button ref={addRef} aria-disabled={allListed} onClick={addRow}&gt;
+            Add a row
+          &lt;/Button&gt;
+        &lt;/fieldset&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="notes"&gt;Notes (optional)&lt;/label&gt;
+          &lt;textarea rows={3} {...fieldProps('notes', errors.notes?.message)} /&gt;
+          &lt;FieldError id="notes-error" messages={messages(errors.notes?.message)} /&gt;
+        &lt;/div&gt;
+        &lt;PhotoUpload
+          photos={photos}
+          onUploaded={(photo) =&gt; setPhotos((current) =&gt; [...current, photo])}
+          onRemove={(id) =&gt; setPhotos((current) =&gt; current.filter((photo) =&gt; photo.id !== id))}
+        /&gt;
+        {keptPhotoIds.length &gt; 0 &amp;&amp; (
+          &lt;p&gt;Photos already in the report stay in it: {keptPhotoIds.length}.&lt;/p&gt;
+        )}
+        &lt;div className={formStyles.actions}&gt;
+          &lt;Button type="submit" variant="primary" disabled={isSubmitting}&gt;
+            Save the report
+          &lt;/Button&gt;
+          &lt;Button as={Link} to={`/events/${event.id}`}&gt;
+            Back without saving
+          &lt;/Button&gt;
+        &lt;/div&gt;
+      &lt;/form&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li>The three totals are drawn from a small array. <code>as const</code> keeps each <code>name</code> as its literal (<code>'bags'</code>, not <code>string</code>), which is what <code>fieldProps</code> needs: remove <code>as const</code> and <code>tsc</code> refuses the plain strings.</li>
+                        <li><code>submit</code> receives the schema's output: numbers, ready for <code>NewImpactReport</code>, plus the photo ids from both places (photos already in the report, and new uploads).</li>
+                        <li>The impact schema has every rule the API checks, so the only refusal it cannot predict is 409, "Impact can only be reported for a cleanup that has taken place." (someone opened the page for a cleanup that has not happened, through an old link). That message goes in the status line.</li>
+                    </ul>
+                    <p>Its styles, <code>src/components/ImpactReportForm.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactReportForm.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactReportForm.module.css"><code class="language-css">.debris {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.debris legend {
+  padding: 0 0.25rem;
+  font-weight: 700;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 0 0 1rem;
+  padding-left: 1.5rem;
+}
+
+/* One row: kind, count and Remove side by side; they wrap on a phone */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem 1rem;
+}
+
+.row button {
+  margin-top: 2rem;
+}</code></pre>
+                    </div>
+                    <p>Next, the loader. In <code>src/pages/loaders.ts</code>, import <code>eventImpactQuery</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/loaders.ts</div>
+                        <pre data-src="shoreline-hq/src/pages/loaders.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> import { data, type LoaderFunctionArgs } from 'react-router'
+ import { ApiError, readSession } from '../api/client.ts'
+-import { eventQuery, impactTotalsQuery, queryClient, sitesQuery, viewerId } from '../api/queries.ts'
++import {
++  eventImpactQuery,
++  eventQuery,
++  impactTotalsQuery,
++  queryClient,
++  sitesQuery,
++  viewerId,
++} from '../api/queries.ts'
+ import { organizersOnly } from '../auth/guards.ts'
+ </code></pre>
+                    </div>
+                    <p>and add the loader at the end:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/loaders.ts</div>
+                        <pre data-src="shoreline-hq/src/pages/loaders.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   return ids
+ }
++
++/** /events/:eventId/impact: organizers only; the cleanup in the cache, its saved report or null */
++export async function impactReportLoader(args: LoaderFunctionArgs) {
++  organizersOnly(args)
++  const { eventId, viewer } = await eventLoader(args)
++  const event = queryClient.getQueryData(eventQuery(eventId, viewer).queryKey)
++  // Only a completed cleanup has a report (saving the first one completes it)
++  const report =
++    event?.status === 'completed'
++      ? await queryClient.query({ ...eventImpactQuery(eventId), staleTime: 'static' })
++      : null
++  return { eventId, viewer, report }
++}</code></pre>
+                    </div>
+                    <p>The rule from Lesson 6.3 again: <code>organizersOnly(args)</code> first. Then <code>eventLoader</code> puts the cleanup in the cache (with its "Cleanup not found" 404), and <code>getQueryData</code> reads it back, typed by the factory's key (Lesson 7.1). Only a completed cleanup has a report, so only then is it fetched: asking for the report of today's cleanup would just be a 404. The report goes straight into the loader's answer, because the form reads it once, as its starting values. Now the page. Create <code>src/pages/ImpactReportPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/ImpactReportPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/ImpactReportPage.tsx"><code class="language-tsx">import { useSuspenseQuery } from '@tanstack/react-query'
+import { Link, useLoaderData } from 'react-router'
+import { eventQuery } from '../api/queries.ts'
+import { ImpactReportForm } from '../components/ImpactReportForm.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import { canReportImpact } from '../utils/impactForm.ts'
+import type { impactReportLoader } from './loaders.ts'
+import styles from './Page.module.css'
+
+// The route is events/:eventId/impact: impactReportLoader has checked the organizer,
+// put the cleanup in the cache, and read the saved report (null when there is none yet)
+export function ImpactReportPage() {
+  const { eventId, viewer, report } = useLoaderData&lt;typeof impactReportLoader&gt;()
+  const { data: event } = useSuspenseQuery(eventQuery(eventId, viewer))
+  useDocumentTitle(`Impact of ${event.title}`)
+
+  return (
+    &lt;&gt;
+      &lt;p&gt;
+        &lt;Link to={`/events/${event.id}`}&gt;← {event.title}&lt;/Link&gt;
+      &lt;/p&gt;
+      &lt;h1&gt;{report === null ? 'Report the impact' : 'Update the impact report'}&lt;/h1&gt;
+      {canReportImpact(event) ? (
+        &lt;&gt;
+          &lt;p className={styles.lead}&gt;
+            What the crew took off the beach. It counts toward the totals on the Impact page.
+          &lt;/p&gt;
+          &lt;ImpactReportForm event={event} report={report} /&gt;
+        &lt;/&gt;
+      ) : (
+        &lt;p&gt;Impact can be reported once a cleanup has taken place. This one is {event.status}.&lt;/p&gt;
+      )}
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The route goes in the organizers-only group in <code>src/App.tsx</code>, next to the edit page:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { HomePage } from './pages/HomePage.tsx'
+ import { ImpactPage } from './pages/ImpactPage.tsx'
+-import { editEventLoader, eventLoader, impactLoader, sitesLoader } from './pages/loaders.ts'
++import { ImpactReportPage } from './pages/ImpactReportPage.tsx'
++import {
++  editEventLoader,
++  eventLoader,
++  impactLoader,
++  impactReportLoader,
++  sitesLoader,
++} from './pages/loaders.ts'
+ import { NewEventPage } from './pages/NewEventPage.tsx'
+ import { NotFoundPage } from './pages/NotFoundPage.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">               { path: 'events/:eventId/edit', element: &lt;EditEventPage /&gt;, loader: editEventLoader },
+               {
++                path: 'events/:eventId/impact',
++                element: &lt;ImpactReportPage /&gt;,
++                loader: impactReportLoader,
++              },
++              {
+                 path: 'volunteers',
+                 element: &lt;VolunteersPage /&gt;,</code></pre>
+                    </div>
+                    <p>Last, the way in: the "For organizers" card on the cleanup's page. Completed cleanups now get the card too, with a button to update the report. In <code>src/components/OrganizerTools.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { cancelEventMutation } from '../api/mutations.ts'
+ import type { CleanupEventDetail } from '../api/types.ts'
++import { canReportImpact } from '../utils/impactForm.ts'
+ import { Button } from './Button.tsx'
+ import cardStyles from './Card.module.css'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   const scheduled = event.status === 'scheduled'
+   const editable = scheduled || event.status === 'draft'
++  const reportable = canReportImpact(event)
+ 
+   function cancelCleanup() {</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   }
+ 
+-  // Nothing to do for past cleanups (unless this page just cancelled one)
+-  if (!editable &amp;&amp; cancel.isIdle) {
++  // Nothing to do for cancelled cleanups (unless this page just cancelled this one)
++  if (!editable &amp;&amp; !reportable &amp;&amp; cancel.isIdle) {
+     return null
+   }</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/OrganizerTools.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/OrganizerTools.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">         &lt;/p&gt;
+       )}
+-      {editable &amp;&amp; (
++      {(editable || reportable) &amp;&amp; (
+         &lt;div className={styles.actions}&gt;
+-          &lt;Button as={Link} to={`/events/${event.id}/edit`}&gt;
+-            Edit details
+-          &lt;/Button&gt;
++          {editable &amp;&amp; (
++            &lt;Button as={Link} to={`/events/${event.id}/edit`}&gt;
++              Edit details
++            &lt;/Button&gt;
++          )}
++          {reportable &amp;&amp; (
++            &lt;Button as={Link} to={`/events/${event.id}/impact`}&gt;
++              {event.status === 'completed' ? 'Update the impact report' : 'Report the impact'}
++            &lt;/Button&gt;
++          )}
+           {scheduled &amp;&amp; (
+             &lt;Button aria-haspopup="dialog" disabled={cancel.isPending} onClick={() =&gt; setConfirming(true)}&gt;</code></pre>
+                    </div>
+                    <p>(Also change the comment above the component to "ways to edit, cancel or report it".) Run <code>npx tsc -b</code>: it should print nothing. Open <strong>Tide Pool Morning Cleanup</strong> (today's cleanup): the card now has <strong>Report the impact</strong> between Edit details and Cancel cleanup. Press it:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_28/28-report-form.png" alt="The Report the impact page for Tide Pool Morning Cleanup in Shoreline Crew HQ: a back link, the heading, three number boxes in a row (Volunteers who came, Bags filled, Weight in kg), a Pieces counted box with one numbered row (Kind of debris set to Plastic bottles, an empty Pieces box and a Remove link) and an Add a row button, a Notes box, a Photos box with a file chooser, and the buttons Save the report and Back without saving." width="1100" height="993" loading="lazy">
+                        <figcaption>The impact report form for today's cleanup. The debris list is a field array: each row is a kind of debris and a count, and <strong>Add a row</strong> adds another.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Try everything <span class="step-time">(10 min)</span></h3>
+                    <ol>
+                        <li>Press <strong>Save the report</strong> with every box empty. The summary from "An Error Summary" appears with four problems and takes the focus, and DevTools' <strong>Network</strong> panel shows no request.</li>
+                        <li>Press the link "Bags must be a whole number…": the focus moves into the bags box, and the address stays <code>/events/e17/impact</code>. Type <code>11</code> in Volunteers and <code>6</code> in Bags: the heading changes to "Fix these 2 before saving" while the focus stays where you type.</li>
+                        <li>Fill in a weight of <code>18.5</code> and <code>40</code> plastic bottles. Press <strong>Add a row</strong>: a Plastic bags row appears with the cursor in its count. Type <code>120</code>, add a third row, type <code>3</code>, and change its kind to Plastic bottles. Save: "Row 3: Plastic bottles is already in the list: add to its count." Press <strong>Remove</strong> on row 3; the focus lands on Add a row.</li>
+                        <li>Choose a photo that is not a JPEG, PNG or WebP (a GIF, or a PDF through the picker's "All files"), then a real photo:
+                            <figure class="screenshot">
+                                <img src="images/lesson_28/28-photos.png" alt="The Photos box of the form: the file chooser has a red border and the message crew-photo.gif is not a JPEG, PNG or WebP image. Below it, the uploaded photo bags-at-the-stairs.jpg as a small picture of a beach with a Remove link." width="656" height="262" loading="lazy">
+                                <figcaption>One photo uploaded to <code>POST /api/photos</code> and shown from the API's address; the GIF was stopped by the form's own check before any request.</figcaption>
+                            </figure>
+                            Measured: the GIF sent no request; the JPEG sent one <code>POST /photos</code>, answered 201, and its preview came from <code>GET /photos/:id</code> on the API.</li>
+                        <li>Add a note and press <strong>Save the report</strong>. Measured: one <code>PUT /events/e17/impact</code> with numbers, not text (<code>"weightKg": 18.5</code>) and the photo's id, then <code>GET /events/e17</code>, and the cleanup's page. Open its <strong>Impact</strong> tab:
+                            <figure class="screenshot">
+                                <img src="images/lesson_28/28-saved.png" alt="Tide Pool Morning Cleanup&#x27;s page after saving: a Completed badge, the For organizers card with an Update the impact report button, and the Impact tab selected: What the crew collected, Volunteers: 11. Bags: 6. Weight: 18.5 kg. Photos uploaded with the report: 1. Pieces counted: Plastic bags 120, Plastic bottles 40." width="976" height="744" loading="lazy">
+                                <figcaption>After the PUT: the cleanup is completed, the Impact tab shows the new report straight from the mutation's answer, and the organizer card now offers to update it.</figcaption>
+                            </figure>
+                        </li>
+                        <li>Open <strong>Impact</strong> in the header: the total weight went from 176.2 kg to 194.7 kg. Then open Storm Debris Sweep and press <strong>Update the impact report</strong>: the form starts with its saved numbers and all ten rows.</li>
+                        <li>Sign out and open <code>/events/e01/impact</code>: the sign-in page, with <code>?next=</code> back to the report. Volunteers get "Organizers only", and <code>/events/e08/impact</code> (Weekend Cove, in a few days) says "Impact can be reported once a cleanup has taken place. This one is scheduled."</li>
+                    </ol>
+                    <figure class="screenshot">
+                        <img src="images/lesson_28/28-phone-dark.png" alt="The impact report form on a phone in dark mode: the error summary Fix these 5 before saving with five links in light red, the last two starting Row 1 and Row 2, then the first number box below." width="390" height="844" loading="lazy">
+                        <figcaption>At 390 pixels in dark mode the summary is the first thing on the screen, and its links take people down to each field.</figcaption>
+                    </figure>
+                    <p>Your test report is now part of the sample data until shoreline-api restarts: stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd> and run <code>node server.ts</code> again when you want today's cleanup back as it was (and sign in again: sessions do not survive a restart). Finally, the checks:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 19ms on 74 files with 150 rules using 20 threads.
+&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 351 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-CatUgjh8.css                            11.06 kB │ gzip:   3.08 kB
+dist/assets/index-CBJw7DlK.js                            581.58 kB │ gzip: 182.27 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.41s</code></pre>
+                    </div>
+                    <p><code>tsc</code> prints nothing and lint is clean. The build grew by 19.8 kB (6.5 kB gzip) to 581.58 kB: today's code is all yours, no new library. The 500 kB warning from Lesson 8.1 is still there for Lesson 10.1. Your hashes and timings will differ.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li><code>utils/debris.ts</code> holds the categories and labels; <code>impactReportSchema</code> checks the report, including "each kind once" on the right row</li>
+                        <li>Organizers see <strong>Report the impact</strong> on today's cleanup and <strong>Update the impact report</strong> on completed ones; guests and volunteers cannot open the page</li>
+                        <li>Rows can be added and removed, keyed by <code>field.id</code>, with the focus in the new count box or on Add a row</li>
+                        <li>A failed save shows the error summary with the focus on it, and each link focuses its field</li>
+                        <li>Wrong photo types and photos over 5 MB are refused before any request; a good photo uploads and shows its preview</li>
+                        <li>Saving sends one <code>PUT</code>, the cleanup becomes completed, and the Impact tab and the Impact page show the new numbers</li>
+                        <li><code>npx tsc -b</code> and <code>npm run lint</code> pass with no errors or warnings, and <code>npm run build</code> succeeds</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, find its "line items" (anything people add a list of) and its files. For each list, write what one row holds and any rule about the whole list; for each file, the types and the largest size you accept, and where the file is stored. Then look at your longest form and decide, with the table from "Should It Be Steps?", whether it is one page or steps.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 13 minutes together, included in the lesson time). Exercise 3 is an optional stretch, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: A summary for the edit form</h3>
+                    <p>Give Lesson 8.1's <code>EditEventForm</code> the same error summary: it appears inside the form after a failed save, takes the focus, and links to each field.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Three changes: read <code>submitCount</code> from <code>formState</code>, set <code>shouldFocusError: false</code>, and render <code>ErrorSummary</code> with a key. <code>listErrors</code> works for any form; the edit form has no rows, so it needs no row numbers.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import { listErrors } from '../utils/formErrors.ts'
+import { Button } from './Button.tsx'
+import { ErrorSummary } from './ErrorSummary.tsx'
+// ...
+const {
+  register,
+  handleSubmit,
+  setError,
+  formState: { errors, isSubmitting, submitCount },
+} = useForm({
+  resolver: zodResolver(eventFormSchema),
+  defaultValues: toFormValues(event),
+  shouldFocusError: false,
+})
+// ...
+&lt;form onSubmit={handleSubmit(save)} noValidate className={formStyles.form}&gt;
+  {submitCount &gt; 0 &amp;&amp; &lt;ErrorSummary key={submitCount} errors={listErrors(errors)} /&gt;}</code></pre>
+                        <p>Measured: emptying the title and the capacity and saving showed "Fix these 2 before saving" with the focus on the summary; its second link moved the focus into the capacity box. The API's capacity message still focuses its field (<code>setError</code> with <code>shouldFocus</code>), because it arrives after the summary has appeared. Type-checks and lints cleanly; the course's code continues without it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A preview while the photo uploads</h3>
+                    <p>On a slow connection the upload takes a while, and nothing shows what is happening except "Uploading…". Show the chosen photo, faded, while it uploads, from the file itself (not from the API).</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>URL.createObjectURL(file)</code> returns a <code>blob:</code> address an <code>&lt;img&gt;</code> can show. Each one keeps the file in memory until <code>URL.revokeObjectURL</code> is called: keep the address in state and revoke it in an effect's cleanup. Start the API with <code>node server.ts --latency=1500</code> to see it.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">// A blob: URL for the chosen file, shown while it uploads
+const [preview, setPreview] = useState&lt;string | null&gt;(null)
+
+// Each blob: URL keeps its file in memory until it is revoked
+useEffect(() =&gt; {
+  if (preview === null) return
+  return () =&gt; URL.revokeObjectURL(preview)
+}, [preview])
+// ...
+  setPreview(URL.createObjectURL(file))
+  try {
+    const photo = await upload.mutateAsync(file)
+    onUploaded({ id: photo.id, url: photo.url, name: file.name })
+  } catch (error: unknown) {
+    // 413 and 415 come with a message written for people; anything else gets the usual sentence
+    const refused = error instanceof ApiError &amp;&amp; (error.status === 413 || error.status === 415)
+    setProblem(`${file.name} was not uploaded. ${refused ? error.message : describeError(error)}`)
+  } finally {
+    setPreview(null)
+  }
+}
+// ...
+{preview !== null &amp;&amp; &lt;img src={preview} alt="" width={96} height={72} className={styles.preview} /&gt;}</code></pre>
+                        <p>Plus a <code>.preview</code> rule (<code>opacity: 0.6</code>, rounded corners) in the CSS Module. Measured with <code>--latency=1500</code>: while uploading, one <code>img</code> with a <code>blob:</code> address and "Uploading bags-at-the-stairs.jpg…"; afterwards none, and fetching the old <code>blob:</code> address failed, so it was revoked. The effect's cleanup runs whenever <code>preview</code> changes and when the component goes away, so no address is forgotten. Type-checks and lints cleanly; not in the course's code.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): The report in two steps</h3>
+                    <p>Optional stretch, not counted in the lesson time. Practice the step pattern on the impact form (knowing that the lesson decided one page suits it better): step 1 is the three totals with a <strong>Next</strong> button that checks them, step 2 is everything else with <strong>Back to the totals</strong> and Save. The focus goes to the new step's heading.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Add <code>trigger</code> to what you read from <code>useForm</code>, a <code>step</code> state of type <code>1 | 2</code>, and an <code>h2</code> with <code>tabIndex={-1}</code> and a ref. Wrap each step in a <code>div</code> with <code>hidden</code>, and check the CSS trap in Common Mistakes. Pressing <kbd>Enter</kbd> in a step 1 box submits the whole form: the second argument of <code>handleSubmit</code> runs when the check fails.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>The functions are in "Should It Be Steps?". The rest:</p>
+                        <pre data-snippet><code class="language-tsx">// Enter in a step 1 box submits the whole form: show the first step with a problem,
+// so the summary's links lead to fields people can see
+function showProblems(problems: FieldErrors&lt;ImpactFormValues&gt;) {
+  setStep(problems.volunteersAttended || problems.bags || problems.weightKg ? 1 : 2)
+}
+// ...
+&lt;form onSubmit={handleSubmit(submit, showProblems)} noValidate className={formStyles.form}&gt;
+  {/* A new key on every submit: the summary appears again and takes the focus */}
+  {submitCount &gt; 0 &amp;&amp; (
+    &lt;ErrorSummary key={submitCount} errors={withRowNumbers(listErrors(errors))} /&gt;
+  )}
+  &lt;h2 ref={stepRef} tabIndex={-1}&gt;
+    Step {step} of 2: {step === 1 ? 'The totals' : 'What was counted'}
+  &lt;/h2&gt;
+  &lt;div hidden={step !== 1} className={styles.step}&gt;
+// ...</code></pre>
+                        <p>Step 2's content goes in <code>&lt;div hidden={step !== 2} className={styles.step}&gt;</code> with a <strong>Back to the totals</strong> button calling <code>showStep(1)</code>, and the CSS Module gets the <code>.step</code> and <code>.step[hidden]</code> rules. Measured: Next with empty totals stayed on step 1 with three messages and no request; with the totals filled, Next showed "Step 2 of 2: What was counted" with the focus on that heading; <kbd>Enter</kbd> in the weight box opened step 2 with the summary listing the empty count; Save sent one <code>PUT</code>. Type-checks and lints cleanly; not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> The debris rows are drawn with <code>fields.map((field, index) =&gt; …)</code>. What should each row's <code>key</code> be?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="What happens to the index of every row below one that is removed?">
+                                A) <code>index</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Two rows may hold the same kind of debris for a moment, and the kind can be changed. Does a key that changes help React?">
+                                B) <code>field.category</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="useFieldArray gives every row an id that stays with its data when rows are added or removed, which is what a key is for. The index still goes in the field paths, because it says where the value is now.">
+                                C) <code>field.id</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Why does <code>ImpactReportForm</code> render <code>&lt;ErrorSummary key={submitCount} …&gt;</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A new key makes React create a new summary on every Save, so its effect runs again and the focus moves to it, while typing between saves only changes its list and leaves the focus alone.">
+                                A) So every failed Save creates a new summary, which takes the focus again, while fixing fields does not
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The list is a prop. Does a prop change need a key to show up?">
+                                B) Otherwise the list of problems would never update
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="There is only one summary on the page. When do lists need keys?">
+                                C) React warns about missing keys on components
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Keys are seen by React, not passed to the component. How could the summary count anything with it?">
+                                D) The summary shows the number of attempts in its heading
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A teammate adds <code>headers: { 'Content-Type': 'multipart/form-data' }</code> to <code>postPhoto</code>. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The header was measured. Did the upload succeed?">
+                                A) Nothing: fetch would have sent the same header
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="415 is about the image type. Is a JPEG the problem here?">
+                                B) The API answers 415 because the type is wrong
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Is the header about the size of the file?">
+                                C) The upload works, but slowly
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The hand-written header has no boundary, so the API cannot split the body into parts, finds no photo field, and answers 400. With a FormData body, fetch writes the header with the boundary itself.">
+                                D) The API answers 400: without the boundary it cannot find the photo field
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> What is the type of <code>register</code>'s first parameter in the impact form, as far as the debris rows go?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="If any string were allowed, would the typo items.0.cuont have been an error?">
+                                A) <code>string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="React Hook Form builds every path from the form's input type with template literal types, so one type covers every row index and only the real field names. tsc listed them in TS2345.">
+                                B) A union including template literal types such as <code>`items.${number}.count`</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="register takes a path. Which part of the form names the field?">
+                                C) <code>number</code>, the row's index
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Which form would steps help most?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="One sitting, one source, every field always asked, and saving again fixes mistakes. Which column of the table is that?">
+                                A) The impact report, copied from one tally sheet at a desk
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Separate tasks, later questions that depend on earlier answers, and a review before a commitment are the signs that steps help. The impact report has none of them.">
+                                B) A volunteer application where the questions depend on the role chosen first, ending with a review before sending
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Eight fields that are always asked. Would splitting them help anyone?">
+                                C) The Edit cleanup details form
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>What happens to a photo that was uploaded but never saved in a report?</summary>
+                    <p>In shoreline-api, nothing: it stays in memory until the server restarts. A real service collects these "orphan" uploads, usually by deleting any file no saved record points at after a day or so. The other common design, uploading the files together with the form in one request, avoids orphans but makes the Save slow and turns every upload error into a form error. The API is built for the first design because the phone app in the React Native course may upload photos long before a report exists.</p>
+                </details>
+                <details>
+                    <summary>Can I show an upload progress bar?</summary>
+                    <p>Not with <code>fetch</code> today: it has no progress events for the request body. The usual way is the older <code>XMLHttpRequest</code>, whose <code>upload</code> object fires <code>progress</code> events with bytes sent and total. Upload libraries wrap it. For photos of a few megabytes on a local API, "Uploading…" with a preview (Exercise 2) is enough.</p>
+                </details>
+                <details>
+                    <summary>Why are the photos not part of the form's values, with another <code>useFieldArray</code>?</summary>
+                    <p>Two reasons. React Hook Form's field arrays are for arrays of objects: measured with a test schema, <code>useFieldArray({ control, name: 'photoIds' })</code> on an array of strings is a TS2322 error that only accepts the object arrays. And a photo is not something people type: it becomes an id only after a request succeeds. Keeping the uploaded photos in state next to the form, and adding their ids in <code>submit</code>, keeps the schema about what people type and the upload about the network.</p>
+                </details>
+                <details>
+                    <summary>Lesson 8.1 asked whether the two cleanup forms should share their field markup. Does this lesson decide?</summary>
+                    <p>Yes, for now: no shared fields component. The impact form shares no fields with the cleanup forms, so it adds no repetition; what it shares is behavior, and that is now in reusable pieces (<code>FieldError</code>, <code>ErrorSummary</code>, <code>listErrors</code>, Exercise 1). A <code>TextField</code> component that bundles label, box, message and <code>aria-*</code> becomes worth it when a third form repeats the same boxes, or when a change (say, hint text under every label) has to be made in many places.</p>
+                </details>
+                <details>
+                    <summary>Why does the Impact tab only count the photos instead of showing them?</summary>
+                    <p>Because a picture needs a text alternative for people who cannot see it, and the API stores no description for a photo. Showing them with an empty <code>alt</code> would hide them from screen readers; inventing an <code>alt</code> such as "Photo 1" says nothing. A real app would ask for a short description when the photo is added and save it with the photo. The previews in the form are different: the file name right beside each one already says which photo it is.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Let organizers drop several photos at once. Add <code>multiple</code> to the file box and loop over <code>input.files</code> (check and upload each one, and collect one message per refused file). Then make the photo box a drop target: handle <code>dragover</code> (call <code>preventDefault()</code>, or the browser opens the file) and <code>drop</code>, whose <code>event.dataTransfer.files</code> is the same <code>FileList</code>. Keep the file box: dragging is impossible for keyboard users, so a drop zone adds a way, never replaces one.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Today's form decided where the focus goes four times: after a failed Save, after following a summary link, after adding a row and after removing one. For each, write where it goes and what would go wrong for a keyboard or screen reader user without it. Which of them would you have forgotten a month ago?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A list in a form is <code>z.array(rowSchema)</code> in the schema and <code>useFieldArray</code> in the form; key rows by <code>field.id</code> and register boxes by path (<code>items.${index}.count</code>), which TypeScript checks</li>
+                        <li>A rule about a whole list goes on the array (<code>superRefine</code>), with a <code>path</code> that puts its message on the row to change</li>
+                        <li>Choose number parsing on purpose: coercion turns an empty box into 0, which is a wrong answer when 0 is a valid one</li>
+                        <li>An error summary takes the focus after a failed save, counts the problems, links to each field and keeps the messages under the fields; every line must make sense on its own</li>
+                        <li>Files go up as <code>FormData</code> without a hand-written <code>Content-Type</code>; check type and size in the browser for speed, and let the server's 413 and 415 be the lock</li>
+                        <li>After a save, put the server's answer in the cache and invalidate what else it changed</li>
+                        <li>Steps are a design decision, not a default: one <code>useForm</code>, <code>trigger</code> per step, hidden steps and a focused heading when they fit</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Review schemas, input and output types</td><td><a href="lesson_27.html">Lesson 8.1: React Hook Form + Zod</a></td></tr>
+                            <tr><td>Review invalidation and the "what changed?" question</td><td><a href="lesson_25.html">Lesson 7.2: Mutations</a></td></tr>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Read about <code>useFieldArray</code> in depth</td><td><a href="https://react-hook-form.com/docs/usefieldarray" target="_blank" rel="noopener">react-hook-form.com: useFieldArray</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>Organizers can report what a cleanup took off the beach, and the HQ's Impact tab and dashboard update at once</li>
+                        <li>You built a list people can grow and shrink, with checked paths, stable keys and focus that never gets lost</li>
+                        <li>Your forms now have an error summary that works for keyboard and screen reader users</li>
+                        <li>You uploaded files the way real apps do, and you know which checks are courtesy and which are the lock</li>
+                        <li>You made a design call (one page, not steps) with reasons, and know how to build steps when they fit</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>That closes Module 8, and the HQ now does nearly everything the crew needs. It also has a lot that could quietly break: two schemas, a list rule, an error summary, guards in front of three pages, five mutations that each refresh different parts of the cache. So far you have checked all of it by hand, in the browser. In <a href="lesson_29.html"><strong>Lesson 9.1: Testing Components</strong></a> you start writing tests that check it for you, every time, with Vitest and React Testing Library: the same "find it by its role and name" thinking you used for accessibility, turned into code.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code> and <code>npm run lint</code> pass, and that <code>src/try-impact.ts</code> is deleted</li>
+                    <li>Write down three things in the HQ you would hate to break without noticing (for example "a guest can open the impact report"): they are your first test ideas</li>
+                    <li>Add your lists, files and one-page-or-steps decision to your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Early in this course a form was a few boxes and a button. Today you built one with a growing list, a file upload, a summary that guides people to their mistakes, and a save that keeps three screens in sync, and you made each of those decisions for a reason you can say out loud. If the focus rules or the field paths still feel like a lot to hold at once, that is normal: you will build forms like this again, and each time more of it will feel like habit. The care you took for keyboard and screen reader users today is the kind of detail that marks a developer people trust with real products.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_27.html" class="prev-lesson">← Previous: React Hook Form + Zod</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_29.html" class="next-lesson">Next: Testing Components →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

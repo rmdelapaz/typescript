@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Give Shoreline Crew HQ's display choices (theme and list density) a small Zustand store that survives reloads: where each kind of state belongs, typed stores and selectors, the persist middleware with validated saved data, and a measured comparison with the same store in Redux Toolkit. React + TypeScript: Build a Modern Web App Lesson 7.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Client State - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🎛️ Lesson 7.3: Client State</h1>
+                <p class="lead">Maya runs the check-in desk on a tablet in bright morning sun and wants the HQ light, whatever the tablet says. Luis plans cleanups on a laptop at night and wants it dark, with lists short enough to see a whole month at once. Neither choice is the crew's data: shoreline-api should never hear about it, and TanStack Query has nothing to fetch. But both choices must reach components all over the app and still be there tomorrow. Today you give that kind of state its own small, typed store with Zustand, save it in the browser, check what comes back from storage, and then build the same store with Redux Toolkit to see what the bigger tool costs and buys.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Decide where a piece of state belongs: the query cache, the URL, a component, a reducer, or an app-wide store</li>
+                        <li>Create a typed Zustand store with state and actions, and read it with selectors that re-render only what changed</li>
+                        <li>Keep a store across reloads with the <code>persist</code> middleware, and check the saved data before trusting it</li>
+                        <li>Use a store outside React (<code>getState</code>, <code>subscribe</code>) for page-wide effects like a theme</li>
+                        <li>Read Redux Toolkit code (slices, typed hooks, a <code>Provider</code>) and compare it with Zustand on size, code and tooling</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 130 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_25.html">Lesson 7.2: Mutations</a> (your <code>shoreline-hq</code> with queries and mutations), typed context from <a href="lesson_18.html">Lesson 5.2</a> and the session store from <a href="lesson_23.html">Lesson 6.3</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> Display choices in the HQ's footer (light, dark or the device's theme; roomy or compact lists), kept in a Zustand store that survives reloads</li>
+                    <li><span class="meta-label">🧩 Stack</span> Zustand 5.1, React 19.3, TypeScript 7.0, Vite 8.3, Node 24 (the versions this lesson was checked with); Redux Toolkit 2.14 and React Redux 9.3 for the comparison only</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and the browser, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-26-start.zip">lesson-26-start.zip</a> · Finished code: <a href="downloads/lesson-26-end.zip">lesson-26-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#where" class="toc-link">Where Does This State Live?</a></li>
+                        <li><a href="#zustand" class="toc-link">A Small Typed Store: Zustand</a></li>
+                        <li><a href="#selectors" class="toc-link">Selectors: Re-render Only What Changed</a></li>
+                        <li><a href="#persist" class="toc-link">Keeping Choices Across Reloads</a></li>
+                        <li><a href="#redux" class="toc-link">The Same Store in Redux Toolkit</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Display Choices That Stick</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="where" class="lesson-section">
+                <h2>🧭 Where Does This State Live?</h2>
+                <p>Lesson 7.2 left you a homework question: which state in the HQ is <em>not</em> server state? You probably found the search text, the "Show details" toggles, the confirm dialog and the desk's undo history. Each already has a home, and each home was chosen for a reason. Before adding a new tool, it is worth naming those reasons, because "global state library" is often the answer people reach for first and the one they need least.</p>
+                <div class="card card-info">
+                    <h3>💡 Mental model: the crew's storage</h3>
+                    <p>Shoreline Crew keeps things in different places on purpose. The logbook at the harbor office (the API, read through TanStack Query's cache) is the record everyone trusts. The notice board by the beach path (the URL) is what anyone can point at and share. Each volunteer's pockets (component state) hold what only they need, for as long as they are on the beach. The desk's clipboard (a reducer) tracks a tricky sequence of steps at one table. And the crew's shared locker (an app-wide store) holds the few things everyone needs to reach, such as how the team likes the tablet set up. Most things belong in pockets; the locker stays small.</p>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>The state</th><th>Its home in the HQ</th><th>Why there</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Cleanups, sites, the roster, volunteers</td><td>TanStack Query's cache (7.1)</td><td>The API owns it; the cache keeps a copy, refetches and invalidates it</td></tr>
+                            <tr><td>Search text, status filter, page number, which volunteer is open</td><td>The URL (6.2)</td><td>It should survive a reload, work with Back, and be shareable as a link</td></tr>
+                            <tr><td>"Show details" on one card, a dialog being open, form fields before Publish</td><td><code>useState</code> in the component (3.4)</td><td>Only that component cares, and it may vanish with it</td></tr>
+                            <tr><td>The desk's undo history</td><td>A reducer (5.1, 7.2)</td><td>One component, several typed actions that must stay consistent</td></tr>
+                            <tr><td>The signed-in session</td><td>A module store read with <code>useSyncExternalStore</code>, kept in <code>sessionStorage</code> (6.3)</td><td>The API client reads it outside React, and it must end with the tab</td></tr>
+                            <tr><td><strong>Theme and list density</strong></td><td><strong>A Zustand store, kept in <code>localStorage</code> (this lesson)</strong></td><td>Many components far apart read it, it is not the API's business, and it should outlive the tab</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The rule behind the table is called <strong>colocation</strong>: keep state as close as possible to where it is used, and move it up or out only when something forces you to. The questions to ask, in order: Does the server own it? (Query.) Should a link or Back reproduce it? (URL.) Does only one component, or one parent and its children, need it? (State or a reducer, passed down as props.) Only when the answer to all three is no does an app-wide store earn its place. That is why the HQ, a fairly big app by now, has exactly one Zustand store with two values in it, and why that is a sign of good design, not of an unfinished one.</p>
+                <div class="card card-info">
+                    <h4>🌱 "Which library should I learn?"</h4>
+                    <p>Job ads list Redux, Zustand, MobX, Jotai and more, and it can feel like you are behind on all of them. The decision table above is the skill that transfers: once you can say <em>what kind</em> of state something is, each library is a different-shaped box for the last row. You will learn one box properly today and read a second one, and that is enough to pick up the others when a team uses them.</p>
+                </div>
+            </section>
+
+            <section id="zustand" class="lesson-section">
+                <h2>🐻 A Small Typed Store: Zustand</h2>
+                <p><strong>Zustand</strong> (German for "state") is a small library for app-wide state. A store is a plain object of values and functions that change them, kept <em>outside</em> React. Components read from it with a Hook; any code, even outside React, can read it and listen to it. There is no provider to wrap around the app. Here is the core of the HQ's store, the part without saving:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/state/uiStore.ts</div>
+                    <pre data-src="shoreline-hq/src/state/uiStore.ts" data-match="excerpt"><code class="language-ts">interface UiState {
+  theme: Theme
+  density: Density
+  setTheme: (theme: Theme) =&gt; void
+  setDensity: (density: Density) =&gt; void
+}
+
+export const useUiStore = create&lt;UiState&gt;()(
+  persist(
+    (set) =&gt; ({
+      theme: 'system',
+      density: 'roomy',
+      setTheme: (theme) =&gt; set({ theme }),
+      setDensity: (density) =&gt; set({ density }),
+    }),
+// ...</code></pre>
+                </div>
+                <ul>
+                    <li>The <code>UiState</code> interface describes everything in the store: two values and two <strong>actions</strong>, functions that change them. Keeping the actions inside the store means components never write state directly; they call <code>setTheme</code>.</li>
+                    <li><code>create</code> calls your function once, with <code>set</code>. <code>set({ theme })</code> <em>merges</em> the object into the state (the other values stay), makes a new state object, and tells every subscriber. Like React state, it never changes the old object.</li>
+                    <li>The result, <code>useUiStore</code>, is a Hook for components and an object with <code>getState()</code>, <code>setState()</code> and <code>subscribe()</code> for everything else.</li>
+                    <li><code>Theme</code> and <code>Density</code> come from <code>as const</code> arrays (Lesson 4.2) with <code>(typeof themes)[number]</code>, an indexed access type like 7.1's <code>ImpactTotals['byMonth'][number]</code>: one list gives both the radio buttons and the type, so they cannot drift apart.</li>
+                </ul>
+                <p>Why <code>create&lt;UiState&gt;()(…)</code>, with an empty pair of parentheses in the middle? TypeScript cannot infer <em>some</em> type arguments and take others from you in the same call. You give <code>UiState</code>; the middleware (<code>persist</code>, next section) adds types of its own, which TypeScript must infer. The first call takes your type, the second call infers the rest. Leave the <code>()</code> out and the error is long, but its last line says it plainly: the middleware's types were not expected.</p>
+                <pre data-snippet><code class="language-ts">import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+
+interface UiState {
+  density: 'roomy' | 'compact'
+  setDensity: (density: 'roomy' | 'compact') =&gt; void
+}
+
+export const useUiStore = create&lt;UiState&gt;(
+  persist(
+    (set) =&gt; ({
+      density: 'roomy',
+      setDensity: (density) =&gt; set({ density }),
+    }),
+    { name: 'shoreline-hq-ui' },
+  ),
+)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.ts:10:3 - error TS2345: Argument of type 'StateCreator&lt;UiState, [], [["zustand/persist", UiState]]&gt;' is not assignable to parameter of type 'StateCreator&lt;UiState, [], []&gt;'.
+  Type 'StateCreator&lt;UiState, [], [["zustand/persist", UiState]]&gt;' is not assignable to type '{ $$storeMutators?: [] | undefined; }'.
+    Types of property '$$storeMutators' are incompatible.
+      Type '[["zustand/persist", UiState]] | undefined' is not assignable to type '[] | undefined'.
+        Type '[["zustand/persist", UiState]]' is not assignable to type '[]'.
+          Source has 1 element(s) but target allows only 0.
+
+...</code></pre>
+                </div>
+                <p>A component reads the store by passing a <strong>selector</strong>, a function from the whole state to the part it needs. No type arguments are needed: the store's interface flows into every selector.</p>
+                <pre data-snippet><code class="language-tsx">import { useUiStore } from './state/uiStore.ts'
+
+export function Scratch() {
+  const density = useUiStore((state) =&gt; state.density)
+  const setTheme = useUiStore((state) =&gt; state.setTheme)
+  const small = density === 'cozy'
+  return &lt;button onClick={() =&gt; setTheme('purple')}&gt;{small ? 'Small' : 'Large'}&lt;/button&gt;
+}</code></pre>
+                <figure class="screenshot">
+                    <img src="images/lesson_26/26-store-types.png" alt="A terminal in shoreline-hq. npx tsc -b reports two errors in src/Scratch.tsx: TS2367 the comparison of the density with cozy can never be true, and TS2345 Argument of type purple is not assignable to parameter of type dark, light or system." width="1100" height="323" loading="lazy">
+                    <figcaption>No type arguments on the selectors: TypeScript knows <code>density</code> from the store's interface and checks every value passed to <code>setTheme</code>.</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:6:17 - error TS2367: This comparison appears to be unintentional because the types '"compact" | "roomy"' and '"cozy"' have no overlap.
+
+6   const small = density === 'cozy'
+                  ~~~~~~~~~~~~~~~~~~
+
+src/Scratch.tsx:7:42 - error TS2345: Argument of type '"purple"' is not assignable to parameter of type '"dark" | "light" | "system"'.
+
+7   return &lt;button onClick={() =&gt; setTheme('purple')}&gt;{small ? 'Small' : 'Large'}&lt;/button&gt;
+                                           ~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/Scratch.tsx:6</code></pre>
+                </div>
+                <p>TypeScript knows that <code>density</code> is <code>"compact" | "roomy"</code> (so a typo in a comparison is caught) and that <code>setTheme</code> takes only the three themes. These are the same checks you have relied on since Module 2, now reaching across the whole app.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: Zustand 5</h4>
+                    <p>Zustand 5 dropped the default export (<code>import { create } from 'zustand'</code>), dropped the second "equality function" argument of the store Hook (use <code>useShallow</code>, shown below), and relies on React's own <code>useSyncExternalStore</code>, the Hook the HQ's session store has used since Lesson 6.3. Code written for version 4 often uses all three old forms; Common Mistakes shows what <code>tsc</code> says about them.</p>
+                </div>
+            </section>
+
+            <section id="selectors" class="lesson-section">
+                <h2>🎯 Selectors: Re-render Only What Changed</h2>
+                <p>After every <code>set</code>, Zustand runs each subscribed component's selector again and compares the new answer with the last one using <code>Object.is</code> (the same check <code>useState</code> uses). Same answer: the component does not re-render. Different answer: it does. So the selector decides how often a component re-renders. <code>EventCard</code> does not need the density itself, only "am I compact?":</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="excerpt"><code class="language-tsx">// true or false: this card re-renders only when the answer changes, not on every store change
+const compact = useUiStore((state) =&gt; state.density === 'compact')</code></pre>
+                </div>
+                <p>Measured on the events list (15 cards, a React <code>Profiler</code> around each card on the dev server): choosing Dark or Light re-rendered <strong>0</strong> cards; choosing Compact or Roomy re-rendered all <strong>15</strong>, which is right, since every card changes. With <code>const { density } = useUiStore()</code> (no selector, so the "answer" is the whole state), every theme change re-rendered all 15 cards for nothing.</p>
+                <div class="mermaid">
+graph TD
+    A["setTheme('dark')"] --> B["New state object"]
+    B --> C["Each selector runs again"]
+    C --> D{"Same answer as before?"}
+    D -->|"yes"| E["Component skips"]
+    D -->|"no"| F["Component re-renders"]
+                </div>
+                <p>One trap follows from <code>Object.is</code>: a selector that builds a new object, such as <code>(state) =&gt; ({ theme: state.theme, density: state.density })</code>, gives a different answer <em>every</em> time, even when nothing changed. In Zustand 5 that is not just slow; React keeps re-rendering until it gives up (Common Mistakes shows the screen). Either use one selector per value, as the HQ's <code>DisplaySettings</code> does, or wrap the selector in <code>useShallow</code>, which compares the object's values instead of the object:</p>
+                <pre data-snippet><code class="language-tsx">import { useShallow } from 'zustand/react/shallow'
+import { useUiStore } from './state/uiStore.ts'
+
+export function Scratch() {
+  // useShallow compares the new object's values with the last one's: same values, same object
+  const { theme, density } = useUiStore(
+    useShallow((state) =&gt; ({ theme: state.theme, density: state.density })),
+  )
+  return &lt;p&gt;{theme}, {density}&lt;/p&gt;
+}</code></pre>
+                <p>That type-checks and runs. With the React Compiler on (Lesson 5.3), you do not need <code>memo</code> on top: the selector already keeps the card from re-rendering.</p>
+            </section>
+
+            <section id="persist" class="lesson-section">
+                <h2>💾 Keeping Choices Across Reloads</h2>
+                <p>A store lives in memory, so a reload starts over. Zustand's <code>persist</code> <strong>middleware</strong> (a function that wraps the store's creator and adds behavior) saves the state to <code>localStorage</code> after every change and reads it back when the store is created:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/state/uiStore.ts</div>
+                    <pre data-src="shoreline-hq/src/state/uiStore.ts" data-match="excerpt"><code class="language-ts">export const useUiStore = create&lt;UiState&gt;()(
+  persist(
+    (set) =&gt; ({
+      theme: 'system',
+      density: 'roomy',
+      setTheme: (theme) =&gt; set({ theme }),
+      setDensity: (density) =&gt; set({ density }),
+    }),
+    {
+      name: 'shoreline-hq-ui',
+      // What localStorage holds is unknown (an old version, a hand edit): keep only values that pass the checks
+      merge: (saved, current) =&gt; {
+        if (typeof saved !== 'object' || saved === null) {
+          return current
+        }
+        return {
+          ...current,
+          theme: 'theme' in saved &amp;&amp; isTheme(saved.theme) ? saved.theme : current.theme,
+          density: 'density' in saved &amp;&amp; isDensity(saved.density) ? saved.density : current.density,
+        }
+      },
+    },
+  ),
+)</code></pre>
+                </div>
+                <p><code>name</code> is the <code>localStorage</code> key. After choosing Dark, the browser held this under <code>shoreline-hq-ui</code> (measured; functions are left out because JSON cannot hold them):</p>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>{"state":{"theme":"dark","density":"roomy"},"version":0}</code></pre>
+                </div>
+                <p>On a first visit nothing is stored at all (measured: the key was missing until the first choice), so the defaults in the store are what a new person sees. <code>version: 0</code> is persist's default version number; when you rename a field one day, you raise <code>version</code> and add a <code>migrate</code> function that converts old saved data.</p>
+                <p>Now the important part: <strong>what comes out of <code>localStorage</code> is not checked by TypeScript</strong>. It could be from an older version of the HQ, from another app on the same address during development, or typed into DevTools by a curious person. The store's interface says <code>theme</code> is one of three strings; the browser can hand back anything. It is Lesson 2.4's rule again: data from outside the program is <code>unknown</code> until a check proves its shape. persist's <code>merge</code> option receives the saved data as <code>unknown</code>, so TypeScript makes you check it:</p>
+                <ul>
+                    <li><code>typeof saved !== 'object' || saved === null</code> handles anything that is not an object.</li>
+                    <li><code>'theme' in saved</code> narrows <code>saved</code> to an object that has a <code>theme</code> property (of type <code>unknown</code>), and <code>isTheme</code> (a type predicate, like <code>isEventStatus</code> in <code>client.ts</code>) narrows that to <code>Theme</code>.</li>
+                    <li>Each value that fails falls back to the current (default) value, one field at a time.</li>
+                </ul>
+                <p>Measured: with <code>{"state": {"theme": "purple", "density": "tiny"}, "version": 0}</code> stored, the HQ started with Match my device and Roomy checked; with <code>{oops</code> stored (not JSON at all), the same, and no error in the console: persist catches a failed parse itself.</p>
+                <div class="card card-danger">
+                    <h4>🛑 What goes in <code>localStorage</code></h4>
+                    <p><code>localStorage</code> is readable by any script running on the page and stays on the device until someone clears it. Display choices are fine there. Sign-in tokens, personal data and anything from the roster are not: the HQ keeps its session in <code>sessionStorage</code>, which ends with the tab (Lesson 5.2), and keeps the crew's data in the query cache, which ends with the page.</p>
+                </div>
+                <p>The theme has one more job: it belongs to the whole page, including the page background behind React's root. So it goes on the <code>&lt;html&gt;</code> element as <code>data-theme</code>, where the CSS can see it. That code does not need to be in a component at all. A Zustand store works outside React, so <code>main.tsx</code> shows the saved theme before the first render and then <strong>subscribes</strong>: the listener gets the new and the previous state after every change.</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/main.tsx</div>
+                    <pre data-src="shoreline-hq/src/main.tsx" data-match="excerpt"><code class="language-tsx">import { showTheme, useUiStore } from './state/uiStore.ts'
+
+// The saved theme goes on &lt;html&gt; before the first render, then follows every change
+showTheme(useUiStore.getState().theme)
+useUiStore.subscribe((state, previous) =&gt; {
+  if (state.theme !== previous.theme) {
+    showTheme(state.theme)
+  }
+})</code></pre>
+                </div>
+                <p>A context (Lesson 5.2) could hold the same two values, but it would need a provider, it cannot be read from <code>main.tsx</code> before React starts, every consumer would re-render on every change, and you would write the saving and loading yourself. For two small values, that is the trade Zustand makes for you.</p>
+            </section>
+
+            <section id="redux" class="lesson-section">
+                <h2>⚖️ The Same Store in Redux Toolkit</h2>
+                <p><strong>Redux</strong> is the oldest widely used state library for React, and <strong>Redux Toolkit</strong> (RTK) is the official, modern way to write it. Many established codebases use it, so you will meet it on teams. Its model: one store for the whole app, split into <strong>slices</strong>; components <strong>dispatch</strong> actions (plain objects like <code>{ type: 'ui/themeChosen', payload: 'dark' }</code>); a reducer per slice computes the next state. You know that model already: it is Lesson 5.1's <code>useReducer</code>, made app-wide.</p>
+                <p>To compare fairly, the HQ's display store was rewritten with Redux Toolkit 2.14 and React Redux 9.3 in a separate copy of the HQ (not in your project). Same two values, same checks on the saved data, same components. The slice:</p>
+                <pre data-snippet><code class="language-ts">import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+
+export const themes = ['system', 'light', 'dark'] as const
+export type Theme = (typeof themes)[number]
+
+export const densities = ['roomy', 'compact'] as const
+export type Density = (typeof densities)[number]
+
+export interface UiState {
+  theme: Theme
+  density: Density
+}
+
+export const initialUi: UiState = { theme: 'system', density: 'roomy' }
+
+// A slice: the state, and one reducer per action; createSlice writes the action creators
+export const uiSlice = createSlice({
+  name: 'ui',
+  initialState: initialUi,
+  reducers: {
+    themeChosen: (state, action: PayloadAction&lt;Theme&gt;) =&gt; {
+      state.theme = action.payload // looks like a mutation: Immer turns it into a copy
+    },
+    densityChosen: (state, action: PayloadAction&lt;Density&gt;) =&gt; {
+      state.density = action.payload
+    },
+  },
+})
+
+export const { themeChosen, densityChosen } = uiSlice.actions</code></pre>
+                <p><code>createSlice</code> writes the action creators (<code>themeChosen('dark')</code>) and their types for you, and <code>PayloadAction&lt;Theme&gt;</code> types each action's payload. The reducers <em>look</em> like they change <code>state</code>; RTK runs them through <strong>Immer</strong>, a library that records those changes and produces a new object, so the old state is never changed. The store and saving it (RTK has no persistence of its own; teams write it by hand like this, or add a library such as redux-persist):</p>
+                <pre data-snippet><code class="language-ts">export const store = configureStore({
+  reducer: { ui: uiSlice.reducer },
+  preloadedState: { ui: loadUi() },
+})
+
+// ... and save them after every action
+store.subscribe(() =&gt; localStorage.setItem(key, JSON.stringify(store.getState().ui)))
+
+export type RootState = ReturnType&lt;typeof store.getState&gt;
+export type AppDispatch = typeof store.dispatch</code></pre>
+                <p>Then typed versions of React Redux's Hooks, created once with <code>withTypes</code> so components never repeat <code>RootState</code>:</p>
+                <pre data-snippet><code class="language-ts">import { useDispatch, useSelector } from 'react-redux'
+import type { AppDispatch, RootState } from './store.ts'
+
+// Typed once, used everywhere instead of the plain hooks
+export const useAppDispatch = useDispatch.withTypes&lt;AppDispatch&gt;()
+export const useAppSelector = useSelector.withTypes&lt;RootState&gt;()</code></pre>
+                <p>The app is wrapped in <code>&lt;Provider store={store}&gt;</code>, and a component reads and dispatches like this:</p>
+                <pre data-snippet><code class="language-tsx">const theme = useAppSelector((state) =&gt; state.ui.theme)
+const density = useAppSelector((state) =&gt; state.ui.density)
+const dispatch = useAppDispatch()
+// ...
+onChange={(choice) =&gt; dispatch(themeChosen(choice))}</code></pre>
+                <p>It type-checks, lints with 0 warnings and builds. What it cost, measured on the two copies of the HQ:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Zustand 5.1</th><th>Redux Toolkit 2.14 + React Redux 9.3</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>npm packages added</td><td>1</td><td>10 (Redux, Immer, Reselect, Redux Thunk and others)</td></tr>
+                            <tr><td>JavaScript after the build (before: 426.45 kB, gzip 133.76 kB)</td><td>431.11 kB (+4.7), gzip 135.60 kB (+1.8)</td><td>451.41 kB (+25.0), gzip 143.06 kB (+9.3)</td></tr>
+                            <tr><td>Store code (non-empty lines, same checks)</td><td>48 in one file</td><td>64 in three files, plus a <code>Provider</code> in <code>App.tsx</code></td></tr>
+                            <tr><td>Saving to <code>localStorage</code></td><td>Built in (<code>persist</code>)</td><td>By hand, or another library</td></tr>
+                            <tr><td>Reading in a component</td><td><code>useUiStore(selector)</code></td><td><code>useAppSelector(selector)</code> + <code>useAppDispatch()</code></td></tr>
+                            <tr><td>Outside React</td><td><code>getState</code>, <code>subscribe((state, previous) =&gt; …)</code></td><td><code>store.getState</code>, <code>store.subscribe(() =&gt; …)</code> (no previous state: keep it yourself)</td></tr>
+                            <tr><td>DevTools</td><td>Optional <code>devtools</code> middleware</td><td>Built into <code>configureStore</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The DevTools in both columns are the <strong>Redux DevTools</strong> browser extension: it lists every action with the state before and after, and can step back through them ("time travel"). That trail of named actions is Redux's real strength on a large team: every change to the store has a name and a single place that handles it, and middleware can log or react to any of them. For the HQ's two display values that strength has nothing to work with, and the cost (ten packages, about five times the extra JavaScript, a provider, three files) buys nothing, so the HQ keeps Zustand.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Reach for Zustand when…</th><th>Reach for Redux Toolkit when…</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A few app-wide values, a small or medium app</td><td>Lots of client state with complex rules, many people changing it</td></tr>
+                            <tr><td>Server data is already in TanStack Query</td><td>The team wants every change named, logged and replayable</td></tr>
+                            <tr><td>You want little code and a small bundle</td><td>The codebase already uses it (the strongest reason of all)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>One more thing you will see in Redux codebases: <strong>RTK Query</strong>, Redux Toolkit's own server-state cache. It does the job TanStack Query does in the HQ. A project uses one or the other for server data, not both.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A selector that builds a new object</h3>
+                    <p>In <code>DisplaySettings</code>, replacing the two value selectors with <code>const { theme, density } = useUiStore((state) =&gt; ({ theme: state.theme, density: state.density }))</code> type-checks and lints cleanly. On the dev server, the HQ disappeared:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_26/26-object-selector.png" alt="The browser shows React Router&#x27;s default error screen: the heading Unexpected Application Error! and the message Maximum update depth exceeded, followed by a stack trace. None of the HQ is visible." width="1100" height="688" loading="lazy">
+                        <figcaption>One selector that builds a new object on every call: the store's answer never looks the same twice, React keeps re-rendering, and gives up (measured on the development server).</figcaption>
+                    </figure>
+                    <p>The console said "The result of getSnapshot should be cached to avoid an infinite loop" before the error. "getSnapshot" is the store's selector as React sees it: a new object on every call, so React never sees a stable answer. Use one selector per value, or <code>useShallow</code>. The footer is part of the layout, outside the pages' error route, which is why React Router's plain default error screen appeared instead of the HQ's own error page.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Reading the whole store</h3>
+                    <p><code>const { density } = useUiStore()</code> works and reads naturally, but without a selector the component subscribes to <em>everything</em>. Measured: every theme change re-rendered all 15 event cards, against 0 with a selector. Harmless with two values; on a store that changes often, it is the slow app nobody can explain. Select what you use.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Trusting what <code>localStorage</code> gives back</h3>
+                    <p>Without the <code>merge</code> check, and <code>{"state": {"theme": "purple", "density": "tiny"}, "version": 0}</code> in storage, the HQ ran with <code>theme</code> set to <code>'purple'</code> (measured: <code>&lt;html data-theme="purple"&gt;</code>), no Theme radio button checked, and lists marked <code>data-density="tiny"</code>, while TypeScript still believed both were valid. Nothing crashed today; the next component that does <code>themeLabels[theme].toUpperCase()</code> will. Check data from outside before it gets a type.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Copying server data into a client store</h3>
+                    <p>It is tempting to "load the events once and keep them in the store". Then the store holds a copy that nobody invalidates: after Lesson 7.2's Publish or Cancel, the copy is stale, and you are writing Query's cache again by hand, without its refetching, retries or keys. Server data stays in the query cache; the store holds only what the server does not know.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Zustand code from older tutorials</h3>
+                    <p>Version 4 code imports <code>create</code> as a default export and passes <code>shallow</code> as a second argument:</p>
+                    <pre data-snippet data-legacy><code class="language-tsx">import create from 'zustand'
+import { shallow } from 'zustand/shallow'
+import { useUiStore } from './state/uiStore.ts'
+
+export const useCountStore = create(() =&gt; ({ count: 0 }))
+
+export function Scratch() {
+  const { theme, density } = useUiStore(
+    (state) =&gt; ({ theme: state.theme, density: state.density }),
+    shallow,
+  )
+  return &lt;p&gt;{theme}, {density}&lt;/p&gt;
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/Scratch.tsx:1:8 - error TS1192: Module '"/Users/you/shoreline/shoreline-hq/node_modules/zustand/esm/index"' has no default export.
+
+1 import create from 'zustand'
+         ~~~~~~
+
+src/Scratch.tsx:8:11 - error TS2339: Property 'theme' does not exist on type 'unknown'.
+
+8   const { theme, density } = useUiStore(
+            ~~~~~
+
+src/Scratch.tsx:8:18 - error TS2339: Property 'density' does not exist on type 'unknown'.
+
+8   const { theme, density } = useUiStore(
+                   ~~~~~~~
+
+src/Scratch.tsx:10:5 - error TS2554: Expected 0-1 arguments, but got 2.
+
+10     shallow,
+       ~~~~~~~
+
+
+Found 4 errors in the same file, starting at: src/Scratch.tsx:1</code></pre>
+                    </div>
+                    <p>The fixes: <code>import { create } from 'zustand'</code>, and <code>useShallow</code> around the selector instead of a second argument. The two TS2339 errors are a side effect of the TS2554 one: once the call is wrong, TypeScript no longer knows what it returns.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Display Choices That Stick</h2>
+                <p>Step 1 creates the store, Step 2 lets the theme reach the page, Step 3 adds the choices to the footer, Step 4 makes lists compact, and Step 5 checks it all, including what happens when the saved data is wrong. Keep shoreline-api and <code>npm run dev</code> running. You do not need to sign in: display choices are for everyone.</p>
+
+                <div class="card">
+                    <h3>Step 1: Install Zustand and create the store <span class="step-time">(10 min)</span></h3>
+                    <p>In a third terminal, in <code>shoreline-hq</code>:</p>
+                    <pre class="terminal"><code class="language-bash">npm install zustand</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>
+added 1 package, and audited 81 packages in 541ms
+
+17 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities</code></pre>
+                    </div>
+                    <p>One package, with no dependencies of its own (this course was checked with 5.1.0; your timing will differ). Create the folder <code>src/state</code> and in it <code>uiStore.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/state/uiStore.ts</div>
+                        <pre data-src="shoreline-hq/src/state/uiStore.ts"><code class="language-ts">import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+
+// How the HQ looks in this browser: client state that shoreline-api never sees.
+// Zustand keeps it in one store outside React, and persist saves it in localStorage.
+
+export const themes = ['system', 'light', 'dark'] as const
+export type Theme = (typeof themes)[number]
+
+export const densities = ['roomy', 'compact'] as const
+export type Density = (typeof densities)[number]
+
+function isTheme(value: unknown): value is Theme {
+  return themes.some((theme) =&gt; theme === value)
+}
+
+function isDensity(value: unknown): value is Density {
+  return densities.some((density) =&gt; density === value)
+}
+
+interface UiState {
+  theme: Theme
+  density: Density
+  setTheme: (theme: Theme) =&gt; void
+  setDensity: (density: Density) =&gt; void
+}
+
+export const useUiStore = create&lt;UiState&gt;()(
+  persist(
+    (set) =&gt; ({
+      theme: 'system',
+      density: 'roomy',
+      setTheme: (theme) =&gt; set({ theme }),
+      setDensity: (density) =&gt; set({ density }),
+    }),
+    {
+      name: 'shoreline-hq-ui',
+      // What localStorage holds is unknown (an old version, a hand edit): keep only values that pass the checks
+      merge: (saved, current) =&gt; {
+        if (typeof saved !== 'object' || saved === null) {
+          return current
+        }
+        return {
+          ...current,
+          theme: 'theme' in saved &amp;&amp; isTheme(saved.theme) ? saved.theme : current.theme,
+          density: 'density' in saved &amp;&amp; isDensity(saved.density) ? saved.density : current.density,
+        }
+      },
+    },
+  ),
+)
+
+// The theme belongs to the whole page, so it lives on &lt;html data-theme="…"&gt;, where the CSS can see it
+export function showTheme(theme: Theme) {
+  document.documentElement.dataset.theme = theme
+}</code></pre>
+                    </div>
+                    <p>You have read each part in the sections above. Two names to notice: the file exports the store Hook, the two lists and their types, and <code>showTheme</code>; the checks <code>isTheme</code> and <code>isDensity</code> stay private, because nothing else needs them. Run <code>npx tsc -b</code>: it should print nothing.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Let the theme reach the page <span class="step-time">(10 min)</span></h3>
+                    <p>Since Lesson 3.6, <code>src/index.css</code> switches its colors with <code>@media (prefers-color-scheme: dark)</code>, which follows the device and nothing else. The person's choice must win over the device, so the colors move to the CSS function <code>light-dark()</code>: it takes a light and a dark value and picks one by the element's <strong>color scheme</strong>. The color scheme is <code>light dark</code> (follow the device) unless <code>data-theme</code> says otherwise. Change these lines in <code>src/index.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css diff-highlight">   --white: #ffffff;
+ 
+-  /* What the page uses: these change in dark mode */
+-  --page: var(--sand);
+-  --text: var(--ink);
+-  --text-muted: var(--muted);
+-  --link: var(--sea-teal);
+-  --surface: var(--white);
+-  --border: #e4dccb;
+-  --error: var(--coral);
++  /* What the page uses: light-dark(light value, dark value) picks one by the color scheme */
++  --page: light-dark(var(--sand), #0f1b26);
++  --text: light-dark(var(--ink), #e9eef3);
++  --text-muted: light-dark(var(--muted), #a9b4c0);
++  --link: light-dark(var(--sea-teal), #7cc6d6);
++  --surface: light-dark(var(--white), #16283a);
++  --border: light-dark(#e4dccb, #2b4257);
++  --error: light-dark(var(--coral), #ff9b85);
+   --focus: var(--link);
+ </code></pre>
+                    </div>
+                    <p>And replace the whole dark-mode block with two rules:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css diff-highlight"> }
+ 
+-@media (prefers-color-scheme: dark) {
+-  :root {
+-    --page: #0f1b26;
+-    --text: #e9eef3;
+-    --text-muted: #a9b4c0;
+-    --link: #7cc6d6;
+-    --surface: #16283a;
+-    --border: #2b4257;
+-    --error: #ff9b85;
+-  }
++/* The person's choice in the HQ (Lesson 7.3) wins over the device's setting */
++:root[data-theme='light'] {
++  color-scheme: light;
++}
++
++:root[data-theme='dark'] {
++  color-scheme: dark;
+ }
+ </code></pre>
+                    </div>
+                    <p>Every color the components use comes from these custom properties, so no CSS Module changes. A bonus of <code>color-scheme</code>: the browser's own parts (scrollbars, form controls) follow the chosen theme too. Now set <code>data-theme</code> from the store, in <code>src/main.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/main.tsx</div>
+                        <pre data-src="shoreline-hq/src/main.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import './index.css'
+ import { App } from './App.tsx'
++import { showTheme, useUiStore } from './state/uiStore.ts'
++
++// The saved theme goes on &lt;html&gt; before the first render, then follows every change
++showTheme(useUiStore.getState().theme)
++useUiStore.subscribe((state, previous) =&gt; {
++  if (state.theme !== previous.theme) {
++    showTheme(state.theme)
++  }
++})
+ 
+ createRoot(document.getElementById('root')!).render(</code></pre>
+                    </div>
+                    <p>The listener runs after <em>every</em> change, density included, so it compares with <code>previous</code> and touches the page only when the theme changed. Reload the HQ and inspect the page (right-click, <strong>Inspect</strong>): the <code>&lt;html&gt;</code> element now has <code>data-theme="system"</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Display choices in the footer <span class="step-time">(12 min)</span></h3>
+                    <p>The choices are radio buttons: two groups, each a <code>fieldset</code> whose <code>legend</code> names it, so a screen reader announces the group's name (Theme) along with each choice. A small generic component draws one group for any list of string options. Create <code>src/components/DisplaySettings.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DisplaySettings.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/DisplaySettings.tsx"><code class="language-tsx">import { useId } from 'react'
+import { densities, themes, useUiStore, type Density, type Theme } from '../state/uiStore.ts'
+import styles from './DisplaySettings.module.css'
+
+const themeLabels: Record&lt;Theme, string&gt; = {
+  system: 'Match my device',
+  light: 'Light',
+  dark: 'Dark',
+}
+
+const densityLabels: Record&lt;Density, string&gt; = {
+  roomy: 'Roomy',
+  compact: 'Compact',
+}
+
+interface ChoicesProps&lt;T extends string&gt; {
+  legend: string
+  options: readonly T[]
+  labels: Record&lt;T, string&gt;
+  value: T
+  onChange: (value: T) =&gt; void
+}
+
+// One group of radio buttons: a fieldset names the group, each label names one choice
+function Choices&lt;T extends string&gt;({ legend, options, labels, value, onChange }: ChoicesProps&lt;T&gt;) {
+  const name = useId()
+  return (
+    &lt;fieldset className={styles.choices}&gt;
+      &lt;legend&gt;{legend}&lt;/legend&gt;
+      {options.map((option) =&gt; (
+        &lt;label key={option}&gt;
+          &lt;input
+            type="radio"
+            name={name}
+            value={option}
+            checked={option === value}
+            onChange={() =&gt; onChange(option)}
+          /&gt;
+          {labels[option]}
+        &lt;/label&gt;
+      ))}
+    &lt;/fieldset&gt;
+  )
+}
+
+// The person's display choices, saved in this browser
+export function DisplaySettings() {
+  const theme = useUiStore((state) =&gt; state.theme)
+  const density = useUiStore((state) =&gt; state.density)
+  const setTheme = useUiStore((state) =&gt; state.setTheme)
+  const setDensity = useUiStore((state) =&gt; state.setDensity)
+
+  return (
+    &lt;section className={styles.settings} aria-label="Display"&gt;
+      &lt;Choices legend="Theme" options={themes} labels={themeLabels} value={theme} onChange={setTheme} /&gt;
+      &lt;Choices
+        legend="Lists"
+        options={densities}
+        labels={densityLabels}
+        value={density}
+        onChange={setDensity}
+      /&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>Choices&lt;T extends string&gt;</code> is a generic component, like Lesson 5.4's <code>DataList&lt;T&gt;</code>. TypeScript infers <code>T</code> from <code>options</code>: for the theme group it is <code>Theme</code>, so <code>labels</code> must have all three themes and <code>onChange</code> receives a <code>Theme</code>. That is why <code>setTheme</code> can be passed directly.</li>
+                        <li><code>useId</code> gives each group its own <code>name</code>, which is what makes radio buttons a group (arrow keys move between them).</li>
+                        <li>The labels in <code>Record&lt;Theme, string&gt;</code> tables cannot miss a choice: add <code>'sepia'</code> to <code>themes</code> and TypeScript points at <code>themeLabels</code>.</li>
+                        <li>Four selectors, one value each: <code>DisplaySettings</code> re-renders when the theme or the density changes, and only then. Actions never change, so selecting them costs nothing.</li>
+                    </ul>
+                    <p>Create <code>src/components/DisplaySettings.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DisplaySettings.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/DisplaySettings.module.css"><code class="language-css">.settings {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 2rem;
+  margin-bottom: 1rem;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.choices legend {
+  float: left;
+  margin-right: 0.75rem;
+  font-weight: 700;
+}
+
+.choices label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.choices input {
+  accent-color: var(--sunrise);
+}</code></pre>
+                    </div>
+                    <p>In <code>src/components/Footer.tsx</code>, import it and put it first in the footer:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Footer.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Footer.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">+import { DisplaySettings } from './DisplaySettings.tsx'
+ import styles from './Footer.module.css'
+ </code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Footer.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Footer.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   return (
+     &lt;footer className={styles.footer}&gt;
++      &lt;DisplaySettings /&gt;
+       &lt;p&gt;Shoreline Crew HQ: the organizers' side of the crew&lt;/p&gt;
+       &lt;p&gt;&amp;copy; {year} Shoreline Crew · Port Marisol, Calder Bay and Seal Rock&lt;/p&gt;</code></pre>
+                    </div>
+                    <p>The footer is Deep Tide blue like the header, where the teal focus ring would vanish. Give it the header's Sunrise ring, in <code>src/components/Footer.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Footer.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Footer.module.css" data-match="diff"><code class="language-diff-css diff-highlight"> .footer {
++  /* Like the header: teal would vanish on Deep Tide, so the focus ring is Sunrise */
++  --focus: var(--sunrise);
++
+   padding: 1.5rem;
+   background: var(--deep-tide);</code></pre>
+                    </div>
+                    <figure class="screenshot">
+                        <img src="images/lesson_26/26-display-settings.png" alt="The footer of Shoreline Crew HQ on Deep Tide blue. A row of radio buttons: Theme with Match my device (selected), Light and Dark; Lists with Roomy (selected) and Compact. Below them the footer text Shoreline Crew HQ: the organizers&#x27; side of the crew." width="1100" height="130" loading="lazy">
+                        <figcaption>The new <strong>Display</strong> choices in the footer: two radio groups, each a <code>fieldset</code> with a <code>legend</code>. Both read and change the Zustand store.</figcaption>
+                    </figure>
+                    <p>Choose <strong>Dark</strong>: the whole HQ changes, even if your computer is in light mode. Choose <strong>Light</strong>, then <strong>Match my device</strong>. Then press <kbd>Tab</kbd> until a Theme radio button has the focus, and use the arrow keys: the choice follows the focus, and the Sunrise ring shows where you are.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_26/26-phone-footer.png" alt="The HQ&#x27;s footer on a 390 pixel wide phone screen in dark mode: the Theme choices Match my device, Light and Dark wrap onto two lines, then the Lists choices Roomy and Compact, then the footer text." width="390" height="260" loading="lazy">
+                        <figcaption>On a phone the radio buttons wrap, and each label is a large, easy target: the whole label selects its radio button.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Compact lists <span class="step-time">(10 min)</span></h3>
+                    <p>Every grid of cards in the HQ (events, sites, the crew list) goes through <code>DataList</code> since Lesson 5.4, so one change there reaches them all. In <code>src/components/DataList.tsx</code>, read the density and put it on the list as a <code>data-</code> attribute:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DataList.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/DataList.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import type { ReactNode } from 'react'
++import { useUiStore } from '../state/uiStore.ts'
+ import styles from './DataList.module.css'
+ </code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DataList.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/DataList.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   layout = 'grid',
+ }: DataListProps&lt;T&gt;) {
++  const density = useUiStore((state) =&gt; state.density)
++
+   if (items.length === 0) {
+     return &lt;p className={styles.empty}&gt;{emptyMessage}&lt;/p&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DataList.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/DataList.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> 
+   return (
+-    &lt;ul className={styles[layout]}&gt;
++    &lt;ul className={styles[layout]} data-density={density}&gt;
+       {items.map((item) =&gt; (
+         &lt;li key={getKey(item)}&gt;{renderItem(item)}&lt;/li&gt;</code></pre>
+                    </div>
+                    <p>The Hook goes before the early return (Hooks run in the same order on every render, Lesson 3.4). In <code>src/components/DataList.module.css</code>, add a rule for compact grids after <code>.grid</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DataList.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/DataList.module.css" data-match="diff"><code class="language-diff-css diff-highlight">   padding: 0;
+   list-style: none;
++}
++
++/* Compact lists (the Display choice in the footer): narrower columns, less space, smaller cards */
++.grid[data-density='compact'] {
++  --card-padding: 0.75rem;
++
++  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
++  gap: 0.75rem;
+ }
+ </code></pre>
+                    </div>
+                    <p>The cards' padding lives in another module (<code>Card.module.css</code>), and one CSS Module cannot name another's classes. A custom property can cross that line: the list sets <code>--card-padding</code>, and the card uses it with a fallback. In <code>src/components/Card.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Card.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Card.module.css" data-match="diff"><code class="language-diff-css diff-highlight"> .card {
+-  padding: 1.25rem;
++  /* A list can make its cards smaller by setting --card-padding */
++  padding: var(--card-padding, 1.25rem);
+   border: 1px solid var(--border);
+   border-radius: 0.75rem;</code></pre>
+                    </div>
+                    <p>Last, a compact event card leaves out the meeting point and the supplies (they are on the cleanup's page). In <code>src/components/EventCard.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { Link } from 'react-router'
+ import type { CleanupEvent, Site } from '../api/types.ts'
++import { useUiStore } from '../state/uiStore.ts'
+ import { getAvailability } from '../utils/availability.ts'
+ import { formatDate } from '../utils/format.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> export function EventCard({ event, site }: EventCardProps) {
+   const [showDetails, setShowDetails] = useState(false)
++  // true or false: this card re-renders only when the answer changes, not on every store change
++  const compact = useUiStore((state) =&gt; state.density === 'compact')
+ 
+   return (</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">         {event.endTime}
+       &lt;/p&gt;
+-      &lt;p&gt;{site ? site.name : 'Site to be confirmed'}: {event.meetingPoint}&lt;/p&gt;
++      {!compact &amp;&amp; &lt;p&gt;{site ? site.name : 'Site to be confirmed'}: {event.meetingPoint}&lt;/p&gt;}
+       &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
+-      {event.suppliesProvided.length &gt; 0 &amp;&amp; (
++      {!compact &amp;&amp; event.suppliesProvided.length &gt; 0 &amp;&amp; (
+         &lt;p className={styles.supplies}&gt;We bring: {event.suppliesProvided.join(', ')}&lt;/p&gt;
+       )}</code></pre>
+                    </div>
+                    <p>Open <strong>Events</strong>, choose <strong>Dark</strong> and <strong>Compact</strong>:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_26/26-compact-dark.png" alt="The Cleanup events page in the dark theme with compact lists: four cards per row with less space between them; each card shows the title, a Scheduled badge, the date and time and the spots left, without the meeting point and the supplies." width="1100" height="688" loading="lazy">
+                        <figcaption>Dark and Compact, chosen in the footer. The device is set to light mode: the person's choice wins. Reload the page and both choices are still there.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Reload, open a tab, break the saved data <span class="step-time">(8 min)</span></h3>
+                    <ul>
+                        <li>Reload the page: still Dark and Compact (measured on the dev server and on <code>npm run preview</code>).</li>
+                        <li>Open the HQ in a second tab: the same choices, because both tabs read the same <code>localStorage</code>. (Change a choice in one tab and look at the other: it does not follow until you reload it. Exercise 3 fixes that.)</li>
+                        <li>Open DevTools (<kbd>F12</kbd>, or <kbd>⌥ Option</kbd>+<kbd>⌘ Cmd</kbd>+<kbd>I</kbd> on a Mac). In Chrome or Edge, <strong>Application</strong>, then <strong>Local storage</strong> and the HQ's address, shows the key <code>shoreline-hq-ui</code> and the JSON from "Keeping Choices Across Reloads" (in Firefox the panel is called <strong>Storage</strong>).</li>
+                    </ul>
+                    <p>Now play the curious person. In the DevTools <strong>Console</strong>, type this and press <kbd>Enter</kbd>, then reload the page:</p>
+                    <pre data-snippet><code class="language-js">localStorage.setItem('shoreline-hq-ui', '{"state":{"theme":"purple","density":"tiny"},"version":0}')</code></pre>
+                    <p>The HQ starts with Match my device and Roomy: <code>merge</code> threw both values away. Choose <strong>Light</strong>, and the bad data is replaced (measured: the key then held <code>{"state":{"theme":"light","density":"roomy"},"version":0}</code>). Finally, the checks:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 12ms on 64 files with 150 rules using 20 threads.
+&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 240 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-stP3t8Fk.css                             9.95 kB │ gzip:   2.90 kB
+dist/assets/index-DX3tmBR8.js                            431.11 kB │ gzip: 135.60 kB
+
+✓ built in 1.07s</code></pre>
+                    </div>
+                    <p>The JavaScript grew from 426.45 kB to 431.11 kB (gzip: 133.76 to 135.60 kB) for Zustand, its <code>persist</code> middleware and your code. Your hashes and timings will differ.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li><code>zustand</code> is in <code>package.json</code>, and <code>src/state/uiStore.ts</code> has the typed store with <code>persist</code> and a <code>merge</code> that checks each saved value</li>
+                        <li>The footer has two labeled radio groups, Theme and Lists, that work with the keyboard</li>
+                        <li>Dark and Light override the device's setting; Match my device follows it again</li>
+                        <li>Compact makes every card list tighter, and event cards leave out the meeting point and supplies</li>
+                        <li>The choices survive a reload and a new tab; nonsense in <code>localStorage</code> falls back to the defaults</li>
+                        <li><code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass with no errors or warnings</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, make the table from "Where Does This State Live?": list every piece of state you expect, its home, and one reason. If the last row (an app-wide store) has more than three or four entries, look at each again.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 12 minutes together, included in the lesson time). Exercise 3 is an optional stretch, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Compact site cards</h3>
+                    <p>Compact lists still show every site's picture and description on the <strong>Sites</strong> page. Make a compact site card show only its name, badges and parking.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Exactly what <code>EventCard</code> does: a selector that answers "am I compact?", and two <code>!compact &amp;&amp;</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>In <code>src/components/SiteCard.tsx</code>, import <code>useUiStore</code>, then:</p>
+                        <pre data-snippet><code class="language-tsx">export function SiteCard({ site }: SiteCardProps) {
+  const compact = useUiStore((state) =&gt; state.density === 'compact')
+
+  return (
+    &lt;Card title={site.name}&gt;
+      {!compact &amp;&amp; &lt;SitePicture image={site.image} /&gt;}
+      &lt;p className={styles.badges}&gt;
+        &lt;Badge label={site.town} /&gt;
+        &lt;Badge label={terrainLabels[site.terrain]} /&gt;
+        &lt;Badge
+          label={site.accessible ? 'Step-free route' : 'No step-free route'}
+          tone={site.accessible ? 'success' : 'info'}
+        /&gt;
+      &lt;/p&gt;
+      {!compact &amp;&amp; &lt;p&gt;{site.description}&lt;/p&gt;}
+      &lt;p className={styles.parking}&gt;Parking: {site.parking}&lt;/p&gt;
+    &lt;/Card&gt;</code></pre>
+                        <p>Measured: 6 pictures with Roomy, 0 with Compact. Type-checks and lints cleanly; the course's code continues without it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Where does it belong?</h3>
+                    <p>For each piece of state, name its home in the HQ (query cache, URL, component state, reducer, session store, or the display store) and give one reason: (a) the title typed into the Plan a cleanup form before Publish; (b) "show site pictures large", a new preference; (c) the selected skill filter on the crew list; (d) today's roster; (e) whether the Cancel cleanup dialog is open; (f) the organizer who is signed in.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Ask the three questions in order: does the server own it, should a link reproduce it, does more than one far-apart part of the app need it and should it outlive the tab?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>(a) The form (component state, or the form's own fields): only the form needs it, and it is gone after Publish. (b) The display store: a preference that many components read and that should outlive the tab. (c) The URL (it already is, since 6.2): Back and shared links should keep it. (d) The query cache: the API owns it. (e) Component state in <code>OrganizerTools</code>: nothing else cares. (f) The session store in <code>sessionStorage</code>: <code>client.ts</code> reads it outside React, and a sign-in should end with the tab, not live on in <code>localStorage</code>.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): Keep tabs in step</h3>
+                    <p>Optional stretch, not counted in the lesson time. With the HQ open in two tabs, a choice in one tab should show up in the other right away.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The browser fires a <code>storage</code> event in the <em>other</em> tabs when <code>localStorage</code> changes. persist can read the saved state again with <code>useUiStore.persist.rehydrate()</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>In <code>src/main.tsx</code>, after the subscription:</p>
+                        <pre data-snippet><code class="language-ts">window.addEventListener('storage', (event) =&gt; {
+  if (event.key === 'shoreline-hq-ui') {
+    void useUiStore.persist.rehydrate()
+  }
+})
+</code></pre>
+                        <p>Measured: choosing Dark and Compact in the first tab changed the second tab to Dark and Compact within a second; without the listener it stayed on Match my device. The rehydrated state goes through <code>merge</code> too, so a bad value from another tab is checked as well. Type-checks and lints cleanly. Not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Where should the text typed into the events search box live?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="It is not a preference to keep for next week. What should happen when someone shares the page's link?">
+                                A) In the Zustand display store, persisted
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="It would work, but what would Back and a shared link lose?">
+                                B) In <code>useState</code> inside <code>EventsPage</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A search that a link or Back should reproduce belongs in the URL's search params, where the HQ has kept it since Lesson 6.2. The query key then includes it, so the cache follows the URL.">
+                                C) In the URL's search params
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The cache holds the API's answers. Who decides what the person typed?">
+                                D) In TanStack Query's cache
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Each <code>EventCard</code> reads <code>useUiStore((state) =&gt; state.density === 'compact')</code>. Fifteen cards are on screen and the person chooses Dark. How many cards re-render?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Zustand compares each selector's answer with the last one. Did the answer change?">
+                                A) 15
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The selector still answers false, the same value as before, so Object.is says nothing changed and no card re-renders. Measured: 0, against 15 when a card read the whole store.">
+                                B) 0
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Each card runs its own selector. Is any one card different from the others here?">
+                                C) 1
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="React only re-renders components whose state or store answer changed. Which components read the theme?">
+                                D) Every component in the app
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Why does the HQ write <code>create&lt;UiState&gt;()(persist(…))</code> with an extra pair of parentheses?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The store is created when the module loads either way. What do the parentheses do for TypeScript?">
+                                A) It makes the store load lazily, the first time a component needs it
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Zustand has no provider at all. Look at what tsc complained about without them.">
+                                B) <code>persist</code> needs a provider, and the first call creates it
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The second call is not a test; both calls run in every build. What does each one take?">
+                                C) The first call checks the types in development only
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="TypeScript cannot take some type arguments from you and infer others in the same call. The first call takes UiState; the second infers the middleware's types. Without it, tsc reports TS2345 about the persist mutator.">
+                                D) So you can give <code>UiState</code> while TypeScript still infers the middleware's types
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Someone stores <code>{"state":{"theme":"purple","density":"compact"},"version":0}</code> under <code>shoreline-hq-ui</code> and reloads the HQ. What does it start with?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="merge checks each saved value on its own: purple fails isTheme and falls back to the default, compact passes isDensity and is kept.">
+                                A) Match my device and Compact
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="merge checks each field separately. Does a bad theme throw away a good density?">
+                                B) Match my device and Roomy
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Is anything in localStorage seen by tsc when you build?">
+                                C) It does not build: TypeScript rejects <code>'purple'</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Without merge's check that might happen. What does isTheme say about purple?">
+                                D) A purple theme, because the saved value wins
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> You join a team whose app keeps its client state in Redux Toolkit slices. You need to add a "compact lists" preference. What is the best first move?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Smaller is nice, but what does a second state library cost the team that reads this code?">
+                                A) Add Zustand next to Redux, since it is smaller
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The codebase already uses Redux Toolkit, which is the strongest reason to use it: a field and a reducer in a slice, read with the team's typed useAppSelector, keep one way of doing things.">
+                                B) Add it to a slice the way the team does, with an action and the typed Hooks
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Is a display preference something the API owns?">
+                                C) Store it in the query cache
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Should a shared link change how lists look for the person who opens it?">
+                                D) Put it in the URL so it survives reloads
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should the session become a Zustand store too?</summary>
+                    <p>It could: Lesson 6.3's session store (<code>readSession</code>, <code>saveSession</code>, <code>onSessionChange</code>, read with <code>useSyncExternalStore</code>) is a tiny hand-written version of what Zustand does. It stays as it is because it already works, <code>client.ts</code> owns it next to the code that sends the token, and it must use <code>sessionStorage</code>. Rewriting working code to use a new library is a cost; do it when the hand-written version starts to hurt.</p>
+                </details>
+                <details>
+                    <summary>When is context still the right tool?</summary>
+                    <p>For values that rarely change and that a part of the tree needs, especially when different parts need different values: a theme for one embedded widget, the current form in a form library, the compound <code>Tabs</code> from Lesson 5.4. Context is per subtree; a Zustand store is one per app. Many libraries, React Redux included, use context inside to hand their store to components.</p>
+                </details>
+                <details>
+                    <summary>Can I see the Zustand store in DevTools?</summary>
+                    <p>Zustand's optional <code>devtools</code> middleware connects a store to the Redux DevTools browser extension, which then lists each <code>set</code> as an action. For a store this small, React DevTools (which shows each component's Hooks) and the <strong>Application</strong> panel's local storage view are usually enough.</p>
+                </details>
+                <details>
+                    <summary>Does <code>light-dark()</code> work in every browser?</summary>
+                    <p>Current versions of Chrome, Edge, Firefox and Safari support it. For older ones, Vite's build already rewrites it: the built CSS in <code>dist/assets</code> has custom properties named <code>--lightningcss-light</code> and <code>--lightningcss-dark</code> instead, switched by the same <code>color-scheme</code> rules (measured). Lightning CSS, the tool Vite uses to minify CSS, does that because of the browsers Vite targets by default.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add a dismissible tip to the events page: "Press / to jump to the search box." with a <strong>Got it</strong> button. Keep the dismissed tips in the display store as <code>dismissedTips: TipId[]</code> with a <code>dismissTip(id)</code> action (<code>TipId</code> a union of tip names), so a dismissed tip stays gone after a reload. Extend <code>merge</code> to keep only known tip ids, and think about where the focus should go when the tip disappears.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Module 7 is done. Draw the HQ's state as a map: the API and the query cache, the URL, the session store, the display store, and the components with their own state and the desk's reducer. Draw an arrow for each way data moves between them. Which part would you explain first to a new teammate, and which part are you still unsure about?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Name the kind of state first: server data goes to the query cache, shareable views to the URL, one component's state stays in it, and only app-wide client state needs a store</li>
+                        <li>A Zustand store is typed by one interface with state and actions; <code>create&lt;T&gt;()(…)</code> lets middleware add its types</li>
+                        <li>Selectors decide re-renders: select the smallest answer you need, and never build a new object in a selector without <code>useShallow</code></li>
+                        <li><code>persist</code> saves a store in <code>localStorage</code>; what comes back is unknown, so <code>merge</code> checks each value</li>
+                        <li>A store works outside React (<code>getState</code>, <code>subscribe</code>), which suits page-wide effects like <code>data-theme</code></li>
+                        <li>Redux Toolkit solves the same problem with slices, actions and a provider: more code and JavaScript, plus named, traceable changes; follow what a codebase already uses</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Review type predicates and narrowing <code>unknown</code></td><td><a href="lesson_06.html">Lesson 2.4: Typing Real Data</a></td></tr>
+                            <tr><td>Read Zustand's own guides (persisting, TypeScript)</td><td><a href="https://zustand.docs.pmnd.rs/" target="_blank" rel="noopener">zustand.docs.pmnd.rs</a></td></tr>
+                            <tr><td>Read Redux Toolkit's TypeScript quick start</td><td><a href="https://redux-toolkit.js.org/" target="_blank" rel="noopener">redux-toolkit.js.org</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>Every person can set the HQ up the way they work: light, dark or like the device, roomy or compact</li>
+                        <li>Those choices survive reloads and new tabs, and bad saved data cannot break the app</li>
+                        <li>You can explain where every piece of the HQ's state lives and why, the skill behind every state library</li>
+                        <li>You built the same store in Redux Toolkit, measured it, and made a decision with numbers instead of opinions</li>
+                        <li>Module 7 is complete: the HQ reads, changes and remembers data like a production app</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The HQ's forms are still hand-made: <code>FormData</code>, your own checks in <code>eventForm.ts</code>, your own field errors. That was the right way to learn what a form does, and it gets heavy as forms grow. In <a href="lesson_27.html"><strong>Lesson 8.1: React Hook Form + Zod</strong></a> you will describe a cleanup once with a Zod schema that gives both the TypeScript type and the checks, and use it to build the page organizers have been missing: editing a cleanup's details.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and set the display choices back to how you like them</li>
+                    <li>Open <code>src/utils/eventForm.ts</code> and <code>src/api/client.ts</code>, and count how many places describe what a valid cleanup is</li>
+                    <li>Add your state table to your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>State management has a reputation as the hardest part of React, mostly because people meet it as a choice between libraries. You met it the other way round: first the kinds of state, then the tool for the one kind that needed it, then a fair, measured look at the alternative. That order is what experienced developers do, and it is why the HQ needs only a handful of lines for something many apps make complicated. Three modules ago the HQ could not fetch; now it reads, writes, caches and remembers. Take a moment to notice how far that is.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_25.html" class="prev-lesson">← Previous: Mutations</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_27.html" class="next-lesson">Next: React Hook Form + Zod →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

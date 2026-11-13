@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 12</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 12: Suspense and Error Boundaries, and useReducer</h1>
+    <p class="sub">Your workbook for Session 12: a warm-up, then for Lessons 4.4 and 5.1 the key ideas, a worked example, the guided lab, predict-then-check practice, the project checklist, a self-check and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>4.4–5.1</b></span>
+      <span class="chip">Session <b>12</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Read a promise while rendering with <code class="inline">use()</code> inside a Suspense boundary, and keep the promise stable.</li>
+  <li>Write a typed error boundary and a fallback that tells not found from could not load, with a Try again that really tries again.</li>
+  <li>Describe every change of a piece of state as a typed action, and write a pure reducer.</li>
+  <li>Let the compiler find every switch that misses a case (<code class="inline">never</code>, <code class="inline">assertNever</code>).</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">W1</div><div class="qt">useApi(key, load): what does the key decide?</div><div class="opts"><div class="opt">A) When the data is loaded again</div><div class="opt">B) How the data is loaded</div><div class="opt">C) Which component may call the Hook</div><div class="opt">D) The URL of the API</div></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">Where does the focus go after a dialog that a button removed, unless your code moves it?</div><div class="opts"><div class="opt">A) Back to the opener, always</div><div class="opt">B) To the page's body</div><div class="opt">C) To the dialog's first button</div><div class="opt">D) To the address bar</div></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">What do useApi's pages and today's cleanup page have in common, and what is new?</div><div class="opts"><div class="opt">A) Nothing: they are unrelated</div><div class="opt">B) Both load data; today the component reads it with use() and the waiting and failing move to boundaries</div><div class="opt">C) Both use refs</div><div class="opt">D) Today's page needs no API</div></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">4.4</span><h3>Suspense, use() and Error Boundaries</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain what Suspense does and where a &lt;Suspense&gt; boundary belongs in a component tree</li>
+  <li>Read a promise while rendering with use(), typed, and keep the promise stable so it is not requested again on every render</li>
+  <li>Write a typed error boundary as a class component, and say which errors it catches and which it does not</li>
+  <li>Design fallbacks that help people: a clear message, "not found" told apart from "could not load", and a Try again that really tries again</li>
+  <li>Judge where Suspense belongs in a single-page app today, and what React Router (Module 6) and TanStack Query (Module 7) take over later</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Suspense:</b> a component that reads data that is not there yet suspends; the nearest <code class="inline">&lt;Suspense&gt;</code> shows its fallback; everything outside stays.</li>
+  <li><b><code class="inline">use(promise)</code></b> returns the resolved value (<code class="inline">use&lt;T&gt;(usable: Usable&lt;T&gt;): T</code>). The promise must be the same on every render: a cache. Never in try/catch.</li>
+  <li><b>Error boundaries</b> catch errors thrown while rendering (a rejected use() too), not handlers or async code. A class: typed union state, <code class="inline">static getDerivedStateFromError</code>, a retry arrow.</li>
+  <li><b>Fallbacks that help:</b> not found is not retried; could not load gets Try again, which forgets the failed promise first.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: the cleanup page</div>
+<div class="codefile">shoreline-hq/src/pages/EventPage.tsx</div>
+<pre class="code" data-src="shoreline-hq/src/pages/EventPage.tsx" data-stage="lesson_16" data-match="excerpt"><span class="k">export</span> <span class="k">function</span> EventPage({ eventId }: EventPageProps) {
+  <span class="k">return</span> (
+    &lt;&gt;
+      &lt;p&gt;
+        &lt;a href=<span class="s">"/events"</span>&gt;← All cleanups&lt;/a&gt;
+      &lt;/p&gt;
+      &lt;ErrorBoundary fallback={EventProblem} onRetry={() =&gt; forgetEvent(eventId)}&gt;
+        &lt;Suspense fallback={&lt;LoadStatus state={{ kind: <span class="s">'loading'</span> }} what=<span class="s">"the cleanup"</span> /&gt;}&gt;
+          &lt;EventDetails eventId={eventId} /&gt;
+        &lt;/Suspense&gt;
+      &lt;/ErrorBoundary&gt;
+    &lt;/&gt;
+  )
+}</pre><p>Read it from the outside in: the back link is outside both boundaries (always there); the ErrorBoundary's fallback is EventProblem and its onRetry forgets the failed promise; the Suspense fallback is the familiar LoadStatus box; EventDetails inside only handles the happy path.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-12/l4_4-suspense-use-and-error-boundaries/TASKS.md</code>. <code class="inline">npm install</code> once in <code class="inline">starter</code>, then <code class="inline">npm test</code>.</li>
+  <li>Task 1: one promise per id. Task 3: the boundary class. Task 2: the panel and its fallback.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Why does Try again need forgetSite?</td><td></td></tr>
+<tr><td>What did the click-handler test prove?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Predict, then check in shoreline-hq (put the file back afterwards).</p>
+<div class="q"><div class="qn">P1</div><div class="qt">A boundary class without <code class="inline">static</code> on getDerivedStateFromError. What do <code class="inline">npx tsc -b</code> and <code class="inline">npm run lint</code> print?</div><pre class="code">  getDerivedStateFromError(error: <span class="k">unknown</span>): ErrorBoundaryState {
+    <span class="k">return</span> { failed: <span class="k">true</span>, error }
+  }</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>A Page for Every Cleanup</b>. In class: Steps 1 to 4. At home: Steps 5 and 6.</p>
+<ul class="tick">
+  <li>☐ Step 1: isCleanupEventDetail and getEvent(id)</li>
+  <li>☐ Step 2: eventPromises.ts (one promise per id)</li>
+  <li>☐ Step 3: ErrorBoundary (typed state, static getDerivedStateFromError, retry)</li>
+  <li>☐ Step 4: EventPage (back link, boundaries, EventDetails, EventProblem)</li>
+  <li>☐ Step 5: titles link to /events/&lt;id&gt;; the app-wide boundary; the test crash removed</li>
+  <li>☐ Step 6: slow, stopped and not-found checked; checks pass</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">A page has the header, a back link, then <code class="inline">&lt;Suspense&gt;</code> around EventDetails, which calls <code class="inline">use(eventPromise(id))</code>. The API is slow. What is on the screen?</div><div class="opts"><div class="opt">A) Nothing at all until the cleanup arrives</div><div class="opt">B) The header and the back link, and the Suspense fallback below them</div><div class="opt">C) The header only; the back link waits too</div><div class="opt">D) An error message, until the promise resolves</div></div></div>
+<div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">A teammate writes <code class="inline">const event = use(getEvent(eventId))</code>. tsc and the linter are quiet. What do people see, and what is the fix?</div><div class="write"></div></div>
+<div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">Which tool printed this (first lines), and why is the code wrong?</div><pre class="code">  ⚠ react(error-boundaries): Avoid constructing JSX within try/catch
+  × react-hooks(rules-of-hooks): React Hook "use" cannot be called in a try/catch block.</pre><div class="opts"><div class="opt">A) tsc: use() returns undefined in a try</div><div class="opt">B) The browser: use() cannot be imported here</div><div class="opt">C) oxlint: use() must not sit in try/catch; its errors belong to an error boundary</div><div class="opt">D) oxlint, but it is only style</div></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Which error does the HQ's ErrorBoundary catch?</div><div class="opts"><div class="opt">A) An error thrown in an onClick handler inside it</div><div class="opt">B) A rejected promise in a setTimeout callback</div><div class="opt">C) An error thrown inside the boundary's own render</div><div class="opt">D) A component inside it that throws while rendering</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">tsc reports this for the ErrorBoundary class (first lines). What is missing?</div><pre class="code">src/components/ErrorBoundary.tsx:21:3 - error TS2416: Property 'state' in type 'ErrorBoundary' is not assignable to the same property in base type 'Component&lt;ErrorBoundaryProps, ErrorBoundaryState, any&gt;'.
+  Type '{ failed: boolean; }' is not assignable to type 'Readonly&lt;ErrorBoundaryState&gt;'.
+    Property 'error' is missing in type '{ failed: boolean; }' but required in type 'Readonly&lt;{ failed: true; error: unknown; }&gt;'.</pre><div class="opts"><div class="opt">A) A type annotation on the field: <code class="inline">state: ErrorBoundaryState = { failed: false }</code></div><div class="opt">B) The word static</div><div class="opt">C) A constructor that calls super(props)</div><div class="opt">D) <code class="inline">as const</code> after the object</div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">The API was down; the page shows Could not load this cleanup with Try again; the API is back. Why does EventPage pass <code class="inline">onRetry={() =&gt; forgetEvent(eventId)}</code>?</div><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt, then for your own app: what people see while each screen loads, if it fails, and which part should keep working when another breaks.</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.1</span><h3>useReducer with Discriminated Unions</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Recognize state whose updates follow rules, and explain why useReducer suits it better than several useState calls</li>
+  <li>Describe every state change as an action, typed as a discriminated union, and read the errors TypeScript gives for a wrong action</li>
+  <li>Write a pure reducer that returns new state instead of changing the old one, and type useReducer and dispatch by letting TypeScript infer them</li>
+  <li>Use the never type and an assertNever helper so the compiler reports every switch that misses a case</li>
+  <li>Build a check-in desk with undo for today's cleanup, and say which parts of it later lessons keep</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Reducer:</b> <code class="inline">(state, action) =&gt; newState</code>; pure, never changes what it got, no side effects, the same state when nothing changed.</li>
+  <li><b>Actions</b> are a discriminated union on <code class="inline">type</code>; a wrong action is a compile error.</li>
+  <li><b>useReducer</b> infers its types from the annotated reducer; <code class="inline">useReducer&lt;S, A&gt;</code> is TS2344 in React 19. <code class="inline">dispatch</code> is stable; Strict Mode runs reducers twice.</li>
+  <li><b>never / assertNever:</b> the default that only accepts nothing: tsc names any member no case handles. <code class="inline">default: return state</code> swallows it.</li>
+  <li><b>useState or useReducer:</b> several values that change together by rules → a reducer; server data → neither.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: rosterReducer</div>
+<div class="codefile">shoreline-hq/src/reducers/rosterReducer.ts</div>
+<pre class="code" data-src="shoreline-hq/src/reducers/rosterReducer.ts" data-stage="lesson_17" data-match="excerpt"><span class="k">export</span> <span class="k">function</span> rosterReducer(state: RosterState, action: RosterAction): RosterState {
+  <span class="k">switch</span> (action.type) {
+    <span class="k">case</span> <span class="s">'checkIn'</span>:
+      <span class="k">return</span> setMark(state, action.signupId, <span class="s">'attended'</span>)
+    <span class="k">case</span> <span class="s">'markNoShow'</span>:
+      <span class="k">return</span> setMark(state, action.signupId, <span class="s">'no-show'</span>)
+    <span class="k">case</span> <span class="s">'clear'</span>:
+      <span class="k">return</span> setMark(state, action.signupId, <span class="k">undefined</span>)
+    <span class="k">case</span> <span class="s">'undo'</span>: {
+      <span class="k">const</span> last = state.history.at(-<span class="s">1</span>)
+      <span class="k">if</span> (last === <span class="k">undefined</span>) {
+        <span class="k">return</span> state
+      }
+      <span class="k">return</span> {
+        marks: withMark(state.marks, last.signupId, last.before),
+        history: state.history.slice(<span class="s">0</span>, -<span class="s">1</span>),
+      }
+    }
+    <span class="k">default</span>:
+      <span class="k">return</span> assertNever(action)
+  }
+}</pre><p>One line per action, plus undo: the newest history entry, its <code class="inline">before</code> mark put back, the entry dropped. The default is the exhaustive check.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-12/l5_1-usereducer-with-discriminated-unions/TASKS.md</code>. <code class="inline">npm install</code> once in <code class="inline">starter</code>, then <code class="inline">npm test</code> and <code class="inline">npm run typecheck</code>.</li>
+  <li>Task 1: a pure reducer. Task 2: assertNever finds the missing case. Task 3: the panel.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Which action did assertNever name?</td><td></td></tr>
+<tr><td>Why does a count of 0 return the same object?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Predict, then run it from the shoreline-hq folder (delete the file afterwards).</p>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict each line: the action, Diego's mark, the history's length, and whether the same state object came back. Then <code class="inline">node ex2-predict.ts</code>.</div><pre class="code"><span class="k">import</span> { initialRoster, rosterReducer, <span class="k">type</span> RosterAction } <span class="k">from</span> <span class="s">'./src/reducers/rosterReducer.ts'</span>
+
+<span class="k">const</span> actions: RosterAction[] = [
+  { <span class="k">type</span>: <span class="s">'checkIn'</span>, signupId: <span class="s">'s088'</span> },
+  { <span class="k">type</span>: <span class="s">'checkIn'</span>, signupId: <span class="s">'s088'</span> },
+  { <span class="k">type</span>: <span class="s">'markNoShow'</span>, signupId: <span class="s">'s088'</span> },
+  { <span class="k">type</span>: <span class="s">'undo'</span> },
+  { <span class="k">type</span>: <span class="s">'undo'</span> },
+  { <span class="k">type</span>: <span class="s">'undo'</span> },
+]
+
+<span class="k">let</span> state = initialRoster
+<span class="k">for</span> (<span class="k">const</span> action <span class="k">of</span> actions) {
+  <span class="k">const</span> next = rosterReducer(state, action)
+  console.log(action.type, next.marks.get(<span class="s">'s088'</span>) ?? <span class="s">'expected'</span>, next.history.length, next === state)
+  state = next
+}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">A reducer ends with <code class="inline">default: return state</code> and the union has a <code class="inline">removed</code> member with no case. What does <code class="inline">npx tsc -b</code> print?</div><pre class="code"><span class="k">import</span> { useReducer } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="k">interface</span> Tally {
+  bags: <span class="k">number</span>
+  weightKg: <span class="k">number</span>
+}
+
+<span class="k">type</span> TallyAction =
+  | { <span class="k">type</span>: <span class="s">'added'</span>; weightKg: <span class="k">number</span> }
+  | { <span class="k">type</span>: <span class="s">'removed'</span>; weightKg: <span class="k">number</span> }
+  | { <span class="k">type</span>: <span class="s">'reset'</span> }
+
+<span class="k">function</span> tallyReducer(tally: Tally, action: TallyAction): Tally {
+  <span class="k">switch</span> (action.type) {
+    <span class="k">case</span> <span class="s">'added'</span>:
+      <span class="k">return</span> { bags: tally.bags + <span class="s">1</span>, weightKg: tally.weightKg + action.weightKg }
+    <span class="k">case</span> <span class="s">'reset'</span>:
+      <span class="k">return</span> { bags: <span class="s">0</span>, weightKg: <span class="s">0</span> }
+    <span class="k">default</span>:
+      <span class="k">return</span> tally
+  }
+}
+
+<span class="k">export</span> <span class="k">function</span> BagTally() {
+  <span class="k">const</span> [tally, dispatch] = useReducer(tallyReducer, { bags: <span class="s">0</span>, weightKg: <span class="s">0</span> })
+
+  <span class="k">return</span> (
+    &lt;section&gt;
+      &lt;p role=<span class="s">"status"</span>&gt;
+        {tally.bags} bags, {tally.weightKg} kg
+      &lt;/p&gt;
+      &lt;button <span class="k">type</span>=<span class="s">"button"</span> onClick={() =&gt; dispatch({ <span class="k">type</span>: <span class="s">'added'</span>, weightKg: <span class="s">4</span> })}&gt;
+        Add a <span class="s">4</span> kg bag
+      &lt;/button&gt;
+      &lt;button <span class="k">type</span>=<span class="s">"button"</span> onClick={() =&gt; dispatch({ <span class="k">type</span>: <span class="s">'reset'</span> })}&gt;
+        Reset
+      &lt;/button&gt;
+    &lt;/section&gt;
+  )
+}</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>The Check-in Desk</b>. In class: Steps 1 to 3. At home: Steps 4 to 6 (after 4.4's Step 5).</p>
+<ul class="tick">
+  <li>☐ Step 1: assertNever; SpotsLine's default; the few experiment</li>
+  <li>☐ Step 2: rosterReducer</li>
+  <li>☐ Step 3: the reducer run in Node</li>
+  <li>☐ Step 4: RosterTable (aria-pressed toggles)</li>
+  <li>☐ Step 5: CheckInDesk on /events/e17</li>
+  <li>☐ Step 6: keyboard check; checks pass</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Which state is a good fit for useReducer rather than several useState calls?</div><div class="opts"><div class="opt">A) A search box's text</div><div class="opt">B) Whether a card's details are open</div><div class="opt">C) Marks and an undo history that must change together, by rules</div><div class="opt">D) The list of cleanups from the API</div></div></div>
+<div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">tsc reports these two errors for the tally's buttons. Which actions were dispatched?</div><pre class="code">src/Scratch.tsx:27:53 - error TS2345: Argument of type '{ type: "added"; }' is not assignable to parameter of type 'TallyAction'.
+src/Scratch.tsx:30:55 - error TS2322: Type '"clear"' is not assignable to type '"added" | "reset"'.
+Found 2 errors in the same file, starting at: src/Scratch.tsx:27</pre><div class="opts"><div class="opt">A) <code class="inline">{ type: 'added' }</code> without a weight, and <code class="inline">{ type: 'clear' }</code>, which is no TallyAction</div><div class="opt">B) <code class="inline">{ type: 'added', weightKg: '4' }</code> and <code class="inline">{ type: 'reset' }</code></div><div class="opt">C) Two correct actions in the wrong order</div><div class="opt">D) <code class="inline">{ type: 'reset', weightKg: 4 }</code> twice</div></div></div>
+<div class="q" data-sc="9" data-kind="short"><div class="qn">Q9</div><div class="qt">A new member was added to TallyAction and the reducer ends with assertNever. What does this tell you, and what do you do?</div><pre class="code">src/Scratch.tsx:21:26 - error TS2345: Argument of type '{ type: "removed"; weightKg: number; }' is not assignable to parameter of type 'never'.
+Found 1 error in src/Scratch.tsx:21</pre><div class="write"></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">A reducer ends with <code class="inline">default: return state</code>, and a teammate adds an action with no case for it. What happens?</div><div class="opts"><div class="opt">A) tsc reports the missing case</div><div class="opt">B) The app throws when the action is dispatched</div><div class="opt">C) Nothing anywhere: it compiles, and the action silently does nothing</div><div class="opt">D) React warns in the console</div></div></div>
+<div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">Inside the reducer someone writes <code class="inline">state.marks.set(id, 'attended')</code> then <code class="inline">return state</code>. With marks typed as a plain Map, what do people see after a click, and why?</div><div class="write"></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">In development, a <code class="inline">console.log</code> as the first line of rosterReducer prints twice per click. Why, and is it a problem?</div><div class="opts"><div class="opt">A) A bug: dispatch was called twice</div><div class="opt">B) Strict Mode runs the reducer twice to flush out impure reducers; a pure reducer does not care</div><div class="opt">C) React always runs reducers twice, also in production</div><div class="opt">D) The reducer is in the dependency array</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt, then one piece of state with rules in your own app, written as a TypeScript union of actions.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">E1</div><div class="qt">What does a Suspense boundary handle, and what does an error boundary handle?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Why must the promise given to <code class="inline">use()</code> be the same on every render?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">What does <code class="inline">return assertNever(action)</code> as a reducer's default give you?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Lesson 4.4 Steps 5 and 6, Exercises 1 and 2, the quiz, the journal</li>
+  <li>☐ Lesson 5.1 Steps 4 to 6, Exercises 1 and 2, the quiz, the journal</li>
+  <li>☐ Labs: 4.4 Task 2; 5.1 Task 3</li>
+  <li>☐ Self-check Q1 to Q12</li>
+  <li>☐ Review for Checkpoint 2 (Lessons 4.1 to 5.1)</li>
+  <li>☐ Bring to Session 13: Lesson 5.1 finished (or <code class="inline">lesson-18-start</code>), this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>Suspense / fallback</td><td>A boundary that shows its fallback while something inside waits</td></tr>
+<tr><td>suspend</td><td>Stop rendering a component until its data is there</td></tr>
+<tr><td><code class="inline">use()</code></td><td>Reads a promise (or context) while rendering</td></tr>
+<tr><td>stable promise / cache</td><td>The same promise on every render, kept outside rendering</td></tr>
+<tr><td>error boundary</td><td>A component that shows a fallback when something inside throws while rendering</td></tr>
+<tr><td><code class="inline">getDerivedStateFromError</code></td><td>The static method React calls on a boundary class; it returns the new state</td></tr>
+<tr><td><code class="inline">ComponentType&lt;P&gt;</code></td><td>A component (function or class) that takes props P</td></tr>
+<tr><td>reducer / action / dispatch</td><td>(state, action) → new state / what happened / the function that sends it</td></tr>
+<tr><td><code class="inline">ActionDispatch</code></td><td>React 19's type for useReducer's dispatch</td></tr>
+<tr><td><code class="inline">never</code> / <code class="inline">assertNever</code></td><td>The type with no values / the exhaustive default</td></tr>
+<tr><td><code class="inline">ReadonlyMap</code></td><td>A Map type without set and delete: changes must copy</td></tr>
+<tr><td>aria-pressed / aria-disabled</td><td>A toggle button's state / dimmed but still focusable</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 12 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

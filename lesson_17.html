@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Use useReducer with TypeScript discriminated unions: describe every state change as a typed action, write a pure reducer, check that every case is handled with never, and build a check-in desk with undo for Shoreline Crew HQ. React + TypeScript: Build a Modern Web App Lesson 5.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>useReducer with Discriminated Unions - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🗂️ Lesson 5.1: useReducer with Discriminated Unions</h1>
+                <p class="lead">On cleanup morning, the crew lead stands at the sign-in table with a clipboard: Diego is here, Grace is not coming, oops, that tick was meant for Ines, undo it. Every one of those is a small change with a rule behind it, and some of them depend on what happened before. Today you give Shoreline Crew HQ that clipboard. You will describe every change as a typed action, put all the rules in one pure function called a reducer, and let TypeScript prove that no kind of change was forgotten. Module 5 starts here: organizing state so it stays understandable as the app grows.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Recognize state whose updates follow rules, and explain why <code>useReducer</code> suits it better than several <code>useState</code> calls</li>
+                        <li>Describe every state change as an action, typed as a discriminated union, and read the errors TypeScript gives for a wrong action</li>
+                        <li>Write a pure reducer that returns new state instead of changing the old one, and type <code>useReducer</code> and <code>dispatch</code> by letting TypeScript infer them</li>
+                        <li>Use the <code>never</code> type and an <code>assertNever</code> helper so the compiler reports every switch that misses a case</li>
+                        <li>Build a check-in desk with undo for today's cleanup, and say which parts of it later lessons keep</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_16.html">Lesson 4.4: Suspense, use() and Error Boundaries</a> (your <code>shoreline-hq</code> with the cleanup page at <code>/events/e08</code>)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A check-in desk on today's cleanup page: mark volunteers as here or no-show, see the counts, and undo slips, all through one typed reducer</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-17-start.zip">lesson-17-start.zip</a> · Finished code: <a href="downloads/lesson-17-end.zip">lesson-17-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#rules" class="toc-link">When State Follows Rules</a></li>
+                        <li><a href="#actions" class="toc-link">Reducers and Actions as Types</a></li>
+                        <li><a href="#use-reducer" class="toc-link">useReducer, Typed</a></li>
+                        <li><a href="#never" class="toc-link">never and Exhaustive Checks</a></li>
+                        <li><a href="#choosing" class="toc-link">useState or useReducer?</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Check-in Desk</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="rules" class="lesson-section">
+                <h2>📋 When State Follows Rules</h2>
+                <p>Everything the HQ remembers so far fits <code>useState</code> well: a search box's text, whether a card's details are open, a <code>LoadState</code> that one effect sets. Each piece changes in one or two obvious ways.</p>
+                <p>The check-in desk you build today is different. It has to remember two things that belong together:</p>
+                <ul>
+                    <li><strong>The marks:</strong> who is checked in and who is a no-show (everyone else is still expected).</li>
+                    <li><strong>The history:</strong> every change so far, so <strong>Undo last change</strong> can put the previous mark back.</li>
+                </ul>
+                <p>And there are rules. Checking someone in records a change in the history. Clicking the same mark again clears it, which is also a change. Pressing <strong>Check in</strong> for someone already checked in changes nothing and must not add a history entry. Undo takes the newest change and restores what was there before; with nothing to undo, it does nothing at all.</p>
+                <p>With two <code>useState</code> calls, every click handler would have to update both pieces the right way: <code>setMarks(…)</code> and <code>setHistory(…)</code>, with the same rules copied into four handlers. Forget the history in one of them, and Undo quietly stops working for that button. The rules would be spread across the component, mixed in with the JSX.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the clipboard and the rule card</h4>
+                    <p>At the sign-in table, volunteers do not grab the clipboard and scribble on it. They say what happened: "Diego is here." The crew lead hears that, checks the rule card taped to the clipboard ("a tick in the Here column; note it in the log so we can undo it"), and writes the new state of the roster. In React terms, "Diego is here" is an <strong>action</strong>, saying it is <strong>dispatching</strong>, the rule card is the <strong>reducer</strong>, and the clipboard is the <strong>state</strong>. Components describe <em>what happened</em>; one function decides <em>how the state changes</em>.</p>
+                </div>
+                <p>Here is the loop you will build, for one click:</p>
+                <div class="mermaid">
+graph TD
+    A["Click: Check in"] --> B["dispatch(action)"]
+    B --> C["rosterReducer"]
+    C --> D["New roster state"]
+    D --> E["React renders again"]
+    E -. "next click" .-> A
+</div>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Reducers are everywhere in React teams: <code>useReducer</code> in components, Redux Toolkit's slices (Lesson 7.3 compares them), form and wizard libraries, and state machines all use the same "state plus action gives new state" idea. A reducer is also the easiest code in a React app to test, because it is a plain function: Lesson 9.1 tests it without rendering anything. And typed actions are how TypeScript keeps a growing app honest: when someone adds a new kind of change, the compiler lists every place that has to handle it.</p>
+                </div>
+            </section>
+
+            <section id="actions" class="lesson-section">
+                <h2>🧾 Reducers and Actions as Types</h2>
+                <p>A <strong>reducer</strong> is a function with this shape: <code>(state, action) =&gt; newState</code>. It gets the current state and one action, and returns the next state. The name comes from the array method <code>reduce</code>, which folds a list of values into one; a reducer folds a list of actions, one at a time, into the current state.</p>
+                <p>Start small. The crew wants a quick tally on the beach: how many bags, and how many kilograms. Create <code>src/Scratch.tsx</code> (this lesson's experiment file, like Lesson 4.4's) and show it by temporarily making <code>return &lt;BagTally /&gt;</code> the first line of <code>CurrentPage</code> in <code>App.tsx</code>:</p>
+                <pre data-snippet><code class="language-tsx">import { useReducer } from 'react'
+
+interface Tally {
+  bags: number
+  weightKg: number
+}
+
+type TallyAction = { type: 'added'; weightKg: number } | { type: 'reset' }
+
+function tallyReducer(tally: Tally, action: TallyAction): Tally {
+  switch (action.type) {
+    case 'added':
+      return { bags: tally.bags + 1, weightKg: tally.weightKg + action.weightKg }
+    case 'reset':
+      return { bags: 0, weightKg: 0 }
+  }
+}
+
+export function BagTally() {
+  const [tally, dispatch] = useReducer(tallyReducer, { bags: 0, weightKg: 0 })
+
+  return (
+    &lt;section&gt;
+      &lt;p role="status"&gt;
+        {tally.bags} bags, {tally.weightKg} kg
+      &lt;/p&gt;
+      &lt;button type="button" onClick={() =&gt; dispatch({ type: 'added', weightKg: 4 })}&gt;
+        Add a 4 kg bag
+      &lt;/button&gt;
+      &lt;button type="button" onClick={() =&gt; dispatch({ type: 'reset' })}&gt;
+        Reset
+      &lt;/button&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+                <p>Measured on the dev server: two clicks on <strong>Add a 4 kg bag</strong> showed "2 bags, 8 kg", and <strong>Reset</strong> showed "0 bags, 0 kg". Read it from the top:</p>
+                <ul>
+                    <li><strong><code>TallyAction</code> is a discriminated union</strong> (Lesson 2.2). Each member is one kind of change, told apart by its literal <code>type</code>. A member carries exactly the data that kind of change needs: <code>added</code> needs a weight, <code>reset</code> needs nothing. Lesson 2.2 used <code>kind</code> as the discriminant; for actions, <code>type</code> is the name almost every React codebase and library uses, so the HQ follows it.</li>
+                    <li><strong>Action names say what happened</strong>: <code>added</code>, <code>reset</code>. In the project you will also see commands such as <code>checkIn</code>; both styles are common, and the point is the same: the action describes the change, not how to compute it.</li>
+                    <li><strong>The reducer switches on <code>action.type</code></strong>. Inside <code>case 'added'</code>, TypeScript has narrowed <code>action</code> to <code>{ type: 'added'; weightKg: number }</code>, so <code>action.weightKg</code> is a number. In <code>case 'reset'</code> there is no <code>weightKg</code> to read.</li>
+                    <li><strong>It returns a new object</strong> and never changes <code>tally</code>. React decides whether to render again by comparing the old and new state with <code>Object.is</code> (the same comparison as effect dependencies in Lesson 4.1). A changed old object looks "the same" to React.</li>
+                </ul>
+                <h3>The rules for a reducer</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Rule</th><th>Why</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Pure: the same state and action always give the same result</td><td>React may call it more than once (Strict Mode does, on purpose); tests can call it with plain values</td></tr>
+                            <tr><td>Never change the state you were given: copy, then change the copy</td><td>React compares old and new state to decide whether anything changed</td></tr>
+                            <tr><td>No side effects: no requests, timers, logging to a server or reading the clock</td><td>Those belong in event handlers and effects; a reducer only calculates</td></tr>
+                            <tr><td>Return a state every time, the same object when nothing changed</td><td>Returning the old state tells React there is nothing to redraw</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h3>Wrong actions do not compile</h3>
+                <p>Because <code>dispatch</code> knows the action type, a missing field or a misspelled <code>type</code> is caught before the browser sees it. Change the two buttons to <code>dispatch({ type: 'added' })</code> and <code>dispatch({ type: 'clear' })</code>:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:27:53 - error TS2345: Argument of type '{ type: "added"; }' is not assignable to parameter of type 'TallyAction'.
+  Property 'weightKg' is missing in type '{ type: "added"; }' but required in type '{ type: "added"; weightKg: number; }'.
+
+27       &lt;button type="button" onClick={() =&gt; dispatch({ type: 'added' })}&gt;
+                                                       ~~~~~~~~~~~~~~~~~
+
+  src/Scratch.tsx:8:37 - 'weightKg' is declared here.
+    8 type TallyAction = { type: 'added'; weightKg: number } | { type: 'reset' }
+                                          ~~~~~~~~
+
+src/Scratch.tsx:30:55 - error TS2322: Type '"clear"' is not assignable to type '"added" | "reset"'.
+
+30       &lt;button type="button" onClick={() =&gt; dispatch({ type: 'clear' })}&gt;
+                                                         ~~~~
+
+  src/Scratch.tsx:8:22 - The expected type comes from property 'type' which is declared here on type 'TallyAction'
+    8 type TallyAction = { type: 'added'; weightKg: number } | { type: 'reset' }
+                           ~~~~
+
+
+Found 2 errors in the same file, starting at: src/Scratch.tsx:27</code></pre>
+                </div>
+                <p>Read both messages as feedback, not as a scolding. The first says which member you meant (<code>added</code>) and which field it is missing, and even shows where <code>weightKg</code> is declared. The second lists every <code>type</code> that exists. In VS Code you get the same red underline the moment you type, and <kbd>Ctrl</kbd>+<kbd>Space</kbd> (also <kbd>Ctrl</kbd>+<kbd>Space</kbd> on a Mac) inside the quotes after <code>type:</code> suggests the valid names. Put the buttons back.</p>
+            </section>
+
+            <section id="use-reducer" class="lesson-section">
+                <h2>🪝 useReducer, Typed</h2>
+                <p><code>const [tally, dispatch] = useReducer(tallyReducer, { bags: 0, weightKg: 0 })</code> takes the reducer and the starting state, and returns a pair, like <code>useState</code>: the current state, and <code>dispatch</code>, the function you call with an action. React runs your reducer with the current state and that action, stores the result, and renders the component again if it changed.</p>
+                <p>You annotate the reducer; TypeScript infers the rest. Measured in the project (making tsc print each type):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You write</th><th>The type</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>const [roster, dispatch] = useReducer(rosterReducer, initialRoster)</code></td><td><code>roster</code>: <code>RosterState</code></td></tr>
+                            <tr><td>the same line</td><td><code>dispatch</code>: <code>ActionDispatch&lt;[action: RosterAction]&gt;</code></td></tr>
+                            <tr><td><code>roster.marks.get('s088')</code></td><td><code>Mark | undefined</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><code>ActionDispatch&lt;[action: RosterAction]&gt;</code> looks odd: React 19's types describe <code>dispatch</code>'s parameters as a tuple (a list of parameter types), so that a reducer without actions can have a <code>dispatch()</code> with no arguments. Read it as "a function that takes one <code>RosterAction</code> and returns nothing". When you pass <code>dispatch</code> to a child component, the clearest prop type says exactly that: <code>dispatch: (action: RosterAction) =&gt; void</code>. The project does this, and the real <code>dispatch</code> fits it.</p>
+                <h3>Two details worth knowing</h3>
+                <ul>
+                    <li><strong><code>dispatch</code> never changes.</strong> React gives you the same function on every render, so passing it down or listing it in an effect's dependencies causes no extra work.</li>
+                    <li><strong>Expensive starting state</strong> can be built lazily: <code>useReducer(reducer, input, init)</code> calls <code>init(input)</code> once, on the first render. The desk starts from a small constant, so it does not need this.</li>
+                </ul>
+                <p>One more measured fact: in development, Strict Mode runs your reducer <strong>twice</strong> for each action, to flush out impure reducers. With a <code>console.log</code> as the first line of the project's reducer, one click on <strong>Check in</strong> printed "rosterReducer ran: checkIn" twice on the dev server, and the desk still counted one check-in. A pure reducer does not care how often it runs. A reducer that sent a request would send it twice (Common Mistakes).</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: useReducer&lt;State, Action&gt; is gone</h4>
+                    <p>Older articles pass both types by hand: <code>useReducer&lt;RosterState, RosterAction&gt;(rosterReducer, initialRoster)</code>. React 19's types changed what those type parameters mean, so that line no longer compiles:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/Scratch.tsx:5:44 - error TS2344: Type 'RosterAction' does not satisfy the constraint 'AnyActionArg'.
+  Type '{ type: "checkIn"; signupId: string; }' is not assignable to type 'AnyActionArg'.
+
+5   const [roster] = useReducer&lt;RosterState, RosterAction&gt;(rosterReducer, initialRoster)
+                                             ~~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:5</code></pre>
+                    </div>
+                    <p>The fix is to delete the angle brackets: type the reducer's parameters and return value, and let <code>useReducer</code> infer everything from it.</p>
+                </div>
+            </section>
+
+            <section id="never" class="lesson-section">
+                <h2>🚫 never and Exhaustive Checks</h2>
+                <p>Lesson 3.3 left you a warning: a <code>switch</code> over a union that misses a case still compiles, and the missing case quietly returns <code>undefined</code>. Today you close that gap.</p>
+                <h3>The type with no values</h3>
+                <p><code>never</code> is the type that has no values at all. Nothing is assignable to it. That sounds useless, until you watch narrowing work through a switch. After <code>case 'added'</code> and <code>case 'reset'</code>, TypeScript has removed both members of <code>TallyAction</code>, and in a <code>default</code> branch nothing is left: there, <code>action</code> has the type <code>never</code>. Add a third member without a case, and in <code>default</code> the action is that leftover member instead. So "is it <code>never</code> here?" is the same question as "did I handle every case?"</p>
+                <h3>The return type already helps</h3>
+                <p>Add a <code>removed</code> member to <code>TallyAction</code> but no case for it:</p>
+                <pre data-snippet><code class="language-tsx">type TallyAction =
+  | { type: 'added'; weightKg: number }
+  | { type: 'removed'; weightKg: number }
+  | { type: 'reset' }</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:13:59 - error TS2366: Function lacks ending return statement and return type does not include 'undefined'.
+
+13 function tallyReducer(tally: Tally, action: TallyAction): Tally {
+                                                             ~~~~~
+
+
+Found 1 error in src/Scratch.tsx:13</code></pre>
+                </div>
+                <p>Because the reducer promises to return a <code>Tally</code>, TypeScript notices that one path falls off the end of the switch. That is useful, but the message points at the return type, not at the missing action. And it only works for functions with a declared return type: <code>SpotsLine</code>, whose return type is inferred, compiled without a word in Lesson 3.3.</p>
+                <h3>assertNever names what is missing</h3>
+                <p>The project's Step 1 adds a three-line helper, <code>src/utils/assertNever.ts</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/utils/assertNever.ts</div>
+                    <pre data-src="shoreline-hq/src/utils/assertNever.ts"><code class="language-ts">// For the end of a switch that handles every member of a union.
+// TypeScript only accepts a call here when no case is left over (value is never),
+// and if a value nobody expected arrives at runtime anyway, it fails loudly.
+export function assertNever(value: never): never {
+  throw new Error(`Unexpected value: ${JSON.stringify(value)}`)
+}</code></pre>
+                </div>
+                <ul>
+                    <li>The parameter is <code>never</code>, so the only call TypeScript accepts is one where the value has been narrowed to nothing.</li>
+                    <li>The return type is also <code>never</code>: this function never returns, it throws. That is why <code>return assertNever(action)</code> fits any return type.</li>
+                    <li>At runtime it is a safety net: if a value nobody planned for arrives anyway (bad data from outside, a JavaScript caller), the app fails loudly with the value in the message instead of silently drawing nothing.</li>
+                </ul>
+                <p>Used as the <code>default</code> of the tally's reducer (try this after Step 1):</p>
+                <pre data-snippet><code class="language-tsx">function tallyReducer(tally: Tally, action: TallyAction): Tally {
+  switch (action.type) {
+    case 'added':
+      return { bags: tally.bags + 1, weightKg: tally.weightKg + action.weightKg }
+    case 'reset':
+      return { bags: 0, weightKg: 0 }
+    default:
+      return assertNever(action)
+  }
+}</code></pre>
+                <p>Now add the <code>removed</code> member again:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:21:26 - error TS2345: Argument of type '{ type: "removed"; weightKg: number; }' is not assignable to parameter of type 'never'.
+
+21       return assertNever(action)
+                            ~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:21</code></pre>
+                </div>
+                <p>This message is the one you want: it names the exact action nobody handles, <code>{ type: "removed"; weightKg: number; }</code>, and points at the switch that has to change. In a large app, adding a member to a union and running <code>npx tsc -b</code> gives you a to-do list: one error per switch that needs a new case.</p>
+                <div class="card card-success">
+                    <h4>✅ When to reach for it</h4>
+                    <p>Use an exhaustive check wherever code branches on a union: reducers, components that draw each <code>kind</code> differently (<code>SpotsLine</code>, Step 1), and functions that turn a union into text. A <code>Record&lt;Union, …&gt;</code> lookup table (Lesson 3.3's <code>StatusBadge</code>) is already exhaustive by itself, so it needs no <code>assertNever</code>.</p>
+                </div>
+            </section>
+
+            <section id="choosing" class="lesson-section">
+                <h2>⚖️ useState or useReducer?</h2>
+                <p>Neither is "more advanced". They do the same job with different trade-offs, and React's own docs say so too. Some rules of thumb:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Reach for…</th><th>When…</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>useState</code></td><td>a value changes in one or two obvious ways, and the setter says it all</td><td>search text, a card's details toggle, the dialog's open flag</td></tr>
+                            <tr><td><code>useReducer</code></td><td>several values change together, updates follow rules, or the next state depends on the history</td><td>the check-in desk (marks + undo history)</td></tr>
+                            <tr><td><code>useReducer</code></td><td>you want the update logic out of the component, in a function you can read, reuse and test on its own</td><td>Step 3 runs the reducer in Node; Lesson 9.1 tests it</td></tr>
+                            <tr><td>neither</td><td>the data lives on the server</td><td>events, sites and (from Lesson 5.2) the roster itself: <code>useApi</code> now, TanStack Query in Lesson 7.1</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The last row shapes today's design. The desk's reducer does <em>not</em> hold the roster rows (names, notes); it only holds today's <strong>marks</strong> and their <strong>history</strong>. The rows arrive as a prop. That split is what lets the reducer last: Lesson 5.2 loads the rows from the API after sign-in and Lesson 7.1 moves that loading into TanStack Query, and neither touches <code>rosterReducer</code>. Lesson 7.2 does change it, on purpose: once the marks are saved to shoreline-api they are server data too, so they move into the cache and the reducer keeps only the undo history.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Changing the state in place</h4>
+                    <p>It is tempting to write the shortest thing that "works":</p>
+                    <pre data-snippet><code class="language-ts">case 'checkIn':
+  state.marks.set(action.signupId, 'attended')
+  return state</code></pre>
+                    <p>The project types the marks as <code>ReadonlyMap</code>, so TypeScript refuses:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/reducers/rosterReducer.ts:53:19 - error TS2339: Property 'set' does not exist on type 'ReadonlyMap&lt;string, Mark&gt;'.
+
+53       state.marks.set(action.signupId, 'attended')
+                     ~~~
+
+
+Found 1 error in src/reducers/rosterReducer.ts:53</code></pre>
+                    </div>
+                    <p>With a plain <code>Map</code> type instead, the same code passes <code>npx tsc -b</code> and <code>npm run lint</code>. Measured in the browser: clicking <strong>Check in for Diego Herrera</strong> changed nothing on screen. The counts stayed at "Checked in: 0 of 7", the badge said "Expected", and the button was not pressed. The reducer returned the same object, so React saw no change and did not render. That is why the project's state uses <code>ReadonlyMap</code> and <code>readonly Change[]</code>: they turn a silent bug into a compile error. Copy first (<code>new Map(old)</code>, <code>[...list, item]</code>), then change the copy.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Side effects in the reducer</h4>
+                    <p>A reducer that saves to the API, starts a timer or reads <code>Date.now()</code> is no longer pure. Strict Mode runs reducers twice in development (measured above), so a request in a reducer would go out twice, and a time read twice could differ. Do side effects in the click handler (or an effect), and give the reducer only the results. In Lesson 7.2 the desk saves its marks this way: a handler sends them, and the reducer only records what changed.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ A default that swallows new actions</h4>
+                    <p>Many tutorials end every reducer with <code>default: return state</code>. It compiles even when a case is missing (measured with the <code>removed</code> action from above: <code>npx tsc -b</code> printed nothing), so a new action does nothing at all, and nobody is told. With a typed action union, every action that exists has a case, so the default can only be reached by a mistake: make it <code>return assertNever(action)</code>.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Check-in Desk</h2>
+                <p>At the end of this project, today's cleanup (Tide Pool Morning Cleanup, <code>/events/e17</code>) has a <strong>Check-in desk</strong>: seven volunteers, a <strong>Check in</strong> and a <strong>No-show</strong> button for each, a live count, and <strong>Undo last change</strong>. Every click is a typed action handled by <code>rosterReducer</code>. Along the way, <code>SpotsLine</code> gets the exhaustive check Lesson 3.3 promised.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>) and delete <code>src/Scratch.tsx</code> (and the line you added to <code>CurrentPage</code>) when you are done experimenting.</p>
+
+                <div class="card card-info">
+                    <h4>💡 Where does the roster come from?</h4>
+                    <p>The API's roster, <code>GET /api/events/e17/signups</code>, is for signed-in organizers only, because it lists people's contact details. Sign-in arrives in Lesson 5.2. Until then, the desk practices on a saved copy of today's roster with <strong>names and notes only</strong>. The reason is security, not size: every file in <code>src/</code> ends up in the JavaScript that every visitor downloads, so an email address or phone number in it would be public. Lesson 5.2 replaces the copy with the real request, and the reducer will not change.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 1: assertNever, and SpotsLine's promised check <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>src/utils/assertNever.ts</code> with the helper from the <a href="#never">never section</a>. Then use it in <code>src/components/SpotsLine.tsx</code>. Add the import:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SpotsLine.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SpotsLine.tsx" data-match="diff"><code class="language-diff-tsx">+import { assertNever } from '../utils/assertNever.ts'
+ import type { Availability } from '../utils/availability.ts'</code></pre>
+                    </div>
+                    <p>and a default at the end of the switch:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SpotsLine.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SpotsLine.tsx" data-match="diff"><code class="language-diff-tsx">     case 'closed':
+       return null
++    default:
++      return assertNever(availability)
+   }</code></pre>
+                    </div>
+                    <p>Now repeat Lesson 3.3's Exercise 3 experiment. In <code>src/utils/availability.ts</code>, add a <code>few</code> kind to the union (and nothing else):</p>
+                    <pre data-snippet><code class="language-ts">export type Availability =
+  | { kind: 'open'; spotsLeft: number }
+  | { kind: 'few'; spotsLeft: number }
+  | { kind: 'full' }
+  | { kind: 'closed' }</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_17/17-never-error.png" alt="A terminal in shoreline-hq. npx tsc -b reports error TS2345 in src/components/SpotsLine.tsx: Argument of type kind few, spotsLeft number is not assignable to parameter of type never, with the availability argument of assertNever underlined. Found 1 error." width="1100" height="222" loading="lazy">
+                        <figcaption>A new kind of <code>Availability</code>, and TypeScript points at the one switch that does not handle it yet. Before Lesson 5.1 this compiled, and the card quietly lost its spots line.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/components/SpotsLine.tsx:23:26 - error TS2345: Argument of type '{ kind: "few"; spotsLeft: number; }' is not assignable to parameter of type 'never'.
+
+23       return assertNever(availability)
+                            ~~~~~~~~~~~~
+
+
+Found 1 error in src/components/SpotsLine.tsx:23</code></pre>
+                    </div>
+                    <p>In Lesson 3.3 this change compiled and the Jetty Rocks card lost its spots line. Now the compiler sends you to the one place that needs a new case. <strong>Remove the <code>few</code> line</strong> again; the HQ keeps three kinds.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The reducer <span class="step-time">(16 min)</span></h3>
+                    <p>Create the folder <code>src/reducers/</code> and the file <code>src/reducers/rosterReducer.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/reducers/rosterReducer.ts</div>
+                        <pre data-src="shoreline-hq/src/reducers/rosterReducer.ts"><code class="language-ts">import { assertNever } from '../utils/assertNever.ts'
+
+/** What the check-in desk records about one sign-up today */
+export type Mark = 'attended' | 'no-show'
+
+/** Every change the check-in desk can make: one object type per kind of change */
+export type RosterAction =
+  | { type: 'checkIn'; signupId: string }
+  | { type: 'markNoShow'; signupId: string }
+  | { type: 'clear'; signupId: string }
+  | { type: 'undo' }
+
+/** One change, remembered so that it can be undone */
+interface Change {
+  signupId: string
+  before: Mark | undefined
+}
+
+export interface RosterState {
+  /** sign-up id → mark; anyone without a mark is still expected */
+  marks: ReadonlyMap&lt;string, Mark&gt;
+  /** the changes so far, newest last */
+  history: readonly Change[]
+}
+
+export const initialRoster: RosterState = { marks: new Map(), history: [] }
+
+// A copy of the marks with one of them changed: the old Map is never touched
+function withMark(marks: ReadonlyMap&lt;string, Mark&gt;, signupId: string, mark: Mark | undefined) {
+  const next = new Map(marks)
+  if (mark === undefined) {
+    next.delete(signupId)
+  } else {
+    next.set(signupId, mark)
+  }
+  return next
+}
+
+function setMark(state: RosterState, signupId: string, mark: Mark | undefined): RosterState {
+  const before = state.marks.get(signupId)
+  if (before === mark) {
+    return state
+  }
+  return {
+    marks: withMark(state.marks, signupId, mark),
+    history: [...state.history, { signupId, before }],
+  }
+}
+
+export function rosterReducer(state: RosterState, action: RosterAction): RosterState {
+  switch (action.type) {
+    case 'checkIn':
+      return setMark(state, action.signupId, 'attended')
+    case 'markNoShow':
+      return setMark(state, action.signupId, 'no-show')
+    case 'clear':
+      return setMark(state, action.signupId, undefined)
+    case 'undo': {
+      const last = state.history.at(-1)
+      if (last === undefined) {
+        return state
+      }
+      return {
+        marks: withMark(state.marks, last.signupId, last.before),
+        history: state.history.slice(0, -1),
+      }
+    }
+    default:
+      return assertNever(action)
+  }
+}</code></pre>
+                    </div>
+                    <p>Read it in four parts:</p>
+                    <ul>
+                        <li><strong>The vocabulary.</strong> <code>Mark</code> is what the desk can record. <code>RosterAction</code> lists the four kinds of change: three carry the <code>signupId</code> they are about, <code>undo</code> needs nothing. Sign-up ids (<code>s088</code>) come from the API, and since one person signs up once per cleanup, a sign-up id identifies one row.</li>
+                        <li><strong>The state.</strong> <code>marks</code> is a <code>Map</code> from sign-up id to <code>Mark</code>; anyone missing from it is still expected, so there is no third "expected" value to keep in sync. <code>history</code> remembers, for each change, which sign-up it touched and what its mark was <em>before</em>. Both are read-only types: the compiler stops any code from changing them in place (Common Mistakes).</li>
+                        <li><strong>Two helpers.</strong> <code>withMark</code> copies the map and changes the copy. <code>setMark</code> holds the rules shared by three actions: if the mark would not change, return the <em>same</em> state (no history entry, no render); otherwise return new marks and a history with one more entry. <code>noUncheckedIndexedAccess</code> (Lesson 2.4) is not involved here: <code>Map.get</code> always returns <code>Mark | undefined</code>, and <code>undefined</code> means "expected".</li>
+                        <li><strong>The reducer</strong> is now short: one line per action, plus <code>undo</code>, which takes the newest change with <code>at(-1)</code> (possibly <code>undefined</code>, so it is checked), puts its <code>before</code> mark back, and drops it from the history with <code>slice(0, -1)</code>. The <code>default</code> is the exhaustive check. The braces after <code>case 'undo':</code> give <code>last</code> its own block, so another case could use the same name.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Try the reducer without React <span class="step-time">(5 min)</span></h3>
+                    <p>A reducer is a plain function, so Node can run it (Lesson 1.1: Node strips the types and runs the file). Create <code>scratch-roster.ts</code> in the <code>shoreline-hq</code> folder itself, next to <code>package.json</code>:</p>
+                    <pre data-snippet><code class="language-ts">import { initialRoster, rosterReducer } from './src/reducers/rosterReducer.ts'
+
+const afterCheckIn = rosterReducer(initialRoster, { type: 'checkIn', signupId: 's088' })
+const afterNoShow = rosterReducer(afterCheckIn, { type: 'markNoShow', signupId: 's091' })
+const afterUndo = rosterReducer(afterNoShow, { type: 'undo' })
+
+console.log(afterNoShow.marks)
+console.log(afterUndo.marks)
+console.log('history:', afterUndo.history.length)
+console.log('first state untouched:', initialRoster.marks.size === 0)</code></pre>
+                    <pre class="terminal"><code class="language-bash">node scratch-roster.ts</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>Map(2) { 's088' =&gt; 'attended', 's091' =&gt; 'no-show' }
+Map(1) { 's088' =&gt; 'attended' }
+history: 1
+first state untouched: true</code></pre>
+                    </div>
+                    <p>Three actions, three new states, and the first state is untouched: <code>initialRoster</code> still has no marks. No component, no browser, no clicking. This is what Lesson 9.1 turns into automated tests. Delete <code>scratch-roster.ts</code> when you are done.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The roster table <span class="step-time">(14 min)</span></h3>
+                    <p>Create <code>src/components/RosterTable.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/RosterTable.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/RosterTable.tsx"><code class="language-tsx">import type { RosterEntry } from '../api/types.ts'
+import type { Mark, RosterAction } from '../reducers/rosterReducer.ts'
+import { Badge, type BadgeTone } from './Badge.tsx'
+import buttonStyles from './Button.module.css'
+import styles from './RosterTable.module.css'
+import { VisuallyHidden } from './VisuallyHidden.tsx'
+
+/** Only what the table shows: a full RosterEntry from the API fits too */
+export type RosterRow = Pick&lt;RosterEntry, 'id' | 'note'&gt; &amp; {
+  volunteer: Pick&lt;RosterEntry['volunteer'], 'name'&gt;
+}
+
+const markBadges: Record&lt;Mark | 'expected', { label: string; tone: BadgeTone }&gt; = {
+  expected: { label: 'Expected', tone: 'neutral' },
+  attended: { label: 'Checked in', tone: 'success' },
+  'no-show': { label: 'No-show', tone: 'danger' },
+}
+
+interface RosterTableProps {
+  entries: RosterRow[]
+  marks: ReadonlyMap&lt;string, Mark&gt;
+  dispatch: (action: RosterAction) =&gt; void
+}
+
+export function RosterTable({ entries, marks, dispatch }: RosterTableProps) {
+  return (
+    &lt;table className={styles.table}&gt;
+      &lt;thead&gt;
+        &lt;tr&gt;
+          &lt;th scope="col"&gt;Volunteer&lt;/th&gt;
+          &lt;th scope="col"&gt;Check-in&lt;/th&gt;
+        &lt;/tr&gt;
+      &lt;/thead&gt;
+      &lt;tbody&gt;
+        {entries.map((entry) =&gt; {
+          const signupId = entry.id
+          const mark = marks.get(signupId)
+          const { label, tone } = markBadges[mark ?? 'expected']
+          return (
+            &lt;tr key={signupId}&gt;
+              &lt;th scope="row"&gt;
+                {entry.volunteer.name}{' '}
+                &lt;span className={styles.mark}&gt;
+                  &lt;Badge label={label} tone={tone} /&gt;
+                &lt;/span&gt;
+                {entry.note !== '' &amp;&amp; &lt;span className={styles.note}&gt;{entry.note}&lt;/span&gt;}
+              &lt;/th&gt;
+              &lt;td className={styles.buttons}&gt;
+                &lt;button
+                  type="button"
+                  className={buttonStyles.secondary}
+                  aria-pressed={mark === 'attended'}
+                  onClick={() =&gt;
+                    dispatch(
+                      mark === 'attended' ? { type: 'clear', signupId } : { type: 'checkIn', signupId },
+                    )
+                  }
+                &gt;
+                  Check in&lt;VisuallyHidden&gt; for {entry.volunteer.name}&lt;/VisuallyHidden&gt;
+                &lt;/button&gt;
+                &lt;button
+                  type="button"
+                  className={buttonStyles.secondary}
+                  aria-pressed={mark === 'no-show'}
+                  onClick={() =&gt;
+                    dispatch(
+                      mark === 'no-show' ? { type: 'clear', signupId } : { type: 'markNoShow', signupId },
+                    )
+                  }
+                &gt;
+                  No-show&lt;VisuallyHidden&gt; for {entry.volunteer.name}&lt;/VisuallyHidden&gt;
+                &lt;/button&gt;
+              &lt;/td&gt;
+            &lt;/tr&gt;
+          )
+        })}
+      &lt;/tbody&gt;
+    &lt;/table&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong><code>RosterRow</code> asks only for what the table reads</strong>: the sign-up's <code>id</code> and <code>note</code>, and the volunteer's <code>name</code>, picked from the API's own <code>RosterEntry</code> type (Lesson 2.4's <code>Pick</code>). TypeScript compares shapes, not names, so in Lesson 5.2 a real <code>RosterEntry[]</code> from the API (which has more fields) can be passed in without changing this component.</li>
+                        <li><strong>The table gets <code>dispatch</code> as a prop</strong>, typed as <code>(action: RosterAction) =&gt; void</code>. It does not need to know the rules; it only reports what happened. Each button sends one of three actions, chosen with a ternary: pressing a pressed button sends <code>clear</code>.</li>
+                        <li><strong>Toggle buttons that stay put.</strong> <code>aria-pressed</code> tells screen readers whether each button is on ("Check in for Diego Herrera, toggle button, pressed"), and the CSS fills a pressed button. The buttons never disappear, so the keyboard focus stays where it was after a click (Lesson 4.3's lesson about vanishing buttons).</li>
+                        <li><strong>A real table:</strong> column headers with <code>scope="col"</code>, and each volunteer's name as a row header (<code>th scope="row"</code>), so a screen reader announces whose row a button belongs to. <code>VisuallyHidden</code> adds the name to each button's label, like the event cards' "Show details for…".</li>
+                        <li><code>markBadges</code> is a lookup table with a <code>Record</code> over <code>Mark | 'expected'</code>: exhaustive without a switch, as in <code>StatusBadge</code>.</li>
+                    </ul>
+                    <p>Its styles, <code>src/components/RosterTable.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/RosterTable.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/RosterTable.module.css"><code class="language-css">.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table tr {
+  border-bottom: 1px solid var(--border);
+}
+
+.table th,
+.table td {
+  padding: 0.5rem 0.75rem 0.5rem 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+/* A badge never breaks across two lines */
+.mark {
+  white-space: nowrap;
+}
+
+.note {
+  display: block;
+  color: var(--text-muted);
+  font-weight: normal;
+  font-size: 0.9rem;
+}
+
+/* Buttons sit side by side and wrap onto a second line on a phone */
+.buttons button {
+  margin: 0 0.5rem 0.5rem 0;
+  white-space: nowrap;
+}
+
+/* A pressed toggle looks like a primary button */
+.buttons [aria-pressed='true'] {
+  background: var(--link);
+  color: var(--page);
+}</code></pre>
+                    </div>
+                    <p>Then the saved roster, <code>src/data/sampleRoster.ts</code> (create the <code>src/data/</code> folder again; Lesson 4.1 emptied it):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/data/sampleRoster.ts</div>
+                        <pre data-src="shoreline-hq/src/data/sampleRoster.ts"><code class="language-ts">import type { RosterRow } from '../components/RosterTable.tsx'
+
+// A saved copy of today's roster for Tide Pool Morning Cleanup, from GET /api/events/e17/signups.
+// That request needs an organizer's sign-in (Lesson 5.2); until then the check-in desk practices here.
+// Names and notes only: everything in src/ ships to every visitor's browser, so no emails or phones.
+export const sampleRosterEventId = 'e17'
+
+export const sampleRoster: RosterRow[] = [
+  { id: 's088', note: 'Bringing my own gloves.', volunteer: { name: 'Diego Herrera' } },
+  { id: 's091', note: '', volunteer: { name: 'Grace Whitaker' } },
+  { id: 's094', note: '', volunteer: { name: 'Ines Moreau' } },
+  { id: 's092', note: '', volunteer: { name: 'Ravi Patel' } },
+  { id: 's090', note: '', volunteer: { name: 'Sofia Lindgren' } },
+  { id: 's093', note: 'Bringing my own gloves.', volunteer: { name: 'Tariq Mensah' } },
+  { id: 's089', note: '', volunteer: { name: 'Theo Nakamura' } },
+]</code></pre>
+                    </div>
+                    <p>The ids, names and notes are the API's own sample data for today's cleanup, so they match what Lesson 5.2 loads for real.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The desk on the cleanup page <span class="step-time">(12 min)</span></h3>
+                    <p>Create <code>src/components/CheckInDesk.tsx</code>, the component that owns the reducer:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/CheckInDesk.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/CheckInDesk.tsx"><code class="language-tsx">import { useReducer } from 'react'
+import { initialRoster, rosterReducer } from '../reducers/rosterReducer.ts'
+import buttonStyles from './Button.module.css'
+import cardStyles from './Card.module.css'
+import styles from './CheckInDesk.module.css'
+import { RosterTable, type RosterRow } from './RosterTable.tsx'
+
+interface CheckInDeskProps {
+  entries: RosterRow[]
+}
+
+// Today's roster: who is here, who did not come, and an undo for slips of the finger
+export function CheckInDesk({ entries }: CheckInDeskProps) {
+  const [roster, dispatch] = useReducer(rosterReducer, initialRoster)
+
+  const here = entries.filter((entry) =&gt; roster.marks.get(entry.id) === 'attended').length
+  const noShows = entries.filter((entry) =&gt; roster.marks.get(entry.id) === 'no-show').length
+  const expected = entries.length - here - noShows
+  const canUndo = roster.history.length &gt; 0
+
+  return (
+    &lt;section className={cardStyles.card} aria-labelledby="check-in-desk"&gt;
+      &lt;h2 id="check-in-desk"&gt;Check-in desk&lt;/h2&gt;
+      &lt;p role="status"&gt;
+        Checked in: {here} of {entries.length}. No-shows: {noShows}. Still expected: {expected}.
+      &lt;/p&gt;
+      &lt;RosterTable entries={entries} marks={roster.marks} dispatch={dispatch} /&gt;
+      &lt;div className={styles.actions}&gt;
+        &lt;button
+          type="button"
+          className={buttonStyles.secondary}
+          aria-disabled={!canUndo}
+          onClick={() =&gt; dispatch({ type: 'undo' })}
+        &gt;
+          Undo last change
+        &lt;/button&gt;
+      &lt;/div&gt;
+      &lt;p className={styles.practice}&gt;
+        Practice copy: these marks stay in this tab. Lesson 5.2 loads the real roster after sign-in, and
+        Lesson 7.2 saves the marks to shoreline-api.
+      &lt;/p&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>useReducer(rosterReducer, initialRoster)</code>: no type arguments; <code>roster</code> is a <code>RosterState</code> and <code>dispatch</code> accepts only <code>RosterAction</code>s.</li>
+                        <li><strong>The counts are derived</strong> from the marks and the rows on every render (Lesson 3.4), never stored. The reducer would otherwise have to keep three numbers in sync with the map.</li>
+                        <li>The count line has <code>role="status"</code>, so a screen reader hears "Checked in: 2 of 7…" after each click.</li>
+                        <li><strong>Undo with nothing to undo</strong> uses <code>aria-disabled</code> instead of <code>disabled</code>. A <code>disabled</code> button cannot hold focus, so pressing Undo for the last time would throw keyboard users back to the top of the page. With <code>aria-disabled</code> the button stays focusable, screen readers announce it as dimmed, and a click is harmless: the reducer returns the same state when the history is empty.</li>
+                        <li>The section is labeled by its heading (<code>aria-labelledby</code>), which makes it a named region screen reader users can jump to.</li>
+                    </ul>
+                    <p>And <code>src/components/CheckInDesk.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/CheckInDesk.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/CheckInDesk.module.css"><code class="language-css">.actions {
+  margin-top: 1rem;
+}
+
+/* Still focusable, so keyboard users do not lose their place; it just does nothing */
+.actions [aria-disabled='true'] {
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.practice {
+  margin-bottom: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}</code></pre>
+                    </div>
+                    <p>Finally, put the desk on today's cleanup page. In <code>src/pages/EventPage.tsx</code>, add two imports:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx"> import { eventPromise, forgetEvent } from '../api/eventPromises.ts'
++import { CheckInDesk } from '../components/CheckInDesk.tsx'
+ import { ErrorBoundary, type FallbackProps } from '../components/ErrorBoundary.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx"> import { StatusBadge } from '../components/StatusBadge.tsx'
++import { sampleRoster, sampleRosterEventId } from '../data/sampleRoster.ts'
+ import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'</code></pre>
+                    </div>
+                    <p>and, in <code>EventDetails</code>, the desk before "Where to meet":</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx">       )}
++      {event.id === sampleRosterEventId &amp;&amp; &lt;CheckInDesk entries={sampleRoster} /&gt;}
+       &lt;h2&gt;Where to meet&lt;/h2&gt;</code></pre>
+                    </div>
+                    <p>The desk sits inside <code>EventDetails</code>, so it appears only once the cleanup has loaded, and only for the cleanup the saved roster belongs to. Open <code>/events/e17</code> and try it:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_17/17-check-in-desk.png" alt="The Check-in desk card on the Tide Pool Morning Cleanup page. The status line says Checked in: 3 of 7. No-shows: 1. Still expected: 3. A table lists seven volunteers with a Status badge (Checked in, No-show or Expected) and a pair of Check in and No-show buttons; pressed buttons are filled. Below are an Undo last change button and a note that this is a practice copy." width="936" height="768" loading="lazy">
+                        <figcaption>The check-in desk after four clicks. Every click dispatches one typed action; <code>rosterReducer</code> works out the new marks, and the counts are derived from them.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Check it, with the keyboard too <span class="step-time">(5 min)</span></h3>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 15ms on 43 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>Then click through the desk, measured on the dev server and the build: <strong>Check in</strong> for Diego Herrera, <strong>No-show</strong> for Grace Whitaker and <strong>Check in</strong> for Ines Moreau gave "Checked in: 2 of 7. No-shows: 1. Still expected: 4.", with the focus still on Ines's button. <strong>Undo last change</strong> gave "Checked in: 1 of 7. No-shows: 1. Still expected: 5." Pressing Grace's pressed <strong>No-show</strong> again cleared it ("No-shows: 0"), and three more Undos brought everything back to "Checked in: 0 of 7". Now do the same with <kbd>Tab</kbd>, <kbd>Shift</kbd>+<kbd>Tab</kbd> and <kbd>Space</kbd> only. On a phone-sized window the buttons wrap under each other, and the page does not scroll sideways:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_17/17-check-in-desk-phone.png" alt="The same check-in desk on a phone in dark mode: the three columns fit the narrow screen, with the Check in and No-show buttons wrapped in the last column. Diego Herrera is checked in and Grace Whitaker is a no-show." width="390" height="640" loading="lazy">
+                        <figcaption>At 390 pixels wide, in dark mode: the buttons wrap inside their column and the page does not scroll sideways.</figcaption>
+                    </figure>
+                    <p>Other cleanups, such as <code>/events/e08</code>, show no desk. Reload <code>/events/e17</code> and the marks are gone: they live in this component's state, in this tab, which is exactly what "practice copy" promises.</p>
+                    <p><strong>Your own project:</strong> look at your Lesson 11.1 app idea for one piece of state with rules, where several values change together or people will want an undo. Write its actions as a TypeScript union on paper first: what can happen, and what does each kind of change need to carry?</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>SpotsLine</code> ends its switch with <code>return assertNever(availability)</code>, and a new <code>Availability</code> kind makes <code>npx tsc -b</code> point at it</li>
+                        <li>☐ <code>rosterReducer</code> handles <code>checkIn</code>, <code>markNoShow</code>, <code>clear</code> and <code>undo</code>, with read-only state and an exhaustive <code>default</code></li>
+                        <li>☐ <code>node scratch-roster.ts</code> printed the marks before and after undo (and the file is deleted)</li>
+                        <li>☐ <code>/events/e17</code> shows the Check-in desk with seven volunteers, live counts and a working <strong>Undo last change</strong>; <code>/events/e08</code> shows none</li>
+                        <li>☐ The desk works with the keyboard alone, and focus stays on the button you pressed</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Start over</h3>
+                    <p>After a practice round, the crew lead wants to wipe the desk clean in one go. Add a <code>startOver</code> action and a <strong>Start over</strong> button next to Undo. Add the action to the union <em>first</em>, run <code>npx tsc -b</code>, and let the error tell you where to go next.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>startOver</code> needs no data, like <code>undo</code>. Which existing value already is "a desk with nothing on it"?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Add <code>| { type: 'startOver' }</code> to <code>RosterAction</code>. The compiler answers:</p>
+                        <div class="card card-output">
+                            <h4>Expected output (npx tsc -b)</h4>
+                            <pre><code>src/reducers/rosterReducer.ts:70:26 - error TS2345: Argument of type '{ type: "startOver"; }' is not assignable to parameter of type 'never'.
+
+70       return assertNever(action)
+                            ~~~~~~
+
+
+Found 1 error in src/reducers/rosterReducer.ts:70</code></pre>
+                        </div>
+                        <p>Add the case before the default:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/reducers/rosterReducer.ts</div>
+                            <pre data-snippet><code class="language-ts">case 'startOver':
+  return initialRoster
+default:
+  return assertNever(action)</code></pre>
+                        </div>
+                        <p>and the button after Undo in <code>CheckInDesk</code>:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/CheckInDesk.tsx</div>
+                            <pre data-snippet><code class="language-tsx">&lt;button
+  type="button"
+  className={buttonStyles.secondary}
+  onClick={() =&gt; dispatch({ type: 'startOver' })}
+&gt;
+  Start over
+&lt;/button&gt;</code></pre>
+                        </div>
+                        <p>Measured: with Diego checked in and Theo a no-show, <strong>Start over</strong> showed "Checked in: 0 of 7. No-shows: 0. Still expected: 7." and Undo became dimmed. Returning <code>initialRoster</code> also empties the history, so Start over itself cannot be undone; on a real cleanup morning a confirmation (Lesson 4.3's <code>ConfirmDialog</code>) would be kind. The course's code does not keep this button.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Predict, then run</h3>
+                    <p>Starting from <code>initialRoster</code>, these actions run one after another, all for Diego Herrera (<code>s088</code>): <code>checkIn</code>, <code>checkIn</code>, <code>markNoShow</code>, <code>undo</code>, <code>undo</code>, <code>undo</code>. After each one, write down Diego's mark, the history's length, and whether the reducer returned the <em>same</em> state object. Then check with this script (save it as <code>ex2-predict.ts</code> next to <code>package.json</code>, run <code>node ex2-predict.ts</code>, delete it after):</p>
+                    <pre data-snippet><code class="language-ts">import { initialRoster, rosterReducer, type RosterAction } from './src/reducers/rosterReducer.ts'
+
+const actions: RosterAction[] = [
+  { type: 'checkIn', signupId: 's088' },
+  { type: 'checkIn', signupId: 's088' },
+  { type: 'markNoShow', signupId: 's088' },
+  { type: 'undo' },
+  { type: 'undo' },
+  { type: 'undo' },
+]
+
+let state = initialRoster
+for (const action of actions) {
+  const next = rosterReducer(state, action)
+  console.log(action.type, next.marks.get('s088') ?? 'expected', next.history.length, next === state)
+  state = next
+}</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Read <code>setMark</code>'s first <code>if</code>, and <code>undo</code>'s. When does the reducer hand back the state it was given?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card card-output">
+                            <h4>Expected output</h4>
+                            <pre><code>checkIn attended 1 false
+checkIn attended 1 true
+markNoShow no-show 2 false
+undo attended 1 false
+undo expected 0 false
+undo expected 0 true</code></pre>
+                        </div>
+                        <p>The second <code>checkIn</code> changes nothing, so it returns the same state (<code>true</code>) and adds no history: one Undo will not be "wasted" on it. <code>markNoShow</code> remembers that Diego was <code>attended</code> before, so the first Undo puts him back to checked in, and the second to expected. The third Undo finds an empty history and returns the same state: in the app, that is the harmless click on the dimmed button.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: An Undo that says what it undoes (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 20 minutes).</em></p>
+                    <p>"Undo last change" makes people guess. Make the button say "Undo: Diego Herrera checked in", "Undo: Sofia Lindgren marked as a no-show" or "Undo: Sofia Lindgren back to expected", and keep "Undo last change" when there is nothing to undo. Do not change the reducer.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The newest history entry tells you whose mark changed. Because it is the newest change, the person's <em>current</em> mark is what that change set. A <code>Record&lt;Mark | 'expected', string&gt;</code> turns a mark into words.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>In <code>CheckInDesk.tsx</code>, import the <code>Mark</code> type (<code>import { initialRoster, rosterReducer, type Mark } from '../reducers/rosterReducer.ts'</code>), add a table above the props:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/CheckInDesk.tsx</div>
+                            <pre data-snippet><code class="language-tsx">const changeWords: Record&lt;Mark | 'expected', string&gt; = {
+  attended: 'checked in',
+  'no-show': 'marked as a no-show',
+  expected: 'back to expected',
+}</code></pre>
+                        </div>
+                        <p>replace <code>canUndo</code> with:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/CheckInDesk.tsx</div>
+                            <pre data-snippet><code class="language-tsx">const last = roster.history.at(-1)
+const lastName = entries.find((entry) =&gt; entry.id === last?.signupId)?.volunteer.name
+const undoLabel =
+  last === undefined || lastName === undefined
+    ? 'Undo last change'
+    : `Undo: ${lastName} ${changeWords[roster.marks.get(last.signupId) ?? 'expected']}`</code></pre>
+                        </div>
+                        <p>and use them on the button: <code>aria-disabled={last === undefined}</code> and <code>{undoLabel}</code> as its text. Measured: the label went from "Undo last change" to "Undo: Diego Herrera checked in", then "Undo: Sofia Lindgren marked as a no-show", "Undo: Sofia Lindgren back to expected" after clearing her, and "Undo: Sofia Lindgren marked as a no-show" again after one Undo. <code>last?.signupId</code> keeps <code>find</code> happy when the history is empty. The course's code keeps the shorter label.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> In the check-in desk, what does a click on <strong>Check in for Diego Herrera</strong> do?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Look at RosterTable: which function does the button call, and does the table know any rules?">
+                                A) It sets Diego's mark with a state setter and adds a history entry with a second setter
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing is sent anywhere yet. Which lesson saves the marks?">
+                                B) It sends a PATCH request to shoreline-api and shows the answer
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The table only describes what happened. Who decides the new state?">
+                                C) It changes <code>roster.marks</code> directly, and React notices the change
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The button only reports what happened. React calls rosterReducer with the current state and that action; the reducer returns a new state with the mark and one more history entry, and the desk renders again.">
+                                D) It dispatches <code>{ type: 'checkIn', signupId: 's088' }</code>, and <code>rosterReducer</code> returns the next state
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> <code>TallyAction</code> is <code>{ type: 'added'; weightKg: number } | { type: 'reset' }</code>. What does <code>npx tsc -b</code> say about <code>dispatch({ type: 'added' })</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="dispatch knows the action type. Is anything missing from that object?">
+                                A) Nothing: the reducer will treat the weight as 0
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="TS2345: the object is not assignable to TallyAction, because the added member requires weightKg. TypeScript even points at where weightKg is declared. Each action carries exactly the data its kind needs.">
+                                B) An error: property <code>weightKg</code> is missing in that object but required by the <code>added</code> action
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="added is one of the two valid type names. What else does that member need?">
+                                C) An error: <code>'added'</code> is not a valid action type
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A teammate adds <code>{ type: 'startOver' }</code> to <code>RosterAction</code> but writes no case for it. The reducer ends with <code>default: return assertNever(action)</code>. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="assertNever only throws at runtime if a value slips through. Does this one get past the compiler?">
+                                A) The app compiles, and clicking Start over throws an error in the browser
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is what default: return state would do. What is the parameter type of assertNever?">
+                                B) The app compiles, and Start over silently does nothing
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="In the default branch, action is narrowed to whatever no case handled: the startOver member. That is not assignable to never, so tsc reports TS2345 and names the missing action, at the switch that needs the new case.">
+                                C) <code>npx tsc -b</code> fails: the <code>startOver</code> action is not assignable to a parameter of type <code>never</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> A reducer does <code>state.marks.set(id, 'attended')</code> and then <code>return state</code>, with <code>marks</code> typed as a plain <code>Map</code>. What do people see after clicking <strong>Check in</strong>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The reducer returned the same object, so React's Object.is comparison saw no change and did not render. Measured: the counts and the badge stayed as they were. Typing the marks as ReadonlyMap makes the set call a compile error instead.">
+                                A) Nothing changes on screen: React got the same state object back, so it did not render
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="How does React decide whether the state changed?">
+                                B) The badge updates, because the Map now holds the mark
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="With a plain Map type, does TypeScript have any reason to object? Measured: tsc and lint were clean.">
+                                C) <code>npx tsc -b</code> fails with "Property 'set' does not exist"
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing throws here. Which comparison decides whether React renders?">
+                                D) React throws an error about changing state
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Lesson 5.2 loads the real roster from the API after sign-in. Why does today's design keep the roster rows <em>out</em> of <code>rosterReducer</code>'s state?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="useReducer accepts any state shape. What does the reducer actually need to know?">
+                                A) Because <code>useReducer</code> cannot hold arrays
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The prop and the state would hold the same rows. Is that about speed, or about who owns the data?">
+                                B) Because props render faster than state
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The rows are server data: today a saved copy, then useApi after sign-in (5.2), then TanStack Query (7.1). The reducer holds only what the desk itself decides, the marks and their history, so it survives both of those changes untouched. (Lesson 7.2 later changes it on purpose, when saved marks become server data too.)">
+                                C) The rows are server data that later lessons load differently; the reducer keeps only today's marks and history, so it never has to change
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Is useReducer the same thing as Redux?</summary>
+                    <p>Same idea, different scope. Redux keeps one store for the whole app, outside React, with reducers and actions very much like today's. <code>useReducer</code> keeps one component's state. Lesson 7.3 shows Redux Toolkit next to Zustand, and you will recognize its slices as reducers with typed actions. Many apps never need Redux; reducers in components plus a server-state library (Lesson 7.1) cover a lot.</p>
+                </details>
+                <details>
+                    <summary>Can I share a reducer's state with components far away?</summary>
+                    <p>Pass <code>state</code> and <code>dispatch</code> down as props, as the desk does with <code>RosterTable</code>. When the components are many levels apart, put them in a context instead: Lesson 5.2 introduces typed context with the HQ's sign-in, and the same pattern works for a reducer's <code>dispatch</code>.</p>
+                </details>
+                <details>
+                    <summary>Copying a Map on every click: isn't that slow?</summary>
+                    <p>Not at this size. A desk has tens of rows; copying a map of a few dozen entries is far below anything a person can notice. Lesson 5.3 shows how to measure rendering before worrying about it. For deeply nested state, libraries such as Immer let you write "change this" code that produces copies for you; with flat state like the desk's, plain copies are clear enough.</p>
+                </details>
+                <details>
+                    <summary>Why a Map and not a plain object for the marks?</summary>
+                    <p>Both work. A <code>Map</code> has a clear API for "set", "delete" and "get, possibly <code>undefined</code>", and <code>ReadonlyMap</code> gives a read-only view in one word. A plain object would need <code>Partial&lt;Record&lt;string, Mark&gt;&gt;</code> and a rest-spread to remove a key. Plain objects are easier to print as JSON, which matters when state is saved or sent; Lesson 7.2 sends the marks as separate requests anyway.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add a <strong>Redo</strong>. A redo needs a second list, the changes you undid, and a rule for when that list is thrown away (a new mark after an undo makes the old future meaningless). Write the new state type and the two new action types first, let <code>assertNever</code> show you where they go, and test the rules with a Node script like Step 3's before you touch the component.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Explain <code>never</code> to a friend who knows JavaScript but not TypeScript, in three sentences and without the word "type" in the first one. Then list every <code>switch</code> and lookup table in your HQ and mark which ones are now exhaustive. Which one would you have forgotten to update first if a fifth event status appeared?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li><code>useReducer</code> fits state whose updates follow rules or change several values together: components dispatch actions that say what happened, and one reducer decides the next state</li>
+                        <li>Actions are a discriminated union on <code>type</code>; each member carries only the data it needs, and a wrong or incomplete action is a compile error</li>
+                        <li>A reducer is pure: no changes to the state it got, no side effects, the same state back when nothing changed (Strict Mode runs it twice in development)</li>
+                        <li>Type the reducer, not the Hook: <code>useReducer</code> infers the state and <code>dispatch</code>; <code>useReducer&lt;State, Action&gt;</code> from older articles no longer compiles</li>
+                        <li><code>never</code> is what is left after every case is handled; <code>assertNever</code> in a <code>default</code> turns "I forgot a case" into an error that names the missing member</li>
+                        <li><code>ReadonlyMap</code> and <code>readonly</code> arrays turn in-place changes, which React would not notice, into compile errors</li>
+                        <li>Keep server data out of the reducer: the desk's reducer holds only today's marks and history, so later lessons can change where the rows come from without touching it</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Look up unions, narrowing and <code>never</code></td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Read React's reference for <code>useReducer</code></td><td><a href="https://react.dev/reference/react/useReducer" target="_blank" rel="noopener">React: useReducer</a></td></tr>
+                            <tr><td>Read React's guide to moving logic into a reducer</td><td><a href="https://react.dev/learn/extracting-state-logic-into-a-reducer" target="_blank" rel="noopener">React: Extracting State Logic into a Reducer</a></td></tr>
+                            <tr><td>Read the TypeScript handbook on exhaustiveness checking</td><td><a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html#exhaustiveness-checking" target="_blank" rel="noopener">TypeScript: Exhaustiveness checking</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You wrote your first reducer with typed actions, and ran it in Node without React</li>
+                        <li>You read TypeScript's errors for a missing field, a misspelled action and an unhandled case, and used each one as directions</li>
+                        <li>You kept Lesson 3.3's promise: <code>SpotsLine</code> can no longer miss a new kind of availability silently</li>
+                        <li>You built an accessible check-in desk with toggle buttons, live counts and undo, on today's cleanup page</li>
+                        <li>You designed state that will survive sign-in and a data library</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The desk practices on a saved copy because the real roster needs sign-in. In <a href="lesson_18.html"><strong>Lesson 5.2: Typed Context</strong></a> organizers sign in with shoreline-api, the session is shared with every component through a typed context (with a <code>useAuth()</code> Hook that can never return "undefined" by accident), drafts appear for organizers, and the check-in desk loads today's real roster.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, the <code>few</code> line is gone from <code>availability.ts</code>, and <code>scratch-roster.ts</code> and <code>src/Scratch.tsx</code> are deleted</li>
+                    <li>Run through the desk once with the keyboard only</li>
+                    <li>Keep your Lesson 11.1 action list (the union you wrote on paper) with your plan</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today you wrote code whose main job is to make mistakes impossible to miss: read-only types, an action union, a function that only exists to fail compilation. If that felt like extra ceremony, notice what it bought you: three different slips (a missing field, a misspelled action, a forgotten case) were each caught with a message that said exactly what to fix. That is the deal TypeScript offers, and it gets better the bigger the app grows. If the <code>never</code> trick still feels like magic, come back to it after a few more switches; most developers need to see it catch a real bug once before it clicks. You just started Module 5 with a feature crew leads would actually use on a beach. Well done.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_16.html" class="prev-lesson">← Previous: Suspense, use() and Error Boundaries</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_18.html" class="next-lesson">Next: Typed Context →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

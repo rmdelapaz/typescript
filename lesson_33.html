@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Put Shoreline Crew HQ on a free static host: Vite modes and environments, a demo build that runs the API's own code in the browser with MSW, SPA routing and caching rules for Netlify, and a GitHub Actions workflow that type-checks, lints, tests and runs Playwright on every push. React + TypeScript: Build a Modern Web App Lesson 10.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Deploying - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🚀 Lesson 10.2: Deploying</h1>
+                <p class="lead">Until today, Shoreline Crew HQ has only ever run on your own computer. This lesson gives it a public address that you can open on your phone, send to a friend or put in a portfolio. On the way you find out what "environment" really means for a front end, build a demo version that carries its own API, teach a static host how a single-page app's addresses work, and hand your checks to GitHub, so every push gets a green tick or a red cross that anyone on the team can see.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain the HQ's environments (development, tests, preview, demo, deployed) and how Vite modes and <code>import.meta.env</code> decide what each build contains</li>
+                        <li>Build a demo version that runs shoreline-api's own code in the browser through MSW's service worker, without a byte of it reaching the normal build</li>
+                        <li>Make deep links work on a static host with a <code>_redirects</code> fallback, and set caching and security headers with <code>_headers</code></li>
+                        <li>Write a GitHub Actions workflow that runs the type check, lint, unit tests, both builds and the Playwright suite against the real API on every push</li>
+                        <li>Choose a host by reading its current terms, deploy a draft and then production with the Netlify CLI, and check the live site from the outside</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_32.html">Lesson 10.1: Performance and the Build</a> (49 Vitest and 21 Playwright tests passing), Git installed, and a free GitHub account</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A demo build of Shoreline Crew HQ that works on any static host, its <code>_redirects</code> and <code>_headers</code>, the course folder as one Git repository with a CI workflow, and the demo live on Netlify</li>
+                    <li><span class="meta-label">🧩 Stack</span> Vite 8.3, MSW 3.0, Playwright 1.65, GitHub Actions (actions/checkout@v7, actions/setup-node@v7, actions/upload-artifact@v7), Netlify CLI 27.17, Node.js 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> your <code>shoreline</code> course folder in VS Code and a terminal, then your browser on GitHub and Netlify</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-33-start.zip">lesson-33-start.zip</a> · Finished code: <a href="downloads/lesson-33-end.zip">lesson-33-end.zip</a>. Each folder has a README with the commands to run it. Today's code includes two files at the top of the course folder, next to the projects: <code>.gitignore</code> and <code>.github/workflows/ci.yml</code>. Names that start with a dot may be hidden in your file manager; VS Code shows them.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#environments" class="toc-link">Environments: Where the HQ Runs</a></li>
+                        <li><a href="#demo" class="toc-link">Demo Mode: the API Inside the Browser</a></li>
+                        <li><a href="#static-host" class="toc-link">Static Hosts and Deep Links</a></li>
+                        <li><a href="#host" class="toc-link">Choosing a Host, Honestly</a></li>
+                        <li><a href="#ci" class="toc-link">Checks on Every Push with GitHub Actions</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Shoreline Crew HQ Goes Live</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="environments" class="lesson-section">
+                <h2>🌍 Environments: Where the HQ Runs</h2>
+                <p>An <strong>environment</strong> is one place your code runs, with its own settings. The HQ already has more of them than you might have noticed:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Environment</th><th>Started with</th><th>Where the API is</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Development</td><td><code>npm run dev</code> (Vite's mode <code>development</code>)</td><td>shoreline-api on your computer, from <code>VITE_API_URL</code> in <code>.env.local</code></td></tr>
+                            <tr><td>Unit tests</td><td><code>npx vitest run</code> (mode <code>test</code>)</td><td>the API's code inside the test run, through MSW (Lesson 9.2)</td></tr>
+                            <tr><td>End-to-end tests</td><td><code>npm run test:e2e</code> (a normal build, mode <code>production</code>)</td><td>the real shoreline-api, started by Playwright (Lesson 9.3)</td></tr>
+                            <tr><td>Demo (new today)</td><td><code>npm run build:demo</code> (mode <code>demo</code>)</td><td>the API's code inside the visitor's browser, through MSW</td></tr>
+                            <tr><td>Deployed</td><td>a host serving the files of one of those builds</td><td>wherever that build was told to look</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Lesson 2.4 showed the mechanism. Vite reads <code>.env</code> files, and every <code>VITE_</code> value ends up in the JavaScript as plain text. Today adds the second half. Every Vite command runs in a <strong>mode</strong>: <code>development</code> for <code>npm run dev</code>, <code>production</code> for <code>vite build</code>, and any name you choose with <code>--mode</code> (you already used <code>--mode analyze</code> in Lesson 10.1). The mode decides which extra env files are read (<code>.env.demo</code>, <code>.env.demo.local</code>), and it reaches your code as <code>import.meta.env.MODE</code>.</p>
+                <p>The important word is <em>build</em>. A front end has no "server settings" that change after it is built. When Vite builds, it <strong>replaces</strong> <code>import.meta.env.MODE</code> and every <code>VITE_</code> variable with its value. <code>if (import.meta.env.MODE === 'demo')</code> becomes <code>if ('production' === 'demo')</code>. The minifier sees a condition that is always false and removes the whole branch, along with everything only that branch imports. Each environment is a different build of the same source, and the files that reach a visitor contain only what that build kept.</p>
+
+                <h3>The problem with "just deploy it"</h3>
+                <p>Build the HQ as it is, put the files on a host, and open the site: every page says it could not reach the server. The build was told <code>VITE_API_URL=http://localhost:4000</code>, and in a visitor's browser <code>localhost</code> means <em>the visitor's own computer</em>, where no shoreline-api is running. Your laptop is not on the internet, and even when it is switched on, nobody else can reach it. There are three honest ways out:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Option</th><th>What visitors get</th><th>Cost</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>A demo build</strong> that runs the API's code in the browser (this lesson)</td><td>The whole HQ with the sample data, working on any static host; each visitor has a private copy that resets on reload</td><td>Free; a bigger download for demo visitors</td></tr>
+                            <tr><td>Put shoreline-api on a Node.js host too</td><td>Shared data for everyone, until the host restarts it (the API keeps data in memory)</td><td>Another account; free Node.js plans usually sleep when idle; a real app would also need a database</td></tr>
+                            <tr><td>Deploy with <code>VITE_API_URL=http://localhost:4000</code></td><td>A site that works only for you, while your API runs</td><td>Free, and useless to anyone else</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the practice beach</h4>
+                    <p>Before a big cleanup, the crew trains new volunteers on a practice beach: same buckets, same grabbers, same check-in clipboard, but the "trash" is planted and gets reset after every session. Nobody's work there counts, and nobody can break the real beach. The demo build is the HQ's practice beach. Every page, form and rule is the real thing, because it is the API's own code answering, while the data is sample data that belongs to one visitor and resets when they reload. It is perfect for a portfolio, a client preview or a teacher, and it is honest about what it is.</p>
+                </div>
+                <p><strong>Why this matters:</strong> "Can I see it?" is the first thing an interviewer, a client or a new teammate asks. A live link that works without any setup on their side answers it in five seconds, and the habits around it (separate builds per environment, nothing secret in front-end code, checks before every deploy) are exactly what teams expect from a developer who ships.</p>
+            </section>
+
+            <section id="demo" class="lesson-section">
+                <h2>🎭 Demo Mode: the API Inside the Browser</h2>
+                <p>Lesson 9.2 put shoreline-api's own code (<code>src/mocks/core</code>) behind MSW, so Vitest could answer the HQ's requests without a server. MSW has a second way in that works in a real browser: a <strong>service worker</strong>. A service worker is a small script that the browser installs for a site and runs beside its pages; it sees every request the pages make and may answer some of them itself. MSW's worker (a file called <code>mockServiceWorker.js</code>) passes each request to the handlers in the page, and the handlers are the same ones the tests use. Decision 3 of the course pays off: the tests, the server and now the demo all run one API core, so they cannot disagree.</p>
+                <div class="mermaid">
+graph TD
+    A["HQ: fetch /api/events"] --> B["MSW service worker"]
+    B --> C["MSW handlers in the tab"]
+    C --> D["shoreline-api core"]
+    D --> E["Response: 15 cleanups"]
+    E --> A
+                </div>
+                <p>The demo answers on the site's own address: a request for <code>https://your-site.netlify.app/api/events</code> never leaves the browser, and everything else (the page, its JavaScript, the six site pictures) comes from the host as usual. Four small pieces make it work, and Step 2 adds them:</p>
+                <ul>
+                    <li><strong>A mode check and a dynamic import</strong> in <code>main.tsx</code>: in the demo build, start the in-browser API before the HQ renders, so the first loader's request already finds it.</li>
+                    <li><strong>The API's address</strong> in <code>client.ts</code>: in the demo build, the site's own origin (<code>window.location.origin</code>) instead of <code>VITE_API_URL</code>, so the same build works at any address you deploy it to.</li>
+                    <li><strong>The worker file</strong>: MSW's Vite plugin adds <code>mockServiceWorker.js</code> to the build, only in demo mode, the same way <code>--mode analyze</code> switched the visualizer on in Lesson 10.1.</li>
+                    <li><strong>A banner</strong> that says what this version is and which sample accounts to sign in with, again only in the demo build.</li>
+                </ul>
+                <p>Here is the start-up code you will add to <code>main.tsx</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/main.tsx</div>
+                    <pre data-src="shoreline-hq/src/main.tsx" data-match="excerpt"><code class="language-tsx">// The demo build (npm run build:demo) starts its own API in the browser before the first request
+if (import.meta.env.MODE === 'demo') {
+  const { startDemoApi } = await import('./mocks/browser.ts')
+  await startDemoApi()
+}</code></pre>
+                </div>
+                <ul>
+                    <li><code>await</code> at the top level of a module is allowed in the HQ's build target: the module waits for the worker before it renders, so the HQ never fires a request too early.</li>
+                    <li>In the normal build the condition is <code>'production' === 'demo'</code>, and the whole <code>if</code> disappears, the <code>import()</code> with it. Step 3 proves it with the build table and the budget test from Lesson 10.1. (Measured: even a normal <code>import</code> at the top of the file is removed with the dead branch. The <code>import()</code> says what you mean, and in the demo build it keeps the API's code in a file of its own.)</li>
+                    <li>TypeScript checks this like any other code: <code>startDemoApi</code> is typed from <code>src/mocks/browser.ts</code>, and a typo in its name is a <code>tsc -b</code> error, not a broken demo.</li>
+                </ul>
+                <div class="card card-warning">
+                    <h4>⚠️ What the demo is not</h4>
+                    <p>Each visitor gets their own copy of the sample data, in their own tab. Two people never see each other's changes, a reload starts again from the sample data (and signs you out, with one <code>401</code> in the console as the old sign-in is refused), and the passwords are the public sample password. That is why the banner says so on every page. Nothing in it is secret, which is the only reason it may be public: a demo of an app with real data needs a real, protected API.</p>
+                </div>
+            </section>
+
+            <section id="static-host" class="lesson-section">
+                <h2>🗺️ Static Hosts and Deep Links</h2>
+                <p>The HQ's build is a folder of plain files: <code>index.html</code>, <code>assets/</code>, a favicon and now pictures. A <strong>static host</strong> stores such a folder on servers around the world and sends each file when it is asked for, over HTTPS, usually through a CDN. There is no Node.js and no code of yours running on its side, which is why free plans can afford to host it.</p>
+                <p>That model has one gap for a single-page app. Open <code>https://your-site.netlify.app/</code> and click through to a cleanup: React Router changes the address bar to <code>/events/e08</code> without asking the host for anything. Now reload, or send the link to a friend. The browser asks the host for <code>/events/e08</code>, the host looks for that file, and there is none. Measured with Netlify's own local server and the demo build, before adding the rule below:</p>
+                <div class="card card-output">
+                    <h4>Expected output (shortened, from <code>curl -i http://localhost:8888/events/e08</code>)</h4>
+                    <pre><code>HTTP/1.1 404 Not Found
+server: Netlify
+...
+content-type: text/plain; charset=utf-8
+...
+404 Not Found</code></pre>
+                </div>
+                <p>The fix is one line in a file Netlify reads from the published folder, <code>_redirects</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/public/_redirects</div>
+                    <pre data-src="shoreline-hq/public/_redirects"><code class="language-ini"># Netlify: every address the host has no file for gets index.html, and React Router shows the page
+/*    /index.html    200</code></pre>
+                </div>
+                <ul>
+                    <li><code>/*</code> matches every address, <code>/index.html</code> is what to send, and <code>200</code> makes it a <strong>rewrite</strong>: the browser keeps <code>/events/e08</code> in the address bar and gets the HQ's page with a normal "OK". The HQ starts, React Router reads the address, and shows the cleanup. This is the <strong>SPA fallback</strong>.</li>
+                    <li>Real files still win: Netlify applies such a rule only when no file exists at that path, so <code>/assets/vendor-….js</code> and <code>/images/sites/pelican-point.jpg</code> are served as they are.</li>
+                    <li>Files in <code>public/</code> are copied into <code>dist/</code> by every build, which is the folder you deploy.</li>
+                    <li>Addresses the HQ does not know, such as <code>/no-such-page</code>, now get <code>index.html</code> too, and the HQ shows its own "Page not found" (Lesson 6.1). The host answers <code>200</code> for them; for an app behind a sign-in that is the usual trade.</li>
+                </ul>
+
+                <h3>Caching: forever for some files, never for one</h3>
+                <p>Lesson 10.1 set up the build so that every file in <code>assets/</code> has a hash in its name that changes whenever its content changes. That makes them safe to cache for as long as a browser likes: a new version is a new name. <code>index.html</code> is the opposite: its name never changes, and it is the file that points at the new names, so browsers must check it again on every visit. A second Netlify file, <code>_headers</code>, says that, plus three safe defaults:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/public/_headers</div>
+                    <pre data-src="shoreline-hq/public/_headers"><code class="language-ini"># Netlify: extra response headers (Lesson 10.2)
+
+# Files with a content hash in their name never change: browsers may keep them for a year
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Every response: safe defaults for an app with sign-in and forms
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY</code></pre>
+                </div>
+                <ul>
+                    <li>A line that starts at the left edge is an address pattern; the indented lines under it are headers for every response that matches. A response can match several rules and gets all their headers.</li>
+                    <li><code>max-age=31536000</code> is one year in seconds; <code>immutable</code> tells the browser not even to ask whether the file changed. Nothing is said about <code>index.html</code>, so it keeps the host's default, which makes browsers check with the host on every visit (Netlify documents that default; check it on your live site in Step 7).</li>
+                    <li><code>nosniff</code> stops browsers from guessing a file's type, <code>Referrer-Policy</code> keeps full addresses (with their search parameters) from leaking to other sites, and <code>X-Frame-Options: DENY</code> stops other sites from showing the HQ inside a frame to trick people into clicking its buttons.</li>
+                </ul>
+            </section>
+
+            <section id="host" class="lesson-section">
+                <h2>🏷️ Choosing a Host, Honestly</h2>
+                <p>Almost any host can serve a folder of files. The real question is "may we, and what does it count?", because free plans come with terms. Here is what three common choices said at the time of writing; terms change, so open each link before you choose:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Host (free plan)</th><th>Who may use it</th><th>What it counts</th><th>Reads <code>_redirects</code> / <code>_headers</code>?</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Netlify Free</td><td>Commercial projects are allowed (<a href="https://www.netlify.com/blog/introducing-netlify-free-plan/">Netlify's announcement of the plan</a>)</td><td>300 credits a month, a hard limit: a production deploy costs 15 credits, 1 GB of bandwidth 20, 10,000 requests 2; deploy previews and branch deploys are not counted (<a href="https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/credit-based-pricing-plans/">credit-based plans</a>)</td><td>Yes, both</td></tr>
+                            <tr><td>Vercel Hobby</td><td>"Non-commercial personal use only" (<a href="https://vercel.com/docs/limits/fair-use-guidelines">fair use guidelines</a>)</td><td>Monthly allowances</td><td>No: it reads <code>vercel.json</code> instead</td></tr>
+                            <tr><td>GitHub Pages</td><td>Not for running an online business (<a href="https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits">GitHub Pages limits</a>)</td><td>Usage limits</td><td>No: no rewrites and no custom headers</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The course uses <strong>Netlify Free</strong>: a portfolio demo of a volunteer group's app is well within its terms, and it reads the two files you just wrote. Do the credit arithmetic once. A visit to the demo downloads about a megabyte (the HQ plus the in-browser API), so 1,000 visits a month cost roughly 20 credits of bandwidth and a few of requests. The expensive part is deploying: each production deploy costs 15 credits, so twenty of them use a whole month. That is one reason this lesson deploys by hand, after the checks are green, instead of on every push (the FAQ shows the automatic way and its cost).</p>
+            </section>
+
+            <section id="ci" class="lesson-section">
+                <h2>🤖 Checks on Every Push with GitHub Actions</h2>
+                <p>Since Module 9 you have run <code>npx vitest run</code> and <code>npm run test:e2e</code> by hand. People forget, especially on the day a small fix "obviously" can't break anything. <strong>Continuous integration (CI)</strong> means a computer runs the checks every time code reaches the shared repository and marks each change with a green tick or a red cross. On GitHub this is <strong>GitHub Actions</strong>: you describe the checks in a <strong>workflow</strong>, a YAML file in <code>.github/workflows/</code>, and GitHub runs it on a fresh virtual machine (a <strong>runner</strong>) for every push. Public repositories run on GitHub's standard runners for free; private ones get a monthly allowance of minutes (your account's billing page shows the current numbers).</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the morning gear check</h4>
+                    <p>Before the crew drives out, someone who did not pack the van checks it against the list: grabbers, gloves, bags, first-aid kit, scales. They don't know what you <em>meant</em> to pack, only what is in the van. A runner is that person. It starts with an empty machine, copies what you committed and nothing else (no <code>node_modules</code>, no <code>.env.local</code>, no running API), and runs the list. A green run proves the HQ works from what is in the repository, not from something that happens to be on your laptop.</p>
+                </div>
+                <h3>One repository, two jobs</h3>
+                <p>GitHub only looks for workflows in <code>.github/workflows/</code> at the top of a repository. The e2e tests start shoreline-api from <code>../shoreline-api</code> (Lesson 9.3's <code>playwright.config.ts</code>), so the repository must hold both folders side by side: the course folder <code>shoreline/</code> becomes the repository, with one workflow at its top. Here is the whole file you will write in Step 5:</p>
+                <div class="code-file">
+                    <div class="code-filename">.github/workflows/ci.yml</div>
+                    <pre data-src=".github/workflows/ci.yml"><code class="language-yaml"># Runs on GitHub's computers for every push to main and every pull request (Lesson 10.2).
+# The course folder is the repository: shoreline-hq and shoreline-api sit side by side, as on your computer.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The checks only read the code: no write access to the repository
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Types, lint, unit tests and builds
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shoreline-hq
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: shoreline-hq/package-lock.json
+      - run: npm ci
+      - run: npx tsc -b
+      # The HQ's rule is zero warnings: here a warning fails the run too
+      - run: npm run lint -- --deny-warnings
+      - run: npx vitest run
+      - run: npm run build
+      # The version you deploy must build as well
+      - run: npm run build:demo
+
+  e2e:
+    name: End-to-end tests with shoreline-api
+    # Only when the quick checks are green: no browser minutes spent on a change that does not compile
+    needs: checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: shoreline-hq
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: shoreline-hq/package-lock.json
+      - run: npm ci
+      # Chromium plus the system libraries it needs on a fresh Ubuntu machine
+      - run: npx playwright install --with-deps chromium
+      # playwright.config.ts starts ../shoreline-api and a preview of the normal build
+      - run: npm run test:e2e
+      # When a test fails, keep Playwright's report (traces included) for a week
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: shoreline-hq/playwright-report/
+          retention-days: 7</code></pre>
+                </div>
+                <ul>
+                    <li><code>on</code> lists the events that start a run: pushes to <code>main</code>, and pull requests (a teammate's proposed change gets checked before anyone merges it).</li>
+                    <li><code>permissions: contents: read</code> gives the workflow read access only. Least privilege: checks never need to change your repository.</li>
+                    <li>A workflow has <strong>jobs</strong>, each on its own runner; a job has <strong>steps</strong> that run in order, and the first one that fails stops the job and turns the run red. <code>defaults.run.working-directory</code> makes every <code>run</code> step start in <code>shoreline-hq</code>, as if you had typed <code>cd shoreline-hq</code> first.</li>
+                    <li><code>uses:</code> runs a ready-made <strong>action</strong>: <code>actions/checkout</code> copies the repository onto the runner, <code>actions/setup-node</code> installs Node.js 24 and caches npm's downloads, keyed on the lockfile. <code>@v7</code> is the major version, the current one at the time of writing (<a href="https://github.com/actions/checkout">checkout</a>, <a href="https://github.com/actions/setup-node">setup-node</a>, <a href="https://github.com/actions/upload-artifact">upload-artifact</a>).</li>
+                    <li><code>npm ci</code>, not <code>npm install</code>: it installs exactly what <code>package-lock.json</code> says and fails if the lockfile and <code>package.json</code> disagree, which is what a check should do.</li>
+                    <li><code>npm run lint -- --deny-warnings</code>: the <code>--</code> passes the flag on to oxlint, which otherwise exits successfully with warnings (Common Mistakes shows it). The HQ's rule since Module 3 is zero warnings, and a warning can mean the React Compiler skipped a component (Lesson 5.3).</li>
+                    <li>Both builds run: the normal one proves the code compiles; the demo build is the one you deploy, so it must never be the first to find a problem.</li>
+                </ul>
+                <h3>Should CI run the end-to-end tests?</h3>
+                <p>Lesson 9.3 left this decision for today. For the HQ the answer is yes, and the reason is specific to this project: shoreline-api needs no install, no database and no account, and it is already in the repository, so the runner can start the real API exactly as your computer does. (Many real back ends are harder to start in CI, and teams then run end-to-end tests against a shared test server, or less often.) Three choices keep it sensible:</p>
+                <ul>
+                    <li><code>needs: checks</code> makes the <code>e2e</code> job wait for the quick job and skip itself if that one is red: no minutes spent starting browsers for a change that does not compile.</li>
+                    <li>It tests the <strong>normal</strong> build against the <strong>real</strong> API. The demo build runs the same API core, but only the normal build talks to a server over the network the way a production HQ would, and the size budget in <code>bundle.spec.ts</code> keeps checking that no demo code leaks into it.</li>
+                    <li><code>npx playwright install --with-deps chromium</code> installs Chromium and the Linux libraries it needs on a fresh machine (on your computer you installed the browser in Lesson 9.3). When a test fails, <code>upload-artifact</code> keeps Playwright's HTML report, with its traces, as a download on the run's page for a week. Its <code>path</code> starts from the top of the repository, because <code>working-directory</code> only applies to <code>run</code> steps.</li>
+                </ul>
+                <div class="mermaid">
+graph TD
+    P["git push"] --> C["checks: tsc, lint, Vitest, builds"]
+    C -->|"green"| E["e2e: Playwright + shoreline-api"]
+    C -->|"red"| X["Run fails: read the step"]
+    E --> T["Green tick on the commit"]
+                </div>
+                <p>The checks do not deploy anything. Deploying stays a step you take on purpose, after a green run (Step 7). On this course's computer, the whole list ran in a fresh copy of the course folder, with no <code>node_modules</code>, no <code>.env.local</code> and <code>CI=true</code>, the way a runner sees it: install, type check, lint, 49 unit tests and both builds took about 15 seconds, and the 21 end-to-end tests passed.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <p>Each of these was tried on a copy of the HQ while this lesson was checked. Deploying is mostly checking, and most of these only show up when you look from the outside.</p>
+
+                <div class="card card-warning">
+                    <h4>⚠️ Deciding "demo or not" while the app runs</h4>
+                    <p>It looks reasonable to start the in-browser API "when the HQ runs on Netlify":</p>
+                    <pre data-snippet><code class="language-tsx">// Start the in-browser API when the HQ runs on Netlify
+if (window.location.hostname.endsWith('.netlify.app')) {
+  const { startDemoApi } = await import('./mocks/browser.ts')
+  await startDemoApi()
+}</code></pre>
+                    <p>It type-checks, and it even works on your Netlify site. But the bundler can't know the hostname in advance, so the API's code stays in the <em>normal</em> build. Measured with <code>npx vite build</code>:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>dist/assets/index-BjwH1TAc.js                             50.04 kB │ gzip:  17.51 kB
+dist/assets/forms-wPpF5eqp.js                            127.33 kB │ gzip:  38.45 kB
+dist/assets/vendor-DenlHpDj.js                           355.82 kB │ gzip: 111.15 kB
+dist/assets/browser-urx2_hst.js                          429.68 kB │ gzip: 164.46 kB</code></pre>
+                    </div>
+                    <p>Worse, the day someone deploys the real HQ (with a real API) to Netlify, it quietly answers from sample data instead. A build decision belongs in the build: <code>import.meta.env.MODE</code>, replaced with text by Vite, so the dead branch is removed.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h4>⚠️ A lint step that passes with warnings</h4>
+                    <p>oxlint reports warnings but exits successfully, so <code>npm run lint</code> alone never turns a CI run red. Measured with an unused variable in <code>DemoBanner.tsx</code>: <code>npm run lint</code> printed <code>Found 1 warning and 0 errors.</code> and exited with 0 (success). With the flag the workflow uses:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened, from <code>npm run lint -- --deny-warnings</code>)</h4>
+                        <pre><code>  ⚠ eslint(no-unused-vars): Variable 'password' is declared but never used. Unused variables should start with a '_'.
+...
+Found 1 warning and 0 errors.</code></pre>
+                    </div>
+                    <p>and the exit code is 1, which is what makes a step fail. Read the warning as feedback, fix it, and the run turns green.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h4>⚠️ A workflow that never runs, or runs an old action</h4>
+                    <p>YAML cares about indentation, and a workflow with a YAML error does not run at all: GitHub reports the problem on the Actions tab instead of running your checks. Copying from an old tutorial causes the other classic failure: an action version too old for today's runners. actionlint, a free workflow checker (Exercise 1), catches both before you push. Measured with actionlint 1.7.12, first with one step indented one space too little, then with <code>actions/checkout@v3</code>:</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>.github/workflows/ci.yml:15:4: could not parse as YAML: did not find expected key [syntax-check]
+.github/workflows/ci.yml:22:15: the runner of "actions/checkout@v3" action is too old to run on GitHub Actions. update the action's version to fix this issue [action]</code></pre>
+                    </div>
+                    <p>Note where the first message points: line 15, the job that contains the bad step, not the step itself. YAML errors are often reported where the parser gave up, so read upward from the line number.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h4>⚠️ Caching everything for a year</h4>
+                    <p>Writing the <code>Cache-Control</code> rule for <code>/*</code> instead of <code>/assets/*</code> looks like a bigger speed-up. It also covers <code>index.html</code>, so returning visitors keep the old page for up to a year, and the old page points at the old files. Your next deploy is invisible to them, and nothing in your own browser shows it if you cleared its cache. Cache files forever only when their name changes with their content.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h4>⚠️ <code>_redirects</code> next to <code>package.json</code></h4>
+                    <p>Netlify reads <code>_redirects</code> and <code>_headers</code> from the folder it publishes, <code>dist/</code>. Files in <code>shoreline-hq/</code> itself never get there; files in <code>shoreline-hq/public/</code> are copied by every build. With the file in the wrong place, the site works until somebody reloads a page, and then shows the "404 Not Found" from "Static Hosts and Deep Links". After every change, <code>ls dist</code> (PowerShell: <code>dir dist</code>) should list both files.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Shoreline Crew HQ Goes Live</h2>
+                <p>You will make the course folder a Git repository, add the demo build and the host's rules, check it all locally the way the host and the runner will see it, and then put it on GitHub and Netlify. Steps 6 and 7 need your free GitHub account and a free Netlify account (you can sign up for Netlify with GitHub). Git must be installed (<code>git --version</code> prints its version).</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: hosts change their screens</h4>
+                    <p>This lesson was checked with Netlify CLI 27.17, MSW 3.0.5 and the GitHub Actions versions above, without creating accounts or deploying anything from the course's computer: everything local was run, and the GitHub and Netlify steps follow their documentation. Sign-up pages, dashboard buttons and CLI prompts change more often than code. When something on screen differs, look for the same idea (create a repository, create a project, deploy a folder) and trust each command's own <code>--help</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 1: One repository for the course folder <span class="step-time">(10 min)</span></h3>
+                    <p>Open a terminal in your course folder <code>shoreline</code> (the one that holds <code>shoreline-api</code>, <code>shoreline-hq</code> and <code>ts-lab</code>). Each project has its own <code>.gitignore</code> or none; create one at the top that covers every folder:</p>
+                    <div class="code-file">
+                        <div class="code-filename">.gitignore</div>
+                        <pre data-src=".gitignore"><code class="language-ini"># The course folder as one Git repository (Lesson 10.2). Each project's own .gitignore still
+# applies inside it; these lines cover every folder, including shoreline-api and ts-lab.
+node_modules/
+.env.local
+# The Netlify command-line tool writes its link to your account here: not code
+.netlify/
+.DS_Store</code></pre>
+                    </div>
+                    <p>Then make the repository and look before you commit:</p>
+                    <pre class="terminal"><code class="language-bash">git init -b main
+git add .
+git status</code></pre>
+                    <p><code>git status</code> lists every file about to be committed. Read it with Lesson 2.4's eyes: no <code>.env.local</code>, no <code>node_modules</code>, no <code>dist</code>. Then let Git prove it for the files that matter:</p>
+                    <pre class="terminal"><code class="language-bash">git check-ignore -v shoreline-hq/.env.local shoreline-hq/node_modules shoreline-hq/dist</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>shoreline-hq/.gitignore:13:*.local      shoreline-hq/.env.local
+shoreline-hq/.gitignore:10:node_modules shoreline-hq/node_modules
+shoreline-hq/.gitignore:11:dist shoreline-hq/dist</code></pre>
+                    </div>
+                    <p>Each line names the file and line of the rule that ignores it. (In the course's copy, 188 files were staged, including both <code>.env.example</code> files and no <code>.env.local</code>.) Commit:</p>
+                    <pre class="terminal"><code class="language-bash">git commit -m "Shoreline Crew HQ: the course code"</code></pre>
+                    <p>If Git asks who you are first, it prints the two <code>git config --global</code> commands to run (your name and email); run them and commit again.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The demo build <span class="step-time">(20 min)</span></h3>
+                    <p>All of this happens in <code>shoreline-hq</code>. MSW is already installed (Lesson 9.2). First the worker file: MSW's Vite plugin can add it to the build, and you only want it in demo mode. Change these lines in <code>vite.config.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                        <pre data-src="shoreline-hq/vite.config.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+ import babel from '@rolldown/plugin-babel'
++import { msw } from 'msw/vite'
+ import { visualizer } from 'rollup-plugin-visualizer'
+ import { defineConfig } from 'vite'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                        <pre data-src="shoreline-hq/vite.config.ts" data-match="diff"><code class="language-diff-ts diff-highlight">     // `npm run analyze` only: a map of every chunk and what is inside it (dist/stats.html)
+     mode === 'analyze' &amp;&amp; visualizer({ filename: 'dist/stats.html', gzipSize: true }),
++    // `npm run build:demo` only: adds MSW's service worker file (mockServiceWorker.js) to the build
++    mode === 'demo' &amp;&amp; msw({ mode: 'worker-only' }),
+   ],
+   build: {</code></pre>
+                    </div>
+                    <p><code>worker-only</code> means "just add <code>mockServiceWorker.js</code> to the output; I start MSW myself". A script for the new build in <code>package.json</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/package.json</div>
+                        <pre data-src="shoreline-hq/package.json" data-match="diff"><code class="language-diff-json diff-highlight">     "dev": "vite",
+     "build": "tsc -b &amp;&amp; vite build",
++    "build:demo": "tsc -b &amp;&amp; vite build --mode demo",
+     "analyze": "vite build --mode analyze",
+     "lint": "oxlint",</code></pre>
+                    </div>
+                    <p>Now the in-browser API. Create <code>src/mocks/browser.ts</code>, next to the folders you copied from shoreline-api in Lesson 9.2:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/mocks/browser.ts</div>
+                        <pre data-src="shoreline-hq/src/mocks/browser.ts"><code class="language-ts">// The demo build's API (Lesson 10.2): shoreline-api's own code, running in this browser tab.
+// MSW's service worker hands every request for /api/... on this site to the same handlers the tests use.
+import { setupWorker } from 'msw/browser'
+import { createHandlers } from './msw/handlers.ts'
+
+export async function startDemoApi() {
+  // The demo answers on the site's own address, wherever it is deployed
+  const { handlers } = createHandlers({ baseUrl: window.location.origin })
+  const worker = setupWorker(...handlers)
+  await worker.start({
+    // Everything that is not /api (the page, its files, the site pictures) goes to the host as usual
+    onUnhandledFrame: 'bypass',
+    // No "[MSW] …" line in the console for every request
+    quiet: true,
+  })
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>setupWorker</code> is the browser twin of the <code>setupServer</code> from <code>src/test/server.ts</code>: same handlers, different way in.</li>
+                        <li><code>worker.start()</code> registers the service worker and resolves when it is ready to answer, which is why <code>main.tsx</code> waits for it.</li>
+                        <li><code>onUnhandledFrame: 'bypass'</code>: requests without a handler go to the network quietly. In tests you used <code>'error'</code>, because there every unexpected request is a bug; here the page's own files are expected.</li>
+                    </ul>
+                    <p>Start it from <code>main.tsx</code>, before the first render:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/main.tsx</div>
+                        <pre data-src="shoreline-hq/src/main.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> })
+ 
++// The demo build (npm run build:demo) starts its own API in the browser before the first request
++if (import.meta.env.MODE === 'demo') {
++  const { startDemoApi } = await import('./mocks/browser.ts')
++  await startDemoApi()
++}
++
+ createRoot(document.getElementById('root')!).render(
+   &lt;StrictMode&gt;</code></pre>
+                    </div>
+                    <p>and tell the API client where the demo's API answers, in <code>src/api/client.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> 
+ function apiBaseUrl(): string {
++  // The demo build's API runs in the browser and answers on the site's own address (Lesson 10.2)
++  if (import.meta.env.MODE === 'demo') {
++    return window.location.origin
++  }
+   const url = import.meta.env.VITE_API_URL
+   if (url === undefined || url === '') {</code></pre>
+                    </div>
+                    <p>The site pictures come from shoreline-api's <code>public/images</code> folder, which the real server serves. On a static host they must be files of the site, so copy the folder into the HQ's <code>public/</code> (macOS, Linux and Git Bash):</p>
+                    <pre class="terminal"><code class="language-bash">cp -R ../shoreline-api/public/images public/</code></pre>
+                    <p>In PowerShell:</p>
+                    <pre class="terminal"><code class="language-bash">Copy-Item -Recurse ..\shoreline-api\public\images public\</code></pre>
+                    <p>The API core builds each picture's address from the request (<code>/images/sites/pelican-point.jpg</code> on the same origin), so they just work. The normal build carries the six pictures (about 185 kB) too; a file on a host costs nothing until someone asks for it. Last, the banner. Create the component and its styles:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DemoBanner.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/DemoBanner.tsx"><code class="language-tsx">import styles from './DemoBanner.module.css'
+
+// Only in the demo build (Lesson 10.2): say what this version is, and how to try the organizer pages
+export function DemoBanner() {
+  return (
+    &lt;aside aria-label="Demo version" className={styles.banner}&gt;
+      &lt;p&gt;
+        &lt;strong&gt;Demo version.&lt;/strong&gt; The sample data lives in this browser tab: your changes are gone when you
+        reload. Sign in as maya.okafor@example.com (organizer) or theo.nakamura@example.com (volunteer) with
+        the password shoreline-demo.
+      &lt;/p&gt;
+    &lt;/aside&gt;
+  )
+}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/DemoBanner.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/DemoBanner.module.css"><code class="language-css">/* Sunrise with Ink text (7.03:1) in both themes */
+.banner {
+  background: var(--sunrise);
+  color: var(--ink);
+  padding: 0.5rem 1.5rem;
+  text-align: center;
+}
+
+.banner p {
+  margin: 0;
+}</code></pre>
+                    </div>
+                    <p>An <code>&lt;aside&gt;</code> with a label is a landmark screen-reader users can jump to, and it sits above the header so it is the first thing anyone reads. Show it in <code>AppLayout.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { onSessionChange } from '../api/client.ts'
+ import styles from './AppLayout.module.css'
++import { DemoBanner } from './DemoBanner.tsx'
+ import { Footer } from './Footer.tsx'
+ import { Header } from './Header.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">         Skip to main content
+       &lt;/a&gt;
++      {import.meta.env.MODE === 'demo' &amp;&amp; &lt;DemoBanner /&gt;}
+       &lt;Header /&gt;
+       &lt;div role="status" className={styles.pending}&gt;</code></pre>
+                    </div>
+                    <p>Build the demo:</p>
+                    <pre class="terminal"><code class="language-bash">npm run build:demo</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_33/33-build-demo.png" alt="A terminal in shoreline-hq running npm run build:demo. After the TypeScript check, Vite builds in mode demo and lists the files: many small page and shared files, the index file of about 50 kB, the forms file of about 127 kB, the vendor file of about 356 kB and, last, a new browser file of about 430 kB." width="794" height="1152" loading="lazy">
+                        <figcaption>The demo build: the same HQ plus a browser file holding MSW and shoreline-api's own code, which only this build loads.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>dist/mockServiceWorker.js                                 17.33 kB
+...
+dist/assets/index-SntSXxQo.js                             50.50 kB │ gzip:  17.66 kB
+dist/assets/forms-wPpF5eqp.js                            127.33 kB │ gzip:  38.45 kB
+dist/assets/vendor-DenlHpDj.js                           355.82 kB │ gzip: 111.15 kB
+dist/assets/browser-urx2_hst.js                          429.68 kB │ gzip: 164.46 kB
+...
+✓ built in 1.42s</code></pre>
+                    </div>
+                    <p>The new <code>browser</code> file (429.68 kB) is MSW plus the API's code and its sample data, loaded only by this build, and <code>mockServiceWorker.js</code> is the worker file the plugin added. <code>dist/</code> now also holds the <code>images</code> folder; <code>_redirects</code> and <code>_headers</code> come in Step 4. (The demo build also splits a few small shared files out of <code>index</code>; that is Rolldown's choice for this build, and the normal build is unaffected.)</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Prove the demo needs no API, and the normal build no demo <span class="step-time">(10 min)</span></h3>
+                    <p>Stop shoreline-api in its terminal (<kbd>Ctrl</kbd>+<kbd>C</kbd>), then preview the demo build:</p>
+                    <pre class="terminal"><code class="language-bash">npm run preview</code></pre>
+                    <p>Open <code>http://localhost:4173</code>. The banner is there, and every page works with no API running. Sign in as Maya (<code>maya.okafor@example.com</code>, <code>shoreline-demo</code>), plan a cleanup, open today's cleanup and report its impact with a photo. Then reload: the new cleanup is gone and you are signed out, as the banner promised.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_33/33-demo-home.png" alt="Shoreline Crew HQ&#x27;s home page in a browser, served from the demo build. Above the dark blue header runs an orange banner: Demo version. The sample data lives in this browser tab: your changes are gone when you reload. Sign in as maya.okafor@example.com (organizer) or theo.nakamura@example.com (volunteer) with the password shoreline-demo. Below it, the home page shows today&#x27;s cleanup and the next ones, with no API running." width="1100" height="688" loading="lazy">
+                        <figcaption>The demo build on a host-like server, with no shoreline-api anywhere: the banner says what this version is and how to try the organizer pages.</figcaption>
+                    </figure>
+                    <p>The course checked the same tour with Playwright against a host-like static server and no API at all: not one request left the site's own address, the six pictures loaded at 1200 pixels wide, a deep link to <code>/events/e08</code> rendered in 1.4 seconds including the worker's start, the uploaded photo came back from the in-browser API, and after the reload the only console message was the expected <code>401</code>. Stop the preview (<kbd>Ctrl</kbd>+<kbd>C</kbd>) and start shoreline-api again. Now the other half of the promise:</p>
+                    <pre class="terminal"><code class="language-bash">npm run build
+npx playwright test e2e/bundle.spec.ts</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened, from <code>npm run build</code>)</h4>
+                        <pre><code>dist/assets/index-Bgq2oWDs.js                             62.74 kB │ gzip:  21.44 kB
+dist/assets/forms-wPpF5eqp.js                            127.33 kB │ gzip:  38.45 kB
+dist/assets/vendor-DenlHpDj.js                           355.82 kB │ gzip: 111.15 kB
+...
+✓ built in 1.37s</code></pre>
+                    </div>
+                    <p>No <code>browser</code> file, the same <code>index</code> size as at the end of Lesson 10.1 (within a few bytes), and Lesson 10.1's budget test passes: <code>1 passed</code>. Searching the normal build's files for <code>setupWorker</code> or <code>Demo version</code> finds nothing.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The host's rules, checked with the host's own server <span class="step-time">(10 min)</span></h3>
+                    <p>Netlify's command-line tool includes a local server that follows its rules. It needs no account with <code>--offline</code>. Build the demo again and serve it as Netlify would:</p>
+                    <pre class="terminal"><code class="language-bash">npm run build:demo
+npx netlify-cli dev --offline --dir dist</code></pre>
+                    <p>The first time, npx asks to install <code>netlify-cli</code>: answer <kbd>y</kbd>. It is a big package, so give it a minute. When it is ready it prints:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>   ╭─────────────────────── ⬥  ────────────────────────╮
+   │                                                   │
+   │   Local dev server ready: http://localhost:8888   │
+   │                                                   │
+   ╰───────────────────────────────────────────────────╯</code></pre>
+                    </div>
+                    <p>Open <code>http://localhost:8888/</code>, click through to a cleanup, and reload: "404 Not Found", the gap from "Static Hosts and Deep Links". Stop the server, create <code>public/_redirects</code> and <code>public/_headers</code> with the contents shown there, build the demo and start the server again. Reload the cleanup now and it stays. In a second terminal, look at the headers (curl comes with macOS, Linux and Windows 10 and later; in PowerShell type <code>curl.exe</code>):</p>
+                    <pre class="terminal"><code class="language-bash">curl -I http://localhost:8888/events/e08</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>HTTP/1.1 200 OK
+...
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+X-Frame-Options: DENY
+...
+content-type: text/html; charset=utf-8</code></pre>
+                    </div>
+                    <p>The page answers <code>200</code> with your three security headers. One rule can't be checked here: asked for a file in <code>assets/</code>, the local server answered with its own development setting, not yours:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened, from <code>curl -I</code> on the vendor file)</h4>
+                        <pre><code>HTTP/1.1 200 OK
+...
+cache-control: public, max-age=0</code></pre>
+                    </div>
+                    <p>So the caching rule goes on the live checklist in Step 7. Two more things the tool did: it created a <code>.netlify</code> folder for its own state, and it added two lines to <code>shoreline-hq/.gitignore</code> (<code># Local Netlify folder</code> and <code>.netlify</code>). Keep them; your top-level <code>.gitignore</code> already ignores that folder too. Stop the server.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The workflow, run by you first <span class="step-time">(12 min)</span></h3>
+                    <p>At the top of the course folder, create the folders <code>.github</code> and, inside it, <code>workflows</code> (the dot matters, and the names must be exactly these). In them create <code>ci.yml</code> with the workflow from "Checks on Every Push". Type it rather than paste it: indentation is part of YAML's grammar, two spaces per level, never tabs. VS Code's status bar shows "Spaces: 2" when the file is set up right.</p>
+                    <p>Before you hand the list to a robot, run it once yourself, in <code>shoreline-hq</code>, with shoreline-api running for the last command:</p>
+                    <pre class="terminal"><code class="language-bash">npm ci
+npx tsc -b
+npm run lint -- --deny-warnings
+npx vitest run
+npm run build
+npm run build:demo
+npm run test:e2e</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (the lines that matter)</h4>
+                        <pre><code>added 210 packages, and audited 211 packages in 3s
+...
+Found 0 warnings and 0 errors.
+...
+ Test Files  13 passed (13)
+      Tests  49 passed (49)
+...
+Running 21 tests using 1 worker
+...
+  21 passed (13.9s)</code></pre>
+                    </div>
+                    <p>Everything green on your computer means a red run on GitHub is about the room, not the code: a missing file in the commit, a lockfile out of date, a version difference. Commit today's work from the course folder:</p>
+                    <pre class="terminal"><code class="language-bash">git add .
+git status
+git commit -m "Demo build, host rules and CI"</code></pre>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Push to GitHub and watch the run <span class="step-time">(10 min)</span></h3>
+                    <p>On GitHub, create a new repository named <code>shoreline</code> (the <strong>+</strong> menu, <strong>New repository</strong>). Choose Private or Public (see the FAQ), and add nothing to it (no README, no <code>.gitignore</code>, no license): your folder already has its history. GitHub then shows the commands to push an existing repository; they look like this, with your user name:</p>
+                    <pre class="terminal"><code class="language-bash">git remote add origin https://github.com/YOUR-USER-NAME/shoreline.git
+git push -u origin main</code></pre>
+                    <p>The first push asks you to sign in. Git for Windows opens a browser window; on macOS and Linux the simplest routes are GitHub's own <code>gh</code> tool (<code>gh auth login</code>) or a personal access token, as GitHub's documentation on "authenticating with GitHub from Git" describes. Never type your GitHub password into the terminal: GitHub does not accept it there.</p>
+                    <p>Open the repository's <strong>Actions</strong> tab. A run named after your last commit appears with two jobs, "Types, lint, unit tests and builds" and, once that one is green, "End-to-end tests with shoreline-api". Click a job to watch its steps; each <code>run</code> line expands to the output you saw in Step 5. The first run takes a few minutes (packages, the browser and its system libraries); later runs are faster thanks to the npm cache. When both jobs are green, your commit gets a green tick. If a job is red, open the failed step and read its last lines exactly as you would in your own terminal: the message is the same, only the room is different. A red <code>e2e</code> job also leaves a <strong>playwright-report</strong> download at the bottom of the run's summary page.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 7: Deploy the demo to Netlify <span class="step-time">(13 min)</span></h3>
+                    <p>Sign up for a free Netlify account at netlify.com. Then, in a terminal in <code>shoreline-hq</code>, connect the command-line tool to your account and create an empty project. The name becomes the address, so pick something unique, such as <code>shoreline-hq-</code> plus your name:</p>
+                    <pre class="terminal"><code class="language-bash">npx netlify-cli login
+npx netlify-cli sites:create --name shoreline-hq-yourname</code></pre>
+                    <p><code>login</code> opens your browser to authorize the tool. <code>sites:create</code> may ask which team to use, then prints the project's address, <code>https://shoreline-hq-yourname.netlify.app</code>, and links this folder to it (in <code>.netlify</code>, which Git ignores). If the name is taken, choose another. Now build the demo and upload it. Without <code>--prod</code>, Netlify publishes a <strong>draft</strong> at a temporary address and leaves the live site alone:</p>
+                    <pre class="terminal"><code class="language-bash">npm run build:demo
+npx netlify-cli deploy --no-build --dir dist</code></pre>
+                    <ul>
+                        <li><code>--dir dist</code> uploads the folder as it is, with <code>_redirects</code>, <code>_headers</code> and the worker file.</li>
+                        <li><code>--no-build</code> matters: the CLI runs a build of its own before deploying unless told not to (its <code>deploy --help</code> says so), and you have just built the version you want.</li>
+                    </ul>
+                    <p>It prints the draft's address. Open it, sign in as Maya, click around. If all is well, publish the same folder to the live address (this is the deploy that costs credits):</p>
+                    <pre class="terminal"><code class="language-bash">npx netlify-cli deploy --no-build --dir dist --prod</code></pre>
+                    <p>Shoreline Crew HQ is on the internet. Now check it from the outside, and tick each line in your journal with what you saw:</p>
+                    <div class="card card-success" id="launch-checklist">
+                        <h4>🚀 Live launch checklist (keep this)</h4>
+                        <ul>
+                            <li><strong>Phone:</strong> open the address on your phone, on mobile data rather than your Wi-Fi: the banner, the events, the site pictures</li>
+                            <li><strong>Deep links:</strong> open a cleanup, reload; paste <code>/events/e08</code> and <code>/impact</code> into a new tab; <code>/no-such-page</code> shows the HQ's "Page not found"</li>
+                            <li><strong>Sign-in and forms:</strong> sign in as Maya, plan a cleanup, check someone in on today's cleanup; reload and see it reset</li>
+                            <li><strong>Headers:</strong> <code>curl -I https://shoreline-hq-yourname.netlify.app/</code> shows your three security headers and a <code>cache-control</code> that makes browsers check again; <code>curl -I</code> on one file from <code>/assets/</code> (copy a name from <code>dist/assets</code>) shows <code>public, max-age=31536000, immutable</code>; <code>/_headers</code> is not shown as a file</li>
+                            <li><strong>HTTPS:</strong> <code>http://</code> redirects to <code>https://</code>, and the browser shows the padlock</li>
+                            <li><strong>Console:</strong> the browser's developer tools show no errors on the pages you visited (apart from the one <code>401</code> right after a reload while signed in)</li>
+                        </ul>
+                    </div>
+                    <figure class="screenshot">
+                        <img src="images/lesson_33/33-demo-phone.png" alt="The demo build at phone width in dark mode, opened directly at the address /events/e08: the orange Demo version banner wraps over several lines at the top, then the header and the cleanup page Weekend Cove Cleanup with its status badge, date and time." width="390" height="800" loading="lazy">
+                        <figcaption>A deep link straight to one cleanup, on a phone in dark mode: the rewrite rule sends the HQ's page, and React Router shows the cleanup.</figcaption>
+                    </figure>
+                    <p>The same routine for every later change: checks green on GitHub, <code>npm run build:demo</code>, a draft deploy, a look, then <code>--prod</code>.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>The course folder is a Git repository with a top-level <code>.gitignore</code>, and <code>git check-ignore</code> proved that <code>.env.local</code>, <code>node_modules</code> and <code>dist</code> stay out</li>
+                        <li><code>npm run build:demo</code> builds a demo that works with no API running, shows its banner, and resets on reload</li>
+                        <li><code>npm run build</code> has no <code>browser</code> file and no banner, and the budget test still passes</li>
+                        <li><code>public/_redirects</code> and <code>public/_headers</code> are in place, and a reloaded deep link works on Netlify's local server</li>
+                        <li><code>.github/workflows/ci.yml</code> runs both jobs green on GitHub (or, before you push, every command passed on your computer)</li>
+                        <li>The demo is live on Netlify, and every line of the live launch checklist is ticked in your journal or has a note saying what you found</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, write down its environments (where it runs in development, in tests and when deployed), where its data will live once it is public, and whether a demo build like today's is the honest way to show it. The final project asks for a public link and a green CI run, so plan for both from the start.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercise 1 is part of the lesson (about 6 minutes, included in the lesson time). Exercises 2 and 3 are optional stretches, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Check the workflow before GitHub does</h3>
+                    <p>A pushed workflow with a mistake costs a round trip to GitHub. Run actionlint on your <code>ci.yml</code>, then break the file on purpose (indent one step by one space less) and read the message. Put the file back and run it once more.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>actionlint's <a href="https://github.com/rhysd/actionlint">README</a> lists the ways to install it: a download for your system, Homebrew (<code>brew install actionlint</code>), or Docker. Run it from the top of the course folder; with no arguments it checks every file in <code>.github/workflows/</code>, and it only works inside a Git repository (Step 1).</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre class="terminal"><code class="language-bash">actionlint</code></pre>
+                        <p>A correct file prints nothing: no news is good news. The broken one printed the <code>could not parse as YAML</code> message from Common Mistakes, pointing at the job above the bad step (measured with actionlint 1.7.12, which also accepted the matrix from Exercise 2). The VS Code extension "GitHub Actions" (publisher GitHub) checks workflows as you type too.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Two Node.js versions (optional stretch)</h3>
+                    <p>Optional stretch, not counted in the lesson time. The course uses Node.js 24, and Node.js 26 is the newer LTS line. Make the <code>checks</code> job run twice, once per version, with a <strong>matrix</strong>, so you hear about the next version before you switch to it.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Under the job, <code>strategy: matrix: node: [24, 26]</code> makes one job per value. Use the value as <code>${{ matrix.node }}</code> in <code>node-version</code>, and in the job's <code>name</code> so the two runs can be told apart.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>The top of the <code>checks</code> job becomes:</p>
+                        <pre data-snippet><code class="language-yaml">name: Types, lint, unit tests and builds on Node.js ${{ matrix.node }}
+runs-on: ubuntu-latest
+strategy:
+  matrix:
+    node: [24, 26]
+defaults:
+  run:
+    working-directory: shoreline-hq
+steps:
+  - uses: actions/checkout@v7
+  - uses: actions/setup-node@v7
+    with:
+      node-version: ${{ matrix.node }}
+      cache: npm
+      cache-dependency-path: shoreline-hq/package-lock.json
+  - run: npm ci
+  - run: npx tsc -b
+  # The HQ's rule is zero warnings: here a warning fails the run too
+  - run: npm run lint -- --deny-warnings
+  - run: npx vitest run
+  - run: npm run build</code></pre>
+                        <p>The rest of the job stays as it was. actionlint 1.7.12 accepted the file, and the job's commands passed on Node.js 26.13 in a fresh copy of the course folder (49 tests, both builds). On GitHub the Actions tab shows two check jobs, one per version; the <code>e2e</code> job waits for both. A red 26 with a green 24 is a warning about the future, not a broken site.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): The tab that was open during a deploy</h3>
+                    <p>Optional stretch, not counted in the lesson time. Someone opens the HQ, you deploy a new version, and then they click <strong>Impact</strong>. Their tab still runs the old <code>index</code> file, which asks for the old <code>ImpactPage-….js</code>, and that file is gone. Find out what they see, then make the HQ recover by itself.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Thanks to the SPA fallback, the host answers the missing file with <code>index.html</code>, which is not JavaScript. Vite fires a <code>vite:preloadError</code> event on <code>window</code> when loading a lazy file fails (its documentation suggests this use). Listen for it in <code>main.tsx</code>, and load the new version.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">// After a new deploy, an open tab may ask for files the host no longer has: load the new version
+window.addEventListener('vite:preloadError', (event) =&gt; {
+  event.preventDefault()
+  window.location.reload()
+})</code></pre>
+                        <p><code>event.preventDefault()</code> stops Vite from passing the error on, and the reload fetches the new <code>index.html</code>. Measured with two demo builds and a host-like server that swapped one for the other while a tab was open: without the listener, the click showed "Something went wrong on this page" and the console complained that the server responded with a MIME type of text/html instead of JavaScript, and clicking again changed nothing. With it, the tab reloaded (on the page it was showing, the new version), and the next click on Impact opened the new page. Not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> You deploy the normal build of the HQ (with <code>VITE_API_URL=http://localhost:4000</code>) and send the link to a friend. What do they see?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Where does localhost point when the page runs in your friend's browser?">
+                                A) The HQ with the data from your computer, as long as your API is running
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="localhost in a visitor's browser is the visitor's own computer, where no API runs, so every page reports that it could not reach the server. That is why the course deploys a demo build that carries the API's code.">
+                                B) Pages that say they could not reach the server, because localhost is their own computer
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Is the demo build what npm run build produces?">
+                                C) The demo version with sample data, because Netlify switches on MSW
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> The home page of the live HQ works, but reloading <code>/events/e08</code> shows "Not Found". What fixes it?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The router already knows the route. Who answers the reload, the router or the host?">
+                                A) Adding <code>events/:eventId</code> to the router a second time
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Headers change how a response is treated. Does the host have a file to send at all?">
+                                B) A <code>Cache-Control</code> rule in <code>_headers</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The host looks for a file called events/e08 and has none. The rewrite rule in public/_redirects sends index.html with status 200 for every path without a file, and React Router shows the cleanup.">
+                                C) <code>/*  /index.html  200</code> in <code>public/_redirects</code>, so the host sends the HQ's page for every address it has no file for
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The demo build has the same routes as the normal one. Is this about the API?">
+                                D) Deploying the normal build instead of the demo
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A teammate starts MSW with <code>if (window.location.hostname.endsWith('.netlify.app'))</code> instead of the mode check. What changes?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Vite can only remove branches it can decide while building. The hostname is known only in the browser, so the API's code ships in the normal build too, and a real HQ deployed to Netlify would quietly answer from sample data.">
+                                A) The API's code is now in the normal build too, and any HQ deployed on Netlify answers from sample data
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Look at what tsc checks. Is anything wrong with the types?">
+                                B) <code>tsc -b</code> fails, because hostname is not known at build time
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Common Mistakes measured the normal build with this line. What appeared in the table?">
+                                C) Nothing: the bundler removes it either way
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why may files in <code>/assets/</code> be cached for a year, but not <code>index.html</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Netlify reads _headers for every file. What is different about the names?">
+                                A) Netlify ignores caching rules for HTML
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Size has nothing to do with it. What happens to a file's name when its content changes?">
+                                B) <code>index.html</code> is too small to be worth caching
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The service worker only answers /api requests. Which file points at the newest JavaScript?">
+                                C) The service worker caches <code>index.html</code> by itself
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A hashed file gets a new name whenever its content changes, so an old copy can never be used by mistake. index.html keeps its name and points at the current file names, so browsers must check it on every visit to see a new deploy.">
+                                D) Hashed files get a new name when they change, while <code>index.html</code> keeps its name and points at the newest files
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> In the workflow, why does the <code>e2e</code> job say <code>needs: checks</code> and test the normal build against shoreline-api?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Playwright starts the API itself (webServer). Is the order about the API?">
+                                A) Because shoreline-api must be installed by the first job
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="needs makes the browser tests wait for the quick checks and skip a change that does not even compile. The normal build against the real API is what a production HQ does, and the budget test keeps proving that no demo code reached it.">
+                                B) It skips the slow browser tests when the quick checks fail, and it tests what a production HQ does: the normal build talking to a real API
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Does any step in the workflow deploy? Which step would that be?">
+                                C) Because the e2e job deploys the site when it passes
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Can Netlify deploy automatically when I push to GitHub?</summary>
+                    <p>Yes. In Netlify's dashboard you can connect the project to your GitHub repository and give it the build settings: base directory <code>shoreline-hq</code>, build command <code>npm run build:demo</code>, publish directory <code>dist</code> (the same can live in a <code>netlify.toml</code> file). Then every push to <code>main</code> builds and publishes on Netlify's computers, and pull requests get deploy previews at their own addresses. The catch on the free plan: every push to <code>main</code> is a production deploy at 15 credits, while deploy previews are not counted. Pushing many small commits a day can pause the site until the next month, which is why this lesson deploys by hand. (Not set up for this course: check Netlify's documentation for the current settings, including which Node.js version its builds use.)</p>
+                </details>
+                <details>
+                    <summary>Could the real shoreline-api go online too?</summary>
+                    <p>It runs anywhere Node.js 24 runs, so a Node.js host could serve it, with <code>--cors=https://shoreline-hq-yourname.netlify.app</code> so your site may call it, and the HQ's normal build pointed at its address with <code>VITE_API_URL</code>. Expect three differences: free Node.js plans usually sleep when idle (the first request after a pause is slow), the data lives in memory and resets on every restart, and everyone shares one copy, including strangers who find it. A real app would add a database and real accounts. For a portfolio, the demo build is the honest choice; the React Native course keeps the API on your computer and reaches it from a phone on the same Wi-Fi.</p>
+                </details>
+                <details>
+                    <summary>Public or private repository?</summary>
+                    <p>Either works: nothing secret is committed (Step 1 checked). A public repository is a portfolio piece employers can read, and its Actions run on GitHub's standard runners for free. Private repositories get a monthly allowance of Action minutes on free accounts; the HQ's two jobs take a few minutes per push, so check your usage page if you push a lot. Client work is usually private unless the client agrees otherwise.</p>
+                </details>
+                <details>
+                    <summary>Can the HQ have its own domain?</summary>
+                    <p>Yes. Buy a domain from a registrar, add it in the project's domain settings on Netlify, and follow its instructions for the DNS records; hosts typically issue the HTTPS certificate themselves once the domain points at them. Nothing in the build changes: the demo answers on whatever address it is served from, thanks to <code>window.location.origin</code>. Run the live launch checklist again on the new address.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Lesson 10.1 promised numbers that mean more than localhost: run Lighthouse (in Chrome's developer tools) against your live demo, once on desktop and once with its mobile setting, and write down the Performance score and the largest item in its "Opportunities". Then add a <code>Content-Security-Policy</code> header to <code>_headers</code> for <code>/*</code>, starting from <code>default-src 'self'</code>, deploy a draft, and read the console: every message is the browser telling you what the policy blocked. Loosen only what the HQ really needs (and note that the service worker, the fonts and the pictures all come from the site itself). Not measured for this course: this is your experiment, which is exactly how teams arrive at a policy.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Paste your live address and your ticked launch checklist. Then answer the Shoreline Crew's coordinator, who saw the link and asks: "Great, can the volunteers start using this on Saturday?" Explain in a short paragraph, for someone who isn't a developer, what the demo is and isn't, and what it would take (and roughly cost) to run the HQ for real. Finally: which check, the ones on your computer or the ones on GitHub, would you trust more on a busy day, and why?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>An environment is a different build of the same source: Vite's mode and <code>VITE_</code> variables are replaced with text while building, so branches decided by them are removed from the other builds</li>
+                        <li>A deployed front end cannot reach <code>localhost</code> on your computer; the HQ's demo build runs shoreline-api's own core in the browser through MSW's service worker, started before the first render, and the normal build contains none of it</li>
+                        <li>Static hosts serve files; a single-page app needs a rewrite fallback (<code>/*  /index.html  200</code> in <code>public/_redirects</code>) so deep links and reloads work</li>
+                        <li>Hashed files may be cached for a year with <code>immutable</code>; <code>index.html</code> must be checked on every visit; a few security headers cost one line each</li>
+                        <li>Read a host's current terms before you choose: who may use the free plan and what it counts (on Netlify Free, production deploys are the expensive part)</li>
+                        <li>CI runs your checks in an empty room on every push: <code>npm ci</code>, <code>tsc -b</code>, lint with <code>--deny-warnings</code>, Vitest, both builds, and Playwright against the real API after the quick checks pass</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Do this</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Build the version you deploy</td><td><code>npm run build:demo</code></td></tr>
+                            <tr><td>Serve a build the way Netlify does</td><td><code>npx netlify-cli dev --offline --dir dist</code></td></tr>
+                            <tr><td>Run CI's checks yourself</td><td><code>npm ci</code>, <code>npx tsc -b</code>, <code>npm run lint -- --deny-warnings</code>, <code>npx vitest run</code>, both builds, <code>npm run test:e2e</code></td></tr>
+                            <tr><td>Check a workflow before pushing</td><td><code>actionlint</code> at the top of the repository</td></tr>
+                            <tr><td>Deploy a draft, then go live</td><td><code>npx netlify-cli deploy --no-build --dir dist</code>, then the same with <code>--prod</code></td></tr>
+                            <tr><td>Review environment variables</td><td><a href="lesson_06.html">Lesson 2.4: Typing Real Data</a></td></tr>
+                            <tr><td>Review MSW and the API core in tests</td><td><a href="lesson_30.html">Lesson 9.2: Interactions and Async</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-accent">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>Shoreline Crew HQ has a public HTTPS address that works on any phone, with no setup for the visitor</li>
+                        <li>You built a demo version that carries its own API, and proved that the normal build carries none of it</li>
+                        <li>Deep links, caching and security headers work the way a static host needs them to</li>
+                        <li>Every push now runs your type check, lint, 49 unit tests, both builds and 21 browser tests on GitHub</li>
+                        <li>You chose a host by its own terms and checked the live site from the outside with a checklist</li>
+                    </ul>
+                </div>
+
+                <p>For quick answers, see <a href="#faq">Common Questions at This Stage</a> above.</p>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>That closes Module 10, and with it the whole Shoreline Crew HQ build: from a first component to a typed, tested, split and deployed app. In <a href="lesson_34.html"><strong>Lesson 11.1: Final Project</strong></a> you do it again on your own, from a brief you choose: plan it, type it first, build it, test it, and ship it with today's routine, a green CI run and a public link included.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure both CI jobs are green and the live launch checklist is ticked (compare your top-level files with lesson-33-end.zip)</li>
+                    <li>Keep the launch checklist and the deploy routine in your journal: the final project uses both</li>
+                    <li>Collect your Lesson 11.1 notes: visitors and screens (10.1), environments and where the data lives (today), critical journeys (9.3)</li>
+                    <li>Write today's journal entry, with the answer for the coordinator</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Shipping is the step many learners postpone for months, because it feels like a different, scarier skill. Today it was the same skills you have used all course: read the message, check the facts, change one thing, check again. If a run went red or a page said "Not Found", that was the system doing its job before a visitor found the problem. Open your live link on your phone and enjoy it for a moment. You built that, and anyone in the world can see it now.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_32.html" class="prev-lesson">← Previous: Performance and the Build</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_34.html" class="next-lesson">Next: Final Project →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

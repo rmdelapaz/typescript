@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 20</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 20: React Hook Form + Zod and Complex Forms</h1>
+    <p class="sub">Answers and reasoning for every Session 20 item: the warm-up, both self-checks, the predict-then-check items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>20</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li>**W1.** Lesson 7.3's homework: how many places in the HQ describe a valid cleanup? Name them. **Answer:** Four: eventForm.ts's types (EventField, EventFormValues), its rules (validateEvent, toNewEvent), client.ts's isCleanupEvent (the shape coming back), and the API's own checks. The first two are today's problem.</li>
+  <li>**W2.** In Lesson 3.5's form, what kept a field's message linked to its box for screen readers? **Answer:** <code class="inline">aria-invalid</code> on the box and <code class="inline">aria-describedby</code> pointing at the message's id (FieldError).</li>
+  <li>**W3.** After the API answers 400 with fieldErrors, where did Lesson 7.2 put the messages? **Answer:** Under the matching fields (the API uses the form's field names), plus "Some fields need attention." in the status line.</li>
+</ol>
+
+  <div class="sec"><h2>8.1 · React Hook Form + Zod: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Lesson 7.3 asked you to count the places that describe a valid cleanup. What does a Zod schema change?</div><div class="opts"><div class="opt">A) Nothing for the types: you still write EventFormValues by hand</div><div class="opt correct">B) The rules and their messages are written once, and the form's types are read from the same schema</div><div class="opt">C) The API no longer needs to check anything</div><div class="opt">D) The client's response guards (isCleanupEvent) disappear</div></div><div class="why"><b>Why:</b> One value that runs (the checks) and gives types (z.input, z.output): add a field and both follow. The API still checks everything (some rules only it can), and the HQ keeps its hand-written response guards for a measured bundle reason.<br><b>A</b> is wrong: <code class="inline">z.input&lt;typeof eventFormSchema&gt;</code> IS the form's values type now.<br><b>C</b> is wrong: The form is a courtesy; the API is the lock.<br><b>D</b> is wrong: Exercise 2 shows how; the lesson keeps them, because guests would download Zod.</div></div>
+  <div class="q" data-sc="2" data-kind="short"><div class="qn">Q2</div><div class="qt">The lesson puts the wrong thing in each of the schema's two types. What are capacity's input and output types?</div><pre class="code">src/Scratch.ts:4:14 - error TS2322: Type 'number' is not assignable to type 'string'.
+src/Scratch.ts:5:14 - error TS2322: Type 'string' is not assignable to type 'number'.
+Found 2 errors in the same file, starting at: src/Scratch.ts:4</pre><div class="opts"><div class="opt correct">Input <code class="inline">string</code> (what the box holds), output <code class="inline">number</code> (what the checked data holds)</div></div><div class="why"><b>Why:</b> <code class="inline">z.coerce.number&lt;string&gt;()</code> turns the text into a number before the rules run. Fields hold the input; the submit function gets the output.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">What does the when option on the end-time refine do?</div><div class="opts"><div class="opt">A) Runs the rule only on the first submit</div><div class="opt">B) Skips the rule when the times are empty</div><div class="opt correct">C) Runs the rule as soon as the two times have no problem, whatever the other fields say</div><div class="opt">D) Turns the rule into a warning</div></div><div class="why"><b>Why:</b> Zod normally runs an object's refine only when every field is valid, so the end-time message would wait until the title and capacity were fixed. when says which issues matter to this rule.<br><b>A</b> is wrong: Timing is React Hook Form's mode, not Zod's.<br><b>B</b> is wrong: Empty times have their own field rules.<br><b>D</b> is wrong: Zod has no warnings: a failed refine is an issue.</div></div>
+  <div class="q" data-sc="4" data-kind="short"><div class="qn">Q4</div><div class="qt">Where does the list of eight names in this error come from? Nobody wrote a type argument.</div><pre class="code">src/Scratch.tsx:7:19 - error TS2345: Argument of type '"titel"' is not assignable to parameter of type '"capacity" | "date" | "description" | "endTime" | "meetingPoint" | "siteId" | "startTime" | "title"'.
+Found 1 error in src/Scratch.tsx:7</pre><div class="opts"><div class="opt correct">From the schema: <code class="inline">zodResolver(eventFormSchema)</code> carries its input and output types, <code class="inline">useForm</code> infers them, and <code class="inline">register</code> accepts only the input type's keys</div></div><div class="why"><b>Why:</b> In Lesson 3.5 EventField had to be written by hand to catch the same typo; now it comes from the schema.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Why does EditEventForm check isEventField(name) before setError, instead of writing name as EventField?</div><div class="opts"><div class="opt">A) setError is slower with a cast</div><div class="opt">B) The cast does not compile</div><div class="opt">C) Object.entries returns numbers</div><div class="opt correct">D) The API could send a key the form does not have, and its message would vanish into an error nobody displays</div></div><div class="why"><b>Why:</b> The API's fieldErrors keys are plain strings (JSON from outside). A type predicate checks them for real; a cast only silences tsc.<br><b>A</b> is wrong: Speed has nothing to do with it.<br><b>B</b> is wrong: <code class="inline">as EventField</code> compiles: that is the danger.<br><b>C</b> is wrong: Object.entries gives string keys (hence the TS2345 without the check).</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">Why does the HQ keep its hand-written response guards in client.ts instead of Zod schemas?</div><div class="opts"><div class="opt correct">A) Zod would add about 25 kB gzip to every visitor's download, while only organizers open the forms</div><div class="opt">B) Zod cannot check API responses</div><div class="opt">C) The guards are faster at run time</div><div class="opt">D) TypeScript cannot compare a schema with types.ts</div></div><div class="why"><b>Why:</b> Measured in the lesson: Zod's full API about 103 kB (25 kB gzip). Kept with the organizer forms, Lesson 10.1 can load it only for them. The build already went from 431.11 to 561.81 kB and warns about a chunk over 500 kB.<br><b>B</b> is wrong: Exercise 2 does exactly that.<br><b>C</b> is wrong: Not the reason given or measured.<br><b>D</b> is wrong: <code class="inline">z.ZodType&lt;CleanupEvent&gt;</code> makes tsc compare them (Exercise 2).</div></div>
+
+  <div class="sec"><h2>8.1 · React Hook Form + Zod: predict, then check</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Weekend Cove Cleanup is full (18 of 18). An organizer saves capacity 10. The schema accepts it: what does the API answer?</div><pre class="code">PATCH http://localhost:4000/api/events/e08   {"capacity": 10}</pre><div class="opts"><div class="opt correct"><pre class="out">HTTP/1.1 400 Bad Request
+content-type: application/json; charset=utf-8
+
+{
+  "error": "validation_failed",
+  "message": "Some fields need attention.",
+  "fieldErrors": {
+    "capacity": [
+      "18 volunteers already hold a spot: capacity cannot be lower."
+    ]
+  }
+}</pre></div></div><div class="why"><b>Why:</b> 400 with a capacity message only the API can give: it knows 18 people hold a spot. setError puts it under the capacity box and focuses it; typing a new value clears it (the schema has no objection), and the next save asks the API again.</div></div>
+
+  <div class="sec"><h2>8.2 · Complex Forms: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">The lesson runs this comparison with Node. Why do the impact report's counts not use z.coerce.number()?</div><pre class="code">0
+Enter a whole number.
+12</pre><div class="opts"><div class="opt correct">Coercion turns an empty box into 0, a valid count, so a skipped box would quietly report "zero"; checking the text first gives a message</div></div><div class="why"><b>Why:</b> For capacity, 0 failed the 1-to-200 rule anyway; for a count, 0 is a real answer. Regex, then transform(Number): input string, output number.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">Row 3 repeats Plastic bottles. Which path does the superRefine give its issue, so the message lands on the right box?</div><div class="opts"><div class="opt">A) <code class="inline">['items']</code></div><div class="opt">B) <code class="inline">['items', 'category']</code></div><div class="opt correct">C) <code class="inline">['items', 2, 'category']</code> (the path relative to the list is [2, 'category'])</div><div class="opt">D) <code class="inline">['plastic-bottles']</code></div></div><div class="why"><b>Why:</b> addIssue's path is relative to the array the refine sits on: [index, 'category']. The resolver turns it into items.2.category, the repeated row's menu.<br><b>A</b> is wrong: That would be a message about the whole list, under no box.<br><b>B</b> is wrong: No row index: which row?<br><b>D</b> is wrong: Paths name places in the data, not values.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">A keyboard user presses Remove on row 1 and the code does nothing about focus. Where is the focus afterwards?</div><div class="opts"><div class="opt">A) On the next row's Remove button</div><div class="opt correct">B) On the page's body: the next Tab starts again from the top</div><div class="opt">C) On the error summary</div><div class="opt">D) Still on the removed button</div></div><div class="why"><b>Why:</b> Measured in the lesson: document.activeElement was <code class="inline">&lt;body&gt;</code>. Whenever a click removes the element that was clicked, decide where the focus goes (the HQ: Add a row).<br><b>A</b> is wrong: Browsers do not move focus to a sibling by themselves.<br><b>C</b> is wrong: Nothing focuses the summary on a removal.<br><b>D</b> is wrong: It is gone from the page.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">The photo box has accept="image/jpeg,image/png,image/webp". Why does the HQ still check the file before uploading?</div><div class="opts"><div class="opt">A) accept makes the request slower</div><div class="opt">B) The API does not check files</div><div class="opt">C) TypeScript requires it</div><div class="opt correct">D) accept is only a hint to the picker: "All files", drag and drop and a 40 MB photo all get past it</div></div><div class="why"><b>Why:</b> The browser's check saves a pointless request and gives a message at once; the API checks again anyway (its answer to a GIF: 415, "Photos must be JPEG, PNG or WebP images.").<br><b>A</b> is wrong: accept changes nothing about the request.<br><b>B</b> is wrong: It does: 413 and 415.<br><b>C</b> is wrong: Types say nothing about a file's content.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">saveImpactMutation writes the PUT's answer with setQueryData before invalidating ['events'] and ['impact']. What does that buy?</div><div class="opts"><div class="opt correct">A) The Impact tab shows the new numbers at once, instead of the old ones for a moment</div><div class="opt">B) It saves the PUT</div><div class="opt">C) It stops the dashboard from updating</div><div class="opt">D) Nothing: invalidation alone does the same</div></div><div class="why"><b>Why:</b> Measured with --latency=1000: invalidation only showed "Volunteers: 10." then 12 a second later; with the answer written first, 12 at once. Use an answer you already have.<br><b>B</b> is wrong: The PUT is the mutation itself.<br><b>C</b> is wrong: ['impact'] is invalidated so the dashboard updates.<br><b>D</b> is wrong: The measured flash says otherwise.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">The error summary's links focus their field with a click handler instead of a plain href="#bags". Why?</div><div class="opts"><div class="opt">A) Plain # links do not work in any browser</div><div class="opt correct">B) A # link adds #bags to the address and a history entry, so Back first undoes the jump</div><div class="opt">C) Click handlers are faster</div><div class="opt">D) TypeScript cannot type href</div></div><div class="why"><b>Why:</b> Measured in Chromium: href="#bags" does focus the box, but writes #bags into the URL. The handler focuses and keeps the address clean.<br><b>A</b> is wrong: Chromium did focus the box.<br><b>C</b> is wrong: Not the point.<br><b>D</b> is wrong: href is a string; nothing to do with it.</div></div>
+
+  <div class="sec"><h2>8.2 · Complex Forms: predict, then check</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P2</div><div class="qt">A GIF sent to the photo endpoint as a raw body. Predict the status code and the message.</div><pre class="code">POST http://localhost:4000/api/photos   Content-Type: image/gif</pre><div class="opts"><div class="opt correct"><pre class="out">{
+  "error": "unsupported_media_type",
+  "message": "Photos must be JPEG, PNG or WebP images."
+}
+HTTP 415</pre></div></div><div class="why"><b>Why:</b> 415 with a sentence written for people: the HQ shows the API's message for 413 and 415.</div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">The same endpoint, with a hand-written <code class="inline">Content-Type: multipart/form-data</code> header (no boundary). Predict the status and which field the API says is missing.</div><pre class="code">POST http://localhost:4000/api/photos   Content-Type: multipart/form-data</pre><div class="opts"><div class="opt correct"><pre class="out">{
+  "error": "validation_failed",
+  "message": "Some fields need attention.",
+  "fieldErrors": {
+    "photo": [
+      "Attach an image in a field named photo."
+    ]
+  }
+}
+HTTP 400</pre></div></div><div class="why"><b>Why:</b> 400: without a boundary the API cannot split the body into parts, so it never finds the photo field. Trying again would not help: leave the header to fetch.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the labs run exactly as <code class="inline">labs/check_labs.py</code> runs them. Test durations are left out.</p>
+<div class="blk lab"><div class="h">Lab 8.1: join the crew (labs/module-20/l8_1-react-hook-form-zod/starter → solution)</div>
+<p>As shipped (tests, then the type check), and the solution:</p>
+<pre class="out">Tests  7 failed | 1 passed (8)
+
+src/lab.test.tsx:38:9 - error TS2322: Type 'number' is not assignable to type 'string'.
+Found 1 error in src/lab.test.tsx:38
+
+Tests  8 passed (8)</pre><p>The solution's schema:</p>
+<pre class="code">name: z.string().trim()
+  .min(<span class="s">2</span>, { error: (issue) =&gt; (issue.input === <span class="s">''</span> ? <span class="s">'Add your name.'</span> : <span class="s">'Use at least 2 characters for your name.'</span>) })
+  .max(<span class="s">60</span>, <span class="s">'Keep your name to 60 characters or fewer.'</span>),
+email: z.email(<span class="s">'Enter an email address like name@example.com.'</span>),
+shirtSize: z.string().pipe(z.enum(shirtSizes, <span class="s">'Choose a shirt size.'</span>)),
+hoursPerMonth: z.coerce.number&lt;<span class="k">string</span>&gt;(hoursRule)
+  .refine((hours) =&gt; Number.isInteger(hours) &amp;&amp; hours &gt;= <span class="s">1</span> &amp;&amp; hours &lt;= <span class="s">40</span>, hoursRule),</pre><ul class="tick">
+  <li><b>Task 1:</b> the one test that passes as shipped is the type test (it only fails in <code class="inline">npm run typecheck</code>: the starter's output type has no number). <code class="inline">z.string().pipe(z.enum(…))</code> keeps the menu's <code class="inline">''</code> a valid input while the output is a size.</li>
+  <li><b>Task 2:</b> <code class="inline">useForm({ resolver: zodResolver(joinSchema), defaultValues: emptyValues })</code>, a <code class="inline">fieldProps(name)</code> helper spreading <code class="inline">register(name)</code> with <code class="inline">aria-invalid</code> and <code class="inline">aria-describedby</code>, <code class="inline">handleSubmit(save)</code>, <code class="inline">noValidate</code>.</li>
+  <li><b>Task 3:</b> the loop with <code class="inline">isJoinField(name)</code> before <code class="inline">setError(name, …, { shouldFocus: first })</code>, then <code class="inline">setError('root.server', …)</code>; the unknown key <code class="inline">volunteerId</code> is ignored.</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Lab 8.2: the supply checkout (labs/module-20/l8_2-complex-forms/starter → solution)</div>
+<p>As shipped (tests, then the type check), and the solution:</p>
+<pre class="out">Tests  9 failed | 1 passed (10)
+
+src/lab.test.tsx:40:9 - error TS2322: Type 'number' is not assignable to type 'string'.
+Found 1 error in src/lab.test.tsx:40
+
+Tests  10 passed (10)</pre><p>The solution's list rule and Add:</p>
+<pre class="code">rows: z.array(rowSchema).superRefine(
+  (rows, context) =&gt; { <span class="c">/* seen Set; addIssue({ code: 'custom', path: [index, 'item'], message }) */</span> },
+  { when: ({ issues }) =&gt; issues.every((issue) =&gt; issue.path?.[<span class="s">1</span>] !== <span class="s">'item'</span>) },
+),
+
+<span class="c">// CheckoutForm</span>
+append({ item: next, count: <span class="s">''</span> }, { focusName: <span class="s">`rows.${fields.length}.count`</span> })</pre><ul class="tick">
+  <li><b>Task 1:</b> without <code class="inline">when</code>, the fourth test gets only the count message: the list rule waits until every row is valid.</li>
+  <li><b>Task 2:</b> <code class="inline">getValues('rows')</code> (not <code class="inline">fields</code>) finds the used items; after <code class="inline">remove(index)</code>, <code class="inline">addRef.current?.focus()</code>; the Add button uses <code class="inline">aria-disabled</code>, so it can keep the focus when all five items are listed.</li>
+  <li><b>Task 3:</b> type first, then size with one decimal; <code class="inline">accept</code> would only be a hint.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 8.1 · React Hook Form + Zod</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="8.1">
+  <li><b>B</b> string in, number out: The type argument makes the input string (what the box holds), and coerce turns it into a number before the rules run, so the output is number. tsc showed both with TS2322.</li>
+  <li><b>D</b> Drop the type argument, or write useForm&lt;EventFormValues, unknown, EventFormData&gt;: z.infer is the output type, but the fields hold the input. Either let zodResolver infer both (no type argument) or give all three: input, context, output.</li>
+  <li><b>A</b> setError('capacity', …) shows the API's message under the field and moves the focus there: save catches the ApiError, checks each key with isEventField, and calls setError, which shows the message under the capacity field and focuses it. The root error fills the status line.</li>
+  <li><b>C</b> The title and capacity messages; the end-time message waits until they are fixed: An object's refine runs only when every field is valid, so the end-time rule waited behind the title and capacity. Measured with the test file: two messages. when lets the rule run as soon as both times are valid.</li>
+  <li><b>B</b> The shared schema already removed the duplicated rules, and the form needs nothing more that RHF adds: The duplicated rules were the real problem, and safeParse with the shared schema fixed that. The action form works, has no dependency, and needs none of RHF's extras such as defaultValues from saved data or dirty fields.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 8.2 · Complex Forms</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="8.2">
+  <li><b>C</b> field.id: useFieldArray gives every row an id that stays with its data when rows are added or removed, which is what a key is for. The index still goes in the field paths, because it says where the value is now.</li>
+  <li><b>A</b> So every failed Save creates a new summary, which takes the focus again, while fixing fields does not: A new key makes React create a new summary on every Save, so its effect runs again and the focus moves to it, while typing between saves only changes its list and leaves the focus alone.</li>
+  <li><b>D</b> The API answers 400: without the boundary it cannot find the photo field: The hand-written header has no boundary, so the API cannot split the body into parts, finds no photo field, and answers 400. With a FormData body, fetch writes the header with the boundary itself.</li>
+  <li><b>B</b> A union including template literal types such as `items.${number}.count`: React Hook Form builds every path from the form's input type with template literal types, so one type covers every row index and only the real field names. tsc listed them in TS2345.</li>
+  <li><b>B</b> A volunteer application where the questions depend on the role chosen first, ending with a review before sending: Separate tasks, later questions that depend on earlier answers, and a review before a commitment are the signs that steps help. The impact report has none of them.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Capacity:</b> string in (the box), number out (the checked data).</li>
+  <li><b>Duplicate row:</b> under the repeated row's menu, via <code class="inline">addIssue</code> with <code class="inline">path: [index, 'category']</code> in the array's <code class="inline">superRefine</code>.</li>
+  <li><b>No Content-Type:</b> fetch writes multipart/form-data with the boundary; a hand-written header has none.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Item 1 C.</b> Thinks the schema replaces the server. Ask who can know that 18 people are signed up.</li>
+  <li><b>Item 3 B or D.</b> Confuses Zod's <code class="inline">when</code> with RHF's mode. Run try-schema with and without <code class="inline">when</code>.</li>
+  <li><b>Item 5 B.</b> Thinks the cast does not compile: it does, which is the danger.</li>
+  <li><b>Item 10 B.</b> Believes the API trusts the browser. Show the 415.</li>
+  <li><b>Item 11 D.</b> Expects invalidation to be instant. Show the measured flash.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 20 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

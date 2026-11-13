@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Give Shoreline Crew HQ a memory with TanStack Query 5: a shared cache, typed queryOptions factories with keys that include the viewer, useQuery and useSuspenseQuery, staleTime and retry rules, loaders that fill the cache, and an impact dashboard with an accessible SVG chart. React + TypeScript: Build a Modern Web App Lesson 7.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>TanStack Query - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🗃️ Lesson 7.1: TanStack Query</h1>
+                <p class="lead">Open a cleanup, go back, open it again: the HQ asks shoreline-api twice for the same answer, and the events list still jumps to the top when you come back. The HQ fetches well, but it has no memory. Today it gets one. TanStack Query keeps every answer from the API in a shared cache, under a key you design, decides when an answer is old enough to ask again, and gives each component a typed result. You will move every page onto it, delete <code>useApi</code>, and use what you have built to add a page the HQ has been missing: the crew's impact dashboard.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain what server state is, and what a cache adds to fetching it</li>
+                        <li>Set up a <code>QueryClient</code> and write typed <code>queryOptions</code> factories with keys that include everything the answer depends on</li>
+                        <li>Read a query's result with <code>useQuery</code>, narrowing it with <code>isSuccess</code>, and keep the last list on screen with <code>placeholderData</code></li>
+                        <li>Choose <code>staleTime</code> and <code>retry</code> settings and explain the requests they cause</li>
+                        <li>Fill the cache from route loaders and read it with <code>useSuspenseQuery</code>, with a Try again that really tries again</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_23.html">Lesson 6.3: Data Loading and Protected Routes</a> (your <code>shoreline-hq</code> with loaders and guards), and <code>useApi</code> from <a href="lesson_14.html">Lesson 4.2</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> A shared cache under every page of the HQ, typed query factories, loaders that fill the cache, and the Impact page with its totals and a chart</li>
+                    <li><span class="meta-label">🧩 Stack</span> TanStack Query 5.107, React Router 8.5, React 19.3, TypeScript 7.0, Vite 8.3, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and the browser, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-24-start.zip">lesson-24-start.zip</a> · Finished code: <a href="downloads/lesson-24-end.zip">lesson-24-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#server-state" class="toc-link">Server State Is Borrowed</a></li>
+                        <li><a href="#keys" class="toc-link">The Cache and Its Keys</a></li>
+                        <li><a href="#reading" class="toc-link">Reading a Query, Typed</a></li>
+                        <li><a href="#fresh" class="toc-link">Fresh, Stale and Retried</a></li>
+                        <li><a href="#loaders" class="toc-link">Loaders on Top of the Cache</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: An HQ With a Memory</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="server-state" class="lesson-section">
+                <h2>🌊 Server State Is Borrowed</h2>
+                <p>Most of what the HQ shows is not its own. The cleanups, the sites and the crew live in shoreline-api; the HQ holds a copy, and that copy starts to age the moment it arrives. Another organizer may publish a cleanup a minute later. That kind of data is called <strong>server state</strong>, and it needs different care from <strong>client state</strong>, the things only this browser knows:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Server state</th><th>Client state</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Who owns it</td><td>The API; the app has a copy</td><td>The app</td></tr>
+                            <tr><td>Can it change behind your back?</td><td>Yes: other people, other devices</td><td>No</td></tr>
+                            <tr><td>Questions it raises</td><td>Is my copy still good? Who else needs it? What if the request fails?</td><td>Where should it live so the right components see it?</td></tr>
+                            <tr><td>In the HQ</td><td>Cleanups, sites, the crew, impact numbers</td><td>An open dialog, the check-in marks, a typed search box</td></tr>
+                            <tr><td>Tool</td><td>TanStack Query (today)</td><td><code>useState</code>, <code>useReducer</code>, context, and Zustand in Lesson 7.3</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><code>useApi</code> from Lesson 4.2 fetched server state well, but it forgot everything when its component unmounted. Every visit asked again, two components asking for the sites sent two requests, a failed request was never retried, and a list could not render at once when you came back, so the router restored the scroll position into an empty page. You could add each of those to <code>useApi</code> yourself. TanStack Query (the library many people still call React Query) is what that looks like after years of other people's bug reports.</p>
+                <div class="card card-info">
+                    <h3>💡 Mental model: the harbor office's logbook</h3>
+                    <p>Before, every crew member who needed the tide times walked to the tide station and read the gauge. Now the harbor office keeps a logbook. Each entry has a label ("tide times, Calder Bay"), the reading, and when it was taken. Ask for an entry: if it is recent, you get it at once; if it is a bit old, you get it at once <em>and</em> someone walks to the station to update it; if there is no entry, someone walks there and you wait. The labels are the <strong>query keys</strong>, the walk is the <strong>query function</strong>, "recent" is <strong>staleTime</strong>, and the logbook is the <strong>QueryClient</strong>.</p>
+                </div>
+                <p>Why it matters: on a team you will rarely write a fetching effect by hand any more. You will write query keys and query functions, and most bugs you meet ("the list didn't update", "it shows the old person's data") will be cache questions. Learning to think in keys is the skill.</p>
+            </section>
+
+            <section id="keys" class="lesson-section">
+                <h2>🔑 The Cache and Its Keys</h2>
+                <p>Three pieces set it up. <code>npm install @tanstack/react-query</code> adds the library (two packages: <code>@tanstack/react-query</code> and the framework-free <code>@tanstack/query-core</code> it builds on). A <code>QueryClient</code> is the cache itself, created once, outside React, so loaders can reach it too. And <code>&lt;QueryClientProvider client={queryClient}&gt;</code> near the top of the tree lets every component's Hooks find it.</p>
+                <p>Each piece of data needs a <strong>query key</strong> and a <strong>query function</strong>. The key is an array, and it is the entry's label: two components with equal keys share one entry and one request. The rule that keeps a cache honest: <strong>the key holds everything the answer depends on</strong>. The events list depends on the search and on who is asking (organizers also get drafts), so both are in its key. The sites are the same for everyone, so their key is just <code>['sites']</code>.</p>
+                <p>Writing the key and the function together in one place is what <code>queryOptions</code> is for. The HQ gets one small <strong>factory</strong> per kind of data:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/queries.ts</div>
+                    <pre data-src="shoreline-hq/src/api/queries.ts" data-match="excerpt"><code class="language-ts">/** Cleanups for a search string such as 'status=scheduled&amp;perPage=50' (drafts for organizers) */
+export function eventsQuery(search: string, viewer: string) {
+  return queryOptions({
+    queryKey: ['events', 'list', search, viewer],
+    queryFn: ({ signal }) =&gt; getEvents(search, signal),
+  })
+}</code></pre>
+                </div>
+                <p>The query function receives an object with a <code>signal</code>, an <code>AbortSignal</code> that TanStack Query aborts when nobody needs the answer any more, so the cancel logic from Lesson 4.1 comes for free. The function must return a promise that rejects on failure; <code>getEvents</code> already throws an <code>ApiError</code> for error statuses, so nothing changes in <code>client.ts</code>.</p>
+                <p>Keys are compared item by item, and a shorter key works as a filter for longer ones. That is why the HQ's keys start general and get specific: in Lesson 7.2, after saving a cleanup, one call with <code>['events']</code> marks every list, detail and roster as out of date.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Factory</th><th>Key</th><th>Why these parts</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>sitesQuery()</code></td><td><code>['sites']</code></td><td>Public, the same for everyone</td></tr>
+                            <tr><td><code>eventsQuery(search, viewer)</code></td><td><code>['events', 'list', search, viewer]</code></td><td>Drafts only reach organizers</td></tr>
+                            <tr><td><code>eventQuery(eventId, viewer)</code></td><td><code>['events', 'detail', eventId, viewer]</code></td><td>A draft is "not found" for guests</td></tr>
+                            <tr><td><code>eventImpactQuery(eventId)</code></td><td><code>['events', 'impact', eventId]</code></td><td>Public</td></tr>
+                            <tr><td><code>rosterQuery(eventId, viewer)</code>, <code>volunteersQuery</code>, <code>volunteerQuery</code></td><td>…with the <code>viewer</code> last</td><td>Organizers only: never share them with a guest</td></tr>
+                            <tr><td><code>impactTotalsQuery()</code></td><td><code>['impact']</code></td><td>Public</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The <code>viewer</code> is the signed-in person's id or <code>'guest'</code>, the same idea as <code>useApi</code>'s viewer since Lesson 5.2: who asks is part of the question. Sign out on the events list and the key changes, so the page asks for the guest list instead of showing the organizer's from the cache.</p>
+            </section>
+
+            <section id="reading" class="lesson-section">
+                <h2>🔍 Reading a Query, Typed</h2>
+                <p>A component reads a query with <code>useQuery(eventsQuery(search, viewer))</code>. The result is an object, and the part to learn first is that it is a <strong>discriminated union</strong>, like the <code>LoadState</code> you wrote in Lessons 2.2 and 4.1, with <code>status</code> as its tag:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th><code>status</code></th><th>Shortcut</th><th><code>data</code></th><th>Means</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>'pending'</code></td><td><code>isPending</code></td><td><code>undefined</code></td><td>No data yet</td></tr>
+                            <tr><td><code>'error'</code></td><td><code>isError</code></td><td>usually <code>undefined</code></td><td>The last attempt failed (see <code>error</code>)</td></tr>
+                            <tr><td><code>'success'</code></td><td><code>isSuccess</code></td><td>the data</td><td>There is data to show</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Separately, <code>isFetching</code> says whether a request is running right now. A query can be <code>'success'</code> and fetching at the same time: that is a background refresh. Because <code>isSuccess</code> is part of the union, checking it narrows <code>data</code>. And you never wrote a type argument: TypeScript takes the data type from the factory's query function. The trick from Lesson 6.3 shows it, passing results to a function that wants a number:</p>
+                <pre data-snippet><code class="language-tsx">import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { eventQuery, eventsQuery } from './api/queries.ts'
+
+// What do the query Hooks give back? Hand each result to a function that wants a number.
+function show(value: number) {
+  return value
+}
+
+export function Scratch() {
+  const list = useQuery(eventsQuery('perPage=50', 'guest'))
+  const cleanup = useSuspenseQuery(eventQuery('e08', 'guest'))
+  show(list.data)
+  show(cleanup.data)
+  if (list.isSuccess) {
+    show(list.data)
+  }
+  return null
+}</code></pre>
+                <figure class="screenshot">
+                    <img src="images/lesson_24/24-query-types.png" alt="A terminal in shoreline-hq. npx tsc -b reports three TS2345 errors in src/Scratch.tsx: Argument of type Page of CleanupEvent or undefined is not assignable to parameter of type number (useQuery&#x27;s data); Argument of type CleanupEventDetail (useSuspenseQuery&#x27;s data); and Argument of type Page of CleanupEvent, inside if (list.isSuccess)." width="1100" height="419" loading="lazy">
+                    <figcaption>No type arguments anywhere, and TypeScript still knows each result's shape: it comes from the query function in the factory. <code>useQuery</code>'s data may be <code>undefined</code> until <code>isSuccess</code> narrows it; <code>useSuspenseQuery</code>'s never is.</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:12:8 - error TS2345: Argument of type 'Page&lt;CleanupEvent&gt; | undefined' is not assignable to parameter of type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+
+12   show(list.data)
+          ~~~~~~~~~
+
+src/Scratch.tsx:13:8 - error TS2345: Argument of type 'CleanupEventDetail' is not assignable to parameter of type 'number'.
+
+13   show(cleanup.data)
+          ~~~~~~~~~~~~
+
+src/Scratch.tsx:15:10 - error TS2345: Argument of type 'Page&lt;CleanupEvent&gt;' is not assignable to parameter of type 'number'.
+
+15     show(list.data)
+            ~~~~~~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:12</code></pre>
+                </div>
+                <p>Before the check, <code>data</code> is <code>Page&lt;CleanupEvent&gt; | undefined</code>; inside <code>if (list.isSuccess)</code> it is <code>Page&lt;CleanupEvent&gt;</code>. <code>useSuspenseQuery</code> (later in this lesson) never returns without data, so its <code>data</code> has no <code>undefined</code> at all.</p>
+                <h3>Keeping the last list on screen</h3>
+                <p>A new search means a new key, and a new key has no data yet: the query goes back to <code>'pending'</code> and the page would say "Loading the cleanups…" after every pause in typing. <code>useApi</code> kept the old data instead; TanStack Query does it when you ask, with <code>placeholderData: keepPreviousData</code>. Options are a plain object, so a page can add one to a factory's options with a spread:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="excerpt"><code class="language-tsx">
+const viewer = viewerId(session)
+const sites = useQuery(sitesQuery())
+// While the next search loads, keep showing the last list (not "Loading…" for every search)
+const events = useQuery({
+  ...eventsQuery(params.toString(), viewer),
+  placeholderData: keepPreviousData,</code></pre>
+                </div>
+                <p>Measured with the API slowed down by <code>--latency=800</code>: typing "pelican" never showed "Loading the cleanups…"; the 15 cleanups stayed until the 3 matches replaced them. Without <code>placeholderData</code>, the list disappeared and "Loading the cleanups…" took its place. While the old list is on screen, <code>isPlaceholderData</code> is <code>true</code> (Exercise 1 uses it).</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: TanStack Query 5.107</h4>
+                    <p>This lesson uses the newest way to fill the cache from outside a component, <code>queryClient.query()</code>. In 5.107 the older <code>ensureQueryData</code>, <code>fetchQuery</code> and <code>prefetchQuery</code> are marked deprecated (VS Code draws a line through them) and still work, so you will see them in many articles. <code>ensureQueryData(options)</code> is the same as <code>query({ ...options, staleTime: 'static' })</code>.</p>
+                </div>
+            </section>
+
+            <section id="fresh" class="lesson-section">
+                <h2>⏱️ Fresh, Stale and Retried</h2>
+                <p>Every entry is either <strong>fresh</strong> or <strong>stale</strong>. <code>staleTime</code> decides: an answer younger than it is fresh and is used without asking the API; an older one is stale and is still shown at once, while TanStack Query asks again in the background, when a component using it mounts, when the window regains focus, or when the network reconnects. The default <code>staleTime</code> is 0: every answer is stale immediately.</p>
+                <div class="mermaid">
+graph TD
+    A["A component needs a key"] --> B{"In the cache?"}
+    B -->|"no"| C["Fetch, show Loading"]
+    B -->|"yes"| D{"Still fresh?"}
+    D -->|"yes"| E["Show it, no request"]
+    D -->|"no"| F["Show it, refetch behind"]
+                </div>
+                <p>The HQ sets 30 seconds for every query, in the <code>QueryClient</code>'s <code>defaultOptions</code>. Measured: opening Weekend Cove Cleanup sent <code>GET /api/events/e08</code>; Back to the list and opening it again sent nothing at all. With the default of 0, going Back sent the list's two requests (<code>/sites</code> and <code>/events?perPage=50</code>) again in the background; the list still appeared at once from the cache. Neither is wrong: pick the time by how fast the data really changes and how much an old copy would hurt. A cleanup's details can be 30 seconds old; a live scoreboard cannot.</p>
+                <p>A separate timer, <code>gcTime</code> (default 5 minutes), decides how long an entry nobody is using stays in memory before it is thrown away. Stale controls requests; <code>gcTime</code> controls memory.</p>
+                <h3>Retries that make sense</h3>
+                <p>When a query function throws, <code>useQuery</code> tries again, by default 3 more times with growing pauses (1, 2 and 4 seconds). That is kind to a flaky phone connection and pointless for a 404: the volunteer <code>v99</code> will not exist on the fourth try either. The HQ's <code>retry</code> option is a function that gets the failure count and the error:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/api/queries.ts</div>
+                    <pre data-src="shoreline-hq/src/api/queries.ts" data-match="excerpt"><code class="language-ts">export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // An answer counts as fresh for 30 seconds: no new request for it in that time
+      staleTime: 30_000,
+      // Try again after a network or server failure, but never after 401, 403 or 404:
+      // asking again will not change those answers
+      retry: (failureCount, error) =&gt;
+        !(error instanceof ApiError &amp;&amp; error.status &lt; 500) &amp;&amp; failureCount &lt; 2,
+    },
+  },
+})</code></pre>
+                </div>
+                <p>The <code>error</code> parameter is typed <code>Error</code> (TanStack Query's default error type), and <code>instanceof ApiError</code> narrows it so <code>status</code> can be read. Server errors (500) and network failures get two more tries. Measured on the dev server, signed in as Maya, opening <code>/volunteers/v99</code>: the alert "Nothing was found at this address" appeared after 0.1 s. With the default retries it took 7.4 s and 5 requests.</p>
+                <div class="card card-info">
+                    <h4>🌱 It is fine if this feels like a lot of knobs</h4>
+                    <p>Most apps set <code>staleTime</code> and <code>retry</code> once, as the HQ does, and leave the rest at the defaults. When a request surprises you, open the browser's Network tab and ask "which rule sent this?". Each answer you work out is one less mystery the next time.</p>
+                </div>
+            </section>
+
+            <section id="loaders" class="lesson-section">
+                <h2>🚚 Loaders on Top of the Cache</h2>
+                <p>Lesson 6.3's loaders decide <em>when</em> a page's data must be there; the cache decides <em>where</em> it is kept. Together: the loader makes sure the entry exists, and the page reads it from the cache. <code>queryClient.query(options)</code> returns the entry's data, fetching first if needed. With <code>staleTime: 'static'</code> for that one call, any cached copy counts as good enough, however old, so a visit you have made before opens at once:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/loaders.ts</div>
+                    <pre data-src="shoreline-hq/src/pages/loaders.ts" data-match="excerpt"><code class="language-ts">/** /sites: the six beach sites */
+export async function sitesLoader() {
+  // staleTime 'static': cached sites (however old) are good enough to show at once
+  await queryClient.query({ ...sitesQuery(), staleTime: 'static' })
+  return null
+}</code></pre>
+                </div>
+                <p>The page then reads with <code>useSuspenseQuery(sitesQuery())</code>. It works like <code>use()</code> from Lesson 4.4: with no data it suspends to the nearest <code>&lt;Suspense&gt;</code>, and an error is thrown to the nearest error boundary. After a loader, the data is always there, so it simply returns it, typed without <code>undefined</code>, and when the entry is stale it refreshes it in the background like any query.</p>
+                <p>Why read the cache instead of <code>useLoaderData</code>? Because the cache keeps going after the first paint: the background refresh above, the window-focus refetch, and in Lesson 7.2 every save marks entries out of date so the pages showing them update themselves. Loader data would sit unchanged until the next navigation.</p>
+                <p>The payoff Lesson 6.3 promised: the events list now comes back with its data. Measured: scrolled down 1200 px on <code>/events</code>, opened Storm Debris Sweep, pressed Back: the list was back at 1200 px. Before this lesson it came back at 0.</p>
+                <h3>Try again, for real</h3>
+                <p>A query that failed inside an error boundary keeps its error in the cache. Re-rendering the boundary's children is not enough: <code>useSuspenseQuery</code> sees the cached error and throws it again at once. <code>useQueryErrorResetBoundary()</code> returns a <code>reset</code> function that tells the queries below "the next render may try again". The <code>ErrorBoundary</code> from Lesson 4.4 already has an <code>onRetry</code> prop for exactly this kind of job:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="excerpt"><code class="language-tsx">// ...
+&lt;TabPanel id="impact"&gt;
+  &lt;ErrorBoundary fallback={ImpactProblem} onRetry={reset}&gt;
+    &lt;Suspense
+      fallback={&lt;LoadStatus query={{ status: 'pending', error: null }} what="the impact report" /&gt;}
+    &gt;
+      &lt;ImpactSummary eventId={event.id} /&gt;
+    &lt;/Suspense&gt;
+  &lt;/ErrorBoundary&gt;</code></pre>
+                </div>
+                <p>Measured by making the first three requests for Storm Debris Sweep's report fail with a 500: the Impact tab showed "Could not load the impact report. The server had a problem (500)." after three attempts (the first try and two retries); <strong>Try again</strong> sent a fourth request and showed the report.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Options from older tutorials</h3>
+                    <p>Version 5 renamed or removed several options that are everywhere in older articles. TypeScript catches them, one at a time (it stops at the first unknown property):</p>
+                    <pre data-snippet data-legacy><code class="language-tsx">import { useQuery } from '@tanstack/react-query'
+import { getSites } from './api/client.ts'
+
+// Options from TanStack Query 4 (and React Query 3) tutorials
+export function OldSites() {
+  const sites = useQuery({
+    queryKey: ['sites'],
+    queryFn: () =&gt; getSites(),
+    cacheTime: 10 * 60 * 1000,
+    keepPreviousData: true,
+    onSuccess: () =&gt; console.log('loaded'),
+  })
+  return sites.isLoading ? &lt;p&gt;Loading…&lt;/p&gt; : null
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/Scratch.tsx:9:5 - error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Object literal may only specify known properties, and 'cacheTime' does not exist in type 'UseQueryOptions&lt;Site[], Error, Site[], string[]&gt;'.
+
+9     cacheTime: 10 * 60 * 1000,
+      ~~~~~~~~~
+
+  node_modules/@tanstack/react-query/build/modern/useQuery.d.ts:252:25 - The last overload is declared here.
+    252 export declare function useQuery&lt;TQueryFnData = unknown, TError = DefaultError, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey&gt;(options: UseQueryOptions&lt;TQueryFnData, TError, TData, TQueryKey&gt;, queryClient?: QueryClient): UseQueryResult&lt;TData, TError&gt;;
+                                ~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:9</code></pre>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Older code</th><th>Version 5</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><code>cacheTime</code></td><td><code>gcTime</code> (same meaning)</td></tr>
+                                <tr><td><code>keepPreviousData: true</code></td><td><code>placeholderData: keepPreviousData</code> (measured: the same TS2769, naming <code>'keepPreviousData'</code>)</td></tr>
+                                <tr><td><code>onSuccess</code> / <code>onError</code> on <code>useQuery</code></td><td>Removed from queries (also TS2769); still on mutations (Lesson 7.2)</td></tr>
+                                <tr><td><code>isLoading</code> for "no data yet"</td><td><code>isPending</code>; <code>isLoading</code> now means pending <em>and</em> fetching. No error here, just a different meaning</td></tr>
+                                <tr><td><code>useQuery(['sites'], fetchSites)</code></td><td>One options object: <code>useQuery({ queryKey, queryFn })</code></td></tr>
+                                <tr><td><code>import … from 'react-query'</code></td><td><code>@tanstack/react-query</code></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A key that leaves something out</h3>
+                    <p>The query function uses <code>search</code>, but the key does not:</p>
+                    <pre data-snippet><code class="language-ts">export function eventsQuery(search: string, viewer: string) {
+  return queryOptions({
+    queryKey: ['events', 'list', viewer],
+    queryFn: ({ signal }) =&gt; getEvents(search, signal),
+  })
+}</code></pre>
+                    <p>It type-checks and lints cleanly. Measured: typing "pelican" changed the address to <code>/events?q=pelican</code>, sent no request, and the page kept saying "Found 15 cleanups". Same key, same entry: the cache had no reason to ask again. Leaving out the <code>viewer</code> instead is caught, because the parameter is now unused (the template's tsconfig turns on <code>noUnusedParameters</code>, and oxlint warns about it too):</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/api/queries.ts:44:45 - error TS6133: 'viewer' is declared but its value is never read.
+
+44 export function eventsQuery(search: string, viewer: string) {
+                                               ~~~~~~
+
+
+Found 1 error in src/api/queries.ts:44</code></pre>
+                    </div>
+                    <p>Run anyway on the dev server (which does not type-check), it showed a guest's 15 cleanups to Maya after she signed in, under an empty Drafts heading. Make "everything the function uses goes in the key" a reflex.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Retrying answers that will not change</h3>
+                    <p>With the default <code>retry</code>, a 404 is retried three times. Measured above: 7.4 s of "Loading this volunteer…" before the error, instead of 0.1 s. Nothing in the console explains the wait, so it looks like a slow API. Don't retry 4xx answers.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A Try again that tries nothing</h3>
+                    <p>Without <code>onRetry={reset}</code>, the impact tab's <strong>Try again</strong> rendered, failed at once with the same message and sent no request (measured: still 3 attempts after the click). Every error boundary around a <code>useSuspenseQuery</code> needs the reset.</p>
+                </div>
+
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: An HQ With a Memory</h2>
+                <p>Steps 1 and 2 add the cache, Steps 3 to 5 move every page onto it, and Step 6 builds the Impact page. From Step 3 on, <code>LoadStatus</code> takes a new prop, so until Step 5 is done the pages you have not reached yet show red underlines in VS Code (and may show errors in the browser). That list is your to-do list; it is empty at the end of Step 5. Keep shoreline-api and <code>npm run dev</code> running.</p>
+
+                <div class="card">
+                    <h3>Step 1: Install and provide the cache <span class="step-time">(6 min)</span></h3>
+                    <p>Stop the dev server with <kbd>Ctrl</kbd>+<kbd>C</kbd>, install, and start it again:</p>
+                    <pre class="terminal"><code class="language-bash">npm install @tanstack/react-query
+npm run dev</code></pre>
+                    <p>The course was checked with version 5.107.1. In <code>src/App.tsx</code>, import the provider and wrap everything in it. (<code>queryClient</code> comes from the file you create in Step 2; the red underline lasts until then.)</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">+import { QueryClientProvider } from '@tanstack/react-query'
+ import { createBrowserRouter } from 'react-router'
+ import { RouterProvider } from 'react-router/dom'
++import { queryClient } from './api/queries.ts'
+ import { guestsOnly, onlyWhenThePathChanges, organizersOnly } from './auth/guards.ts'
+ import { AuthProvider } from './auth/AuthProvider.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> export function App() {
+   return (
+-    &lt;AuthProvider&gt;
+-      &lt;RouterProvider router={router} /&gt;
+-    &lt;/AuthProvider&gt;
++    // The cache is outside everything else: every page and loader shares it
++    &lt;QueryClientProvider client={queryClient}&gt;
++      &lt;AuthProvider&gt;
++        &lt;RouterProvider router={router} /&gt;
++      &lt;/AuthProvider&gt;
++    &lt;/QueryClientProvider&gt;
+   )
+ }</code></pre>
+                    </div>
+                    <p>The provider sits outside <code>AuthProvider</code> and the router, so every page, and every component those pages render, shares one cache.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The impact request and the factories <span class="step-time">(14 min)</span></h3>
+                    <p>First, the one request the HQ does not have yet. <code>GET /api/impact</code> returns the crew's totals as an <code>ImpactTotals</code> (from <code>types.ts</code>), for the page you build in Step 6. As always, the client checks the shape before anyone uses it. In <code>src/api/client.ts</code>, add <code>ImpactTotals</code> to the type imports:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   EventStatus,
+   ImpactReport,
++  ImpactTotals,
+   PageInfo,
+   Role,</code></pre>
+                    </div>
+                    <p>Add the checks before <code>isApiErrorBody</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> }
+ 
++/** A count for every debris category */
++function isCategoryCounts(value: unknown): value is Record&lt;DebrisCategory, number&gt; {
++  return isRecord(value) &amp;&amp; debrisCategories.every((category) =&gt; typeof value[category] === 'number')
++}
++
++/** One bar of the impact dashboard's chart: a month's cleanups and weight */
++function isMonthTotal(value: unknown): value is ImpactTotals['byMonth'][number] {
++  return (
++    isRecord(value) &amp;&amp;
++    typeof value.month === 'string' &amp;&amp;
++    typeof value.events === 'number' &amp;&amp;
++    typeof value.weightKg === 'number'
++  )
++}
++
++function isSiteTotal(value: unknown): value is ImpactTotals['bySite'][number] {
++  return (
++    isRecord(value) &amp;&amp;
++    typeof value.siteId === 'string' &amp;&amp;
++    typeof value.events === 'number' &amp;&amp;
++    typeof value.weightKg === 'number'
++  )
++}
++
++// The ImpactTotals properties that hold numbers
++const totalFields: (keyof ImpactTotals)[] = [
++  'events', 'volunteerHours', 'volunteersAttended', 'bags', 'weightKg',
++]
++
++/** The crew's totals for the impact dashboard (GET /api/impact) */
++function isImpactTotals(value: unknown): value is ImpactTotals {
++  return (
++    isRecord(value) &amp;&amp;
++    totalFields.every((key) =&gt; typeof value[key] === 'number') &amp;&amp;
++    (value.from === null || typeof value.from === 'string') &amp;&amp;
++    (value.to === null || typeof value.to === 'string') &amp;&amp;
++    isCategoryCounts(value.byCategory) &amp;&amp;
++    isListOf(isMonthTotal)(value.byMonth) &amp;&amp;
++    isListOf(isSiteTotal)(value.bySite)
++  )
++}
++
+ function isApiErrorBody(value: unknown): value is ApiErrorBody {
+   return isRecord(value) &amp;&amp; typeof value.error === 'string' &amp;&amp; typeof value.message === 'string'</code></pre>
+                    </div>
+                    <p><code>ImpactTotals['byMonth'][number]</code> is an <strong>indexed access type</strong>: "the type of one item of the <code>byMonth</code> array". It names the item type without copying it. Then the request, before <code>getVolunteers</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> }
+ 
++/** Totals for every completed cleanup: weight, bags, hours, and by month, debris category and site */
++export function getImpactTotals(signal?: AbortSignal): Promise&lt;ImpactTotals&gt; {
++  return getJSON('/impact', isImpactTotals, signal)
++}
++
+ /** The crew, one page at a time; query is a search string such as 'skill=first-aid&amp;page=2' */
+ export function getVolunteers(query: string, signal?: AbortSignal): Promise&lt;Page&lt;Volunteer&gt;&gt; {</code></pre>
+                    </div>
+                    <p>Now create <code>src/api/queries.ts</code>: the client with the HQ's two defaults, the viewer helper, and one factory per kind of data:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/queries.ts</div>
+                        <pre data-src="shoreline-hq/src/api/queries.ts"><code class="language-ts">// Shoreline Crew HQ's cache (Lesson 7.1): the QueryClient, and one queryOptions factory per kind of data.
+// A factory pairs a key (where the answer is kept) with the function that fetches it.
+import { QueryClient, queryOptions } from '@tanstack/react-query'
+import {
+  ApiError,
+  getEvent,
+  getEvents,
+  getImpact,
+  getImpactTotals,
+  getRoster,
+  getSites,
+  getVolunteer,
+  getVolunteers,
+  type Session,
+} from './client.ts'
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // An answer counts as fresh for 30 seconds: no new request for it in that time
+      staleTime: 30_000,
+      // Try again after a network or server failure, but never after 401, 403 or 404:
+      // asking again will not change those answers
+      retry: (failureCount, error) =&gt;
+        !(error instanceof ApiError &amp;&amp; error.status &lt; 500) &amp;&amp; failureCount &lt; 2,
+    },
+  },
+})
+
+/** Who is asking: a person's id, or 'guest'. Some answers depend on it, so it goes in their keys. */
+export function viewerId(session: Session | null): string {
+  return session?.user.id ?? 'guest'
+}
+
+/** The six beach sites (the same for everyone) */
+export function sitesQuery() {
+  return queryOptions({
+    queryKey: ['sites'],
+    queryFn: ({ signal }) =&gt; getSites(signal),
+  })
+}
+
+/** Cleanups for a search string such as 'status=scheduled&amp;perPage=50' (drafts for organizers) */
+export function eventsQuery(search: string, viewer: string) {
+  return queryOptions({
+    queryKey: ['events', 'list', search, viewer],
+    queryFn: ({ signal }) =&gt; getEvents(search, signal),
+  })
+}
+
+/** One cleanup with its site (a draft only for organizers) */
+export function eventQuery(eventId: string, viewer: string) {
+  return queryOptions({
+    queryKey: ['events', 'detail', eventId, viewer],
+    queryFn: ({ signal }) =&gt; getEvent(eventId, signal),
+  })
+}
+
+/** A completed cleanup's impact report (public) */
+export function eventImpactQuery(eventId: string) {
+  return queryOptions({
+    queryKey: ['events', 'impact', eventId],
+    queryFn: ({ signal }) =&gt; getImpact(eventId, signal),
+  })
+}
+
+/** A cleanup's sign-ups with contact details (organizers only) */
+export function rosterQuery(eventId: string, viewer: string) {
+  return queryOptions({
+    queryKey: ['events', 'roster', eventId, viewer],
+    queryFn: ({ signal }) =&gt; getRoster(eventId, signal),
+  })
+}
+
+/** One page of the crew for a search string such as 'skill=first-aid&amp;page=2' (organizers only) */
+export function volunteersQuery(search: string, viewer: string) {
+  return queryOptions({
+    queryKey: ['volunteers', 'list', search, viewer],
+    queryFn: ({ signal }) =&gt; getVolunteers(search, signal),
+  })
+}
+
+/** One person on the crew (organizers only) */
+export function volunteerQuery(volunteerId: string, viewer: string) {
+  return queryOptions({
+    queryKey: ['volunteers', 'detail', volunteerId, viewer],
+    queryFn: ({ signal }) =&gt; getVolunteer(volunteerId, signal),
+  })
+}
+
+/** The crew's totals for the impact dashboard (public) */
+export function impactTotalsQuery() {
+  return queryOptions({
+    queryKey: ['impact'],
+    queryFn: ({ signal }) =&gt; getImpactTotals(signal),
+  })
+}</code></pre>
+                    </div>
+                    <p>Every factory has the same shape, and none has a type annotation: <code>queryOptions</code> infers the data type from the query function, and remembers it on the key, so the Hooks you call with these options are typed too.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Small pages first <span class="step-time">(10 min)</span></h3>
+                    <p><code>LoadStatus</code> will read a query result instead of a <code>LoadState</code>. It only needs three fields, so its prop type asks for exactly those; any <code>useQuery</code> result fits, and so does a hand-made object. Replace <code>src/components/LoadStatus.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/LoadStatus.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/LoadStatus.tsx"><code class="language-tsx">import { describeError } from '../api/client.ts'
+import { Button } from './Button.tsx'
+import styles from './LoadStatus.module.css'
+
+/** What LoadStatus reads from a TanStack Query result (any query fits) */
+export interface QueryStatus {
+  status: 'pending' | 'error' | 'success'
+  error: unknown
+  /** Shows a "Try again" button under the error */
+  refetch?: () =&gt; unknown
+}
+
+interface LoadStatusProps {
+  query: QueryStatus
+  /** What is loading, for the messages: "the beach sites" */
+  what: string
+}
+
+// The message to show while data is on its way, or when it could not be loaded
+export function LoadStatus({ query, what }: LoadStatusProps) {
+  const { status, error, refetch } = query
+  if (status === 'pending') {
+    return (
+      &lt;p role="status" className={styles.loading}&gt;
+        Loading {what}…
+      &lt;/p&gt;
+    )
+  }
+  if (status === 'error') {
+    return (
+      &lt;div className={styles.failed}&gt;
+        &lt;p role="alert"&gt;
+          Could not load {what}. {describeError(error)}
+        &lt;/p&gt;
+        {refetch &amp;&amp; (
+          &lt;Button onClick={() =&gt; void refetch()}&gt;Try again&lt;/Button&gt;
+        )}
+      &lt;/div&gt;
+    )
+  }
+  return null
+}</code></pre>
+                    </div>
+                    <p><code>refetch</code> is a function that returns something (a promise); <code>() =&gt; unknown</code> accepts any such function, and <code>void</code> says the button does not wait for it. Now the home page. In <code>src/pages/HomePage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">+import { useQuery } from '@tanstack/react-query'
+ import { Link } from 'react-router'
+-import { getEvents, type Page } from '../api/client.ts'
++import type { Page } from '../api/client.ts'
++import { eventsQuery, viewerId } from '../api/queries.ts'
+ import type { CleanupEvent } from '../api/types.ts'
++import { useAuth } from '../auth/AuthContext.ts'
+ import { Card } from '../components/Card.tsx'
+ import { LoadStatus } from '../components/LoadStatus.tsx'
+-import { useApi } from '../hooks/useApi.ts'
+ import { formatDate } from '../utils/format.ts'
+ import styles from './Page.module.css'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> 
+ // One cleanup is enough: the first scheduled one from today on
+-const nextQuery = 'status=scheduled&amp;when=upcoming&amp;perPage=1'
++const nextSearch = 'status=scheduled&amp;when=upcoming&amp;perPage=1'
+ 
+ interface NextCleanupProps {</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> 
+ export function HomePage() {
+-  const upcoming = useApi(`/events?${nextQuery}`, (signal) =&gt; getEvents(nextQuery, signal))
++  const viewer = viewerId(useAuth().session)
++  const upcoming = useQuery(eventsQuery(nextSearch, viewer))
+ 
+   return (</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">       &lt;div className={styles.grid}&gt;
+         &lt;Card title="Next cleanup"&gt;
+-          {upcoming.state.kind === 'ready' ? (
+-            &lt;NextCleanup upcoming={upcoming.state.data} /&gt;
++          {upcoming.isSuccess ? (
++            &lt;NextCleanup upcoming={upcoming.data} /&gt;
+           ) : (
+-            &lt;LoadStatus state={upcoming.state} what="the next cleanup" onRetry={upcoming.reload} /&gt;
++            &lt;LoadStatus query={upcoming} what="the next cleanup" /&gt;
+           )}
+           &lt;Link to="/events"&gt;See all cleanups&lt;/Link&gt;</code></pre>
+                    </div>
+                    <p>The constant became <code>nextSearch</code>: "query" now means a TanStack query. The planning form's sites, in <code>src/pages/NewEventPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/NewEventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/NewEventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">-import { getSites } from '../api/client.ts'
++import { useQuery } from '@tanstack/react-query'
++import { sitesQuery } from '../api/queries.ts'
+ import { LoadStatus } from '../components/LoadStatus.tsx'
+ import { NewEventForm } from '../components/NewEventForm.tsx'
+-import { useApi } from '../hooks/useApi.ts'
+ import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+ import styles from './Page.module.css'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/NewEventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/NewEventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   useDocumentTitle('Plan a cleanup')
+   // The form needs the sites for its menu and its checks
+-  const sites = useApi('/sites', getSites)
++  const sites = useQuery(sitesQuery())
+ 
+   return (</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/NewEventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/NewEventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">         sign up.
+       &lt;/p&gt;
+-      {sites.state.kind === 'ready' ? (
+-        &lt;NewEventForm sites={sites.state.data} /&gt;
++      {sites.isSuccess ? (
++        &lt;NewEventForm sites={sites.data} /&gt;
+       ) : (
+-        &lt;LoadStatus state={sites.state} what="the beach sites" onRetry={sites.reload} /&gt;
++        &lt;LoadStatus query={sites} what="the beach sites" /&gt;
+       )}
+     &lt;/&gt;</code></pre>
+                    </div>
+                    <p>The volunteer card, in <code>src/pages/VolunteerPage.tsx</code>. Its key comes from the URL's <code>:volunteerId</code>, as <code>useApi</code>'s did:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteerPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteerPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">+import { useQuery } from '@tanstack/react-query'
+ import { useParams } from 'react-router'
+-import { getVolunteer } from '../api/client.ts'
++import { viewerId, volunteerQuery } from '../api/queries.ts'
+ import type { Volunteer } from '../api/types.ts'
++import { useAuth } from '../auth/AuthContext.ts'
+ import { Card } from '../components/Card.tsx'
+ import { LoadStatus } from '../components/LoadStatus.tsx'
+-import { useApi } from '../hooks/useApi.ts'
+ import { formatDate } from '../utils/format.ts'
+ import { skillLabels } from '../utils/skills.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteerPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteerPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">     throw new Error('VolunteerPage needs a route with a :volunteerId parameter')
+   }
+-  const volunteer = useApi(`/volunteers/${volunteerId}`, (signal) =&gt;
+-    getVolunteer(volunteerId, signal),
+-  )
++  const viewer = viewerId(useAuth().session)
++  const volunteer = useQuery(volunteerQuery(volunteerId, viewer))
+ 
+-  if (volunteer.state.kind !== 'ready') {
+-    return &lt;LoadStatus state={volunteer.state} what="this volunteer" onRetry={volunteer.reload} /&gt;
++  if (!volunteer.isSuccess) {
++    return &lt;LoadStatus query={volunteer} what="this volunteer" /&gt;
+   }
+-  return &lt;VolunteerDetails volunteer={volunteer.state.data} /&gt;
++  return &lt;VolunteerDetails volunteer={volunteer.data} /&gt;
+ }</code></pre>
+                    </div>
+                    <p><code>!volunteer.isSuccess</code> narrows too: after the early return, TypeScript knows <code>data</code> is a <code>Volunteer</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The two search pages <span class="step-time">(8 min)</span></h3>
+                    <p>Both keep their URL-driven filters from Lesson 6.2; only the fetching changes, plus <code>placeholderData</code>. In <code>src/pages/EventsPage.tsx</code>, the imports:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+ import { useEffect, useRef } from 'react'
+ import { Link, useSearchParams } from 'react-router'
+-import { getEvents, getSites, isEventStatus } from '../api/client.ts'
++import { isEventStatus } from '../api/client.ts'
++import { eventsQuery, sitesQuery, viewerId } from '../api/queries.ts'
+ import type { CleanupEvent, Site } from '../api/types.ts'
+ import { useAuth } from '../auth/AuthContext.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { EventList } from '../components/EventList.tsx'
+ import { LoadStatus } from '../components/LoadStatus.tsx'
+-import { useApi } from '../hooks/useApi.ts'
+ import { useDebouncedValue } from '../hooks/useDebouncedValue.ts'
+ import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'</code></pre>
+                    </div>
+                    <p>Then the session, the two queries, and the three places that read them:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> 
+ export function EventsPage() {
+-  const { isOrganizer } = useAuth()
++  const { session, isOrganizer } = useAuth()
+   // The filters live in the address: /events?q=pelican&amp;status=completed
+   const [searchParams, setSearchParams] = useSearchParams()</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   if (search !== '') params.set('q', search)
+   if (status !== 'all') params.set('status', status)
+-  const eventsQuery = params.toString()
+ 
+-  const sites = useApi('/sites', getSites)
+-  const events = useApi(`/events?${eventsQuery}`, (signal) =&gt; getEvents(eventsQuery, signal))
++  const viewer = viewerId(session)
++  const sites = useQuery(sitesQuery())
++  // While the next search loads, keep showing the last list (not "Loading…" for every search)
++  const events = useQuery({
++    ...eventsQuery(params.toString(), viewer),
++    placeholderData: keepPreviousData,
++  })
+ 
+   // Typing: replace the history entry (Back skips the letters), and update the box right away</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   }
+ 
+-  // Whichever request is not ready yet decides what the status message says
+-  const waiting = sites.state.kind !== 'ready' ? sites : events
++  // Whichever query has no data yet decides what the status message says
++  const waiting = sites.isSuccess ? events : sites
+ 
+   return (</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">         onClear={clearFilters}
+       /&gt;
+-      {sites.state.kind === 'ready' &amp;&amp; events.state.kind === 'ready' ? (
++      {sites.isSuccess &amp;&amp; events.isSuccess ? (
+         &lt;EventGroups
+-          events={events.state.data.items}
+-          sites={sites.state.data}
++          events={events.data.items}
++          sites={sites.data}
+           filtering={search !== '' || status !== 'all'}
+           showDrafts={isOrganizer}
+         /&gt;
+       ) : (
+-        &lt;LoadStatus state={waiting.state} what="the cleanups" onRetry={waiting.reload} /&gt;
++        &lt;LoadStatus query={waiting} what="the cleanups" /&gt;
+       )}
+     &lt;/&gt;</code></pre>
+                    </div>
+                    <p><code>waiting</code> is one query result or the other; both fit <code>LoadStatus</code>'s <code>QueryStatus</code>, so TypeScript accepts either. The crew list gets the same treatment in <code>src/pages/VolunteersPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">+import { keepPreviousData, useQuery } from '@tanstack/react-query'
+ import type { ChangeEvent } from 'react'
+ import { NavLink, Outlet, useSearchParams } from 'react-router'
+-import { getVolunteers, isSkill } from '../api/client.ts'
++import { isSkill } from '../api/client.ts'
++import { viewerId, volunteersQuery } from '../api/queries.ts'
+ import type { Skill, Volunteer } from '../api/types.ts'
++import { useAuth } from '../auth/AuthContext.ts'
+ import { DataList } from '../components/DataList.tsx'
+ import { LoadStatus } from '../components/LoadStatus.tsx'
+ import { Pagination } from '../components/Pagination.tsx'
+-import { useApi } from '../hooks/useApi.ts'
+ import { useDebouncedValue } from '../hooks/useDebouncedValue.ts'
+ import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   if (search !== '') params.set('q', search)
+   if (skill !== 'all') params.set('skill', skill)
+-  const volunteersQuery = params.toString()
+-  const volunteers = useApi(`/volunteers?${volunteersQuery}`, (signal) =&gt;
+-    getVolunteers(volunteersQuery, signal),
+-  )
++  const viewer = viewerId(useAuth().session)
++  // While the next page or search loads, keep showing the last list (not "Loading…")
++  const volunteers = useQuery({
++    ...volunteersQuery(params.toString(), viewer),
++    placeholderData: keepPreviousData,
++  })
+ 
+   // A new search or skill starts again on page 1 (typing works as on the events page)</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">         &lt;Outlet /&gt;
+         &lt;div&gt;
+-          {volunteers.state.kind === 'ready' ? (
++          {volunteers.isSuccess ? (
+             &lt;&gt;
+               &lt;p role="status"&gt;
+-                Found {volunteers.state.data.page.total}{' '}
+-                {volunteers.state.data.page.total === 1 ? 'person' : 'people'}.
++                Found {volunteers.data.page.total}{' '}
++                {volunteers.data.page.total === 1 ? 'person' : 'people'}.
+               &lt;/p&gt;
+               &lt;DataList
+-                items={volunteers.state.data.items}
++                items={volunteers.data.items}
+                 getKey={(volunteer) =&gt; volunteer.id}
+                 renderItem={renderVolunteer}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">                 layout="plain"
+               /&gt;
+-              &lt;Pagination page={volunteers.state.data.page} label="Pages of volunteers" /&gt;
++              &lt;Pagination page={volunteers.data.page} label="Pages of volunteers" /&gt;
+             &lt;/&gt;
+           ) : (
+-            &lt;LoadStatus state={volunteers.state} what="the crew" onRetry={volunteers.reload} /&gt;
++            &lt;LoadStatus query={volunteers} what="the crew" /&gt;
+           )}
+         &lt;/div&gt;</code></pre>
+                    </div>
+                    <p>Neither page got a loader: their search boxes change the address on every letter, and Lesson 6.3 showed what a loader does to that. Paging through the crew now keeps the current page on screen until the next one arrives, and paging back to a page you have seen is instant.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Loaders fill the cache <span class="step-time">(12 min)</span></h3>
+                    <p>Replace <code>src/pages/loaders.ts</code>. The loaders keep their names, so <code>App.tsx</code>'s routes stay as they are. The event loader keeps Lesson 6.3's 404 answer and now returns the two values the page needs to build the same key (the third loader is for Step 6):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/loaders.ts</div>
+                        <pre data-src="shoreline-hq/src/pages/loaders.ts"><code class="language-ts">// Route loaders (Lesson 6.3). Since Lesson 7.1 they fill the cache, and the pages read it.
+import { data, type LoaderFunctionArgs } from 'react-router'
+import { ApiError, readSession } from '../api/client.ts'
+import { eventQuery, impactTotalsQuery, queryClient, sitesQuery, viewerId } from '../api/queries.ts'
+
+/** /sites: the six beach sites */
+export async function sitesLoader() {
+  // staleTime 'static': cached sites (however old) are good enough to show at once
+  await queryClient.query({ ...sitesQuery(), staleTime: 'static' })
+  return null
+}
+
+/** /events/:eventId: the cleanup must be in the cache before the page shows */
+export async function eventLoader({ params }: LoaderFunctionArgs) {
+  const { eventId } = params
+  if (eventId === undefined) {
+    throw new Error('eventLoader needs a route with an :eventId parameter')
+  }
+  // The page builds the same key from these two values
+  const viewer = viewerId(readSession())
+  try {
+    await queryClient.query({ ...eventQuery(eventId, viewer), staleTime: 'static' })
+  } catch (error: unknown) {
+    if (error instanceof ApiError &amp;&amp; error.status === 404) {
+      const message = 'There is no cleanup at this address. The link may be wrong, or the cleanup is not public.'
+      throw data(message, { status: 404, statusText: 'Cleanup not found' })
+    }
+    throw error
+  }
+  return { eventId, viewer }
+}
+
+/** /impact: the crew's totals */
+export async function impactLoader() {
+  await queryClient.query({ ...impactTotalsQuery(), staleTime: 'static' })
+  return null
+}</code></pre>
+                    </div>
+                    <p>Why return the viewer instead of letting the page read <code>useAuth()</code>? On sign-out, the session changes first and the loaders run again a moment later. A page that built its key from the session would ask for the guest's copy of a draft before the loader could turn that 404 into "Cleanup not found". With the key from the loader, the page and its loader always agree. Replace <code>src/pages/SitesPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/SitesPage.tsx"><code class="language-tsx">import { useSuspenseQuery } from '@tanstack/react-query'
+import { sitesQuery } from '../api/queries.ts'
+import { DataList } from '../components/DataList.tsx'
+import { SiteCard } from '../components/SiteCard.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './Page.module.css'
+
+export function SitesPage() {
+  useDocumentTitle('Beach sites')
+  // sitesLoader put the sites in the cache before this page renders: data is never undefined
+  const { data: sites } = useSuspenseQuery(sitesQuery())
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Beach sites&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;Six stretches of coast the crew looks after.&lt;/p&gt;
+      &lt;DataList
+        items={sites}
+        getKey={(site) =&gt; site.id}
+        emptyMessage="No beach sites yet."
+        renderItem={(site) =&gt; &lt;SiteCard site={site} /&gt;}
+      /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>In <code>src/pages/EventPage.tsx</code>, the imports, then the check-in desk's roster:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">+import { useQuery, useQueryErrorResetBoundary, useSuspenseQuery } from '@tanstack/react-query'
+ import { Suspense } from 'react'
+ import { Link, useLoaderData } from 'react-router'
+-import { describeError, getRoster } from '../api/client.ts'
++import { eventQuery, rosterQuery, viewerId } from '../api/queries.ts'
+ import type { CleanupEventDetail } from '../api/types.ts'
+ import { useAuth } from '../auth/AuthContext.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { StatusBadge } from '../components/StatusBadge.tsx'
+ import { Tab, TabList, TabPanel, Tabs } from '../components/Tabs.tsx'
+-import { useApi } from '../hooks/useApi.ts'
+ import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+ import { getAvailability } from '../utils/availability.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> // Today's roster from the API, loaded on its own, so the cleanup's details never wait for it
+ function TodaysDesk({ eventId }: TodaysDeskProps) {
+-  const roster = useApi(`/events/${eventId}/signups`, (signal) =&gt; getRoster(eventId, signal))
++  const viewer = viewerId(useAuth().session)
++  const roster = useQuery(rosterQuery(eventId, viewer))
+ 
+-  if (roster.state.kind !== 'ready') {
+-    return &lt;LoadStatus state={roster.state} what="today's roster" onRetry={roster.reload} /&gt;
++  if (!roster.isSuccess) {
++    return &lt;LoadStatus query={roster} what="today's roster" /&gt;
+   }
+   // The desk is for the people with a spot (not the waiting list or cancellations)
+-  const expected = roster.state.data.filter((entry) =&gt; entry.status === 'confirmed')
++  const expected = roster.data.filter((entry) =&gt; entry.status === 'confirmed')
+   return &lt;CheckInDesk entries={expected} /&gt;
+ }</code></pre>
+                    </div>
+                    <p>Then the page reads the cache, and the impact tab gets its reset. The report is no longer a promise from the loader: the tab's <code>ImpactSummary</code> asks the cache for it, and suspends until it is there:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> }
+ 
+-// What the impact tab shows when the report could not be loaded
+-function ImpactProblem({ error }: FallbackProps) {
+-  return (
+-    &lt;LoadStatus state={{ kind: 'failed', message: describeError(error) }} what="the impact report" /&gt;
+-  )
++// What the impact tab shows when the report could not be loaded: Try again calls retry
++function ImpactProblem({ error, retry }: FallbackProps) {
++  return &lt;LoadStatus query={{ status: 'error', error, refetch: retry }} what="the impact report" /&gt;
+ }
+ 
+-// The route is events/:eventId: eventLoader has loaded the cleanup before this page renders
++// The route is events/:eventId: eventLoader has put the cleanup in the cache before this page renders
+ export function EventPage() {
+-  const { event, impact } = useLoaderData&lt;typeof eventLoader&gt;()
++  const { eventId, viewer } = useLoaderData&lt;typeof eventLoader&gt;()
++  const { data: event } = useSuspenseQuery(eventQuery(eventId, viewer))
+   const { isOrganizer } = useAuth()
++  // Lets the impact tab's Try again ask the API again instead of showing the same error
++  const { reset } = useQueryErrorResetBoundary()
+   useDocumentTitle(event.title)
+   const checkInDay = isOrganizer &amp;&amp; event.status === 'scheduled' &amp;&amp; event.date === today
++  const completed = event.status === 'completed'
+ 
+   return (</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">         &lt;/p&gt;
+         &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
+-        {checkInDay || impact !== null ? (
++        {checkInDay || completed ? (
+           // A new key for each cleanup: fresh tabs, nothing selected from the last one
+           &lt;Tabs key={event.id} defaultTab={checkInDay ? 'desk' : 'details'}&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">               &lt;Tab id="details"&gt;Details&lt;/Tab&gt;
+               {checkInDay &amp;&amp; &lt;Tab id="desk"&gt;Check-in desk&lt;/Tab&gt;}
+-              {impact !== null &amp;&amp; &lt;Tab id="impact"&gt;Impact&lt;/Tab&gt;}
++              {completed &amp;&amp; &lt;Tab id="impact"&gt;Impact&lt;/Tab&gt;}
+             &lt;/TabList&gt;
+             &lt;TabPanel id="details"&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">               &lt;/TabPanel&gt;
+             )}
+-            {impact !== null &amp;&amp; (
++            {completed &amp;&amp; (
+               &lt;TabPanel id="impact"&gt;
+-                &lt;ErrorBoundary fallback={ImpactProblem}&gt;
+-                  &lt;Suspense fallback={&lt;LoadStatus state={{ kind: 'loading' }} what="the impact report" /&gt;}&gt;
+-                    &lt;ImpactSummary impact={impact} /&gt;
++                &lt;ErrorBoundary fallback={ImpactProblem} onRetry={reset}&gt;
++                  &lt;Suspense
++                    fallback={&lt;LoadStatus query={{ status: 'pending', error: null }} what="the impact report" /&gt;}
++                  &gt;
++                    &lt;ImpactSummary eventId={event.id} /&gt;
+                   &lt;/Suspense&gt;
+                 &lt;/ErrorBoundary&gt;</code></pre>
+                    </div>
+                    <p>In <code>src/components/ImpactSummary.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactSummary.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactSummary.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">-import { use } from 'react'
+-import type { DebrisCategory, ImpactReport } from '../api/types.ts'
++import { useSuspenseQuery } from '@tanstack/react-query'
++import { eventImpactQuery } from '../api/queries.ts'
++import type { DebrisCategory } from '../api/types.ts'
+ import { DataList } from './DataList.tsx'
+ </code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactSummary.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactSummary.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> 
+ interface ImpactSummaryProps {
+-  /** The report on its way: the event page's loader started the request */
+-  impact: Promise&lt;ImpactReport&gt;
++  eventId: string
+ }
+ 
+-// What a completed cleanup took off the beach. Suspends until the report arrives.
+-export function ImpactSummary({ impact }: ImpactSummaryProps) {
+-  const report = use(impact)
++// What a completed cleanup took off the beach. Suspends until the report is in the cache.
++export function ImpactSummary({ eventId }: ImpactSummaryProps) {
++  const { data: report } = useSuspenseQuery(eventImpactQuery(eventId))
+   const mostFirst = report.items.toSorted((a, b) =&gt; b.count - a.count)
+ </code></pre>
+                    </div>
+                    <p>Last, delete <code>src/hooks/useApi.ts</code> and <code>src/utils/loadState.ts</code> (right-click each in VS Code's Explorer, <strong>Delete</strong>). Run <code>npx tsc -b</code>: if anything still imports them or still passes <code>state</code> to <code>LoadStatus</code>, TypeScript lists it. It should print nothing. <code>useApi</code> did its job: it taught you what a query is, and every idea in it (a key, a load function with a signal, the viewer, keeping old data) is in today's code under a new name.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: The Impact page <span class="step-time">(14 min)</span></h3>
+                    <p>The request and its factory are ready since Step 2. The chart is its own component (Lesson 10.1 will load it only when someone opens the page). Create <code>src/components/ImpactChart.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactChart.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactChart.tsx"><code class="language-tsx">import type { ImpactTotals } from '../api/types.ts'
+import styles from './ImpactChart.module.css'
+
+/** One bar: an item of ImpactTotals' byMonth list */
+type MonthTotal = ImpactTotals['byMonth'][number]
+
+interface ImpactChartProps {
+  months: MonthTotal[]
+}
+
+const monthNames = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' })
+// The drawing is 360 units wide and scales with its card (on a phone too)
+const rowHeight = 36
+const barStart = 92 // room for the month names on the left
+const barSpace = 198 // the longest bar; the rest is room for its label
+
+// "2026-06" → "Jun 2026" (the 1st of the month at local midnight, so it never slips back a day)
+function monthLabel(month: string): string {
+  return monthNames.format(new Date(`${month}-01T00:00`))
+}
+
+// Kilograms collected per month, as horizontal bars. Screen readers get the same numbers as text.
+export function ImpactChart({ months }: ImpactChartProps) {
+  const heaviest = Math.max(1, ...months.map((month) =&gt; month.weightKg))
+  const summary = months.map((month) =&gt; `${monthLabel(month.month)}: ${month.weightKg} kg`)
+
+  return (
+    &lt;svg
+      className={styles.chart}
+      viewBox={`0 0 360 ${months.length * rowHeight}`}
+      role="img"
+      aria-label={`Weight collected by month. ${summary.join(', ')}.`}
+    &gt;
+      {months.map((month, index) =&gt; {
+        const top = index * rowHeight
+        const width = (month.weightKg / heaviest) * barSpace
+        return (
+          &lt;g key={month.month}&gt;
+            &lt;text className={styles.label} x={0} y={top + 23}&gt;
+              {monthLabel(month.month)}
+            &lt;/text&gt;
+            &lt;rect className={styles.bar} x={barStart} y={top + 6} width={width} height={24} rx={4} /&gt;
+            &lt;text className={styles.label} x={barStart + width + 6} y={top + 23}&gt;
+              {month.weightKg} kg
+            &lt;/text&gt;
+          &lt;/g&gt;
+        )
+      })}
+    &lt;/svg&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>An SVG is a picture to a screen reader, so <code>role="img"</code> and an <code>aria-label</code> that reads out every bar give it the same numbers sighted people get. The <code>viewBox</code> is the drawing's own coordinate system; the CSS makes it as wide as its card, so everything scales together. Create <code>src/components/ImpactChart.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactChart.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactChart.module.css"><code class="language-css">/* The chart scales with its column; the text inside scales with it */
+.chart {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+  height: auto;
+}
+
+.bar {
+  fill: var(--link);
+}
+
+.label {
+  fill: var(--text);
+  font-size: 16px;
+}</code></pre>
+                    </div>
+                    <p>SVG shapes are colored with <code>fill</code>, and <code>var(--link)</code> is the app's teal, which already has a lighter dark-mode value. Now the page, <code>src/pages/ImpactPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/ImpactPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/ImpactPage.tsx"><code class="language-tsx">import { useSuspenseQuery } from '@tanstack/react-query'
+import { impactTotalsQuery } from '../api/queries.ts'
+import { Card } from '../components/Card.tsx'
+import { ImpactChart } from '../components/ImpactChart.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './ImpactPage.module.css'
+import pageStyles from './Page.module.css'
+
+// The crew's dashboard: what every completed cleanup adds up to (impactLoader filled the cache)
+export function ImpactPage() {
+  useDocumentTitle('Our impact')
+  const { data: impact } = useSuspenseQuery(impactTotalsQuery())
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Our impact&lt;/h1&gt;
+      &lt;p className={pageStyles.lead}&gt;Everything the crew has taken off the beaches so far.&lt;/p&gt;
+      &lt;dl className={styles.totals}&gt;
+        &lt;div&gt;
+          &lt;dt&gt;Cleanups&lt;/dt&gt;
+          &lt;dd&gt;{impact.events}&lt;/dd&gt;
+        &lt;/div&gt;
+        &lt;div&gt;
+          &lt;dt&gt;Volunteers&lt;/dt&gt;
+          &lt;dd&gt;{impact.volunteersAttended}&lt;/dd&gt;
+        &lt;/div&gt;
+        &lt;div&gt;
+          &lt;dt&gt;Volunteer hours&lt;/dt&gt;
+          &lt;dd&gt;{impact.volunteerHours}&lt;/dd&gt;
+        &lt;/div&gt;
+        &lt;div&gt;
+          &lt;dt&gt;Bags&lt;/dt&gt;
+          &lt;dd&gt;{impact.bags}&lt;/dd&gt;
+        &lt;/div&gt;
+        &lt;div&gt;
+          &lt;dt&gt;Weight&lt;/dt&gt;
+          &lt;dd&gt;{impact.weightKg} kg&lt;/dd&gt;
+        &lt;/div&gt;
+      &lt;/dl&gt;
+      &lt;Card title="Weight collected by month"&gt;
+        &lt;ImpactChart months={impact.byMonth} /&gt;
+      &lt;/Card&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>A <code>dl</code> fits label-and-number pairs; a <code>div</code> around each pair is allowed inside <code>dl</code> and gives each one a box. Create <code>src/pages/ImpactPage.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/ImpactPage.module.css</div>
+                        <pre data-src="shoreline-hq/src/pages/ImpactPage.module.css"><code class="language-css">/* Five numbers in a row on a laptop, two or three per row on a phone */
+.totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 1rem;
+  margin: 0 0 2rem;
+}
+
+.totals div {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.totals dt {
+  color: var(--text-muted);
+}
+
+.totals dd {
+  margin: 0;
+  font-family: 'Outfit Variable', system-ui, sans-serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+}</code></pre>
+                    </div>
+                    <p>Give it a route with its loader in <code>src/App.tsx</code> (everyone may see it, so it stays outside the organizers' guard):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { EventsPage } from './pages/EventsPage.tsx'
+ import { HomePage } from './pages/HomePage.tsx'
+-import { eventLoader, sitesLoader } from './pages/loaders.ts'
++import { ImpactPage } from './pages/ImpactPage.tsx'
++import { eventLoader, impactLoader, sitesLoader } from './pages/loaders.ts'
+ import { NewEventPage } from './pages/NewEventPage.tsx'
+ import { NotFoundPage } from './pages/NotFoundPage.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">           { path: 'events/:eventId', element: &lt;EventPage /&gt;, loader: eventLoader },
+           { path: 'sites', element: &lt;SitesPage /&gt;, loader: sitesLoader },
++          { path: 'impact', element: &lt;ImpactPage /&gt;, loader: impactLoader },
+           { path: 'sign-in', element: &lt;SignInPage /&gt;, loader: guestsOnly, action: signInAction },
+           {</code></pre>
+                    </div>
+                    <p>And the link Lesson 6.1 took out of the header comes back, in <code>src/components/Header.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Header.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Header.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">           &lt;li&gt;&lt;NavLink to="/events"&gt;Events&lt;/NavLink&gt;&lt;/li&gt;
+           &lt;li&gt;&lt;NavLink to="/sites"&gt;Sites&lt;/NavLink&gt;&lt;/li&gt;
++          &lt;li&gt;&lt;NavLink to="/impact"&gt;Impact&lt;/NavLink&gt;&lt;/li&gt;
+           {isOrganizer &amp;&amp; &lt;li&gt;&lt;NavLink to="/volunteers"&gt;Volunteers&lt;/NavLink&gt;&lt;/li&gt;}
+         &lt;/ul&gt;</code></pre>
+                    </div>
+                    <figure class="screenshot">
+                        <img src="images/lesson_24/24-impact.png" alt="Shoreline Crew HQ&#x27;s Our impact page. The header has Events, Sites and Impact, with Impact underlined. Five boxes give the totals: Cleanups 6, Volunteers 68, Volunteer hours 214.5, Bags 45, Weight 176.2 kg. Below, a card titled Weight collected by month shows five teal horizontal bars, one per month, each labeled with its kilograms; the longest is 52.9 kg." width="1100" height="700" loading="lazy">
+                        <figcaption>The impact dashboard: <code>impactLoader</code> put <code>GET /api/impact</code> in the cache, and the page read it with <code>useSuspenseQuery</code>. The chart is plain SVG drawn from <code>byMonth</code>; the months depend on today's date, so yours will differ.</figcaption>
+                    </figure>
+                    <figure class="screenshot">
+                        <img src="images/lesson_24/24-impact-phone.png" alt="The Our impact page on a phone-sized screen in dark mode. The totals sit two to a row, and the chart&#x27;s bars and labels have shrunk with the card, light teal on dark blue." width="390" height="1086" loading="lazy">
+                        <figcaption>The same page at 390 pixels wide in dark mode: the chart scales with its card, and its colors come from the app's light and dark tokens.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 7: Watch the cache work <span class="step-time">(6 min)</span></h3>
+                    <p>Open the browser's DevTools (<kbd>F12</kbd>, or <kbd>⌥ Option</kbd>+<kbd>⌘ Cmd</kbd>+<kbd>I</kbd> on a Mac), choose the <strong>Network</strong> tab and type <code>4000</code> in its filter box so only API requests show:</p>
+                    <ul>
+                        <li>Go Home → Sites → Events: one request for the sites, not two.</li>
+                        <li>Open Weekend Cove Cleanup, press Back, open it again: one <code>e08</code> request in all. Wait more than 30 seconds and press Back: the list appears at once and its requests run behind it.</li>
+                        <li>On <code>/events</code>, scroll down, open a past cleanup, press Back: you are where you were.</li>
+                        <li>Signed in as Maya, open <code>/volunteers/v99</code>: the error is immediate.</li>
+                        <li>Sign out on <code>/events</code>: 17 cleanups become 15, with a new request for the guest's list.</li>
+                    </ul>
+                    <p>Then the checks:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 13ms on 60 files with 150 rules using 20 threads.
+&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 230 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-DKdjp4R3.css                             8.81 kB │ gzip:   2.69 kB
+dist/assets/index-CTHOleOb.js                            421.40 kB │ gzip: 132.35 kB
+
+✓ built in 1.07s</code></pre>
+                    </div>
+                    <p>The JavaScript grew from 384.04 kB to about 421 kB (gzip: from 121.72 to about 132 kB): TanStack Query is roughly 11 kB over the network, plus a new page. Lesson 10.1 measures and splits the bundle. Your hashes and timings will differ.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li><code>@tanstack/react-query</code> is installed, and <code>QueryClientProvider</code> wraps the app</li>
+                        <li><code>src/api/queries.ts</code> has the client (30-second <code>staleTime</code>, no retries for 4xx) and a factory per kind of data, with the viewer in every key whose answer depends on who asks</li>
+                        <li>No file imports <code>useApi</code> or <code>LoadState</code>, and both files are gone</li>
+                        <li>The sites, event and impact routes' loaders fill the cache; their pages read it with <code>useSuspenseQuery</code></li>
+                        <li>Back to the events list keeps your scroll position, and a cleanup you opened a moment ago opens without a request</li>
+                        <li>The Impact page shows the totals and the chart, in light and dark mode, and the header links to it</li>
+                        <li><code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass with no errors or warnings</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, list its kinds of server data and write a key for each, starting general and ending with everything the answer depends on (who asks, filters, page). Note a sensible <code>staleTime</code> next to each.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 12 minutes together, included in the lesson time). Exercise 3 is an optional stretch, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Say that the list is updating</h3>
+                    <p>While a new search loads, the events page shows the last search's list with no sign that a new one is coming. Make the status line start with "Updating… " while that is the case.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The query result has a boolean for "the data on screen is the placeholder". Pass it to <code>EventGroups</code> as a new prop.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">/** True while the list on screen is the last search's, and the new one is on its way */
+updating: boolean
+// ...
+function EventGroups({ events, sites, filtering, showDrafts, updating }: EventGroupsProps) {
+// ...
+&lt;p className={styles.lead} role="status"&gt;
+  {updating &amp;&amp; 'Updating… '}
+  Found {events.length} {events.length === 1 ? 'cleanup' : 'cleanups'}: {upcoming.length}{' '}
+  coming up, {past.length} in the log.
+&lt;/p&gt;
+// ...
+updating={events.isPlaceholderData}</code></pre>
+                        <p>Measured with <code>--latency=800</code>: after typing "pelican" the line read "Updating… Found 15 cleanups: 8 coming up, 7 in the log.", then "Found 3 cleanups: 1 coming up, 2 in the log.". The line is a <code>role="status"</code> region, so screen readers hear the change too. Type-checks and lints cleanly; the course's code continues without it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Predict the requests</h3>
+                    <p>Starting each time with a freshly loaded tab, write down how many requests each of these sends, then check in the Network tab: (a) open the home page, click <strong>Sites</strong>, then <strong>Events</strong>: how many <code>GET /api/sites</code>? (b) on <code>/events</code>, open Weekend Cove Cleanup, press Back, open it again within 30 seconds: how many <code>GET /api/events/e08</code>? (c) signed in as Maya, open <code>/volunteers/v99</code>: how many requests for <code>v99</code>, and how long until the error?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>For each one, ask: is there an entry under that key, is it fresh, and does the <code>retry</code> rule apply to this error?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>(a) One: the sites page's loader filled <code>['sites']</code>, and the events page found it fresh. (b) One, on the first visit; Back and the second visit used the fresh entries. (c) One request and an immediate error with the production build (<code>npm run preview</code>), because a 404 is not retried. On the dev server the measurement showed 2: development mode does extra work (such as React's Strict Mode checks), so compare request counts on <code>npm run preview</code>.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): Load before the click</h3>
+                    <p>Optional stretch, not counted in the lesson time. When the pointer rests on a cleanup's title in the list (or the keyboard focuses it), start loading that cleanup, so the click finds it in the cache.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>EventCard</code> can import <code>queryClient</code> and call <code>query()</code> with the same factory the loader uses. A prefetch nobody waits for must not leave an unhandled rejection behind.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">// A pointer resting on the link (or the keyboard focusing it) is a good guess at the next click:
+// start loading the cleanup now. Errors are ignored here; the page will report them.
+function prefetch() {
+  void queryClient.query(eventQuery(event.id, viewerId(session))).catch(() =&gt; {})
+}
+// ...
+&lt;Link to={`/events/${event.id}`} onPointerEnter={prefetch} onFocus={prefetch}&gt;
+  {event.title}
+&lt;/Link&gt;</code></pre>
+                        <p><code>session</code> comes from <code>useAuth()</code> next to <code>isOrganizer</code>. Measured: hovering Weekend Cove Cleanup sent <code>GET /api/events/e08</code>; the click that followed sent nothing, and the page appeared without the "Loading…" pill. Type-checks and lints cleanly. Not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> In <code>const list = useQuery(eventsQuery(search, viewer))</code>, what is the type of <code>list.data</code> before any check?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Where would a type like that come from? Look at what the factory's query function returns.">
+                                A) <code>unknown</code>, until you pass a type argument
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Is there data on the very first render, before any answer has arrived?">
+                                B) <code>Page&lt;CleanupEvent&gt;</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The type comes from getEvents through queryOptions, and undefined is there because a pending query has no data yet. Checking list.isSuccess narrows it to Page of CleanupEvent; useSuspenseQuery never has undefined.">
+                                C) <code>Page&lt;CleanupEvent&gt; | undefined</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Did the terminal card show any any? The factory has no annotations, yet tsc named exact types.">
+                                D) <code>any</code>, because the factory has no type annotations
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> You open Weekend Cove Cleanup, press Back, and open it again ten seconds later. How many requests for <code>/api/events/e08</code> does the HQ send in all?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The first visit fills the entry; ten seconds later it is still fresh (staleTime is 30 seconds), so the loader and the page both use it without asking the API. That was measured on the preview and the dev server.">
+                                A) One
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That was the HQ in Lesson 6.3. What does the cache do with an answer that is ten seconds old?">
+                                B) Two, one per visit
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The loader and the page share one key. Does a shared key mean two requests?">
+                                C) Four: a loader and a page per visit
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Something has to ask the API the first time. Where else would the data come from?">
+                                D) None: the list already had the cleanup
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Maya opens <code>/volunteers/v99</code>, which does not exist. Why does the HQ show the error at once instead of after several seconds?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="404 is an answer, not a crash. What decides whether useQuery asks again?">
+                                A) The error page catches 404s before the query runs
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="staleTime decides when to ask again after a success. Which option is about failures?">
+                                B) <code>staleTime</code> is 30 seconds
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Retrying is on by default in useQuery. What did the HQ change?">
+                                C) <code>useQuery</code> never retries
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The QueryClient's retry function returns false for an ApiError below 500, so a 404 fails on the first answer. With the default (three retries with growing pauses) the same page took over seven seconds.">
+                                D) The <code>retry</code> function in <code>queries.ts</code> skips errors below 500
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Maya is on <code>/events</code> (17 cleanups, with drafts) and clicks <strong>Sign out</strong>. Why does she not keep seeing the drafts from the cache?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing in the HQ clears the cache. Look at what the events key contains.">
+                                A) Signing out empties the whole cache
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The key ends with the viewer: after sign-out it is guest, a different entry with no data yet, so the page asks the API for the guest's list (15 cleanups). The organizer's entry stays in memory until gcTime, but nothing reads it.">
+                                B) The viewer is part of the key, so a guest's key points at a different entry
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The events page has no loader, and the guard only protects organizer pages. What makes useQuery ask again?">
+                                C) The guard loader redirects her
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Thirty seconds have not passed. Would a fresh entry be fetched again?">
+                                D) The organizer's list goes stale after 30 seconds
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> The Impact tab shows "Could not load the impact report". What makes its <strong>Try again</strong> send a new request?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Remounting was measured without the reset: what happened?">
+                                A) Nothing extra: re-rendering the children always fetches again
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="placeholderData shows old data while a new key loads. Is this a new key?">
+                                B) <code>placeholderData: keepPreviousData</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="useSuspenseQuery rethrows a cached error unless the error reset boundary has been reset. The ErrorBoundary calls onRetry, which is reset from useQueryErrorResetBoundary, before rendering the children again, so the query fetches.">
+                                C) <code>onRetry={reset}</code>, with <code>reset</code> from <code>useQueryErrorResetBoundary()</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The retry option decides automatic tries before the error shows. What happens after the error is on screen?">
+                                D) The <code>retry</code> option in the <code>QueryClient</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why factories instead of custom Hooks like <code>useEvents()</code>?</summary>
+                    <p>Custom query Hooks are common and fine, and a <code>useEvents(search)</code> would be one line around <code>useQuery</code>. But a Hook only works inside a component, and the HQ needs the same key and function in loaders too (and in Lesson 7.2, when it marks entries as out of date). A <code>queryOptions</code> factory is a plain function that works everywhere, keeps its types, and lets each page add its own options with a spread.</p>
+                </details>
+                <details>
+                    <summary>Now that there is a cache, do I still need loaders?</summary>
+                    <p>For the HQ, yes. Loaders still guard routes, still answer 404s before anything renders, and still make the first visit to a page appear complete instead of flashing "Loading…". The cache makes them cheap: a loader whose entry is already cached finishes at once. Pages with a search box in the address stay loader-free, as in Lesson 6.3.</p>
+                </details>
+                <details>
+                    <summary>Is there a way to see what is in the cache?</summary>
+                    <p>Yes: the TanStack Query Devtools, a separate package (<code>@tanstack/react-query-devtools</code>) with a <code>ReactQueryDevtools</code> component you put inside the provider. It shows every key, its data, and whether it is fresh, stale or fetching. Its documentation says it is left out of production builds automatically; check that in your own build output if you add it.</p>
+                </details>
+                <details>
+                    <summary>What happened to <code>LoadState</code>?</summary>
+                    <p>It did its job: TanStack Query's result is the same idea, a union tagged by <code>status</code>, made by the library. <code>LoadStatus</code> kept its messages and buttons and now reads that union directly, so the HQ has one fewer type to keep in step.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>On the morning of a cleanup, volunteers sign up at the last minute. Keep the check-in desk's roster fresh while it is on screen: give <code>rosterQuery</code> a shorter <code>staleTime</code> and a <code>refetchInterval</code> (milliseconds between background refetches while a component uses the query). Then check in the Network tab that the requests stop when you leave the page, and that the desk's marks survive each refresh (they live in the reducer from Lesson 5.1, not in the cache).</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Pick one key from <code>queries.ts</code> and write its story for one visit: who builds it (a loader, a page, or both), whether there is an entry, whether it is fresh, what request (if any) goes out, and when the entry is finally thrown away. Then write one sentence: what would go wrong if one part of that key were missing?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Server state is a copy of someone else's data: it needs a cache that knows how old each answer is</li>
+                        <li>A query key is the entry's label; it holds everything the answer depends on (filters, page, who asks), from general to specific</li>
+                        <li><code>queryOptions</code> factories keep the key and the function together and carry the data type to every Hook and loader that uses them</li>
+                        <li>A query result is a union tagged by <code>status</code>; <code>isSuccess</code> narrows <code>data</code>, and <code>isFetching</code> is a separate question</li>
+                        <li><code>staleTime</code> decides when to ask again, <code>gcTime</code> when to forget, <code>retry</code> which failures deserve another try</li>
+                        <li>Loaders fill the cache with <code>queryClient.query({ ...options, staleTime: 'static' })</code>; pages read it with <code>useSuspenseQuery</code>, and error boundaries call <code>reset</code> before retrying</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>See every endpoint the HQ can query</td><td><a href="api.html">The shoreline-api reference</a></td></tr>
+                            <tr><td>Read TanStack Query's guides (choose React and version 5)</td><td><a href="https://tanstack.com/query/latest" target="_blank" rel="noopener">tanstack.com/query</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>Every page of the HQ reads server data from one shared, typed cache</li>
+                        <li>Revisits are instant, Back keeps your place on the events list, and failures are retried only when it helps</li>
+                        <li>The loaders from Lesson 6.3 now fill the cache instead of holding their own copies</li>
+                        <li>The crew has an impact dashboard with an accessible chart</li>
+                        <li>You retired a Hook you wrote yourself, which is what growing as a developer often looks like</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The HQ can now read and remember. It still cannot change anything: the planning form says "Ready to save", and Cancel cleanup says nothing is sent. In <a href="lesson_25.html"><strong>Lesson 7.2: Mutations</strong></a> the HQ creates cleanups, cancels them and saves check-ins (editing a cleanup's details waits for Lesson 8.1), then tells the cache which entries are out of date (that is what the general-to-specific keys are for), including updates that show on screen before the API has even answered.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass</li>
+                    <li>Open the planning form, fill it in and press <strong>Publish</strong>: the message says it is ready to save, and nothing reaches shoreline-api. Note what you would expect the events list to show afterwards</li>
+                    <li>Add the keys for your own project's data to your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today you replaced working code with better code across most of the app, and it kept working at every step. That is a real professional skill, and a calm one: small changes, the compiler's list of what is left, and a check in the browser. Caching has a reputation for being one of the hard problems in programming. You now have a precise vocabulary for it (keys, fresh, stale, retry, reset), and the next time a list "doesn't update", you will know which questions to ask first.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_23.html" class="prev-lesson">← Previous: Data Loading and Protected Routes</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_25.html" class="next-lesson">Next: Mutations →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

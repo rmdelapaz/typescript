@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Write custom Hooks in TypeScript: extract Shoreline Crew HQ's four loading effects into a generic useApi Hook with a reload, add useDocumentTitle and a debounced search Hook, type tuple and object return values, and use useEffectEvent. React + TypeScript: Build a Modern Web App Lesson 4.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Custom Hooks - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🪝 Lesson 4.2: Custom Hooks</h1>
+                <p class="lead">Last lesson you wrote the same dozen lines four times: a state, an effect, a controller, a <code>.then</code> and a <code>.catch</code>, once for every page that loads data. Today you turn that pattern into a tool of your own. A custom Hook is just a function whose name starts with <code>use</code>, but it changes how a React app reads: each page says <em>what</em> it needs in one line, and the <em>how</em> lives in one place, typed once. You will build three Hooks for Shoreline Crew HQ, give every page a Try again button, and make the events search ask the API only when someone stops typing.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain what a custom Hook is, when a plain function is the better choice, and why two components that call the same Hook do not share its state</li>
+                        <li>Follow the Rules of Hooks inside your own Hooks, and read the linter's <code>rules-of-hooks</code> errors</li>
+                        <li>Type what a Hook returns: nothing, one value, a tuple with <code>as const</code>, or an object with an interface</li>
+                        <li>Write generic Hooks (<code>useDebouncedValue&lt;T&gt;</code>, <code>useApi&lt;T&gt;</code>) whose types follow the arguments you pass</li>
+                        <li>Pass a function into a Hook safely with <code>useEffectEvent</code>, and explain what a data library like TanStack Query adds on top of a Hook like <code>useApi</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_13.html">Lesson 4.1: Effects and Fetching</a> (your <code>shoreline-hq</code> loading its data from shoreline-api)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> Three Hooks (<code>useDocumentTitle</code>, <code>useApi</code>, <code>useDebouncedValue</code>), a Try again button on every page that loads data, tab titles, and an events search that asks the API</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-14-start.zip">lesson-14-start.zip</a> · Finished code: <a href="downloads/lesson-14-end.zip">lesson-14-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#what" class="toc-link">What a Custom Hook Is</a></li>
+                        <li><a href="#rules" class="toc-link">The Rules, for Your Own Hooks</a></li>
+                        <li><a href="#returns" class="toc-link">Typing What a Hook Returns</a></li>
+                        <li><a href="#generic" class="toc-link">Generic Hooks: Waiting for the Typing to Stop</a></li>
+                        <li><a href="#useapi" class="toc-link">A Hook for Loading Data</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Three Hooks for the HQ</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="what" class="lesson-section">
+                <h2>🪝 What a Custom Hook Is</h2>
+                <p>Open <code>SitesPage.tsx</code> and <code>NewEventPage.tsx</code> side by side. Apart from the heading and what they show, they are the same: a <code>LoadState</code>, an effect with an <code>AbortController</code>, the same <code>.then</code> and <code>.catch</code>. The home page and the events page repeat it again. Four copies means four places to fix when you add a Try again button, and four chances to forget the <code>aborted</code> check in one of them.</p>
+                <p>You already know the cure for repeated code in JavaScript: a function. The only question is what to do about the Hooks inside it. React's answer is simple: <strong>a function whose name starts with <code>use</code> may call Hooks.</strong> That function is a <strong>custom Hook</strong>. There is no registration, no special type, no import from React: the name is the whole contract.</p>
+                <p>Here is the smallest useful one, pulled out of Lesson 4.1's <code>TideClock</code>. Try it as <code>src/Scratch.tsx</code> (your experiment file for this lesson), shown by temporarily making <code>return &lt;TideClock /&gt;</code> the first line of <code>CurrentPage</code> in <code>App.tsx</code>:</p>
+                <pre data-snippet><code class="language-tsx">import { useEffect, useState } from 'react'
+
+// A custom Hook: a function whose name starts with "use" and that calls other Hooks
+function useNow(intervalMs: number): Date {
+  const [now, setNow] = useState(() =&gt; new Date())
+
+  useEffect(() =&gt; {
+    const timer = setInterval(() =&gt; setNow(new Date()), intervalMs)
+    return () =&gt; clearInterval(timer)
+  }, [intervalMs])
+
+  return now
+}
+
+export function TideClock() {
+  const now = useNow(1000)
+  return &lt;p&gt;Crew time: {now.toLocaleTimeString('en-US')}&lt;/p&gt;
+}
+
+export function MinuteClock() {
+  const now = useNow(60_000)
+  return &lt;p&gt;This minute: {now.toLocaleTimeString('en-US', { timeStyle: 'short' })}&lt;/p&gt;
+}</code></pre>
+                <ul>
+                    <li><code>useNow</code> calls <code>useState</code> and <code>useEffect</code> exactly as a component would. It returns a value instead of elements: the current time, typed <code>Date</code> by its return annotation.</li>
+                    <li><code>TideClock</code> asks for the time every second, <code>MinuteClock</code> every minute. Each reads like a sentence; the timer, its cleanup and its dependency live in one place.</li>
+                    <li><code>intervalMs</code> is a parameter, and the effect reads it, so it goes in the dependency array. A Hook's parameters are just values from the component that calls it.</li>
+                </ul>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the laminated checklist</h4>
+                    <p>Every Shoreline Crew lead carries the same laminated card: "check in with the harbor office, count the bags, radio when you leave". The card is the custom Hook. It is written once, and every crew follows it. But each crew that follows the card has its <em>own</em> radio, its own bag count and its own sign-off. Nobody shares a bag count because they share a card. Custom Hooks share <em>logic</em>, never <em>state</em>.</p>
+                </div>
+                <p>That last sentence is worth proving. Put two components on a page that both call the Hook you will build today, <code>useApi('/sites', getSites)</code>:</p>
+                <pre data-snippet><code class="language-tsx">import { getSites } from './api/client.ts'
+import { useApi } from './hooks/useApi.ts'
+
+function SiteCount() {
+  const sites = useApi('/sites', getSites)
+  return &lt;p&gt;Sites: {sites.state.kind === 'ready' ? sites.state.data.length : '…'}&lt;/p&gt;
+}
+
+export function TwoCounts() {
+  return (
+    &lt;&gt;
+      &lt;SiteCount /&gt;
+      &lt;SiteCount /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p>The page shows "Sites: 6" twice, and the Network tab on the dev server shows four requests for <code>/api/sites</code>, two of them canceled: each <code>SiteCount</code> has its own state and its own effect, and Strict Mode runs each effect twice in development (Lesson 4.1). Two calls, two requests, two states. Sharing one answer between components is a different job: lifting state up (Lesson 3.4), context (Lesson 5.2), or a data library with a cache (Lesson 7.1).</p>
+                <div class="mermaid">
+graph TD
+    A["SitesPage"] --> H["useApi"]
+    B["EventsPage"] --> H
+    H --> S["useState: its own state"]
+    H --> E["useEffect: its own request"]
+</div>
+                <h3>Hook, function or component?</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>The repeated code…</th><th>Make it a…</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>calls no Hooks: it only calculates</td><td>plain function (no <code>use</code> in the name)</td><td><code>formatDate</code>, <code>getAvailability</code>, <code>validateEvent</code></td></tr>
+                            <tr><td>returns elements for the screen</td><td>component</td><td><code>LoadStatus</code>, <code>EventCard</code></td></tr>
+                            <tr><td>calls Hooks and returns values</td><td>custom Hook</td><td><code>useApi</code>, <code>useDebouncedValue</code>, <code>useDocumentTitle</code> (today)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>On a team, custom Hooks are how knowledge gets shared: the one person who worked out the canceling, the error messages and the retry writes them once, and everyone else writes one line. Most React codebases you join will have a <code>hooks/</code> folder, and reading, using and reviewing those Hooks is daily work. Interviewers like the topic too: "extract this into a custom Hook and type it" is a classic exercise.</p>
+                </div>
+                <p>A useful habit from experienced teams: wait until you have written something twice before you extract it, and name the Hook after what it gives the component (<code>useNow</code>), not after how it works inside (<code>useIntervalState</code>). The HQ has four copies of its loading effect, so it is well past "twice".</p>
+            </section>
+
+            <section id="rules" class="lesson-section">
+                <h2>📏 The Rules, for Your Own Hooks</h2>
+                <p>The Rules of Hooks from Lesson 3.4 apply inside your Hooks too, because React cannot tell where a Hook call comes from: it only counts calls, in order, on every render. So:</p>
+                <ul>
+                    <li><strong>Call Hooks at the top level</strong> of a component or a custom Hook: never inside a condition, a loop, a nested function, or after an early <code>return</code>.</li>
+                    <li><strong>Call Hooks only from components and custom Hooks</strong>, never from a plain function.</li>
+                    <li><strong>Start a custom Hook's name with <code>use</code></strong>, followed by a capital letter: <code>useApi</code>, not <code>useapi</code> or <code>loadApi</code>.</li>
+                </ul>
+                <p>The name matters to the tools, not just to people. Here is the tab-title effect from Lesson 4.1's Exercise 2, extracted into a function with an ordinary name:</p>
+                <pre data-snippet><code class="language-tsx">import { useEffect } from 'react'
+
+// Not named use…: the linter cannot tell that it calls Hooks
+function setTabTitle(title: string) {
+  useEffect(() =&gt; {
+    document.title = title
+  }, [title])
+}
+
+export function SitesHeading() {
+  setTabTitle('Beach sites')
+  return &lt;h1&gt;Beach sites&lt;/h1&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run lint)</h4>
+                    <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  × react-hooks(rules-of-hooks): React Hook "useEffect" is called in function "setTabTitle" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".
+   ╭─[src/Scratch.tsx:5:3]
+ 3 │ // Not named use…: the linter cannot tell that it calls Hooks
+ 4 │ function setTabTitle(title: string) {
+   ·          ─────┬─────
+   ·               ╰── Outer function
+ 5 │   useEffect(() =&gt; {
+   ·   ────┬────
+   ·       ╰── Hook is called here
+ 6 │     document.title = title
+   ╰────
+
+Found 0 warnings and 1 error.
+Finished in 12ms on 34 files with 150 rules using 20 threads.</code></pre>
+                </div>
+                <p>TypeScript has no complaint (<code>npx tsc -b</code> passes): types say nothing about where Hooks may run. The linter's <code>rules-of-hooks</code> check is an <strong>error</strong>, and its message tells you the fix in its last sentence: rename <code>setTabTitle</code> to <code>useTabTitle</code> and the error is gone. With the <code>use</code> name, the linter checks every rule <em>inside</em> the Hook as well, which is how it catches the mistake in Common Mistakes.</p>
+                <p>Read that error as feedback, not as a scolding. The rules feel arbitrary until you remember why they exist: React matches the first <code>useState</code> call with the first piece of state, the second with the second, on every render. A Hook that only sometimes runs shifts every Hook after it.</p>
+            </section>
+
+            <section id="returns" class="lesson-section">
+                <h2>🧾 Typing What a Hook Returns</h2>
+                <p>A Hook can return anything a function can. Four shapes cover nearly every Hook you will write or meet:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Returns</th><th>When</th><th>Example</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>nothing (<code>void</code>)</td><td>The Hook only keeps something outside React in step</td><td><code>useDocumentTitle('Beach sites')</code></td></tr>
+                            <tr><td>one value</td><td>The component needs one thing</td><td><code>const search = useDebouncedValue(query, 300)</code></td></tr>
+                            <tr><td>a tuple</td><td>Two (at most three) things the caller names itself, like <code>useState</code></td><td><code>const [open, toggle] = useToggle(false)</code></td></tr>
+                            <tr><td>an object</td><td>Three or more things, or things whose names matter</td><td><code>const sites = useApi(…)</code>, then <code>sites.state</code>, <code>sites.reload</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h3>The tuple trap</h3>
+                <p>A toggle Hook returns a value and a function, like <code>useState</code> does:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+function useToggle(initial: boolean) {
+  const [on, setOn] = useState(initial)
+  const toggle = () =&gt; setOn((current) =&gt; !current)
+  return [on, toggle]
+}
+
+export function DetailsButton() {
+  const [open, toggle] = useToggle(false)
+  return (
+    &lt;button type="button" aria-expanded={open} onClick={toggle}&gt;
+      Details
+    &lt;/button&gt;
+  )
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:12:48 - error TS2322: Type 'boolean | (() =&gt; void) | undefined' is not assignable to type 'MouseEventHandler&lt;HTMLButtonElement&gt; | undefined'.
+  Type 'boolean' is not assignable to type 'MouseEventHandler&lt;HTMLButtonElement&gt;'.
+
+12     &lt;button type="button" aria-expanded={open} onClick={toggle}&gt;
+                                                  ~~~~~~~
+
+  node_modules/@types/react/index.d.ts:2469:9 - The expected type comes from property 'onClick' which is declared here on type 'DetailedHTMLProps&lt;ButtonHTMLAttributes&lt;HTMLButtonElement&gt;, HTMLButtonElement&gt;'
+    2469         onClick?: MouseEventHandler&lt;T&gt; | undefined;
+                 ~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:12</code></pre>
+                </div>
+                <p>Read the first line of the message: <code>toggle</code> is <code>boolean | (() =&gt; void) | undefined</code>. When TypeScript infers the type of an array literal, it assumes the array can grow, shrink and be reordered, so <code>[on, toggle]</code> becomes <code>(boolean | (() =&gt; void))[]</code>: any number of items, each either kind. Destructuring an array then gives each name the union, plus <code>undefined</code> because of <code>noUncheckedIndexedAccess</code> (Lesson 2.4: an array may be shorter than you think). Nothing says the first item is the boolean.</p>
+                <p>The fix is two words at the end of the <code>return</code>:</p>
+                <pre data-snippet><code class="language-tsx">function useToggle(initial: boolean) {
+  const [on, setOn] = useState(initial)
+  const toggle = () =&gt; setOn((current) =&gt; !current)
+  return [on, toggle] as const
+}</code></pre>
+                <p><code>as const</code> tells TypeScript "this array will never change". The return type becomes <code>readonly [boolean, () =&gt; void]</code>, a <strong>tuple</strong>: exactly two items, a boolean first and a function second. <code>npx tsc -b</code> passes, and <code>open</code> and <code>toggle</code> each get their own type. You met tuples in Lesson 4.1 (<code>Promise.all</code>); <code>useState</code>'s own return type is a tuple too.</p>
+                <p>An object needs no such trick: property names keep their own types. For a Hook other files will use, write the object's shape as an exported interface and put it in the return annotation. The interface is then the Hook's documentation, and a mistake inside the Hook (a missing property, a wrong type) is reported at the <code>return</code>, inside the Hook, instead of in every component that uses it.</p>
+            </section>
+
+            <section id="generic" class="lesson-section">
+                <h2>🧬 Generic Hooks: Waiting for the Typing to Stop</h2>
+                <p>This lesson's events search will ask the API instead of filtering in the browser. The API searches more than the page could: titles, descriptions <em>and</em> site names, so "pelican" will find every cleanup at Pelican Point Beach. But a search box changes on every keystroke. Typing "pelican" one letter at a time would send seven requests, for "p", "pe", "pel" and so on, when only the last one matters.</p>
+                <p>The usual answer is to <strong>debounce</strong>: wait until the value has stopped changing for a moment, then use it. As a Hook:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/hooks/useDebouncedValue.ts</div>
+                    <pre data-src="shoreline-hq/src/hooks/useDebouncedValue.ts"><code class="language-ts">import { useEffect, useState } from 'react'
+
+/** The value, but only once it has stopped changing for `delay` milliseconds */
+export function useDebouncedValue&lt;T&gt;(value: T, delay: number): T {
+  const [settled, setSettled] = useState(value)
+
+  useEffect(() =&gt; {
+    const timer = setTimeout(() =&gt; setSettled(value), delay)
+    return () =&gt; clearTimeout(timer)
+  }, [value, delay])
+
+  return settled
+}</code></pre>
+                </div>
+                <ul>
+                    <li>Every new <code>value</code> starts a timer, and the cleanup of the previous run clears the previous timer. While someone keeps typing, each keystroke cancels the last timer, so <code>setSettled</code> only runs once the typing has paused for <code>delay</code> milliseconds.</li>
+                    <li>Setting state inside a timer callback is what effects are for; the linter's <code>set-state-in-effect</code> rule from Lesson 4.1 does not mind it.</li>
+                    <li>The file is <code>.ts</code>, not <code>.tsx</code>: a Hook that returns no elements contains no JSX.</li>
+                </ul>
+                <p>The <code>&lt;T&gt;</code> makes it work for any kind of value, exactly like Lesson 2.3's <code>first&lt;T&gt;</code>. You almost never write the type yourself: TypeScript infers <code>T</code> from the first argument. Measured with this course's setup, <code>useDebouncedValue(query.trim(), 300)</code> returns <code>string</code>, and with the events page's status (typed <code>StatusFilter</code>) it returns <code>StatusFilter</code>: whatever goes in comes out, with its type. <code>useState(value)</code> inside needs no annotation for the same reason: its type is <code>T</code>.</p>
+                <div class="mermaid">
+graph TD
+    A["Key: p"] --> B["Timer starts"]
+    B --> C["Key: e, timer restarts"]
+    C --> D["... more keys ..."]
+    D --> E["300 ms with no key"]
+    E --> F["settled = pelican"]
+    F --> G["One request"]
+</div>
+                <p>In the project the events page sends <code>?q=</code> to the API with the settled value. Measured on the dev server, typing "pelican" with a tenth of a second between keys sent exactly one search, <code>perPage=50&amp;q=pelican</code>. With the delay set to <code>0</code> (try it after the project), the same typing sent 7 requests, one per letter.</p>
+            </section>
+
+            <section id="useapi" class="lesson-section">
+                <h2>🔌 A Hook for Loading Data</h2>
+                <p>Now the big one: the loading effect from Lesson 4.1, as a Hook. The page should say <em>how</em> to load its data, and the Hook should do the rest. The obvious first try takes the load function as a parameter and, as the linter asks, puts it in the dependency array:</p>
+                <pre data-snippet><code class="language-tsx">import { useEffect, useState } from 'react'
+import { describeError, getEvents } from './api/client.ts'
+import type { LoadState } from './utils/loadState.ts'
+
+// A first try: the load function is a dependency like any other
+function useApiFirstTry&lt;T&gt;(load: (signal: AbortSignal) =&gt; Promise&lt;T&gt;): LoadState&lt;T&gt; {
+  const [state, setState] = useState&lt;LoadState&lt;T&gt;&gt;({ kind: 'loading' })
+
+  useEffect(() =&gt; {
+    const controller = new AbortController()
+    load(controller.signal)
+      .then((data) =&gt; setState({ kind: 'ready', data }))
+      .catch((error: unknown) =&gt; {
+        if (controller.signal.aborted) return
+        setState({ kind: 'failed', message: describeError(error) })
+      })
+    return () =&gt; controller.abort()
+  }, [load])
+
+  return state
+}
+
+export function CoveCount() {
+  const search = 'cove'
+  const state = useApiFirstTry((signal) =&gt; getEvents(`q=${search}`, signal))
+  return &lt;p&gt;{state.kind === 'ready' ? `Found ${state.data.page.total}` : 'Searching…'}&lt;/p&gt;
+}</code></pre>
+                <p><code>npx tsc -b</code> and <code>npm run lint</code> both pass. The page shows "Found 2". And the Network tab fills up: on this course's machine, more than 700 requests in two seconds, the same flood as an effect with no array at all. Why? <code>(signal) =&gt; getEvents(…)</code> creates a <em>new</em> function on every render of <code>CoveCount</code>. React compares dependencies with <code>Object.is</code>, and two functions are never the same object, even with the same code. So: render, new function, effect runs, answer arrives, state changes, render, new function, effect runs…</p>
+                <p>Two pieces of information are mixed up in that one parameter. <strong>What</strong> you are loading (the sites, or the cleanups matching "cove") decides when to load again. <strong>How</strong> you load it (which client function, which signal) does not. So <code>useApi</code> takes them separately:</p>
+                <ul>
+                    <li><code>key</code>: a short string naming what is loaded. The course uses the API path, <code>'/sites'</code> or <code>'/events?q=cove'</code>. Strings compare by value, so the same key on every render means "nothing changed". The key is in the effect's array.</li>
+                    <li><code>load</code>: how to load it, a function that receives the <code>AbortSignal</code>. It may be a new function on every render; that no longer matters.</li>
+                </ul>
+                <p>The second point needs React 19's <code>useEffectEvent</code>. It wraps a function so that an effect can call it and always get the latest version, without that function being a dependency:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/hooks/useApi.ts</div>
+                    <pre data-src="shoreline-hq/src/hooks/useApi.ts" data-match="excerpt"><code class="language-ts">export function useApi&lt;T&gt;(key: string, load: (signal: AbortSignal) =&gt; Promise&lt;T&gt;): ApiResult&lt;T&gt; {
+  const [state, setState] = useState&lt;LoadState&lt;T&gt;&gt;({ kind: 'loading' })
+  const [attempt, setAttempt] = useState(0)
+  // The latest load function, without making the effect run again when it changes
+  const loadLatest = useEffectEvent(load)
+
+  useEffect(() =&gt; {
+    const controller = new AbortController()
+    loadLatest(controller.signal)
+      .then((data) =&gt; setState({ kind: 'ready', data }))
+      .catch((error: unknown) =&gt; {
+        if (controller.signal.aborted) return
+        console.error(error)
+        setState({ kind: 'failed', message: describeError(error) })
+      })
+    return () =&gt; controller.abort()
+  }, [key, attempt])
+
+  function reload() {
+    setState({ kind: 'loading' })
+    setAttempt((count) =&gt; count + 1)
+  }
+
+  return { state, reload }
+}</code></pre>
+                </div>
+                <ul>
+                    <li><code>loadLatest</code> has the same type as <code>load</code> (<code>useEffectEvent</code>'s type is "give me a function, get the same kind of function back"). The effect calls it; the linter knows functions from <code>useEffectEvent</code> must <em>not</em> be in the array (Common Mistakes shows the warning).</li>
+                    <li>The array is <code>[key, attempt]</code>. The effect does not read <code>key</code> at all: <code>key</code> is there only to say "run again when this changes", the same trick as <code>attempt</code> in Lesson 4.1's Exercise 1.</li>
+                    <li><code>reload</code> is that exercise, built in: show the loading message and count one more attempt, in the same click. Every page gets a Try again button for free.</li>
+                    <li>When <code>key</code> changes, the state does not go back to <code>loading</code> (setting state at the top of an effect is what the linter warned about in 4.1). The page keeps showing the last answer until the new one arrives. For a search box that is exactly right: the list does not blink away while you type. You will see it with a slow API in the project.</li>
+                </ul>
+                <p>The types follow the arguments again. <code>useApi('/sites', getSites)</code> infers <code>T</code> from <code>getSites</code>' return type, <code>Promise&lt;Site[]&gt;</code>, so the result is <code>ApiResult&lt;Site[]&gt;</code>, its <code>state</code> is <code>LoadState&lt;Site[]&gt;</code> and <code>reload</code> is <code>() =&gt; void</code>. After <code>sites.state.kind === 'ready'</code>, <code>sites.state.data</code> is <code>Site[]</code>, exactly as before: the Hook moved the code, not the safety.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: useEffectEvent</h4>
+                    <p><code>useEffectEvent</code> joined React's stable releases in React 19.2; in older code and older articles you will see the same problem solved with <code>useCallback</code> (Lesson 5.3) or a ref that stores the latest function (Lesson 4.3 introduces refs). The idea is the same: the effect should run again when <em>what</em> changes, not when a function is recreated.</p>
+                </div>
+                <h3>What useApi does not do, and why a library takes over later</h3>
+                <p><code>useApi</code> is about forty lines, and it is the right size for learning what every data library does inside. It is not the end of the story. Here is what it leaves out:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Real apps want…</th><th>useApi today</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Two pages asking for <code>'/sites'</code> share one answer (a cache)</td><td>Every call sends its own request; leave a page and come back, and it loads again</td></tr>
+                            <tr><td>Retrying a failed request on its own, a couple of times</td><td>Only when someone presses Try again</td></tr>
+                            <tr><td>Refreshing data that may be old when the tab gets focus again</td><td>Never refreshes by itself</td></tr>
+                            <tr><td>Knowing "showing old results, new ones on the way"</td><td>Keeps old results but cannot say so (Exercise 3 adds it)</td></tr>
+                            <tr><td>Updating the screen after a create or edit, everywhere it appears</td><td>No idea that data changed</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Lesson 7.1 replaces <code>useApi</code> with <strong>TanStack Query</strong>, which does all of this. You will recognize its main Hook: <code>useQuery</code> takes a <code>queryKey</code> (what you load, and the key of its cache) and a <code>queryFn</code> (how to load it, and it receives a <code>signal</code>). That is today's <code>key</code> and <code>load</code>, with years of edge cases handled. Writing the small version first is how the big one stops being magic.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ An early return before a Hook, inside your Hook</h4>
+                    <p>It looks harmless to skip the work when there is no title:</p>
+                    <pre data-snippet><code class="language-tsx">import { useEffect } from 'react'
+
+export function useTabTitle(title: string) {
+  if (title === '') return
+  useEffect(() =&gt; {
+    document.title = title
+  }, [title])
+}</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_14/14-conditional-hook.png" alt="A terminal in shoreline-hq. npm run lint reports an error from react-hooks(rules-of-hooks): React Hook useEffect is called conditionally. React Hooks must be called in the exact same order in every component render. The code frame marks the useEffect call after the early return, with the help text: move the Hook call before the condition." width="1100" height="343" loading="lazy">
+                        <figcaption>The linter knows <code>useTabTitle</code> is a Hook from its name, so it checks the Rules of Hooks inside it: an early <code>return</code> before a Hook is an error, not a warning.</figcaption>
+                    </figure>
+                    <p>On renders where the title is empty, <code>useEffect</code> is not called, and every Hook the component calls after <code>useTabTitle</code> shifts by one. Do what the help line says: call the Hook every time and put the condition <em>inside</em> the effect (<code>if (title === '') return</code> as the effect's first line).</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Putting the useEffectEvent function in the array</h4>
+                    <p>Old habits say "everything the effect uses goes in the array". For functions from <code>useEffectEvent</code>, the linter says the opposite:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint, trimmed)</h4>
+                        <pre><code>  ⚠ react-hooks(exhaustive-deps): Functions returned from `useEffectEvent` must not be included in the dependency array.
+    ╭─[src/hooks/useApi.ts:32:21]
+ 31 │     return () =&gt; controller.abort()
+ 32 │   }, [key, attempt, loadLatest])
+    ·                     ──────────
+ 33 │
+    ╰────
+  help: Remove the dependency from the dependency array.</code></pre>
+                    </div>
+                    <p>A <code>useEffectEvent</code> function is not meant to trigger anything; it is a fresh copy on every render, so in the array it would bring back the endless requests. Leave it out, and put the values that <em>should</em> trigger a reload (the key) in the array.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Calling load directly in the effect</h4>
+                    <p>Skip <code>useEffectEvent</code> and call <code>load(controller.signal)</code> in the effect, and the linter notices twice: <code>loadLatest</code> is unused, and</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint, one of two warnings)</h4>
+                        <pre><code>  ⚠ react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'load'
+  help: Either include it or remove the dependency array.</code></pre>
+                    </div>
+                    <p>Adding <code>load</code> to the array makes the warning go away and brings back the first try's flood of requests. The warning is right that the effect reads <code>load</code>; <code>useEffectEvent</code> is how you tell React it should read the latest one without reacting to it.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Three Hooks for the HQ</h2>
+                <p>At the end of this project, <code>src/hooks/</code> holds three Hooks. Every page that loads data uses <code>useApi</code> (no more copied effects) and shows a Try again button when loading fails. The sites, events and "Plan a cleanup" pages put their name in the browser tab. And the events page searches through the API, once the typing pauses, with the status filter asking the API too.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>) and delete <code>src/Scratch.tsx</code> (and the line you added to <code>CurrentPage</code>) if you still have them.</p>
+
+                <div class="card">
+                    <h3>Step 1: The tab title Hook <span class="step-time">(6 min)</span></h3>
+                    <p>Create the folder <code>src/hooks</code> and in it <code>useDocumentTitle.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/hooks/useDocumentTitle.ts</div>
+                        <pre data-src="shoreline-hq/src/hooks/useDocumentTitle.ts"><code class="language-ts">import { useEffect } from 'react'
+
+const appName = 'Shoreline Crew HQ'
+
+/** Shows "title · Shoreline Crew HQ" in the browser tab while the component is on the screen */
+export function useDocumentTitle(title: string): void {
+  useEffect(() =&gt; {
+    const previous = document.title
+    document.title = `${title} · ${appName}`
+    return () =&gt; {
+      document.title = previous
+    }
+  }, [title])
+}</code></pre>
+                    </div>
+                    <p>This is Lesson 4.1's Exercise 2 with a name: remember the old title, set the new one, put the old one back in the cleanup. The return type <code>void</code> says out loud that this Hook gives the component nothing; it only keeps the tab in step. <code>title</code> is in the array, so a page whose title changes (Exercise 2) updates the tab. The app's name is added in one place, so no page can spell it differently.</p>
+                    <p>Restoring the old title may look unnecessary today, because every link loads a whole new page. From Lesson 6.1 the router swaps pages without a reload, and then a page that leaves without its cleanup would leave its title behind.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The data Hook <span class="step-time">(12 min)</span></h3>
+                    <p>Create <code>src/hooks/useApi.ts</code>. Everything inside the function is the pattern from Lesson 4.1, now in one place:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/hooks/useApi.ts</div>
+                        <pre data-src="shoreline-hq/src/hooks/useApi.ts"><code class="language-ts">import { useEffect, useEffectEvent, useState } from 'react'
+import { describeError } from '../api/client.ts'
+import type { LoadState } from '../utils/loadState.ts'
+
+/** What useApi gives a component: the state of the request, and a way to send it again */
+export interface ApiResult&lt;T&gt; {
+  state: LoadState&lt;T&gt;
+  reload: () =&gt; void
+}
+
+/**
+ * Loads data when the component appears, and again whenever `key` changes.
+ * key: what is loaded (a short text that changes when the request should change)
+ * load: how to load it (gets an AbortSignal so the request can be canceled)
+ */
+export function useApi&lt;T&gt;(key: string, load: (signal: AbortSignal) =&gt; Promise&lt;T&gt;): ApiResult&lt;T&gt; {
+  const [state, setState] = useState&lt;LoadState&lt;T&gt;&gt;({ kind: 'loading' })
+  const [attempt, setAttempt] = useState(0)
+  // The latest load function, without making the effect run again when it changes
+  const loadLatest = useEffectEvent(load)
+
+  useEffect(() =&gt; {
+    const controller = new AbortController()
+    loadLatest(controller.signal)
+      .then((data) =&gt; setState({ kind: 'ready', data }))
+      .catch((error: unknown) =&gt; {
+        if (controller.signal.aborted) return
+        console.error(error)
+        setState({ kind: 'failed', message: describeError(error) })
+      })
+    return () =&gt; controller.abort()
+  }, [key, attempt])
+
+  function reload() {
+    setState({ kind: 'loading' })
+    setAttempt((count) =&gt; count + 1)
+  }
+
+  return { state, reload }
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>ApiResult&lt;T&gt;</code> is exported, so any file can name the result's type, and the return annotation makes TypeScript check the <code>return</code> against it.</li>
+                        <li>The <code>/** … */</code> comment above the function is what VS Code shows when you hover over <code>useApi</code> anywhere in the project: documentation for the next person, who may be you in a month.</li>
+                        <li><code>describeError</code> and <code>console.error</code> moved here from the pages: the messages for people and the details for developers are now decided once.</li>
+                    </ul>
+                    <p>Run <code>npx tsc -b</code>: no errors, even though nothing uses the Hook yet.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Try again, for every page <span class="step-time">(6 min)</span></h3>
+                    <p><code>LoadStatus</code> gets an optional <code>onRetry</code> prop. When it is there, the error gets a <strong>Try again</strong> button. Replace <code>src/components/LoadStatus.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/LoadStatus.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/LoadStatus.tsx"><code class="language-tsx">import type { LoadState } from '../utils/loadState.ts'
+import buttonStyles from './Button.module.css'
+import styles from './LoadStatus.module.css'
+
+interface LoadStatusProps {
+  state: LoadState&lt;unknown&gt;
+  /** What is loading, for the messages: "the beach sites" */
+  what: string
+  /** Shows a "Try again" button under the error */
+  onRetry?: () =&gt; void
+}
+
+// The message to show while data is on its way, or when it could not be loaded
+export function LoadStatus({ state, what, onRetry }: LoadStatusProps) {
+  if (state.kind === 'loading') {
+    return (
+      &lt;p role="status" className={styles.loading}&gt;
+        Loading {what}…
+      &lt;/p&gt;
+    )
+  }
+  if (state.kind === 'failed') {
+    return (
+      &lt;div className={styles.failed}&gt;
+        &lt;p role="alert"&gt;
+          Could not load {what}. {state.message}
+        &lt;/p&gt;
+        {onRetry &amp;&amp; (
+          &lt;button type="button" className={buttonStyles.secondary} onClick={onRetry}&gt;
+            Try again
+          &lt;/button&gt;
+        )}
+      &lt;/div&gt;
+    )
+  }
+  return null
+}</code></pre>
+                    </div>
+                    <p>The alert text stays in its own <code>&lt;p role="alert"&gt;</code>, so screen readers announce the message without the button's label mixed in; the red border moves to the <code>div</code> around both. The button uses the shared <code>buttonStyles</code> from Lesson 3.6. Add the two new rules at the end of <code>src/components/LoadStatus.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/LoadStatus.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/LoadStatus.module.css" data-match="diff"><code class="language-diff-css"> .failed {
+   border: 2px solid var(--error);
+ }
++
++.failed p {
++  margin: 0;
++}
++
++.failed button {
++  margin-top: 0.75rem;
++}</code></pre>
+                    </div>
+                    <p>Because <code>onRetry</code> is optional, the four pages still compile unchanged. Their turn is next.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Three pages, one line each <span class="step-time">(12 min)</span></h3>
+                    <p>Replace <code>src/pages/SitesPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/SitesPage.tsx"><code class="language-tsx">import { getSites } from '../api/client.ts'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { SiteCard } from '../components/SiteCard.tsx'
+import { useApi } from '../hooks/useApi.ts'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './Page.module.css'
+
+export function SitesPage() {
+  useDocumentTitle('Beach sites')
+  const sites = useApi('/sites', getSites)
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Beach sites&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;Six stretches of coast the crew looks after.&lt;/p&gt;
+      {sites.state.kind === 'ready' ? (
+        &lt;div className={styles.grid}&gt;
+          {sites.state.data.map((site) =&gt; (
+            &lt;SiteCard key={site.id} site={site} /&gt;
+          ))}
+        &lt;/div&gt;
+      ) : (
+        &lt;LoadStatus state={sites.state} what="the beach sites" onRetry={sites.reload} /&gt;
+      )}
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Compare it with the version from Lesson 4.1: the imports of <code>useEffect</code>, <code>useState</code>, <code>describeError</code>, <code>Site</code> and <code>LoadState</code> are gone, and a dozen lines of state and effect became one line. <code>getSites</code> is passed as it is, because its signature, <code>(signal?: AbortSignal) =&gt; Promise&lt;Site[]&gt;</code>, already fits <code>load</code>. Hooks come first in the component, as always.</p>
+                    <p>"Plan a cleanup" loads the same sites. Replace <code>src/pages/NewEventPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/NewEventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/NewEventPage.tsx"><code class="language-tsx">import { getSites } from '../api/client.ts'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { NewEventForm } from '../components/NewEventForm.tsx'
+import { useApi } from '../hooks/useApi.ts'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './Page.module.css'
+
+export function NewEventPage() {
+  useDocumentTitle('Plan a cleanup')
+  // The form needs the sites for its menu and its checks
+  const sites = useApi('/sites', getSites)
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Plan a cleanup&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;
+        Fill in the basics. Save it as a draft to finish later, or publish it so volunteers can
+        sign up.
+      &lt;/p&gt;
+      {sites.state.kind === 'ready' ? (
+        &lt;NewEventForm sites={sites.state.data} /&gt;
+      ) : (
+        &lt;LoadStatus state={sites.state} what="the beach sites" onRetry={sites.reload} /&gt;
+      )}
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The home page needs a parameter: its query string. In <code>src/pages/HomePage.tsx</code>, change the imports:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx">-import { useEffect, useState } from 'react'
+-import { describeError, getEvents, type Page } from '../api/client.ts'
++import { getEvents, type Page } from '../api/client.ts'
+ import type { CleanupEvent } from '../api/types.ts'
+ import { Card } from '../components/Card.tsx'
+ import { LoadStatus } from '../components/LoadStatus.tsx'
++import { useApi } from '../hooks/useApi.ts'
+ import { formatDate } from '../utils/format.ts'
+-import type { LoadState } from '../utils/loadState.ts'
+ import styles from './Page.module.css'</code></pre>
+                    </div>
+                    <p>name the query once, under the towns:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx"> const towns = ['Port Marisol', 'Calder Bay', 'Seal Rock']
++
++// One cleanup is enough: the first scheduled one from today on
++const nextQuery = 'status=scheduled&amp;when=upcoming&amp;perPage=1'</code></pre>
+                    </div>
+                    <p>and replace the state and the effect at the top of <code>HomePage</code>, and the card's contents:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx"> export function HomePage() {
+-  const [state, setState] = useState&lt;LoadState&lt;Page&lt;CleanupEvent&gt;&gt;&gt;({ kind: 'loading' })
+-
+-  // One cleanup is enough: the first scheduled one from today on
+-  useEffect(() =&gt; {
+-    const controller = new AbortController()
+-    getEvents('status=scheduled&amp;when=upcoming&amp;perPage=1', controller.signal)
+-      .then((upcoming) =&gt; setState({ kind: 'ready', data: upcoming }))
+-      .catch((error: unknown) =&gt; {
+-        if (controller.signal.aborted) return
+-        console.error(error)
+-        setState({ kind: 'failed', message: describeError(error) })
+-      })
+-    return () =&gt; controller.abort()
+-  }, [])
++  const upcoming = useApi(`/events?${nextQuery}`, (signal) =&gt; getEvents(nextQuery, signal))</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx">         &lt;Card title="Next cleanup"&gt;
+-          {state.kind === 'ready' ? (
+-            &lt;NextCleanup upcoming={state.data} /&gt;
++          {upcoming.state.kind === 'ready' ? (
++            &lt;NextCleanup upcoming={upcoming.state.data} /&gt;
+           ) : (
+-            &lt;LoadStatus state={state} what="the next cleanup" /&gt;
++            &lt;LoadStatus state={upcoming.state} what="the next cleanup" onRetry={upcoming.reload} /&gt;
+           )}</code></pre>
+                    </div>
+                    <p>Here <code>load</code> is an inline arrow, a new function on every render, and that is fine: thanks to <code>useEffectEvent</code> only the key decides when to load. The key is built from the same constant as the request, so the two cannot disagree. Run <code>npx tsc -b</code> and open <code>/</code>, <code>/sites</code> and <code>/events/new</code>: everything looks as before, and the tabs of the last two now say where you are.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The events page searches through the API <span class="step-time">(16 min)</span></h3>
+                    <p>Create <code>src/hooks/useDebouncedValue.ts</code> with the code from the lesson (Generic Hooks). Then the events page changes the most: the API does the searching and the status filtering, and the page only groups what it gets back. Replace <code>src/pages/EventsPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx"><code class="language-tsx">import { useState } from 'react'
+import { getEvents, getSites } from '../api/client.ts'
+import type { CleanupEvent, Site } from '../api/types.ts'
+import { EventFilters, type StatusFilter } from '../components/EventFilters.tsx'
+import { EventList } from '../components/EventList.tsx'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { useApi } from '../hooks/useApi.ts'
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './Page.module.css'
+
+interface EventGroupsProps {
+  events: CleanupEvent[]
+  sites: Site[]
+  filtering: boolean
+}
+
+// The cleanups the API found, in three groups
+function EventGroups({ events, sites, filtering }: EventGroupsProps) {
+  const upcoming = events.filter((event) =&gt; event.status === 'scheduled')
+  const drafts = events.filter((event) =&gt; event.status === 'draft')
+  const past = events
+    .filter((event) =&gt; event.status === 'completed' || event.status === 'cancelled')
+    .toReversed()
+  const noMatches = 'No cleanups here match your filters.'
+
+  return (
+    &lt;&gt;
+      &lt;p className={styles.lead} role="status"&gt;
+        Found {events.length} {events.length === 1 ? 'cleanup' : 'cleanups'}: {upcoming.length}{' '}
+        coming up, {past.length} in the log.
+      &lt;/p&gt;
+      &lt;h2&gt;Coming up&lt;/h2&gt;
+      &lt;EventList
+        events={upcoming}
+        sites={sites}
+        emptyMessage={filtering ? noMatches : 'Nothing scheduled yet.'}
+      /&gt;
+      &lt;h2&gt;Drafts&lt;/h2&gt;
+      &lt;EventList
+        events={drafts}
+        sites={sites}
+        emptyMessage={filtering ? noMatches : 'No drafts waiting to be published.'}
+      /&gt;
+      &lt;h2&gt;Past cleanups&lt;/h2&gt;
+      &lt;EventList
+        events={past}
+        sites={sites}
+        emptyMessage={filtering ? noMatches : 'No cleanups in the log yet.'}
+      /&gt;
+    &lt;/&gt;
+  )
+}
+
+export function EventsPage() {
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState&lt;StatusFilter&gt;('all')
+  useDocumentTitle('Cleanup events')
+
+  // The API searches; the page asks only once the typing has paused
+  const search = useDebouncedValue(query.trim(), 300)
+  const params = new URLSearchParams({ perPage: '50' })
+  if (search !== '') params.set('q', search)
+  if (status !== 'all') params.set('status', status)
+  const eventsQuery = params.toString()
+
+  const sites = useApi('/sites', getSites)
+  const events = useApi(`/events?${eventsQuery}`, (signal) =&gt; getEvents(eventsQuery, signal))
+
+  function clearFilters() {
+    setQuery('')
+    setStatus('all')
+  }
+
+  // Whichever request is not ready yet decides what the status message says
+  const waiting = sites.state.kind !== 'ready' ? sites : events
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Cleanup events&lt;/h1&gt;
+      &lt;p&gt;
+        &lt;a href="/events/new"&gt;Plan a cleanup&lt;/a&gt;
+      &lt;/p&gt;
+      &lt;EventFilters
+        query={query}
+        status={status}
+        onQueryChange={setQuery}
+        onStatusChange={setStatus}
+        onClear={clearFilters}
+      /&gt;
+      {sites.state.kind === 'ready' &amp;&amp; events.state.kind === 'ready' ? (
+        &lt;EventGroups
+          events={events.state.data.items}
+          sites={sites.state.data}
+          filtering={search !== '' || status !== 'all'}
+        /&gt;
+      ) : (
+        &lt;LoadStatus state={waiting.state} what="the cleanups" onRetry={waiting.reload} /&gt;
+      )}
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>matchesFilters</code> is gone: the API filters. <code>URLSearchParams</code> builds the query string (and encodes anything a person types, such as spaces or <code>&amp;</code>). After the <code>status !== 'all'</code> check, TypeScript narrows <code>status</code> from <code>StatusFilter</code> to <code>EventStatus</code>, so only one of the four statuses the API accepts can be sent.</li>
+                        <li>The query string is also the key: a different search or status is a different key, so <code>useApi</code> loads again; the same one is not.</li>
+                        <li><code>search</code> is the <em>settled</em> text. The input still shows every key you press (it reads <code>query</code>), but the request waits for 300 ms of quiet.</li>
+                        <li>Two <code>useApi</code> calls, two independent states: the sites load once, the cleanups again for every search. <code>waiting</code> picks whichever is not ready yet for the message and its Try again button, since both have the same shape (<code>ApiResult</code>).</li>
+                        <li>The heading, the link and the filters always show; only the results wait. In Lesson 4.1 an early return hid the whole page while loading. Now that loading happens on every search, the search box must never disappear while you type in it. The grouped list moved into a small local component, <code>EventGroups</code>, like <code>NextCleanup</code> on the home page.</li>
+                        <li>The status line now says "Found 15 cleanups" instead of "Showing 15 of 15": the page only knows what the API sent back.</li>
+                    </ul>
+                    <p>Open <code>/events</code> and type <code>pelican</code>:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_14/14-events-search.png" alt="The Cleanup events page with pelican typed in the Search cleanups box, outlined in red. The status line says Found 3 cleanups: 1 coming up, 2 in the log. Coming up shows Family Beach Morning; the Past cleanups group further down holds the two finished cleanups at Pelican Point Beach." width="1100" height="688" loading="lazy">
+                        <figcaption>The API searches titles, descriptions <em>and</em> site names, so pelican finds every cleanup at Pelican Point Beach. The request went out once, after the typing paused.</figcaption>
+                    </figure>
+                    <p>In the browser's Network tab (filter by <strong>Fetch/XHR</strong>), the search shows up as one request for <code>events?perPage=50&amp;q=pelican</code> after you stop typing. Choose <strong>Cancelled</strong> in the Status menu, and a request with <code>status=cancelled</code> follows at once. <strong>Clear filters</strong> brings all fifteen back.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Check it, slow it down, break it <span class="step-time">(8 min)</span></h3>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 11ms on 33 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>Now watch the Hook keep the previous answer. Stop shoreline-api and start it slow:</p>
+                    <pre class="terminal"><code class="language-bash">node server.ts --latency=1500</code></pre>
+                    <p>Reload <code>/events</code>, wait for the list, and type <code>pelican</code>. For about a second and a half after you stop typing, the page still shows the fifteen cleanups, and the status line still says <strong>Found 15 cleanups: 8 coming up, 7 in the log.</strong> Then the three results replace them. Nothing blinks, nothing jumps. (Exercise 3 adds a "Searching…" message for that second and a half.)</p>
+                    <p>Last, stop shoreline-api and reload <code>/sites</code>:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_14/14-sites-retry.png" alt="The Beach sites page with shoreline-api stopped. A box with a red border says Could not load the beach sites. Could not reach the server. Check that shoreline-api is running, then try again. Under the message is a Try again button, outlined in red." width="984" height="652" loading="lazy">
+                        <figcaption>Every page that loads data now gets a <strong>Try again</strong> button from <code>useApi</code>'s <code>reload</code>. Start the API, press it, and the sites appear.</figcaption>
+                    </figure>
+                    <p>Start the API again (<code>node server.ts</code>) and press <strong>Try again</strong>: the six sites appear and the error and its button are gone. Try the same on <code>/</code>, <code>/events</code> and <code>/events/new</code>; each page got the button from one line in <code>useApi</code> and one prop on <code>LoadStatus</code>.</p>
+                    <p><strong>Your own project:</strong> look at your Lesson 11.1 app's list of screens from last lesson. Which pieces of logic would more than one screen repeat (loading, a search box, a toggle, the tab title)? Write down the name of each Hook you would extract, its parameters and its return type.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>src/hooks/</code> has <code>useDocumentTitle</code>, <code>useApi</code> and <code>useDebouncedValue</code>, each with typed parameters and return type</li>
+                        <li>☐ No page contains <code>useEffect</code> any more: the home, events, sites and "Plan a cleanup" pages load through <code>useApi</code></li>
+                        <li>☐ The sites, events and "Plan a cleanup" tabs show the page's name and "Shoreline Crew HQ"</li>
+                        <li>☐ With shoreline-api stopped, every page shows the error with a Try again button that works once the API is back</li>
+                        <li>☐ Typing "pelican" in the events search sends one request after the typing pauses, and finds three cleanups</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: A toggle Hook for the event cards</h3>
+                    <p>Every <code>EventCard</code> has a "Show details" button backed by <code>useState(false)</code> and an updater that flips it. Write <code>src/hooks/useToggle.ts</code> that returns the value and a function that flips it, as a tuple, and use it in <code>EventCard</code> so the button's <code>onClick</code> is just the function.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Start from the toggle in Typing What a Hook Returns. Which two words keep the tuple's types apart? And in <code>EventCard</code>, what can you remove from the imports?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/hooks/useToggle.ts</div>
+                            <pre data-snippet><code class="language-ts">import { useState } from 'react'
+
+/** A true/false value and a function that flips it */
+export function useToggle(initial: boolean) {
+  const [on, setOn] = useState(initial)
+  const toggle = () =&gt; setOn((current) =&gt; !current)
+  return [on, toggle] as const
+}</code></pre>
+                        </div>
+                        <p>In <code>EventCard.tsx</code>, remove the <code>react</code> import, import <code>useToggle</code> from <code>'../hooks/useToggle.ts'</code>, and change the state line and the button:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                            <pre data-snippet><code class="language-tsx">export function EventCard({ event, site }: EventCardProps) {
+  const [showDetails, toggleDetails] = useToggle(false)
+  // ...
+      &lt;button
+        type="button"
+        className={styles.toggle}
+        aria-expanded={showDetails}
+        onClick={toggleDetails}
+      &gt;</code></pre>
+                        </div>
+                        <p><code>npx tsc -b</code> and <code>npm run lint</code> pass, and each card still opens and closes on its own: measured, "Show details for Tide Pool Morning Cleanup" turned into "Hide details" with <code>aria-expanded="true"</code> and showed the description. Fifteen cards, fifteen calls, fifteen separate values: the checklist, not the bag count. The course's code keeps <code>useState</code> here.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: The tab title follows the search</h3>
+                    <p>While someone searches the events, make the tab say <strong>Search: pelican · Shoreline Crew HQ</strong> (with whatever they searched for), and <strong>Cleanup events · Shoreline Crew HQ</strong> again when the box is empty. Which value should the title use: what is typed, or what was searched?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>useDocumentTitle</code> already has <code>title</code> in its dependency array, so the tab updates whenever you pass a new string. The call has to come after the line that works out <code>search</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Move the call below <code>search</code> and give it a condition:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">// The API searches; the page asks only once the typing has paused
+const search = useDebouncedValue(query.trim(), 300)
+useDocumentTitle(search === '' ? 'Cleanup events' : `Search: ${search}`)</code></pre>
+                        </div>
+                        <p>Using the settled <code>search</code> keeps the tab in step with the results, and saves six title changes while "pelican" is typed. Measured: after the search the tab says <code>Search: pelican · Shoreline Crew HQ</code>. Each new title runs the effect's cleanup first, so the "previous" title it restores at the end is always the one from before the page opened. The course's code keeps the fixed title.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: "Searching…" (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 20 minutes).</em></p>
+                    <p>With <code>node server.ts --latency=1500</code>, the old list stays on the screen while a search loads, but nothing says so. Give <code>ApiResult</code> a third property, <code>updating: boolean</code>, that is true while the data shown belongs to an older key, and make the events page's status line say <strong>Searching…</strong> while it is true.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Remember which key the current data was loaded for, in a second piece of state set next to the data in <code>.then</code>. Then <code>updating</code> is a derived value: no effect, no extra state for it.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>In <code>useApi.ts</code>, add the property to the interface (<code>updating: boolean</code>), then:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/hooks/useApi.ts</div>
+                            <pre data-snippet><code class="language-ts">const [attempt, setAttempt] = useState(0)
+// The key the current data was loaded for
+const [loadedKey, setLoadedKey] = useState(key)
+// The latest load function, without making the effect run again when it changes
+const loadLatest = useEffectEvent(load)
+
+useEffect(() =&gt; {
+  const controller = new AbortController()
+  loadLatest(controller.signal)
+    .then((data) =&gt; {
+      setState({ kind: 'ready', data })
+      setLoadedKey(key)
+    })
+  // ...
+  return { state, reload, updating: state.kind === 'ready' &amp;&amp; loadedKey !== key }</code></pre>
+                        </div>
+                        <p>In <code>EventsPage.tsx</code>, give <code>EventGroups</code> a <code>searching: boolean</code> prop, pass <code>searching={events.updating}</code>, and choose the text:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">&lt;p className={styles.lead} role="status"&gt;
+  {searching ? (
+    'Searching…'
+  ) : (
+    &lt;&gt;
+      Found {events.length} {events.length === 1 ? 'cleanup' : 'cleanups'}:{' '}
+      {upcoming.length} coming up, {past.length} in the log.
+    &lt;/&gt;
+  )}
+&lt;/p&gt;</code></pre>
+                        </div>
+                        <p>Measured with 1.5 seconds of latency: a moment after "pelican" is typed the line says <strong>Searching…</strong>, and when the answer arrives it changes to <strong>Found 3 cleanups: 1 coming up, 2 in the log.</strong> TanStack Query has this built in as <code>isFetching</code> and <code>isPlaceholderData</code> (Lesson 7.1).</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>SitesPage</code> and <code>NewEventPage</code> both call <code>useApi('/sites', getSites)</code>, and both are on the screen at once. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A custom Hook shares logic, not state. Each call has its own useState and its own effect, so each component sends its own request and keeps its own result. Sharing one answer needs a cache, which TanStack Query adds in Lesson 7.1.">
+                                A) Each component sends its own request and keeps its own state
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The key names what is loaded, but useApi has no cache. Where does each call keep its state?">
+                                B) The second one reuses the first one's answer, because the key is the same
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Two components calling the same Hook is normal, like two components calling useState. What does each call get?">
+                                C) React shows an error, because a Hook can only be used by one component
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A function named <code>setTabTitle</code> calls <code>useEffect</code>. Which tool complains, and how?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Types say nothing about where Hooks may be called. Did npx tsc -b fail in the lesson?">
+                                A) <code>npx tsc -b</code>, with a type error
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing goes wrong at run time in this case, yet the code breaks a rule. Which tool reads function names?">
+                                B) The browser console, when the page renders
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="oxlint's rules-of-hooks check sees useEffect in a function that is neither a component nor a Hook, and reports an error. Renaming it useTabTitle fixes it, and makes the linter check the rules inside it too.">
+                                C) <code>npm run lint</code>, with a <code>rules-of-hooks</code> error that says Hook names must start with use
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The linter found a broken rule, and broken rules of Hooks are errors. What did the output say: warning or error?">
+                                D) <code>npm run lint</code>, with a warning that can be ignored
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> <code>useToggle</code> ends with <code>return [on, toggle]</code>, without <code>as const</code>. What type does <code>toggle</code> get in <code>const [open, toggle] = useToggle(false)</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That would need a tuple. What does TypeScript infer for an array literal that could change?">
+                                A) <code>() =&gt; void</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript does infer a type here; it is just too wide. Read the first line of the TS2322 message.">
+                                B) <code>any</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript keeps both kinds of items in the array's type. Which union did the message show?">
+                                C) <code>boolean</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Without as const the return type is an array of boolean or function, so each destructured name gets the union, plus undefined because noUncheckedIndexedAccess is on. as const makes it a readonly tuple: a boolean first, then a function.">
+                                D) <code>boolean | (() =&gt; void) | undefined</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> The first try at <code>useApi</code> had <code>load</code> in its dependency array, and a page passed <code>(signal) =&gt; getEvents('q=cove', signal)</code>. Why did it send hundreds of requests?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The array was there and complete; the linter was satisfied. What is different about the arrow function on each render?">
+                                A) The effect had no dependency array
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Each render creates a new arrow function, and Object.is says two functions are never equal. So every render changed a dependency, the effect ran, set state, and rendered again. useApi now reloads only when the key string changes, and reads the function through useEffectEvent.">
+                                B) Every render created a new function, so the dependency changed every time
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Strict Mode doubles effects once, when the component first appears. Would that explain hundreds?">
+                                C) Strict Mode runs effects over and over in development
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The API answered every request correctly. What made the effect run again after each answer?">
+                                D) The API rejected the requests, so they were retried
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> You type "pelican" into the events search, one key at a time. With <code>useDebouncedValue(query.trim(), 300)</code>, which requests go to the API?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That is what happened with the delay set to 0. What does each new key do to the previous timer?">
+                                A) Seven: one for every letter
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The search box itself shows every letter at once, because it reads query. Which value is the request built from?">
+                                B) None until you press Enter
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Each new value clears the previous timer in the effect's cleanup, so the settled value only changes once the typing pauses for 300 ms. The key then becomes perPage=50 and q=pelican, and useApi sends one request.">
+                                C) One, for <code>q=pelican</code>, after the typing pauses
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Is a custom Hook just a component without JSX?</summary>
+                    <p>Close, but the difference matters. A component returns elements and React decides when to call it; it gets its own place in the tree. A Hook returns whatever you like and runs <em>inside</em> the component that calls it, as part of that component's render: its state is that component's state. That is why a Hook can give a value back to the component, and why two components using it never share its state.</p>
+                </details>
+                <details>
+                    <summary>Where should Hooks live, and how many is too many?</summary>
+                    <p><code>src/hooks/</code> for Hooks used by several files (the course's folder layout); a Hook used by one component can stay in that component's file, like a local helper. Extract when you see the same Hooks-plus-logic twice, or when a component's top half is about <em>how</em> instead of <em>what</em>. A Hook that only wraps one <code>useState</code> with nothing added is usually not worth a file.</p>
+                </details>
+                <details>
+                    <summary>Why <code>useEffectEvent</code> and not <code>useCallback</code>?</summary>
+                    <p>With <code>useCallback</code> (Lesson 5.3), every page would have to wrap its load function and list that function's dependencies correctly, or the endless requests come back. <code>useEffectEvent</code> puts the fix inside the Hook, once, and lets pages pass a plain arrow. It is meant for exactly this: logic an effect calls that should see the latest props without causing the effect to run again.</p>
+                </details>
+                <details>
+                    <summary>Should I write my own <code>useApi</code> at work?</summary>
+                    <p>For a real product, usually not: use TanStack Query or your framework's data loading, which handle caching, retries, refetching and mutations you would otherwise write and debug yourself. But nearly every team writes small Hooks like <code>useDocumentTitle</code>, <code>useDebouncedValue</code> and <code>useToggle</code>, and the ones that use a library still wrap it in their own Hooks (<code>useEvents()</code>, <code>useSites()</code>). Knowing how <code>useApi</code> works is what lets you debug those.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Organizers keep choosing the same status filter. Write <code>useStoredState&lt;T&gt;(storageKey: string, initial: T)</code>, a Hook with the same return type as <code>useState</code> (a tuple) that also saves the value in <code>localStorage</code> and reads it back when the page opens. Use it for the events page's status so "Completed" survives a reload. Two things to think about: <code>localStorage</code> only stores strings (and <code>JSON.parse</code> returns <code>any</code>: check what comes back, as Lesson 2.4 taught, before you trust it), and the initial read belongs in <code>useState</code>'s function form, not in an effect. Lesson 7.3 does this properly with Zustand's <code>persist</code>.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> In your own words, explain the difference between <code>useApi</code>'s <code>key</code> and its <code>load</code> function, and what went wrong in the first try that took only <code>load</code>. Then pick one piece of logic in your own planned app that two screens would repeat, and sketch the Hook: its name, its parameters with types, and what it returns (nothing, a value, a tuple or an object, and why).</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A custom Hook is a function whose name starts with <code>use</code> and that calls other Hooks; it shares logic between components, never state</li>
+                        <li>The Rules of Hooks hold inside your Hooks; the linter finds Hooks by their names and reports broken rules as errors</li>
+                        <li>Return nothing, one value, a tuple (with <code>as const</code>, or TypeScript infers an array of unions) or an object described by an exported interface</li>
+                        <li>Generic Hooks take their types from their arguments: <code>useDebouncedValue(query, 300)</code> is a <code>string</code>, <code>useApi('/sites', getSites)</code> an <code>ApiResult&lt;Site[]&gt;</code></li>
+                        <li>A function passed into a Hook is new on every render; let a key decide when to reload, and read the function through <code>useEffectEvent</code></li>
+                        <li>Debouncing waits for a value to settle before using it: one request per pause instead of one per key</li>
+                        <li><code>useApi</code> shows what every data library does inside, and what it leaves out (cache, retries, refetching), which is why TanStack Query replaces it in Lesson 7.1</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Look up tuples, generics and <code>as const</code></td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Check what <code>q</code> and <code>status</code> do on the API</td><td><a href="api.html">The shoreline-api reference</a></td></tr>
+                            <tr><td>Read React's guide to custom Hooks</td><td><a href="https://react.dev/learn/reusing-logic-with-custom-hooks" target="_blank" rel="noopener">React: Reusing Logic with Custom Hooks</a></td></tr>
+                            <tr><td>Read the reference for <code>useEffectEvent</code></td><td><a href="https://react.dev/reference/react/useEffectEvent" target="_blank" rel="noopener">React: useEffectEvent</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You wrote your first custom Hooks and typed their parameters and return values</li>
+                        <li>You read <code>rules-of-hooks</code> errors and a tuple-versus-array type error, and fixed both</li>
+                        <li>You replaced four copied effects with one generic <code>useApi</code>, and found out why a function in a dependency array can flood a server</li>
+                        <li>You gave every data page a working Try again button and every main page a tab title</li>
+                        <li>You moved the events search to the API with a debounced value, and watched the Hook keep old results while new ones load</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Hooks so far have worked with values that drive what React draws. In <a href="lesson_15.html"><strong>Lesson 4.3: Refs and the DOM</strong></a> you reach past React to the actual elements: <code>useRef</code> for values React should not re-render for, focusing the search box with the <kbd>/</kbd> key, passing a ref as a prop the React 19 way, and a dialog in a portal that asks "Cancel this cleanup?" with the focus where a keyboard user needs it.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, <code>src/Scratch.tsx</code> is gone, and the debounce delay is back at <code>300</code> if you tried <code>0</code></li>
+                    <li>Restart shoreline-api without switches (<code>node server.ts</code>)</li>
+                    <li>Keep your list of Hooks for your own app with your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Extracting a Hook is one of those skills that feels like magic in other people's code and like plumbing in your own. Today you did the plumbing, including the part where the first try flooded the server. That was not a failure; it was the most useful moment of the lesson, because now you know <em>why</em> keys and <code>useEffectEvent</code> exist, and you will spot the same bug in a code review. Every React developer has written that loop at least once. Writing it on purpose, measuring it, and fixing it is how you become the one who explains it to others.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_13.html" class="prev-lesson">← Previous: Effects and Fetching</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_15.html" class="next-lesson">Next: Refs and the DOM →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

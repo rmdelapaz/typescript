@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 23</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 23: Performance and the Build</h1>
+    <p class="sub">Answers and reasoning for every Session 23 item: the self-check, the lesson's mistakes as measured, the lab's reference solution and budget runs, the lesson page's own quiz and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>23</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>10.1 · Performance and the Build: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt"><code class="inline">npm run build</code> prints "Some chunks are larger than 500 kB after minification". Best first step?</div><div class="opts"><div class="opt">A) Raise <code class="inline">build.chunkSizeWarningLimit</code> until it goes away</div><div class="opt">B) Treat it as a failed build and roll back</div><div class="opt correct">C) Look inside the bundle, then split out what most visitors do not need</div><div class="opt">D) Replace React with a smaller library</div></div><div class="why"><b>Why:</b> It is a warning, not an error: one big file usually means everyone downloads code they do not need. Measure (who downloads what), look (the treemap), then split (Lesson 10.1). Raising the limit changes nothing a visitor downloads.<br><b>A</b> is wrong: That silences the message and changes no byte.<br><b>B</b> is wrong: The build worked; the warning is advice.<br><b>D</b> is wrong: React DOM is the price of using React; the treemap shows bigger wins.</div></div>
+  <div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">Before Lesson 10.1, the HQ's build ends like this. What does every visitor download, guest or organizer?</div><pre class="code">dist/assets/index-B-Vm3u1y.js                            581.69 kB │ gzip: 182.31 kB</pre><div class="opts"><div class="opt correct">A) All 581.69 kB: React, the router, the query library, the form libraries and every page</div><div class="opt">B) About 182 kB to parse and run</div><div class="opt">C) Only the code for the pages they open</div><div class="opt">D) Nothing until they click</div></div><div class="why"><b>Why:</b> One JavaScript file holds everything. The network carries the gzip size (182.31 kB), but the phone still parses and runs all 581.69 kB. The lesson's Network table: 1 file, 581.69 kB, for every kind of visit.<br><b>B</b> is wrong: Gzip is what travels; the browser unpacks and runs the full size.<br><b>C</b> is wrong: Without dynamic imports there is nothing to load later.<br><b>D</b> is wrong: The single file is the first thing index.html loads.</div></div>
+  <div class="q" data-sc="3"><div class="qn">Q3</div><div class="qt">In a data router, a route's <code class="inline">lazy</code> downloads the page's file when?</div><div class="opts"><div class="opt">A) When the app starts</div><div class="opt">B) After the loader's data has arrived</div><div class="opt correct">C) At the same time as the route's loaders, after the click</div><div class="opt">D) Only after the page has rendered</div></div><div class="why"><b>Why:</b> React Router starts the loaders and the file download together and renders when both are done (measured: the Impact page's file was requested before /api/impact answered). React.lazy inside a page starts only when React renders it: a waterfall.<br><b>A</b> is wrong: That would put it back in the first visit.<br><b>B</b> is wrong: That is React.lazy's waterfall, not the route's lazy.<br><b>D</b> is wrong: The page needs its code to render at all.</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">A guest opens a shared link to /events/e08/edit. With the HQ's lazy routes, what happens?</div><div class="opts"><div class="opt">A) The guest sees the edit form: lazy pages skip the guard</div><div class="opt">B) Nothing is downloaded: the guard runs before any file is requested</div><div class="opt">C) The build refuses lazy routes behind guards</div><div class="opt correct">D) The edit page's file is downloaded while the guard decides, then the guest is sent to sign in</div></div><div class="why"><b>Why:</b> The file loads in parallel with the loaders, so guests following organizer links download that page (measured: 557.32 kB in 7 files). Fine: nothing in front-end code is secret. Splitting is for speed, not for secrets; the guards decide what a person sees, the API what anyone may do.<br><b>A</b> is wrong: The guard's loader still redirects.<br><b>B</b> is wrong: Loaders and the lazy file start together.<br><b>C</b> is wrong: There is no such rule.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">This line gives a type error. Why?</div><pre class="code"><span class="k">const</span> ImpactChart = lazy(() =&gt; <span class="k">import</span>(<span class="s">'../components/ImpactChart.tsx'</span>))</pre><div class="opts"><div class="opt">A) Charts cannot be loaded lazily</div><div class="opt correct">B) React.lazy needs a module with a default export, and ImpactChart is a named export</div><div class="opt">C) ImpactChart.tsx has its own type error</div><div class="opt">D) lazy() must be called inside the component</div></div><div class="why"><b>Why:</b> Read the bottom line of TS2322: "Property 'default' is missing". Return <code class="inline">{ default: ImpactChart }</code> from your own async function (Lab 10.1 Task 2 does the same for TideTables). And call lazy at the top level, never inside a component.<br><b>A</b> is wrong: Any component can be lazy.<br><b>C</b> is wrong: The error is about the import's shape.<br><b>D</b> is wrong: Inside a component, a new lazy component on every render would reload and reset.</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">Why do React, React DOM, React Router and TanStack Query get their own vendor group?</div><div class="opts"><div class="opt">A) It makes a guest's first download smaller</div><div class="opt">B) Vite requires a vendor group</div><div class="opt">C) It loads those libraries only on the pages that use them</div><div class="opt correct">D) Its file keeps its name when only the HQ's own code changes, so returning visitors reuse it</div></div><div class="why"><b>Why:</b> The bytes are the same; the caching is not. Measured: after a tagline change only index got a new name; vendor (355.82 kB) kept vendor-DenlHpDj.js. Lab 10.1's Task 3 shows the same with React alone.<br><b>A</b> is wrong: Every page needs those libraries; a group does not remove bytes.<br><b>B</b> is wrong: Groups are optional.<br><b>C</b> is wrong: Groups decide which file, not when it loads.</div></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">A teammate replaced the two groups with <code class="inline">{ name: 'vendor', test: /node_modules[\\/]/ },</code>. The build prints this. What happened?</div><pre class="code">dist/assets/vendor-DJqBY5YG.css                            0.69 kB │ gzip:   0.35 kB
+dist/assets/index-CQFHV4Rj.css                             8.33 kB │ gzip:   2.42 kB
+dist/assets/index-CDLAbaOo.js                             62.72 kB │ gzip:  21.37 kB
+dist/assets/vendor-CUGVkuZG.js                           483.56 kB │ gzip: 149.12 kB</pre><div class="opts"><div class="opt">A) Nothing: the forms file was just renamed</div><div class="opt correct">B) Zod and React Hook Form moved into the vendor file every page loads, so guests download them again</div><div class="opt">C) The organizer pages are no longer lazy</div><div class="opt">D) The build is smaller, so it is better</div></div><div class="why"><b>Why:</b> A group that catches a module the main file needs makes the main file load the whole group. There is no forms file any more, so a test that only looked for that name would pass; the budget test counts bytes and fails (Lesson 10.1, Common Mistakes).<br><b>A</b> is wrong: The bytes moved into a file every visit loads.<br><b>C</b> is wrong: The pages are still lazy; their libraries are not.<br><b>D</b> is wrong: Fewer files, but every guest downloads 128 kB more.</div></div>
+  <div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">An old tutorial's <code class="inline">manualChunks: { vendor: [...] }</code> in vite.config.ts. What does Vite 8 do?</div><div class="opts"><div class="opt">A) Works as in Vite 7</div><div class="opt">B) Ignores it silently</div><div class="opt correct">C) tsc reports TS2769 (manualChunks must be a function) and the build stops: use <code class="inline">codeSplitting.groups</code></div><div class="opt">D) Splits every package into its own file</div></div><div class="why"><b>Why:</b> Vite 8 bundles with Rolldown; rollupOptions is a deprecated alias, and Rolldown accepts only the function form of manualChunks (itself deprecated). TypeScript reads the config and says so before the build fails with "manualChunks is not a function".<br><b>A</b> is wrong: Vite 7 bundled with Rollup; Vite 8 does not.<br><b>B</b> is wrong: It fails loudly, twice.<br><b>D</b> is wrong: That is not what it does in any version.</div></div>
+  <div class="q" data-sc="9" data-kind="short"><div class="qn">Q9</div><div class="qt">The e2e budget test checks two things about a guest's visit. Name both, and why a name check alone was not enough.</div><div class="opts"><div class="opt correct">No /assets/forms- file, AND the total JavaScript under 440 kB; the catch-all vendor group had no forms file yet sent the form libraries to every guest</div></div><div class="why"><b>Why:</b> A budget fails on any cause, including ones you did not think of: one static import of an organizer page, a new library, a group that catches too much (Lesson 10.1, Step 6).</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">Why does <code class="inline">toCsv</code> put a <code class="inline">'</code> in front of a cell such as <code class="inline">=HYPERLINK(...)</code>?</div><div class="opts"><div class="opt">A) Spreadsheets need it for every text cell</div><div class="opt correct">B) A cell starting with = + - @ can run as a formula when the file is opened; the quote makes it plain text</div><div class="opt">C) To mark the cell as a number</div><div class="opt">D) RFC 4180 requires it</div></div><div class="why"><b>Why:</b> CSV injection: a name or note typed into the app could become a formula on the council's computer. RFC 4180 is about quoting commas, quotes and line breaks; the formula guard is an extra safety rule (Lesson 10.1, Step 4; Lab 10.1 Task 1).<br><b>A</b> is wrong: Only cells that start with a formula character.<br><b>C</b> is wrong: Numbers are written as they are.<br><b>D</b> is wrong: RFC 4180 does not mention formulas.</div></div>
+  <div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">In Lab 10.1 the starter's toCsv takes rows and columns typed with any, and the handed-out test file has a @ts-expect-error line. npm run typecheck prints this. What does it mean?</div><pre class="code">src/csv.test.ts:37:5 - error TS2578: Unused '@ts-expect-error' directive.</pre><div class="opts"><div class="opt correct">The directive expected a type error that never came: the loose toCsv accepts a column that reads a property the rows do not have; a generic <code class="inline">toCsv&lt;Row&gt;</code> makes that line an error, and the directive is then used</div></div><div class="why"><b>Why:</b> Testing a type, not a value: @ts-expect-error turns "this must NOT compile" into a check. Vitest runs the code without checking types, so only tsc can run this test.</div></div>
+  <div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">Lesson 10.1's Exercise 1 lazy-loaded the 1.31 kB impact chart with React.lazy and measured it. The verdict?</div><div class="opts"><div class="opt correct">A) Not worth it: it already arrives with the lazy Impact page, and splitting adds a request after the data</div><div class="opt">B) Worth it: every kilobyte counts</div><div class="opt">C) It broke the tests</div><div class="opt">D) It made the vendor file smaller</div></div><div class="why"><b>Why:</b> Measure, then decide. A second request that starts only after /api/impact answered, plus a "Loading the chart…" moment, to save about a kilobyte. With a 100 kB charting library the same few lines would be a clear win (Lab 10.1's tide tables are that case).<br><b>B</b> is wrong: Requests cost too; a kilobyte is not worth a waterfall.<br><b>C</b> is wrong: The tests passed.<br><b>D</b> is wrong: The chart is the HQ's own code, not a vendor library.</div></div>
+
+  <div class="sec"><h2>The Lesson's Mistakes, as Measured</h2><span class="rule"></span></div>
+<p>For the instructor: the outputs the guide refers to. The builds and the type check are real runs on the course app; the test runs needing ports are the lesson's own cards.</p>
+<div class="blk"><div class="h">The old manualChunks object (`npx tsc -b`, first and key lines)</div>
+<pre class="out">vite.config.ts:8:29 - error TS2769: No overload matches this call.
+                    Type '{ vendor: string[]; }' is not assignable to type 'ManualChunksFunction'.</pre></div>
+<div class="blk"><div class="h">The catch-all vendor group (`npx vite build`)</div>
+<pre class="out">dist/assets/vendor-DJqBY5YG.css                            0.69 kB │ gzip:   0.35 kB
+dist/assets/index-CQFHV4Rj.css                             8.33 kB │ gzip:   2.42 kB
+dist/assets/index-CDLAbaOo.js                             62.72 kB │ gzip:  21.37 kB
+dist/assets/vendor-CUGVkuZG.js                           483.56 kB │ gzip: 149.12 kB</pre></div>
+<div class="blk"><div class="h">The budget test, catch-all group (the lesson's card)</div>
+<pre class="out">    Error: expect(received).toBeLessThan(expected)
+
+    Expected: &lt; 440000
+    Received:   551230</pre></div>
+<div class="blk"><div class="h">React.lazy with a named export (the lesson's card)</div>
+<pre class="out">src/pages/ImpactPage.tsx:14:32 - error TS2322: Type 'Promise&lt;typeof import("/Users/you/shoreline/shoreline-hq/src/components/ImpactChart")&gt;' is not assignable to type 'Promise&lt;{ default: ComponentType&lt;any&gt;; }&gt;'.
+  Property 'default' is missing in type 'typeof import("/Users/you/shoreline/shoreline-hq/src/components/ImpactChart")' but required in type '{ default: ComponentType&lt;any&gt;; }'.
+
+14 const ImpactChart = lazy(() =&gt; import('../components/ImpactChart.tsx'))
+                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</pre></div>
+<div class="blk"><div class="h">The object form of lazy with shared routes (the lesson's card)</div>
+<pre class="out">     ✓ saves new details and shows the cleanup 262ms
+     × shows the form's own message and sends nothing 1011ms
+     × puts the API's message under the field when its rules say no 1006ms
+...
+TestingLibraryElementError: Unable to find a label with the text of: Title (5 to 80 characters)
+...
+      Tests  2 failed | 1 passed (3)</pre></div>
+<div class="blk"><div class="h">Everything after the lesson (`npx vitest run`, real; the e2e run, the lesson's card)</div>
+<pre class="out"> Test Files  13 passed (13)
+      Tests  49 passed (49)</pre><pre class="out"> Test Files  13 passed (13)
+      Tests  49 passed (49)
+...
+Running 21 tests using 1 worker
+...
+  ✓  17 e2e/bundle.spec.ts:8:1 › a guest browsing the public pages stays within the JavaScript budget (299ms)
+...
+  ✓  20 e2e/impact.spec.ts:37:1 › the impact page hands out its monthly totals as a CSV file (148ms)
+...
+  21 passed (13.8s)</pre></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output is real: the lab runs exactly as <code class="inline">labs/check_labs.py</code> runs it (Node 24, a learner's terminal, a fresh copy). Vite prints the same hashes for the same code on any machine with the same packages.</p>
+<div class="blk lab"><div class="h">Lab 10.1: labs/module-23/l10_1-performance-and-the-build/starter → solution</div>
+<p>As shipped: the tests, the type test and the budget:</p>
+<pre class="out"> Test Files  1 failed (1)
+      Tests  4 failed (4)</pre><pre class="out">src/csv.test.ts:37:5 - error TS2578: Unused '@ts-expect-error' directive.</pre><pre class="out">dist/index.html                  0.32 kB │ gzip:  0.23 kB
+dist/assets/index-DlWXbWGe.js  386.55 kB │ gzip: 89.14 kB
+
+JavaScript in dist/ (kB, before compression):
+  assets/index-DlWXbWGe.js               386.56  first visit  (tide data)
+FAIL  the tide data is not in the first visit (Task 2)
+FAIL  the tide data has a file of its own (Task 2)
+FAIL  React has a vendor file of its own (Task 3)
+FAIL  the first visit is within the budget: 386.56 kB of 230 kB</pre><p>Task 1, <code class="inline">src/csv.ts</code>:</p>
+<pre class="code"><span class="c">// Rows of data as a CSV file that spreadsheets open (RFC 4180: CRLF line endings, "…" with doubled quotes)</span>
+
+<span class="c">/** One column of the file: its heading, and how to read its value from a row */</span>
+<span class="k">export</span> <span class="k">interface</span> CsvColumn&lt;Row&gt; {
+  heading: <span class="k">string</span>
+  value: (row: Row) =&gt; <span class="k">string</span> | <span class="k">number</span>
+}
+
+<span class="c">// A text cell starting with = + - @ could run as a formula when a spreadsheet opens the file ("CSV injection"):</span>
+<span class="c">// a ' in front makes the spreadsheet show it as text.</span>
+<span class="k">function</span> cell(value: <span class="k">string</span> | <span class="k">number</span>): <span class="k">string</span> {
+  <span class="k">if</span> (<span class="k">typeof</span> value === <span class="s">'number'</span>) <span class="k">return</span> String(value)
+  <span class="k">const</span> text = /^[=+\-@\t\r]/.test(value) ? <span class="s">`'${value}`</span> : value
+  <span class="k">return</span> /[<span class="s">",\r\n]/.test(text) ? `"</span>${text.replaceAll(<span class="s">'"'</span>, <span class="s">'""'</span>)}"` : text
+}
+
+<span class="c">/** A heading line, then one line per row, each ending with CRLF */</span>
+<span class="k">export</span> <span class="k">function</span> toCsv&lt;Row&gt;(rows: <span class="k">readonly</span> Row[], columns: <span class="k">readonly</span> CsvColumn&lt;Row&gt;[]): <span class="k">string</span> {
+  <span class="k">const</span> lines = [
+    columns.map((column) =&gt; cell(column.heading)),
+    ...rows.map((row) =&gt; columns.map((column) =&gt; cell(column.value(row)))),
+  ]
+  <span class="k">return</span> lines.map((line) =&gt; line.join(<span class="s">','</span>)).join(<span class="s">'\r\n'</span>) + <span class="s">'\r\n'</span>
+}</pre><p>Task 2, <code class="inline">src/App.tsx</code>:</p>
+<pre class="code"><span class="k">import</span> { lazy, Suspense, useState } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="c">// The tables' code (and their data) arrive in a file of their own, the first time someone opens them.</span>
+<span class="c">// React.lazy wants a module with a default export, so name the one TideTables.tsx exports.</span>
+<span class="k">const</span> TideTables = lazy(<span class="k">async</span> () =&gt; {
+  <span class="k">const</span> { TideTables } = <span class="k">await</span> <span class="k">import</span>(<span class="s">'./TideTables.tsx'</span>)
+  <span class="k">return</span> { <span class="k">default</span>: TideTables }
+})
+
+<span class="c">/** Tide Watch: most visitors only read the next cleanup's tide; few open the full tables */</span>
+<span class="k">export</span> <span class="k">function</span> App() {
+  <span class="k">const</span> [showTables, setShowTables] = useState(<span class="k">false</span>)
+  <span class="k">return</span> (
+    &lt;main&gt;
+      &lt;h1&gt;Tide Watch&lt;/h1&gt;
+      &lt;p&gt;Next cleanup: Saturday at Driftwood Cove. Low tide at <span class="s">09</span>:<span class="s">40</span>, the best time to reach the rocks.&lt;/p&gt;
+      &lt;button <span class="k">type</span>=<span class="s">"button"</span> aria-expanded={showTables} onClick={() =&gt; setShowTables((shown) =&gt; !shown)}&gt;
+        {showTables ? <span class="s">'Hide the tide tables'</span> : <span class="s">'Show the tide tables'</span>}
+      &lt;/button&gt;
+      {showTables &amp;&amp; (
+        &lt;Suspense fallback={&lt;p role=<span class="s">"status"</span>&gt;Loading the tide tables…&lt;/p&gt;}&gt;
+          &lt;TideTables /&gt;
+        &lt;/Suspense&gt;
+      )}
+    &lt;/main&gt;
+  )
+}</pre><p>Task 3, the group in <code class="inline">vite.config.ts</code>:</p>
+<pre class="code"><span class="c">/// &lt;reference types="vitest/config" /&gt;</span>
+<span class="k">import</span> react <span class="k">from</span> <span class="s">'@vitejs/plugin-react'</span>
+<span class="k">import</span> { defineConfig } <span class="k">from</span> <span class="s">'vite'</span>
+
+<span class="c">// Vitest reads its settings from here, like the course app (Lesson 9.1)</span>
+<span class="k">export</span> <span class="k">default</span> defineConfig({
+  plugins: [react()],
+  test: { environment: <span class="s">'jsdom'</span>, setupFiles: [<span class="s">'./src/setupTests.ts'</span>] },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            <span class="c">// React on every visit, in a file whose name stays the same when only the app's code changes</span>
+            { name: <span class="s">'vendor'</span>, test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
+})</pre><p>Then <code class="inline">npm test</code> (and <code class="inline">npm run typecheck</code> prints nothing after its two <code class="inline">&gt;</code> lines):</p>
+<pre class="out"> Test Files  1 passed (1)
+      Tests  4 passed (4)</pre><p>and the budget:</p>
+<pre class="out">dist/index.html                       0.39 kB │ gzip:  0.26 kB
+dist/assets/index-D6mumWCL.js         3.28 kB │ gzip:  1.55 kB
+dist/assets/TideTables-CgHB0W01.js  166.74 kB │ gzip: 19.47 kB
+dist/assets/vendor-WGfG_Ba-.js      218.72 kB │ gzip: 68.24 kB
+
+JavaScript in dist/ (kB, before compression):
+  assets/TideTables-CgHB0W01.js          166.74  when asked  (tide data)
+  assets/index-D6mumWCL.js                 3.28  first visit
+  assets/vendor-WGfG_Ba-.js              218.73  first visit
+OK    the tide data is not in the first visit (Task 2)
+OK    the tide data has a file of its own (Task 2)
+OK    React has a vendor file of its own (Task 3)
+OK    the first visit is within the budget: 222.01 kB of 230 kB</pre><p>The first visit drops from 386.56 kB to 222.01 kB: the tide data (166.74 kB) moved to the TideTables file, React to vendor. Change the h1 and build again: only index gets a new name (the checker's diff of the two builds' names):</p>
+<pre class="out">1c1
+&lt; index-D6mumWCL.js
+---
+&gt; index-CV9-3g2-.js</pre><p>Accept a static <code class="inline">import { TideTables }</code> removed in favor of the lazy one only: if the static import stays anywhere, the data stays in the first visit (the budget's first line says FAIL). Do not accept a raised budget.</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Page's Own Quick Quiz</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 10.1 · Performance and the Build</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="10.1">
+  <li><b>D</b> Look inside the bundle, then split out what most visitors do not need: Measure first: the treemap shows what is inside the file and who needs each part. Then split what most visitors never use, as the HQ did with the organizer forms.</li>
+  <li><b>A</b> The edit page's file is downloaded while the guard decides, then the guest is sent to sign in, which is fine because code is not secret: The router downloads a lazy route's file while its loaders run, so the edit page's file arrives while organizersOnly decides; then the guest sees Sign in. That is fine: front-end code is never secret, and the API protects the data.</li>
+  <li><b>C</b> React.lazy needs a module with a default export, and ImpactChart is a named export: React.lazy wants a promise of a module whose default export is a component. ImpactChart.tsx only has a named export, so the function must return an object with default set to ImpactChart.</li>
+  <li><b>B</b> Its file keeps its name when only the HQ's own code changes, so returning visitors reuse it from the cache: The vendor file only changes when the libraries change, so its hashed name stays the same when you fix the HQ's own code, and returning visitors reuse it from their cache. Step 5 measured it.</li>
+  <li><b>A</b> It fails on the budget: Zod and React Hook Form are now in the vendor file every page loads: Zod and React Hook Form move into vendor, which the main file needs for React, so every guest downloads them. No forms file exists, but the byte budget catches the extra kilobytes.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Warm-up and Exit Ticket</h2><span class="rule"></span></div>
+<p>The warm-up's answers are in the Facilitator Guide.</p>
+<ol class="steps">
+  <li><b>Before splitting:</b> measure what each visitor downloads (Network tab on the preview), look inside (treemap), then split what most visitors do not need; measure again.</li>
+  <li><b>Guest and edit page:</b> React Router downloads the lazy file with the loaders, before the guard redirects. Fine: front-end code is public; the guard decides what a person sees, the API what anyone may do.</li>
+  <li><b>Budget vs warning:</b> the warning fires only above 500 kB per chunk; the budget catches any change that sends a guest more JavaScript (a static import, a new library, a catch-all group), and names the forms file if it appears.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A.</b> Treats warnings as noise. Ask what the change did for a visitor.</li>
+  <li><b>Q2 B.</b> Confuses transfer with cost. The phone runs the full size.</li>
+  <li><b>Q3 B.</b> Mixes up React.lazy and route lazy: the waterfall is React.lazy's.</li>
+  <li><b>Q4 B or C.</b> Believes splitting hides code. Open any lazy file in the Network tab.</li>
+  <li><b>Q6 A.</b> Thinks groups reduce bytes. They change names and caching.</li>
+  <li><b>Q12 A.</b> Splits by reflex. Exercise 1 measured the opposite.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 23 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

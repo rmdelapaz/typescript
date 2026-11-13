@@ -1,0 +1,55 @@
+# Runs on GitHub's computers for every push to main and every pull request (Lesson 10.2).
+# This project is the whole repository: package.json sits at the top, next to .github.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The checks only read the code: no write access to the repository
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Types, lint, unit tests and builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx tsc -b
+      # Zero warnings: here a warning fails the run too
+      - run: npm run lint -- --deny-warnings
+      - run: npx vitest run
+      - run: npm run build
+      # The version you deploy must build as well
+      - run: npm run build:demo
+
+  e2e:
+    name: End-to-end tests
+    # Only when the quick checks are green
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Chromium plus the system libraries it needs on a fresh Ubuntu machine
+      - run: npx playwright install --with-deps chromium
+      # playwright.config.ts builds the demo and previews it
+      - run: npm run test:e2e
+      # When a test fails, keep Playwright's report (traces included) for a week
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

@@ -1,0 +1,1453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Describe Shoreline Crew's data with object types, interfaces and type aliases, mark properties optional or read-only, model choices with unions and literal types, narrow values safely, and handle null and undefined without crashes. React + TypeScript: Build a Modern Web App Lesson 2.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Shaping Data - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>🧩 Lesson 2.2: Shaping Data</h1>
+                <p class="lead">Every screen in Shoreline Crew HQ shows objects: a beach with a name and a terrain, a cleanup with a start time and a status, a volunteer who may or may not have left a phone number. Today you learn to describe those objects so precisely that TypeScript can tell a cleanup that is "cancelled" from one that is "canceled", knows a check-in code is only sometimes there, and refuses to let you read a phone number until you have handled the people who have none. By the end you will have drafted the crew's own data types, and you will be able to read the real API's contract like a map.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Describe objects with object types and interfaces, including nested objects, and read the errors for missing, misspelled and extra properties</li>
+                        <li>Choose between <code>interface</code> and <code>type</code>, and build one shape on another with <code>extends</code> or <code>&amp;</code></li>
+                        <li>Mark properties optional (<code>?</code>) or read-only (<code>readonly</code>) and say what each promise means for the code that uses them</li>
+                        <li>Model "one of these" with unions and literal types, such as a cleanup's four statuses</li>
+                        <li>Narrow a union with <code>typeof</code>, equality, <code>in</code> and a discriminant property, and check an <code>unknown</code> value that should be an object</li>
+                        <li>Handle <code>null</code> and <code>undefined</code> with an <code>if</code>, <code>??</code> and <code>?.</code>, and know when the <code>!</code> assertion is honest</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_03.html">Lesson 2.1: Types and Inference</a> (your <code>ts-lab</code> workbench with <code>npm run check</code>)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> <code>shapes.ts</code> in <code>ts-lab</code>: a first draft of Shoreline Crew's data types (sites, cleanups, volunteers, a loading state) with functions that handle every case</li>
+                    <li><span class="meta-label">🧩 Stack</span> TypeScript 7.0, Node.js 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> VS Code with your <code>shoreline</code> folder open and one terminal in <code>ts-lab</code>; the API and the dev server can stay off today</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-04-start.zip">lesson-04-start.zip</a> · Finished code: <a href="downloads/lesson-04-end.zip">lesson-04-end.zip</a>. Each folder has a README with the commands to run it. The finished code adds <code>ts-lab/shapes.ts</code>; run <code>npm ci</code> in <code>ts-lab</code> before <code>npm run check</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#object-types" class="toc-link">Describing an Object</a></li>
+                        <li><a href="#interface-or-type" class="toc-link">interface or type?</a></li>
+                        <li><a href="#optional-readonly" class="toc-link">Optional and Read-only Properties</a></li>
+                        <li><a href="#unions" class="toc-link">Unions and Literal Types</a></li>
+                        <li><a href="#narrowing" class="toc-link">Narrowing: Proving Which One You Have</a></li>
+                        <li><a href="#null-handling" class="toc-link">Handling null and undefined</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Draft the Crew's Data Shapes</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="object-types" class="lesson-section">
+                <h2>📦 Describing an Object</h2>
+                <p>Last lesson's types were single values: a number, a string, an array of numbers. Real data comes in objects, and the API sends nothing else: every site, cleanup and volunteer is an object with named properties. This lesson is about describing those objects. As in Lesson 2.1, you work in <code>ts-lab</code>: create <code>scratch.ts</code> again (you deleted it at the end of the last lesson), put each example in it, save, and run <code>npm run check</code> (and <code>node scratch.ts</code> when the example prints something). Open a terminal in <code>ts-lab</code> (<code>cd ts-lab</code> from your <code>shoreline</code> folder).</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the sign-in sheet</h4>
+                    <p>At every cleanup, the crew hands out a sign-in sheet with printed columns: name, phone, shirt size. Nobody has to explain what goes where, and a sheet with a missing column or a scribbled extra one stands out at once. An object type is that printed sheet for your data: it names every column and what belongs in it, and TypeScript checks each object against it.</p>
+                </div>
+
+                <h3>An object type</h3>
+                <p>You can write the shape of an object right where you declare it, in curly braces: each property's name, a colon, its type, separated by semicolons (or commas, or line breaks):</p>
+                <pre data-snippet><code class="language-ts">const cove: { name: string; town: string; accessible: boolean } = {
+  name: 'Driftwood Cove',
+  town: 'Port Marisol',
+  accessible: false,
+}
+
+console.log(`${cove.name} is in ${cove.town}`)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>Driftwood Cove is in Port Marisol</code></pre>
+                </div>
+                <p>The check is silent. That works, but nobody wants to repeat a long shape on every site. So you give it a name.</p>
+
+                <h3>An interface</h3>
+                <p>You met <code>interface</code> in Lesson 1.1: a named object type. Here is a site with two mistakes that are easy to make when you type objects by hand, a misspelled property and one the type does not list:</p>
+                <pre data-snippet><code class="language-ts">interface Site {
+  id: string
+  name: string
+  town: string
+  accessible: boolean
+}
+
+const cove: Site = {
+  id: 'driftwood-cove',
+  name: 'Driftwood Cove',
+  town: 'Port Marisol',
+  acessible: false,
+}
+
+const jetty: Site = {
+  id: 'north-jetty',
+  name: 'North Jetty',
+  town: 'Calder Bay',
+  accessible: false,
+  parking: 'Harbor lot B',
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:12:3 - error TS2561: Object literal may only specify known properties, but 'acessible' does not exist in type 'Site'. Did you mean to write 'accessible'?
+
+12   acessible: false,
+     ~~~~~~~~~
+
+scratch.ts:20:3 - error TS2353: Object literal may only specify known properties, and 'parking' does not exist in type 'Site'.
+
+20   parking: 'Harbor lot B',
+     ~~~~~~~
+
+
+Found 2 errors in the same file, starting at: scratch.ts:12</code></pre>
+                </div>
+                <p>Two related codes. <strong>TS2561</strong> says the object has a property the type does not know, and because it looks like a typo of one it does know, TypeScript suggests the fix: <code>accessible</code>. <strong>TS2353</strong> is the same complaint without a suggestion: <code>Site</code> has no <code>parking</code>. TypeScript reports extra properties on an object literal (an object written out in curly braces right where it is assigned) because there they are almost always a mistake, as here. The third kind of object error you already know from Lesson 1.1: leave a property out and you get <strong>TS2741</strong>, <code>Property 'town' is missing</code>. You will produce one in the project.</p>
+                <p>Fix both objects (spell <code>accessible</code> correctly, delete the <code>parking</code> line) and the check is silent again.</p>
+
+                <h3>Objects inside objects</h3>
+                <p>A property's type can be another object type. The API gives every site a picture with a URL and alt text, so <code>image</code> is an object of its own:</p>
+                <pre data-snippet><code class="language-ts">interface Site {
+  id: string
+  name: string
+  image: { url: string; alt: string }
+}
+
+const flats: Site = {
+  id: 'sandpiper-flats',
+  name: 'Sandpiper Flats',
+  image: {
+    url: '/images/sites/sandpiper-flats.jpg',
+    alt: 'A boardwalk crossing a green salt marsh at low tide.',
+  },
+}
+
+console.log(flats.image.alt)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>A boardwalk crossing a green salt marsh at low tide.</code></pre>
+                </div>
+                <p>Type <code>flats.image.</code> in VS Code and the suggestion list offers exactly <code>alt</code> and <code>url</code>. That is the everyday payoff of object types: the editor knows your data, so you stop guessing property names and checking the API's documentation for every one.</p>
+            </section>
+
+            <section id="interface-or-type" class="lesson-section">
+                <h2>🤔 interface or type?</h2>
+                <p>TypeScript has a second way to name a type: a <strong>type alias</strong>, written <code>type Name = …</code>. For an object shape, <code>interface Site { … }</code> and <code>type Site = { … }</code> describe the same thing and catch the same mistakes. The differences show up when you build on a shape or name something that is not an object:</p>
+                <pre data-snippet><code class="language-ts">interface CleanupEvent {
+  id: string
+  title: string
+  capacity: number
+}
+
+// interface: build a bigger shape on top of another with extends
+interface CleanupEventDetail extends CleanupEvent {
+  siteName: string
+}
+
+// type: give a name to any type, including a union, and combine shapes with &amp;
+type EventStatus = 'draft' | 'scheduled' | 'completed' | 'cancelled'
+type EventWithStatus = CleanupEvent &amp; { status: EventStatus }
+
+const weekend: CleanupEventDetail = {
+  id: 'e08',
+  title: 'Weekend Cove Cleanup',
+  capacity: 18,
+  siteName: 'Driftwood Cove',
+}
+const kayak: EventWithStatus = {
+  id: 'e15',
+  title: 'Harbor Kayak Cleanup',
+  capacity: 8,
+  status: 'draft',
+}
+
+console.log(`${weekend.title} at ${weekend.siteName}; ${kayak.title} is a ${kayak.status}`)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>Weekend Cove Cleanup at Driftwood Cove; Harbor Kayak Cleanup is a draft</code></pre>
+                </div>
+                <ul>
+                    <li><code>interface CleanupEventDetail extends CleanupEvent</code>: "everything a <code>CleanupEvent</code> has, plus <code>siteName</code>". The API describes its event detail exactly like this.</li>
+                    <li><code>type EventStatus = 'draft' | …</code>: only a type alias can name a union (the next sections are all about unions). An interface always describes an object.</li>
+                    <li><code>CleanupEvent &amp; { status: EventStatus }</code>: the <code>&amp;</code> (an <strong>intersection</strong>) means "both at once", so the result needs every property of both. It is how type aliases build on other shapes.</li>
+                </ul>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th><code>interface</code></th><th><code>type</code></th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Describes an object shape</td><td>yes</td><td>yes</td></tr>
+                            <tr><td>Names a union, a literal or a primitive</td><td>no</td><td>yes</td></tr>
+                            <tr><td>Builds on another shape</td><td><code>extends</code></td><td><code>&amp;</code></td></tr>
+                            <tr><td>Can be reopened to add properties later</td><td>yes (two declarations with the same name merge)</td><td>no (a second <code>type Site</code> is an error)</td></tr>
+                            <tr><td>In this course</td><td>object shapes</td><td>unions and everything else</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The last row is a convention, not a law, and it is the one the API's own type file follows. Teams argue about this choice far more than it deserves: both are fine, and the habit that matters is picking one rule and using it everywhere. "Reopening" (declaration merging) is mostly used to add to types from libraries; you will rarely write it yourself.</p>
+            </section>
+
+            <section id="optional-readonly" class="lesson-section">
+                <h2>❔ Optional and Read-only Properties</h2>
+                <h3>Optional: <code>?</code></h3>
+                <p>Some properties are only sometimes there. When an organizer opens a cleanup, the API includes the code volunteers type to check in on the day; when a volunteer opens the same cleanup, the code is left out. A <code>?</code> after the name marks a property as optional:</p>
+                <pre data-snippet><code class="language-ts">interface CleanupEventDetail {
+  id: string
+  title: string
+  checkInCode?: string
+}
+
+const forVolunteers: CleanupEventDetail = { id: 'e17', title: 'Tide Pool Morning Cleanup' }
+const forOrganizers: CleanupEventDetail = {
+  id: 'e17',
+  title: 'Tide Pool Morning Cleanup',
+  checkInCode: '4827',
+}
+
+console.log(forVolunteers.title)
+console.log(forOrganizers.checkInCode.length)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:15:13 - error TS18048: 'forOrganizers.checkInCode' is possibly 'undefined'.
+
+15 console.log(forOrganizers.checkInCode.length)
+               ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Found 1 error in scratch.ts:15</code></pre>
+                </div>
+                <p>Both objects are valid <code>CleanupEventDetail</code>s: one has the code and one does not. The error is on the last line, and it is worth reading closely. <code>forOrganizers</code> clearly has a code today, yet <strong>TS18048</strong> says it is possibly <code>undefined</code>. TypeScript goes by the <em>type</em>, not today's value: an optional <code>string</code> is <code>string | undefined</code> everywhere you read it, because the next object might come from the API for a volunteer. You handle it like any other "maybe nothing" value, which is the last section of this lesson. (Run <code>node scratch.ts</code> anyway and it prints <code>4</code>: running is not checking, and today's data happens to be fine.)</p>
+
+                <h3>Read-only: <code>readonly</code></h3>
+                <p><code>readonly</code> before a property says "set it when you create the object, never change it afterwards". It suits ids: a site's id is how everything else refers to it. Arrays have a read-only form too:</p>
+                <pre data-snippet><code class="language-ts">interface Site {
+  readonly id: string
+  name: string
+}
+
+const cove: Site = { id: 'driftwood-cove', name: 'Driftwood Cove' }
+cove.name = 'Driftwood Cove Beach'
+cove.id = 'cove'
+
+const supplies: readonly string[] = ['Gloves', 'Bags', 'Grabbers']
+supplies.push('Buckets')</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:8:6 - error TS2540: Cannot assign to 'id' because it is a read-only property.
+
+8 cove.id = 'cove'
+       ~~
+
+scratch.ts:11:10 - error TS2339: Property 'push' does not exist on type 'readonly string[]'.
+
+11 supplies.push('Buckets')
+            ~~~~
+
+
+Found 2 errors in the same file, starting at: scratch.ts:8</code></pre>
+                </div>
+                <p>Changing <code>name</code> is fine; changing <code>id</code> is <strong>TS2540</strong>. A <code>readonly string[]</code> has no <code>push</code> (or any other method that changes the array), hence the TS2339 "does not exist". Like every type, <code>readonly</code> disappears when the code runs: it is a check, not a lock. The API's type file does not use it, and you will not need it much in this course for a good reason: from Module 3 on, React asks you never to change data in place at all, but to make a new copy with the change.</p>
+            </section>
+
+            <section id="unions" class="lesson-section">
+                <h2>🔀 Unions and Literal Types</h2>
+                <p>In Lesson 2.1 you saw that <code>const capacity = 18</code> has the <strong>literal type</strong> <code>18</code>, a type with exactly one value. On its own that sounds useless. Combine several with <code>|</code>, read "or", and you get one of the most useful tools in TypeScript: a <strong>union</strong>, a type whose values may be any one of its members. In Lesson 1.1 you described a site's terrain as <code>string</code>, which accepts <code>"sandy-ish"</code> and every other typo. The crew uses exactly four words:</p>
+                <pre data-snippet><code class="language-ts">type Terrain = 'sand' | 'rocky' | 'marsh' | 'mixed'
+
+interface Site {
+  name: string
+  terrain: Terrain
+}
+
+const flats: Site = { name: 'Sandpiper Flats', terrain: 'marsh' }
+const pier: Site = { name: 'Seal Rock Pier', terrain: 'concrete' }</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:9:46 - error TS2322: Type '"concrete"' is not assignable to type 'Terrain'.
+
+9 const pier: Site = { name: 'Seal Rock Pier', terrain: 'concrete' }
+                                               ~~~~~~~
+
+  scratch.ts:5:3 - The expected type comes from property 'terrain' which is declared here on type 'Site'
+    5   terrain: Terrain
+        ~~~~~~~
+
+
+Found 1 error in scratch.ts:9</code></pre>
+                </div>
+                <p>The familiar TS2322, followed by a line that tells you where the expectation came from: the <code>terrain</code> property in <code>Site</code>. Type <code>terrain: '</code> in VS Code and the suggestion list offers exactly the four words. A cleanup's status works the same way (<code>'draft' | 'scheduled' | 'completed' | 'cancelled'</code>), and when a value is close to a member, such as <code>'canceled'</code>, you get Lesson 1.1's TS2820 with a "Did you mean" instead.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the tick boxes on the sign-in sheet</h4>
+                    <p>"Shirt size: S / M / L / XL" with four boxes to tick is a union of literal types. A free-text "shirt size" line is <code>string</code>, and someone will write "medium-ish". The boxes make the wrong answer impossible to write down, and everyone reading the sheet knows the complete list of answers.</p>
+                </div>
+
+                <h3>Unions of different types</h3>
+                <p>Members do not have to be literals. A capacity typed into a form arrives as text, while the API sends a number, so a function that accepts both takes <code>string | number</code>. The catch: you may only use what <em>every</em> member has.</p>
+                <pre data-snippet><code class="language-ts">// A capacity typed into a form arrives as text; one from the API is a number
+function capacityText(capacity: string | number) {
+  return capacity.toFixed(0)
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:3:19 - error TS2339: Property 'toFixed' does not exist on type 'string | number'.
+  Property 'toFixed' does not exist on type 'string'.
+
+3   return capacity.toFixed(0)
+                    ~~~~~~~
+
+
+Found 1 error in scratch.ts:3</code></pre>
+                </div>
+                <p><strong>TS2339</strong> with a second line explaining which member is the problem: numbers have <code>toFixed</code>, strings do not. To use it, you have to prove you have a number, which is the next section. You have also met a union already: <code>string | null</code> from <code>getItem</code> in Lesson 2.1 is a union of a type and <code>null</code>.</p>
+
+                <h3>A trap: literal types inside objects</h3>
+                <p>This one confuses everybody once. The object below looks like a perfectly good site:</p>
+                <pre data-snippet><code class="language-ts">type Terrain = 'sand' | 'rocky' | 'marsh' | 'mixed'
+
+interface Site {
+  name: string
+  terrain: Terrain
+}
+
+function describeSite(site: Site) {
+  return `${site.name} (${site.terrain})`
+}
+
+const flats = { name: 'Sandpiper Flats', terrain: 'marsh' }
+console.log(describeSite(flats))</code></pre>
+
+                <figure class="screenshot">
+                    <img src="images/lesson_04/04-widen-error.png" alt="A terminal in ts-lab. npm run check reports error TS2345 at scratch.ts line 13: Argument of type { name: string; terrain: string; } is not assignable to parameter of type Site. Two indented lines follow: Types of property terrain are incompatible, and Type string is not assignable to type Terrain. The code frame underlines flats in describeSite(flats)." width="1100" height="323" loading="lazy">
+                    <figcaption>One error, three levels: the top line says what failed, each indented line says why, one level deeper. The last line is the real cause: <code>terrain</code> was inferred as <code>string</code>.</figcaption>
+                </figure>
+
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:13:26 - error TS2345: Argument of type '{ name: string; terrain: string; }' is not assignable to parameter of type 'Site'.
+  Types of property 'terrain' are incompatible.
+    Type 'string' is not assignable to type 'Terrain'.
+
+13 console.log(describeSite(flats))
+                            ~~~~~
+
+
+Found 1 error in scratch.ts:13</code></pre>
+                </div>
+                <p>Read it from the bottom: the property <code>terrain</code> is a <code>string</code>, and a <code>string</code> is not a <code>Terrain</code>. Why a <code>string</code>, when the value is <code>'marsh'</code>? Inference again: <code>flats</code> is a <code>const</code>, but its properties are not, so <code>flats.terrain = 'anything'</code> would be allowed later, and TypeScript infers the general type <code>string</code> for it, the way it did for <code>let</code>. The fix is to say what the object is when you create it: <code>const flats: Site = { … }</code>. Then <code>'marsh'</code> is checked against <code>Terrain</code> right there, and the call is fine:</p>
+                <pre data-snippet><code class="language-ts">const flats: Site = { name: 'Sandpiper Flats', terrain: 'marsh' }
+console.log(describeSite(flats))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>Sandpiper Flats (marsh)</code></pre>
+                </div>
+                <p>This is one more place to annotate, and it follows Lesson 2.1's rule of the edges: an object you build by hand to match a known shape is data entering your code, so name its type.</p>
+            </section>
+
+            <section id="narrowing" class="lesson-section">
+                <h2>🔍 Narrowing: Proving Which One You Have</h2>
+                <p>A union says "one of these". Before you use a member's special abilities, you prove which one you have, and TypeScript follows your proof: inside the <code>if</code>, the type is <strong>narrowed</strong> to the members that passed. You used <code>typeof</code> for this in Lesson 2.1. There are four everyday ways, and one of them will become the backbone of your React screens.</p>
+
+                <h3>1. typeof, for primitives</h3>
+                <pre data-snippet><code class="language-ts">// A capacity typed into a form arrives as text; one from the API is a number
+function capacityText(capacity: string | number) {
+  if (typeof capacity === 'number') {
+    return capacity.toFixed(0)
+  }
+  return capacity.trim()
+}
+
+console.log(capacityText(18), capacityText(' 12 '))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>18 12</code></pre>
+                </div>
+                <p>Inside the <code>if</code>, <code>capacity</code> is a <code>number</code>. After it, TypeScript knows the number case has returned, so only <code>string</code> is left and <code>trim</code> is allowed. Hover over both uses of <code>capacity</code> to watch the type change.</p>
+
+                <h3>2. Equality, for literal types</h3>
+                <pre data-snippet><code class="language-ts">type EventStatus = 'draft' | 'scheduled' | 'completed' | 'cancelled'
+
+function canSignUp(status: EventStatus) {
+  if (status === 'draft' || status === 'cancelled') {
+    return false
+  }
+  // here status is 'scheduled' | 'completed'
+  return status === 'scheduled'
+}
+
+console.log(canSignUp('scheduled'), canSignUp('cancelled'))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>true false</code></pre>
+                </div>
+                <p>Comparing with <code>===</code> narrows a union of literals: after the <code>if</code> returns, <code>status</code> can only be <code>'scheduled'</code> or <code>'completed'</code>. A <code>switch</code> on the value narrows the same way in each <code>case</code>; the project uses one.</p>
+
+                <h3>3. A discriminant property, for unions of objects</h3>
+                <p>A screen that loads cleanups is always in one of three situations: still loading, failed (with a message), or ready (with the events). Each situation has different data, so each is its own object type, and a shared property with a different literal in each one, here <code>kind</code>, tells them apart. This pattern is called a <strong>discriminated union</strong>, and the shared property the <strong>discriminant</strong>. Try to use the events without checking first:</p>
+                <pre data-snippet><code class="language-ts">type LoadState =
+  | { kind: 'loading' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'ready'; events: string[] }
+
+function report(state: LoadState) {
+  return `${state.events.length} cleanups loaded`
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:7:19 - error TS2339: Property 'events' does not exist on type 'LoadState'.
+  Property 'events' does not exist on type '{ kind: "loading"; }'.
+
+7   return `${state.events.length} cleanups loaded`
+                    ~~~~~~
+
+
+Found 1 error in scratch.ts:7</code></pre>
+                </div>
+                <p>A screen that is still loading has no events, and TypeScript says exactly that. Check <code>kind</code> first:</p>
+                <pre data-snippet><code class="language-ts">type LoadState =
+  | { kind: 'loading' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'ready'; events: string[] }
+
+function report(state: LoadState) {
+  if (state.kind === 'loading') {
+    return 'Loading cleanups...'
+  }
+  if (state.kind === 'failed') {
+    return `Could not load cleanups: ${state.message}`
+  }
+  return `${state.events.length} cleanups loaded`
+}
+
+console.log(report({ kind: 'failed', message: 'the API did not answer' }))
+console.log(report({ kind: 'ready', events: ['Weekend Cove Cleanup', 'Family Beach Morning'] }))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>Could not load cleanups: the API did not answer
+2 cleanups loaded</code></pre>
+                </div>
+
+                <figure class="screenshot">
+                    <img src="images/lesson_04/04-hover-narrowed.png" alt="The TypeScript Playground editor showing the LoadState union and the report function. Inside the branch if (state.kind === &#x27;failed&#x27;), a hover pop-up over state reads: (parameter) state: { kind: &quot;failed&quot;; message: string; }." width="700" height="330" loading="lazy">
+                    <figcaption>Inside <code>if (state.kind === 'failed')</code>, hovering over <code>state</code> shows one member of the union, the one with <code>message</code>. VS Code shows the same pop-up.</figcaption>
+                </figure>
+
+                <div class="mermaid">
+graph TD
+    A["state: LoadState"] --> B{"kind is 'loading'?"}
+    B -->|"yes"| C["Show 'Loading'"]
+    B -->|"no"| D{"kind is 'failed'?"}
+    D -->|"yes"| E["state.message exists"]
+    D -->|"no"| F["state.events exists"]
+                </div>
+                <p>Each check removes a member, and by the last line only <code>{ kind: 'ready'; events: string[] }</code> is left, so <code>state.events</code> is allowed without a third <code>if</code>. The win is bigger than it looks: it is impossible to show a list of events that never arrived, or an error message that does not exist. In Lesson 3.3 this exact pattern decides what a component draws, and in Lesson 5.1 it describes every change to a roster.</p>
+
+                <h3>4. <code>in</code>, for objects without a discriminant</h3>
+                <p>When two object types have no shared literal property, check for a property only one of them has. The API sends a plain event in lists and an event with its site when you open one:</p>
+                <pre data-snippet><code class="language-ts">interface CleanupEvent {
+  title: string
+  siteId: string
+}
+
+interface CleanupEventDetail extends CleanupEvent {
+  site: { name: string; town: string }
+}
+
+function where(event: CleanupEvent | CleanupEventDetail) {
+  if ('site' in event) {
+    return `${event.site.name}, ${event.site.town}`
+  }
+  return event.siteId
+}
+
+console.log(where({ title: 'Family Beach Morning', siteId: 'pelican-point' }))
+console.log(where({
+  title: 'Weekend Cove Cleanup',
+  siteId: 'driftwood-cove',
+  site: { name: 'Driftwood Cove', town: 'Port Marisol' },
+}))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>pelican-point
+Driftwood Cove, Port Marisol</code></pre>
+                </div>
+
+                <h3>Checking an unknown value that should be an object</h3>
+                <p>Lesson 2.1 ended with a puzzle: <code>typeof null</code> is <code>'object'</code>. Here it is in practice, with a site read from outside the program:</p>
+                <pre data-snippet><code class="language-ts">const saved: unknown = JSON.parse('{"name": "North Jetty", "town": "Calder Bay"}')
+
+if (typeof saved === 'object') {
+  console.log(saved.name)
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:4:15 - error TS18047: 'saved' is possibly 'null'.
+
+4   console.log(saved.name)
+                ~~~~~
+
+scratch.ts:4:21 - error TS2339: Property 'name' does not exist on type 'object'.
+
+4   console.log(saved.name)
+                      ~~~~
+
+
+Found 2 errors in the same file, starting at: scratch.ts:4</code></pre>
+                </div>
+                <p>Two errors from one line. <code>typeof saved === 'object'</code> lets <code>null</code> through (that old JavaScript quirk), hence TS18047. And knowing that something is an object says nothing about its properties: the type <code>object</code> has no <code>name</code>. So you check each thing you are about to use, in order:</p>
+                <pre data-snippet><code class="language-ts">const saved: unknown = JSON.parse('{"name": "North Jetty", "town": "Calder Bay"}')
+
+if (
+  typeof saved === 'object' &amp;&amp;
+  saved !== null &amp;&amp;
+  'name' in saved &amp;&amp;
+  typeof saved.name === 'string'
+) {
+  console.log(saved.name.toUpperCase())
+} else {
+  console.log('That is not a site')
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>NORTH JETTY</code></pre>
+                </div>
+                <p>Each condition narrows a little further: an object, not <code>null</code>, has a <code>name</code>, and that <code>name</code> is a string. TypeScript follows every step, so by the body, <code>saved.name.toUpperCase()</code> is allowed. Writing this for every property of a cleanup would be tiring; in Lesson 2.4 you wrap checks like these in one reusable function for the API's data, and in Module 8 a library writes them for you.</p>
+            </section>
+
+            <section id="null-handling" class="lesson-section">
+                <h2>🕳️ Handling null and undefined</h2>
+                <p>"Maybe nothing" is the union you will meet most: a volunteer's <code>phone</code> is <code>string | null</code>, an optional check-in code is <code>string | undefined</code>, and <code>find</code> returns <code>undefined</code> when nothing matches. In Lesson 1.2 the template answered one of these with <code>!</code>; in Lesson 2.1 you used an <code>if</code>. Here is the full toolkit.</p>
+                <pre data-snippet><code class="language-ts">interface Volunteer {
+  name: string
+  phone: string | null
+}
+
+const hannah: Volunteer = { name: 'Hannah Becker', phone: null }
+const siteNames = ['Driftwood Cove', 'North Jetty', 'Long Strand Beach']
+
+// 1. An if: the clearest way, and it works for any check
+if (hannah.phone !== null) {
+  console.log(`Call ${hannah.phone}`)
+} else {
+  console.log(`${hannah.name} has no phone on file`)
+}
+
+// 2. ?? gives a fallback when the value is null or undefined
+console.log(hannah.phone ?? 'no phone on file')
+
+// 3. ?. stops (and gives undefined) when the value before it is null or undefined
+const pelican = siteNames.find((name) =&gt; name.startsWith('Pelican'))
+console.log(pelican?.toUpperCase())
+console.log(pelican?.toUpperCase() ?? 'No Pelican site in the list')</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>Hannah Becker has no phone on file
+no phone on file
+undefined
+No Pelican site in the list</code></pre>
+                </div>
+                <ul>
+                    <li><strong>An <code>if</code></strong> (<code>!== null</code>, <code>!== undefined</code>) is the clearest, and the right choice when the two cases need different code.</li>
+                    <li><strong><code>??</code></strong>, the <strong>nullish coalescing</strong> operator: "the value on the left, unless it is <code>null</code> or <code>undefined</code>, then the one on the right". Perfect for a fallback text. The type of <code>hannah.phone ?? 'no phone on file'</code> is plain <code>string</code>.</li>
+                    <li><strong><code>?.</code></strong>, <strong>optional chaining</strong>: "if the value before me is <code>null</code> or <code>undefined</code>, stop and give <code>undefined</code>". That is why the third line printed <code>undefined</code> instead of crashing. Its result is still "maybe nothing", so it is usually followed by <code>??</code>, as in the last line.</li>
+                </ul>
+
+                <h3>Why <code>??</code> and not <code>||</code></h3>
+                <p>Older JavaScript used <code>||</code> for fallbacks, and you will see it everywhere. It falls back on any <strong>falsy</strong> value, and <code>0</code> and <code>''</code> are falsy too:</p>
+                <pre data-snippet><code class="language-ts">const spotsTaken: number = 0
+const note: string = ''
+
+console.log(spotsTaken || 'unknown', '|', spotsTaken ?? 'unknown')
+console.log(note || 'no note', '|', note ?? 'no note')</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>unknown | 0
+no note |</code></pre>
+                </div>
+                <p>Zero spots taken is a real, important number (a brand-new cleanup), and <code>||</code> turned it into "unknown". TypeScript is happy with both, because both are valid JavaScript; this is a logic mistake, and the habit that prevents it is simple: for "missing", use <code>??</code>. The same trap hides in <code>if (event.spotsTaken)</code>, which skips zero. Compare with <code>null</code> or <code>undefined</code> when that is what you mean.</p>
+
+                <h3>The <code>!</code> assertion: a promise TypeScript cannot check</h3>
+                <p>A <code>!</code> after a value is the <strong>non-null assertion</strong>: "trust me, this is not <code>null</code> or <code>undefined</code>". TypeScript removes the "maybe nothing" from the type and checks nothing. When the promise is wrong:</p>
+                <pre data-snippet><code class="language-ts">const siteNames = ['Driftwood Cove', 'North Jetty', 'Long Strand Beach']
+
+const pier = siteNames.find((name) =&gt; name === 'Seal Rock Pier')!
+console.log(pier.toUpperCase())</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check, then node scratch.ts)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+file:///Users/you/shoreline/ts-lab/scratch.ts:4
+console.log(pier.toUpperCase())
+                 ^
+
+TypeError: Cannot read properties of undefined (reading 'toUpperCase')
+    at file:///Users/you/shoreline/ts-lab/scratch.ts:4:18
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.22.2</code></pre>
+                </div>
+                <p>The check is silent and the program crashes: the list has no Seal Rock Pier. So when is <code>!</code> honest? When <em>you</em> control the thing it promises. Shoreline Crew HQ's <code>main.tsx</code>, from the Vite template, is the classic case:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/main.tsx</div>
+                    <pre data-src="shoreline-hq/src/main.tsx" data-match="excerpt"><code class="language-tsx">createRoot(document.getElementById('root')!).render(</code></pre>
+                </div>
+                <p>The element with id <code>root</code> is in <code>index.html</code>, which is part of the same project; if it ever went missing, the app could not work at all and would fail on its very first line. That is a fair use. For anything from outside (the API, the browser's storage, a <code>find</code> over data), use an <code>if</code>, <code>??</code> or <code>?.</code> instead.</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Tool</th><th>Reads as</th><th>Use it for</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>if (x !== null)</code></td><td>"only when it is there"</td><td>different code for each case</td></tr>
+                            <tr><td><code>x ?? fallback</code></td><td>"x, or else the fallback"</td><td>a default value or text</td></tr>
+                            <tr><td><code>x?.y</code></td><td>"y, if x is there"</td><td>reaching into something that may be missing (then <code>??</code>)</td></tr>
+                            <tr><td><code>x!</code></td><td>"I promise it is there"</td><td>only what your own project guarantees</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-success">
+                    <h4>✅ "Possibly null" is good news</h4>
+                    <p>Every TS18047 and TS18048 is a crash that did not happen: a volunteer without a phone, a cleanup opened by someone who is not an organizer, a search with no match. These cases are real, and in plain JavaScript you find them when a user does. Handling them feels like extra work for a week or two. Then it becomes the way you think about data, and that way of thinking is a big part of what employers mean by "writes reliable code".</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Building an object first and typing it later</h4>
+                    <p><code>const flats = { terrain: 'marsh' }</code> infers <code>terrain: string</code>, and passing <code>flats</code> where a <code>Site</code> is expected gives the three-level TS2345 above. Annotate the object where you create it (<code>const flats: Site = …</code>), and mistakes are reported on the property that is wrong instead of at a call far away.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Using || for "missing"</h4>
+                    <p><code>spotsTaken || 'unknown'</code> hides a real zero, and <code>note || 'no note'</code> hides an empty note on purpose. Use <code>??</code> when you mean <code>null</code> or <code>undefined</code>, and compare explicitly (<code>!== null</code>) in conditions.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Silencing "possibly undefined" with !</h4>
+                    <p>Adding <code>!</code> makes TS18048 disappear and the crash stay, as the Seal Rock Pier example showed. The error asked "what if it is not there?"; <code>!</code> answers "it always is" without checking. Answer the question with <code>?.</code>, <code>??</code> or an <code>if</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Checking typeof x === 'object' and forgetting null</h4>
+                    <p><code>typeof null</code> is <code>'object'</code>. Always pair the check with <code>x !== null</code>, as in the narrowing section; TypeScript reminds you with TS18047 if you forget.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Copying an enum from an old tutorial</h4>
+                    <p>Older TypeScript code describes a fixed set of values with <code>enum Status { Draft, Scheduled }</code>. <code>npm run check</code> in <code>ts-lab</code> accepts it, but <code>node</code> refuses to run it, because an enum is not just a type that can be stripped away (it creates an object):</p>
+                    <div class="card card-output">
+                        <h4>Expected output (node scratch.ts, trimmed)</h4>
+                        <pre><code>file:///Users/you/shoreline/ts-lab/scratch.ts:1
+  &gt; enum Status {
+      Draft,
+      Scheduled,
+  &gt; }
+
+SyntaxError [ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX]: TypeScript enum is not supported in strip-only mode
+...</code></pre>
+                    </div>
+                    <p>Shoreline Crew HQ's settings refuse it too (<code>error TS1294: This syntax is not allowed when 'erasableSyntaxOnly' is enabled.</code>). Use a union of literal types instead, like <code>EventStatus</code>: it does the same job, disappears completely when the code runs, and is what this course, the API and current React code use.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Draft the Crew's Data Shapes</h2>
+                <p>You will write <code>ts-lab/shapes.ts</code>: your own first draft of the types Shoreline Crew HQ works with, some sample data, and small functions that handle every case those types allow. Then you break it four ways and finish by comparing your draft with the API's real contract. In Lesson 2.4 the app gets the real thing, and you will recognize every line.</p>
+
+                <div class="card">
+                    <h3>Step 1: The types <span class="step-time">(12 min)</span></h3>
+                    <p>In <code>ts-lab</code>, create <code>shapes.ts</code> (keep <code>scratch.ts</code> for the exercises) and type the types:</p>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/shapes.ts</div>
+                        <pre data-src="ts-lab/shapes.ts" data-match="excerpt"><code class="language-ts">// Shoreline Crew data shapes (Lesson 2.2): a first draft of the API's types
+
+// Unions of literal types: exactly one of these words
+type Terrain = 'sand' | 'rocky' | 'marsh' | 'mixed'
+type EventStatus = 'draft' | 'scheduled' | 'completed' | 'cancelled'
+
+interface Site {
+  id: string
+  name: string
+  town: string
+  terrain: Terrain
+  accessible: boolean
+  image: { url: string; alt: string; width: number; height: number }
+}
+
+interface CleanupEvent {
+  id: string
+  title: string
+  siteId: string
+  status: EventStatus
+  startTime: string
+  capacity: number
+  spotsTaken: number
+}
+
+// An event with its site, as the API sends one event; organizers also get the check-in code
+interface CleanupEventDetail extends CleanupEvent {
+  site: Site
+  checkInCode?: string
+}
+
+interface Volunteer {
+  id: string
+  name: string
+  phone: string | null
+}
+
+// What a screen can be doing: each member has its own "kind"
+type LoadState =
+  | { kind: 'loading' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'ready'; events: CleanupEvent[] }</code></pre>
+                    </div>
+                    <p>Before you go on, say in your own words what each type promises. Which property may be missing? Which may be <code>null</code>? What is the difference for the code that reads them? (Optional means "possibly not there at all", read as <code>undefined</code>; <code>string | null</code> means "always there, possibly empty on purpose". The API uses both, as you will see in Step 5.)</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Sample data <span class="step-time">(10 min)</span></h3>
+                    <p>Add a site, two cleanups and two people from the crew, each annotated with its type where it is created:</p>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/shapes.ts</div>
+                        <pre data-src="ts-lab/shapes.ts" data-match="excerpt"><code class="language-ts">// ...
+const cove: Site = {
+  id: 'driftwood-cove',
+  name: 'Driftwood Cove',
+  town: 'Port Marisol',
+  terrain: 'mixed',
+  accessible: false,
+  image: {
+    url: '/images/sites/driftwood-cove.jpg',
+    alt: 'A small curved cove with pale sand and gray driftwood logs along the tide line.',
+    width: 1200,
+    height: 675,
+  },
+}
+const sites: Site[] = [cove]
+
+const weekendCove: CleanupEventDetail = {
+  id: 'e08',
+  title: 'Weekend Cove Cleanup',
+  siteId: 'driftwood-cove',
+  status: 'scheduled',
+  startTime: '09:00',
+  capacity: 18,
+  spotsTaken: 18,
+  site: cove,
+}
+
+const kayakDraft: CleanupEvent = {
+  id: 'e15',
+  title: 'Harbor Kayak Cleanup',
+  siteId: 'north-jetty',
+  status: 'draft',
+  startTime: '09:00',
+  capacity: 8,
+  spotsTaken: 0,
+}
+
+const crew: Volunteer[] = [
+  { id: 'v02', name: 'Luis Romero', phone: '(831) 555-0102' },
+  { id: 'v03', name: 'Hannah Becker', phone: null },
+]</code></pre>
+                    </div>
+                    <p>Notice that <code>weekendCove</code> is a <code>CleanupEventDetail</code> with a <code>site</code> and no <code>checkInCode</code> (this is what a volunteer would receive), while <code>kayakDraft</code> is a plain <code>CleanupEvent</code>. Run <code>npm run check</code>; it should be silent. If you get TS2561 or TS2353, compare the property names with your interfaces.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Functions that handle every case <span class="step-time">(14 min)</span></h3>
+                    <p>Add the functions and the lines that use them:</p>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/shapes.ts</div>
+                        <pre data-src="ts-lab/shapes.ts" data-match="excerpt"><code class="language-ts">// ...
+function statusLabel(status: EventStatus) {
+  switch (status) {
+    case 'draft':
+      return 'Draft (organizers only)'
+    case 'scheduled':
+      return 'Scheduled'
+    case 'completed':
+      return 'Completed'
+    case 'cancelled':
+      return 'Cancelled'
+  }
+}
+
+function spotsLine(event: CleanupEvent) {
+  const left = event.capacity - event.spotsTaken
+  return left &gt; 0 ? `${left} spots left` : 'Full: join the waiting list'
+}
+
+function siteName(siteId: string) {
+  return sites.find((site) =&gt; site.id === siteId)?.name ?? 'Unknown site'
+}
+
+function checkInLine(event: CleanupEventDetail) {
+  return `Check-in code: ${event.checkInCode ?? 'shown to organizers only'}`
+}
+
+function contactLine(person: Volunteer) {
+  if (person.phone === null) {
+    return `${person.name}: no phone on file`
+  }
+  return `${person.name}: ${person.phone}`
+}
+
+function report(state: LoadState) {
+  if (state.kind === 'loading') {
+    return 'Loading cleanups...'
+  }
+  if (state.kind === 'failed') {
+    return `Could not load cleanups: ${state.message}`
+  }
+  return `${state.events.length} cleanups loaded`
+}
+
+for (const event of [weekendCove, kayakDraft]) {
+  const where = siteName(event.siteId)
+  console.log(`${event.title} at ${where}: ${statusLabel(event.status)}, ${spotsLine(event)}`)
+}
+console.log(`${weekendCove.site.name} is ${weekendCove.site.terrain}; ${checkInLine(weekendCove)}`)
+for (const person of crew) {
+  console.log(contactLine(person))
+}
+console.log(report({ kind: 'loading' }))
+console.log(report({ kind: 'failed', message: 'the API did not answer' }))
+console.log(report({ kind: 'ready', events: [weekendCove, kayakDraft] }))</code></pre>
+                    </div>
+                    <pre class="terminal"><code class="language-bash">node shapes.ts
+npm run check</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (node shapes.ts)</h4>
+                        <pre><code>Weekend Cove Cleanup at Driftwood Cove: Scheduled, Full: join the waiting list
+Harbor Kayak Cleanup at Unknown site: Draft (organizers only), 8 spots left
+Driftwood Cove is mixed; Check-in code: shown to organizers only
+Luis Romero: (831) 555-0102
+Hannah Becker: no phone on file
+Loading cleanups...
+Could not load cleanups: the API did not answer
+2 cleanups loaded</code></pre>
+                    </div>
+                    <p><code>npm run check</code> prints only its two <code>&gt;</code> lines. Find each tool from this lesson in the functions: the <code>switch</code> narrows <code>status</code>; <code>siteName</code> uses <code>?.</code> and <code>??</code> (the kayak cleanup's site is not in the list, so you see <code>Unknown site</code>, not a crash); <code>checkInLine</code> uses <code>??</code> on an optional property; <code>contactLine</code> uses an <code>if</code> on <code>null</code>; <code>report</code> narrows the discriminated union. In the loop, hover over <code>event</code>: it is <code>CleanupEvent | CleanupEventDetail</code>, and <code>event.title</code> is allowed because both members have a title.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Break it four ways <span class="step-time">(10 min)</span></h3>
+                    <p>One change at a time: make it, run <code>npm run check</code>, read the whole message, undo it (<kbd>Ctrl</kbd>+<kbd>Z</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>Z</kbd> on a Mac). For each, write down the code and the question TypeScript is asking.</p>
+                    <ol>
+                        <li><strong>A word that is not on the list:</strong> in <code>cove</code>, change <code>terrain: 'mixed'</code> to <code>terrain: 'beach'</code>.</li>
+                        <li><strong>A missing property:</strong> in <code>kayakDraft</code>, delete the <code>title</code> line.</li>
+                        <li><strong>A skipped check:</strong> in <code>report</code>, delete the whole <code>if (state.kind === 'failed') { … }</code> block.</li>
+                        <li><strong>A search that may find nothing:</strong> in <code>siteName</code>, change <code>?.name</code> to <code>.name</code>.</li>
+                    </ol>
+                    <div class="card card-output">
+                        <h4>Expected output (1: a word that is not on the list)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+shapes.ts:48:3 - error TS2322: Type '"beach"' is not assignable to type 'Terrain'.
+
+48   terrain: 'beach',
+     ~~~~~~~
+
+  shapes.ts:11:3 - The expected type comes from property 'terrain' which is declared here on type 'Site'
+    11   terrain: Terrain
+         ~~~~~~~
+
+
+Found 1 error in shapes.ts:48</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (2: a missing property)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+shapes.ts:70:7 - error TS2741: Property 'title' is missing in type '{ id: string; siteId: string; status: "draft"; startTime: string; capacity: number; spotsTaken: number; }' but required in type 'CleanupEvent'.
+
+70 const kayakDraft: CleanupEvent = {
+         ~~~~~~~~~~
+
+  shapes.ts:18:3 - 'title' is declared here.
+    18   title: string
+         ~~~~~
+
+
+Found 1 error in shapes.ts:70</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (3: a skipped check)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+shapes.ts:122:19 - error TS2339: Property 'events' does not exist on type '{ kind: "failed"; message: string; } | { kind: "ready"; events: CleanupEvent[]; }'.
+  Property 'events' does not exist on type '{ kind: "failed"; message: string; }'.
+
+122   return `${state.events.length} cleanups loaded`
+                      ~~~~~~
+
+
+Found 1 error in shapes.ts:122</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (4: a search that may find nothing)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+shapes.ts:104:10 - error TS2532: Object is possibly 'undefined'.
+
+104   return sites.find((site) =&gt; site.id === siteId).name ?? 'Unknown site'
+             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Found 1 error in shapes.ts:104</code></pre>
+                    </div>
+                    <p>Mistake 3 is worth a second look: with the <code>failed</code> check gone, two members are left when the last line runs, and the message names both, then the one without <code>events</code>. Mistake 4 is a new code for an old question: <strong>TS2532</strong>, "Object is possibly 'undefined'", is what TypeScript says when the maybe-missing thing is the result of a call rather than a named variable. Undo every change until <code>npm run check</code> is silent again.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Read the real contract <span class="step-time">(5 min)</span></h3>
+                    <p>Open <code>shoreline-api/core/types.ts</code> in VS Code: the file the API and both of the crew's apps share. Find your four interfaces in it. Here are two of them:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-api/core/types.ts</div>
+                        <pre data-src="shoreline-api/core/types.ts" data-match="excerpt"><code class="language-ts">/** A cleanup event with its site, as GET /api/events/:id returns it. */
+export interface CleanupEventDetail extends CleanupEvent {
+  site: Site
+  /** only present for organizers: the code volunteers type to check in on the day */
+  checkInCode?: string
+}
+
+/** A person in the crew. Organizers are volunteers with extra permissions. */
+export interface Volunteer {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  role: Role
+  skills: Skill[]
+  joinedOn: DateString
+  /** hours from attended cleanups */
+  hoursLogged: number
+}</code></pre>
+                    </div>
+                    <p>Your <code>CleanupEventDetail</code> matches it, apart from the comments. The real <code>Volunteer</code> has more properties (an email, a role, skills), and some types you have not met: <code>Skill[]</code> is an array of another union, and <code>DateString</code> is a type alias for <code>string</code> that the file defines near the top to document the format. The <code>/** … */</code> comments are shown by VS Code when you hover over a property, and <code>export</code> makes a type usable from other files (Lesson 2.4). Write down two differences between your draft and the real file; you will need neither list nor draft after Lesson 2.4, but reading a contract like this is a skill you use on every project.</p>
+                    <p><strong>Your own project:</strong> sketch the two or three main objects of the app you are planning for Lesson 11.1 as interfaces on paper. Mark one property that is optional, one that may be <code>null</code>, and one that should be a union of literal types instead of a <code>string</code>.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>shapes.ts</code> has the <code>Terrain</code> and <code>EventStatus</code> unions, the <code>Site</code>, <code>CleanupEvent</code>, <code>CleanupEventDetail</code> and <code>Volunteer</code> interfaces, and the <code>LoadState</code> union</li>
+                        <li>☐ <code>node shapes.ts</code> prints the eight lines above, and <code>npm run check</code> reports no errors</li>
+                        <li>☐ I can point at a <code>switch</code>, a discriminant check, an <code>if</code> on <code>null</code>, a <code>??</code> and a <code>?.</code> in my functions and say what each one narrows</li>
+                        <li>☐ I produced TS2322, TS2741, TS2339 and TS2532 and wrote down the question each one asks</li>
+                        <li>☐ I compared my draft with <code>shoreline-api/core/types.ts</code> and noted two differences</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time). Use <code>scratch.ts</code> for each, and delete <code>scratch.ts</code> when you are done, so <code>ts-lab</code> keeps one file per lesson.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Type a sign-up</h3>
+                    <p>When a volunteer signs up for a cleanup, the API stores a sign-up. Here is one, with a single property left out (the real one also has <code>createdAt</code>):</p>
+                    <pre data-snippet><code class="language-json">{
+  "id": "s101",
+  "eventId": "e17",
+  "volunteerId": "v04",
+  "status": "attended",
+  "note": "Bringing my own gloves",
+  "checkedInAt": "2026-03-14T15:05:00.000Z"
+}</code></pre>
+                    <p>A sign-up's <code>status</code> is one of <code>confirmed</code>, <code>waitlisted</code>, <code>cancelled</code>, <code>attended</code> or <code>no-show</code>, and <code>checkedInAt</code> is <code>null</code> until the volunteer checks in. Write a <code>SignupStatus</code> type and a <code>Signup</code> interface, then a function <code>checkInLine(signup: Signup)</code> that returns <code>v04: checked in at 15:05 UTC</code> or <code>v11: not checked in yet (confirmed)</code>. Test it with this sign-up and one that has not checked in.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>checkedInAt</code> is always present, so it is not optional: its type is <code>string | null</code>. Check for <code>null</code> first. The time is characters 11 to 15 of the timestamp: <code>slice(11, 16)</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">type SignupStatus = 'confirmed' | 'waitlisted' | 'cancelled' | 'attended' | 'no-show'
+
+interface Signup {
+  id: string
+  eventId: string
+  volunteerId: string
+  status: SignupStatus
+  note: string
+  checkedInAt: string | null
+}
+
+function checkInLine(signup: Signup) {
+  if (signup.checkedInAt === null) {
+    return `${signup.volunteerId}: not checked in yet (${signup.status})`
+  }
+  return `${signup.volunteerId}: checked in at ${signup.checkedInAt.slice(11, 16)} UTC`
+}
+
+const signups: Signup[] = [
+  {
+    id: 's101',
+    eventId: 'e17',
+    volunteerId: 'v04',
+    status: 'attended',
+    note: 'Bringing my own gloves',
+    checkedInAt: '2026-03-14T15:05:00.000Z',
+  },
+  {
+    id: 's102',
+    eventId: 'e17',
+    volunteerId: 'v11',
+    status: 'confirmed',
+    note: '',
+    checkedInAt: null,
+  },
+]
+
+for (const signup of signups) {
+  console.log(checkInLine(signup))
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>v04: checked in at 15:05 UTC
+v11: not checked in yet (confirmed)</code></pre>
+                        </div>
+                        <p>Compare yours with <code>Signup</code> in <code>shoreline-api/core/types.ts</code>: it is the same shape, with the API's <code>Timestamp</code> alias instead of <code>string</code> for the two times (it also has <code>createdAt</code>).</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Three questions in one file</h3>
+                    <p>Put this in <code>scratch.ts</code> and run <code>npm run check</code>. Answer each of the three errors in code, without <code>any</code>, <code>!</code> or changing the types, until the check is silent and <code>node scratch.ts</code> prints a line.</p>
+                    <pre data-snippet><code class="language-ts">type EventStatus = 'draft' | 'scheduled' | 'completed' | 'cancelled'
+
+interface CleanupEventDetail {
+  title: string
+  status: EventStatus
+  checkInCode?: string
+}
+
+type LoadState =
+  | { kind: 'loading' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'ready'; event: CleanupEventDetail }
+
+const creek: CleanupEventDetail = { title: 'Creek Mouth After the Rains', status: 'canceled' }
+
+function codeLength(event: CleanupEventDetail) {
+  return event.checkInCode.length
+}
+
+function errorText(state: LoadState) {
+  return `Sorry: ${state.message}`
+}
+
+console.log(creek.title, codeLength(creek), errorText({ kind: 'loading' }))</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>One is a spelling the union does not allow (read the "Did you mean"). One is an optional property: what should the length be when there is no code? One reads <code>message</code>, which only one member of <code>LoadState</code> has: check <code>kind</code> first and return something else otherwise.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card card-output">
+                            <h4>Expected output (npm run check, before the fixes)</h4>
+                            <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:14:75 - error TS2820: Type '"canceled"' is not assignable to type 'EventStatus'. Did you mean '"cancelled"'?
+
+14 const creek: CleanupEventDetail = { title: 'Creek Mouth After the Rains', status: 'canceled' }
+                                                                             ~~~~~~
+
+  scratch.ts:5:3 - The expected type comes from property 'status' which is declared here on type 'CleanupEventDetail'
+    5   status: EventStatus
+        ~~~~~~
+
+scratch.ts:17:10 - error TS18048: 'event.checkInCode' is possibly 'undefined'.
+
+17   return event.checkInCode.length
+            ~~~~~~~~~~~~~~~~~
+
+scratch.ts:21:26 - error TS2339: Property 'message' does not exist on type 'LoadState'.
+  Property 'message' does not exist on type '{ kind: "loading"; }'.
+
+21   return `Sorry: ${state.message}`
+                            ~~~~~~~
+
+
+Found 3 errors in the same file, starting at: scratch.ts:14</code></pre>
+                        </div>
+                        <pre data-snippet><code class="language-ts">type EventStatus = 'draft' | 'scheduled' | 'completed' | 'cancelled'
+
+interface CleanupEventDetail {
+  title: string
+  status: EventStatus
+  checkInCode?: string
+}
+
+type LoadState =
+  | { kind: 'loading' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'ready'; event: CleanupEventDetail }
+
+const creek: CleanupEventDetail = { title: 'Creek Mouth After the Rains', status: 'cancelled' }
+
+function codeLength(event: CleanupEventDetail) {
+  return event.checkInCode?.length ?? 0
+}
+
+function errorText(state: LoadState) {
+  if (state.kind === 'failed') {
+    return `Sorry: ${state.message}`
+  }
+  return 'No error'
+}
+
+console.log(creek.title, codeLength(creek), errorText({ kind: 'loading' }))</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>Creek Mouth After the Rains 0 No error</code></pre>
+                        </div>
+                        <p>Three answers to three questions: the status is spelled the crew's way; no code means length 0 (<code>?.</code> stops at the missing code and <code>??</code> supplies the 0); and the error text exists only after checking that the state failed. If you ran the broken file with <code>node</code> first, it crashed on the check-in code: the second question was a real bug.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A site name from outside (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 15 minutes).</em></p>
+                    <p>Write <code>siteNameFrom(value: unknown)</code> that returns the value's <code>name</code> if the value is an object with a non-empty string <code>name</code>, and <code>Unknown site</code> otherwise. Test it with <code>JSON.parse</code> of <code>{"id": "north-jetty", "name": "North Jetty"}</code>, <code>{"name": 42}</code>, <code>{"name": "  "}</code>, <code>null</code> and <code>"North Jetty"</code> (a string, not an object).</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Start from the object check in the narrowing section and add one more condition: <code>value.name.trim() !== ''</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">function siteNameFrom(value: unknown) {
+  if (
+    typeof value === 'object' &amp;&amp;
+    value !== null &amp;&amp;
+    'name' in value &amp;&amp;
+    typeof value.name === 'string' &amp;&amp;
+    value.name.trim() !== ''
+  ) {
+    return value.name
+  }
+  return 'Unknown site'
+}
+
+console.log(siteNameFrom(JSON.parse('{"id": "north-jetty", "name": "North Jetty"}')))
+console.log(siteNameFrom(JSON.parse('{"name": 42}')))
+console.log(siteNameFrom(JSON.parse('{"name": "  "}')))
+console.log(siteNameFrom(JSON.parse('null')))
+console.log(siteNameFrom(JSON.parse('"North Jetty"')))</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>North Jetty
+Unknown site
+Unknown site
+Unknown site
+Unknown site</code></pre>
+                        </div>
+                        <p>Only the first value passes all five conditions. This function is a small version of what Lesson 2.4 builds for every cleanup the API sends: outside data is <code>unknown</code> until each property you rely on has been checked.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Which declaration lets a site's terrain be exactly one of the crew's four words, and nothing else?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="An interface always describes an object with properties. Is a terrain an object?">
+                                A) <code>interface Terrain { sand: string; rocky: string; marsh: string; mixed: string }</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A union of literal types allows exactly these four strings. Anything else, including a typo, is TS2322 (or TS2820 with a Did you mean suggestion), and the editor suggests the four words as you type.">
+                                B) <code>type Terrain = 'sand' | 'rocky' | 'marsh' | 'mixed'</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This accepts every string, including typos. Which kind of type allows only a fixed list of values?">
+                                C) <code>terrain: string</code> with a comment listing the four words
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> <code>CleanupEventDetail</code> has <code>checkInCode?: string</code>. What does <code>npm run check</code> say about <code>return event.checkInCode.length</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The property is declared in the interface, so it exists. What does the question mark add to its type?">
+                                A) TS2339: Property 'checkInCode' does not exist
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TS2741 is about creating an object without a required property. Is checkInCode required?">
+                                B) TS2741: Property 'checkInCode' is missing
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript goes by the type, and the type says the code may be absent. What happens for a volunteer?">
+                                C) Nothing, because the property is declared
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="An optional property reads as string or undefined, so TS18048 asks you to handle the missing case, for example with event.checkInCode?.length ?? 0 or an if.">
+                                D) TS18048: 'event.checkInCode' is possibly 'undefined'
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> <code>const flats = { name: 'Sandpiper Flats', terrain: 'marsh' }</code>, then <code>describeSite(flats)</code> gives TS2345 ending in "Type 'string' is not assignable to type 'Terrain'". Why, and what is the usual fix?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Object properties can change later, so TypeScript infers the general type string for terrain. Writing const flats: Site = ... checks marsh against Terrain where the object is created.">
+                                A) The property was inferred as <code>string</code>; annotate the object: <code>const flats: Site = …</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="marsh is one of the four Terrain words. Read the last line of the message again: which type does it say terrain has?">
+                                B) <code>'marsh'</code> is not a valid terrain; use <code>'mixed'</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That would hide the question instead of answering it. What did TypeScript infer for the property?">
+                                C) Change the parameter to <code>site: any</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> With <code>type LoadState = { kind: 'loading' } | { kind: 'failed'; message: string } | { kind: 'ready'; events: CleanupEvent[] }</code>, where may you read <code>state.message</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Only one member has message. What does TypeScript say about a property that not every member has?">
+                                A) Anywhere in a function that takes a <code>LoadState</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="After that check two members are left, and one of them has no message.">
+                                B) After <code>if (state.kind === 'loading') return</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Checking the discriminant narrows state to the member with kind failed, which is the only one that has message.">
+                                C) Inside <code>if (state.kind === 'failed') { … }</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A new cleanup has <code>spotsTaken</code> set to <code>0</code>. What does <code>console.log(spotsTaken || 'unknown')</code> print?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="0 is falsy, so the OR operator falls back to the right side. For missing values use ??, which only falls back on null and undefined and prints 0 here.">
+                                A) <code>unknown</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The OR operator falls back on every falsy value. Is 0 falsy?">
+                                B) <code>0</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This is valid JavaScript and valid TypeScript. The problem is in the logic, not the types.">
+                                C) Nothing: <code>npm run check</code> reports an error first
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should I write semicolons or commas between properties?</summary>
+                    <p>Either works, and so does a plain line break, which is what this course and the API use for multi-line interfaces. On one line, separate properties with semicolons, as in <code>{ url: string; alt: string }</code>; that is what TypeScript prints in its own messages. Code formatters such as Prettier pick one style for you.</p>
+                </details>
+                <details>
+                    <summary>What is the difference between <code>phone?: string</code> and <code>phone: string | null</code>?</summary>
+                    <p><code>phone?: string</code> means the property may be absent from the object altogether (reading it gives <code>undefined</code>). <code>phone: string | null</code> means the property is always there, and <code>null</code> says "deliberately empty". APIs often use <code>null</code> for "we know there is none" and leave optional properties out when they do not apply to you, which is exactly how the crew's API treats a phone number and a check-in code. <code>??</code> and <code>?.</code> handle both.</p>
+                </details>
+                <details>
+                    <summary>Do types like these check the data the API actually sends?</summary>
+                    <p>No, and this is the most important limit to remember. Types disappear when the code runs, so writing <code>const site: Site = await response.json()</code> would be a claim, not a check: if the API sent something else, nothing would notice. That is why data from outside starts as <code>unknown</code> and gets checked, as in the narrowing section. Lesson 2.4 does this for the API's data, and Module 8 hands the job to Zod.</p>
+                </details>
+                <details>
+                    <summary>Why does the course use unions of strings instead of enums?</summary>
+                    <p>Unions of literal types disappear when the code runs, so Node and Vite can strip them, and the values are the same plain strings the API sends in its JSON. Enums create a runtime object, which Node's type stripping and the app's <code>erasableSyntaxOnly</code> setting refuse (see Common Mistakes). You will still meet enums in older code; read them as "a named list of values".</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>In <code>shapes.ts</code>, delete the <code>case 'cancelled'</code> lines from <code>statusLabel</code> and hover over the function name: the return type is now the three labels <em>or <code>undefined</code></em>. TypeScript noticed that one status falls through the <code>switch</code> without returning. Run <code>npm run check</code>: no error, because nothing yet requires a string. How would you make TypeScript insist that every status is handled? Write your guess in your notes (Lesson 3.3 shows a way with a lookup table, and Lesson 5.1 the classic one with a type called <code>never</code>), then put the lines back.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Think of a bug you have seen in a website or app (a blank screen, "undefined" printed on a page, a list that never loaded). Which tool from today would have caught it: a union of literal types, an optional property, a discriminated union, or <code>??</code> instead of <code>||</code>? Describe the bug and the type you would write to prevent it in two or three sentences.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>An <strong>object type</strong> lists each property and its type; an <code>interface</code> names one. Object literals are checked for missing (TS2741), misspelled (TS2561) and extra (TS2353) properties</li>
+                        <li>Use <code>interface</code> for object shapes and <code>type</code> for unions and everything else; build on shapes with <code>extends</code> or <code>&amp;</code></li>
+                        <li><code>?</code> makes a property optional (it reads as <code>T | undefined</code>); <code>readonly</code> forbids changing it after creation</li>
+                        <li>A <strong>union</strong> (<code>A | B</code>) is "one of these"; unions of <strong>literal types</strong> describe fixed lists like the four statuses. Annotate objects where you create them, or their properties widen to <code>string</code></li>
+                        <li><strong>Narrowing</strong> proves which member you have: <code>typeof</code>, <code>===</code>/<code>switch</code>, a <strong>discriminant</strong> property, <code>in</code>, and the object check <code>typeof x === 'object' &amp;&amp; x !== null &amp;&amp; 'name' in x</code></li>
+                        <li>For "maybe nothing": an <code>if</code>, <code>??</code> (not <code>||</code>), <code>?.</code>; <code>!</code> only for what your own project guarantees</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up a type or pattern quickly</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>See every type the API uses</td><td><a href="api.html">The Shoreline Crew API</a></td></tr>
+                            <tr><td>Read the official chapter on narrowing</td><td><a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html" target="_blank" rel="noopener">TypeScript Handbook: Narrowing</a></td></tr>
+                            <tr><td>Look up a new word</td><td><a href="glossary.html">Glossary</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You drafted Shoreline Crew's data types (sites, cleanups, volunteers and a loading state) and wrote functions that handle every case they allow</li>
+                        <li>You can choose between <code>interface</code> and <code>type</code>, and use optional, read-only and nested properties</li>
+                        <li>You replaced free-text strings with unions of literal types and found the "widened literal" trap</li>
+                        <li>You narrowed unions four ways and checked an <code>unknown</code> object safely, <code>null</code> quirk included</li>
+                        <li>You handled "maybe nothing" with <code>if</code>, <code>??</code> and <code>?.</code>, and saw exactly when <code>!</code> lies</li>
+                        <li>You read the API's real contract and recognized its shapes</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_05.html"><strong>Lesson 2.3: Functions and Generics</strong></a> you type functions properly: parameters with defaults, return types for functions other files rely on, function types like <code>(event: CleanupEvent) =&gt; string</code>, and generics, the angle brackets in <code>Array&lt;string&gt;</code>. You will write one function that works for a list of sites, cleanups or anything else, without giving up a single check.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>node shapes.ts</code> prints its eight lines and <code>npm run check</code> in <code>ts-lab</code> reports no errors</li>
+                    <li>Delete <code>scratch.ts</code> (Lesson 2.3 adds <code>functions.ts</code>)</li>
+                    <li>Keep your notes from Step 4 and Step 5: four error codes, their questions, and two differences from the real contract</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today was dense: six new ideas, each with its own syntax and its own error messages. If narrowing or <code>??</code> versus <code>||</code> still feels slippery, that is normal; they settle as you use them, and you will use them in almost every lesson from here on. Notice what changed, though: TypeScript's messages are starting to read like sentences you understand. Last week they were noise. That is real progress, and it is yours.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_03.html" class="prev-lesson">← Previous: Types and Inference</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_05.html" class="next-lesson">Next: Functions and Generics →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

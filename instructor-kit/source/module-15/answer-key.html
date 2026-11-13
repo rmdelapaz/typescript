@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 15</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 15: React Router 8, Search Params and Nested Routes</h1>
+    <p class="sub">Answers and reasoning for every Session 15 item: the warm-up, both self-checks, the predict-then-check items, the lab reference outputs, the lesson pages' own quizzes and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>15</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up: From Session 14</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>W1.</b> Only the call site: <code class="inline">as={Link} to="/events/new"</code>. Button's props follow <code class="inline">as</code> (ComponentPropsWithRef), so <code class="inline">to</code> becomes required and <code class="inline">href</code> an error; Button.tsx itself does not change. Today's demo does it.</li>
+  <li><b>W2.</b> Only when the component MOUNTS. If React keeps the same component for the next cleanup, the old choice stays: today's <code class="inline">key={eventId}</code>.</li>
+  <li><b>W3.</b> The whole app loads again: HTML, JavaScript and fonts are fetched or re-run, the session is read again from sessionStorage, every page's data is fetched again, and anything in memory is gone. Today's router keeps the app running.</li>
+</ol>
+
+  <div class="sec"><h2>6.1 · React Router 8: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Measured in the HQ after Lesson 6.1: from the home page, through Events, one cleanup, Back, Forward and the logo back home. How many HTML pages did the browser load?</div><div class="opts"><div class="opt">A) Six, one for each step</div><div class="opt correct">B) One: the first</div><div class="opt">C) Three: one for each different address</div><div class="opt">D) None: the dev server keeps the page</div></div><div class="why"><b>Why:</b> A router link renders a real <code class="inline">&lt;a href&gt;</code> but cancels the browser's page load on a plain click; the router writes the address with the History API and renders the matching route. Back and Forward work without a page load too (Lesson 6.1, Links That Do Not Reload).<br><b>A</b> is wrong: That was the HQ before the router: every plain link reloaded the whole app.<br><b>C</b> is wrong: The address changes each time, but the document does not.<br><b>D</b> is wrong: The very first visit still loads the app's index.html.</div></div>
+  <div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">What does <code class="inline">npx tsc -b</code> say about this route list?</div><pre class="code"><span class="k">import</span> { createBrowserRouter } <span class="k">from</span> <span class="s">'react-router'</span>
+<span class="k">import</span> { EventsPage } <span class="k">from</span> <span class="s">'./pages/EventsPage.tsx'</span>
+<span class="k">import</span> { NewEventPage } <span class="k">from</span> <span class="s">'./pages/NewEventPage.tsx'</span>
+
+<span class="c">// An index route is the page AT its parent's address: it cannot have pages of its own</span>
+<span class="k">export</span> <span class="k">const</span> router = createBrowserRouter([
+  {
+    index: <span class="k">true</span>,
+    element: &lt;EventsPage /&gt;,
+    children: [{ path: <span class="s">'new'</span>, element: &lt;NewEventPage /&gt; }],
+  },
+])</pre><div class="opts"><div class="opt">A) Nothing: React Router ignores children on an index route</div><div class="opt">B) error TS2339: Property 'children' does not exist</div><div class="opt correct">C) error TS2322: children must be undefined, because index: true picked the index member of the RouteObject union</div><div class="opt">D) Nothing at build time; the browser shows an error screen</div></div><div class="why"><b>Why:</b> RouteObject is a discriminated union: IndexRouteObject has <code class="inline">children?: undefined</code>. The real message ends with <code class="inline">Type '[{ path: string; element: Element; }]' is not assignable to type 'undefined'.</code>: read it from the bottom up. An index route is the page AT its parent's address, so it cannot have pages of its own.<br><b>A</b> is wrong: TypeScript checks every route object's shape.<br><b>B</b> is wrong: children exists, but its type on this member is undefined.<br><b>D</b> is wrong: The type checker catches it before anything runs.</div></div>
+  <div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">tsc prints this for a new back link. What is the fix?</div><pre class="code">src/Scratch.tsx:4:16 - error TS2322: Type '{ href: string; children: string; }' is not assignable to type 'IntrinsicAttributes &amp; LinkProps &amp; RefAttributes&lt;HTMLAnchorElement&gt;'.
+Found 1 error in src/Scratch.tsx:4</pre><div class="opts"><div class="opt correct">Use <code class="inline">to</code> instead of <code class="inline">href</code>: <code class="inline">&lt;Link to="/events"&gt;</code></div></div><div class="why"><b>Why:</b> A router Link takes <code class="inline">to</code>; it still renders a real <code class="inline">&lt;a href&gt;</code> in the browser. TypeScript lists Link's props, so the typo is caught (and the Did you mean points at ref, which is not the fix). The same rule makes <code class="inline">&lt;Button as={Link}&gt;</code> require <code class="inline">to</code> (Lesson 6.1, Link through the polymorphic Button).</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">The sites page throws while rendering. The <code class="inline">errorElement</code> sits on the LAYOUT route (<code class="inline">path: '/'</code> with AppLayout). What does the visitor see?</div><div class="opts"><div class="opt">A) The header with Sites marked current, the message and the footer</div><div class="opt">B) React Router's own Unexpected Application Error! screen</div><div class="opt">C) A blank page with an error in the Console</div><div class="opt correct">D) The message, but no header and no footer: the error element replaced the layout too</div></div><div class="why"><b>Why:</b> An error element replaces the route it sits on, layout included. On a pathless route INSIDE the layout it replaces only the page, which is what the HQ does (Lesson 6.1, When a Page Crashes, measured three ways).<br><b>A</b> is wrong: That is the pathless route inside the layout: the HQ's choice.<br><b>B</b> is wrong: That is what happens with no errorElement on any route.<br><b>C</b> is wrong: React Router catches the error; the page is not blank.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">The route is written <code class="inline">'events/:id'</code> while EventPage reads <code class="inline">eventId</code> from <code class="inline">useParams()</code>. What happens?</div><div class="opts"><div class="opt correct">A) <code class="inline">npx tsc -b</code> and <code class="inline">npm run lint</code> pass; on /events/e08 the page shows "Something went wrong on this page" and the Console names EventPage's error</div><div class="opt">B) <code class="inline">npx tsc -b</code> reports TS2339: eventId does not exist</div><div class="opt">C) The cleanup page works: React Router matches the names by position</div><div class="opt">D) Page not found</div></div><div class="why"><b>Why:</b> Both sides are just strings, so TypeScript stays quiet (the kit ran it: <code class="inline">npx tsc -b</code> printed nothing). <code class="inline">eventId</code> is undefined, EventPage throws its own message, and the errorElement shows the crash page. Lesson 6.2's <code class="inline">useParams&lt;'eventId'&gt;()</code> names the parameter; it still cannot see the route list.<br><b>B</b> is wrong: Untyped useParams() allows any name; each value is string | undefined.<br><b>C</b> is wrong: Parameters are matched by name, not position.<br><b>D</b> is wrong: The address still matches 'events/:id'; only the name differs.</div></div>
+  <div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">Why does EventPage put <code class="inline">key={eventId}</code> on its ErrorBoundary?</div><div class="opts"><div class="opt correct">When only the parameter changes the route stays the same, so React keeps the components and their state; a new key mounts fresh ones (boundary, Suspense, tabs)</div></div><div class="why"><b>Why:</b> Measured in the lesson: without a key, going from one cleanup to another kept the old selected tab and showed no panel. A key is React's identity for a component (list keys, Lesson 3.3).</div></div>
+
+  <div class="sec"><h2>6.1 · React Router 8: predict, then check</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict, then try it.</div><pre class="code"><span class="k">import</span> { BrowserRouter, Route, Routes } <span class="k">from</span> <span class="s">'react-router'</span>
+<span class="k">import</span> { EventsPage } <span class="k">from</span> <span class="s">'./pages/EventsPage.tsx'</span>
+<span class="k">import</span> { HomePage } <span class="k">from</span> <span class="s">'./pages/HomePage.tsx'</span>
+
+<span class="c">// Declarative mode: the same routes as JSX. Fine for small apps, but no loaders or actions.</span>
+<span class="k">export</span> <span class="k">function</span> DeclarativeApp() {
+  <span class="k">return</span> (
+    &lt;BrowserRouter&gt;
+      &lt;Routes&gt;
+        &lt;Route index element={&lt;HomePage /&gt;} /&gt;
+        &lt;Route path=<span class="s">"events"</span> element={&lt;EventsPage /&gt;} /&gt;
+      &lt;/Routes&gt;
+    &lt;/BrowserRouter&gt;
+  )
+}</pre><div class="opts"><div class="opt correct"><b>npx tsc -b</b><pre class="out">(no output: tsc accepts it)</pre></div></div><div class="why"><b>Why:</b> Declarative mode is still part of React Router 8 and imports from <code class="inline">react-router</code>; this version compiles in the HQ. It cannot load data per route or handle form actions, which the HQ uses from Lesson 6.3, so the HQ starts in data mode (the lesson's FAQ).</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict, then try it.</div><pre class="code"><span class="c">// App.tsx: only the route's parameter is renamed</span>
+{ path: <span class="s">'events/:id'</span>, element: &lt;EventPage /&gt; },
+
+<span class="c">// EventPage.tsx is unchanged</span>
+<span class="k">const</span> { eventId } = useParams()</pre><div class="opts"><div class="opt correct"><b>npx tsc -b</b><pre class="out">(no output: tsc accepts it)</pre></div></div><div class="why"><b>Why:</b> Both sides are just strings, so TypeScript and the linter stay quiet (run for real: the route renamed in a copy of the HQ, then <code class="inline">npx tsc -b</code>). In the browser, /events/e08 shows "Something went wrong on this page" and EventPage's own message in the Console. Self-check Q5.</div></div>
+
+  <div class="sec"><h2>6.2 · Search Params, Nested Routes and Typed Navigation: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">What does the second line print?</div><pre class="code"><span class="k">const</span> params = <span class="k">new</span> URLSearchParams(<span class="s">'q=pelican point&amp;status=completed'</span>)
+console.log(params.get(<span class="s">'q'</span>), params.get(<span class="s">'page'</span>), params.has(<span class="s">'status'</span>))</pre><div class="opts"><div class="opt correct">A) <code class="inline">pelican point null true</code></div><div class="opt">B) <code class="inline">pelican+point undefined true</code></div><div class="opt">C) <code class="inline">pelican point '' true</code></div><div class="opt">D) <code class="inline">pelican%20point null false</code></div></div><div class="why"><b>Why:</b> <code class="inline">get</code> decodes the value (<code class="inline">+</code> or <code class="inline">%20</code> become a space) and returns <code class="inline">null</code> for a missing name: <code class="inline">string | null</code>. <code class="inline">toString()</code> writes spaces as <code class="inline">+</code> again (<code class="inline">q=jetty&amp;status=completed</code> after a <code class="inline">set</code>). URLSearchParams is a browser class, so this ran in Node too.<br><b>B</b> is wrong: Spaces come back as spaces, and a missing name is null, not undefined.<br><b>C</b> is wrong: Missing means null, not an empty string.<br><b>D</b> is wrong: get decodes, and has('status') is true.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt"><code class="inline">const status: StatusFilter = searchParams.get('status') ?? 'all'</code> gives this. How does the HQ fix it, and why not with <code class="inline">as StatusFilter</code>?</div><pre class="code">src/Scratch.tsx:6:9 - error TS2322: Type 'string' is not assignable to type 'StatusFilter'.
+Found 1 error in src/Scratch.tsx:6</pre><div class="opts"><div class="opt correct"><code class="inline">readParam(searchParams, 'status', isEventStatus) ?? 'all'</code>: a type predicate checks the text; an as would let ?status=banana through</div></div><div class="why"><b>Why:</b> The address is input from outside the app, like the API's JSON in Lesson 2.4: check it, then trust it. Measured: /events?status=banana showed All statuses and all 15 cleanups.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">Signed in as Maya on the crew page: Next page →, click Kwame Asante, Next page → again (address /volunteers/v09?page=3), then type ma in the search. Now Back. Where are you?</div><div class="opts"><div class="opt">A) /volunteers/v09?page=3</div><div class="opt">B) /volunteers/v09?q=m</div><div class="opt correct">C) /volunteers/v09?page=2</div><div class="opt">D) /volunteers</div></div><div class="why"><b>Why:</b> Typing uses replace: true, so the first letter REPLACED the ?page=3 entry and the letters added none; Back goes to the entry before it (Lesson 6.2, Exercise 1, measured).<br><b>A</b> is wrong: That entry was replaced by the typing.<br><b>B</b> is wrong: Replace means the letters are never places to go back to.<br><b>D</b> is wrong: That is several entries further back.</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">Someone removes <code class="inline">&lt;Outlet /&gt;</code> from VolunteersPage. Signed in as Maya, they click Aisha Rahman. What happens?</div><div class="opts"><div class="opt">A) <code class="inline">npx tsc -b</code> fails: the child route has nowhere to render</div><div class="opt">B) React Router shows its error screen</div><div class="opt">C) The card replaces the list</div><div class="opt correct">D) The address becomes /volunteers/v20 and her name turns bold, but no card appears and no request is sent</div></div><div class="why"><b>Why:</b> The router matched the child route; there is simply nowhere to draw it, and nothing complains (tsc, lint and the Console were all quiet, measured). A nested page that does nothing: check the parent's Outlet first.<br><b>A</b> is wrong: Routes and outlets are not connected by types.<br><b>B</b> is wrong: Nothing throws.<br><b>C</b> is wrong: Children render at the parent's Outlet, never instead of the parent.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">These four lines are in a Scratch.tsx in the HQ (data mode). How many errors does <code class="inline">npx tsc -b</code> report?</div><pre class="code"><span class="k">import</span> { generatePath, href } <span class="k">from</span> <span class="s">'react-router'</span>
+
+<span class="c">// href(): checked only in framework mode, where React Router generates the list of routes</span>
+<span class="k">export</span> <span class="k">const</span> typoInPath = href(<span class="s">'/volunters/:volunteerId'</span>, { volunteerId: <span class="s">'v04'</span> })
+<span class="k">export</span> <span class="k">const</span> missingValue = href(<span class="s">'/volunteers/:volunteerId'</span>)
+
+<span class="c">// generatePath(): reads the parameter names from the pattern you pass</span>
+<span class="k">export</span> <span class="k">const</span> fine = generatePath(<span class="s">'/volunteers/:volunteerId'</span>, { volunteerId: <span class="s">'v04'</span> })
+<span class="k">export</span> <span class="k">const</span> typoInName = generatePath(<span class="s">'/volunteers/:volunteerId'</span>, { volunterId: <span class="s">'v04'</span> })</pre><div class="opts"><div class="opt">A) Four: each line has a mistake</div><div class="opt correct">B) One, on the generatePath line with volunterId</div><div class="opt">C) Two, on the two href lines</div><div class="opt">D) None: all four compile</div></div><div class="why"><b>Why:</b> href() is typed from the generated route list of framework mode; in data mode it accepts any path and any params, so the typo path and the missing value compile (and fail at run time). generatePath reads the names from the pattern: <code class="inline">error TS2741</code>.<br><b>A</b> is wrong: The fine line is fine, and both href lines compile.<br><b>C</b> is wrong: That is what href would report in framework mode.<br><b>D</b> is wrong: generatePath does check the parameter names.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">In the crew list, names link with <code class="inline">to={{ pathname: volunteer.id, search: searchParams.toString() }}</code>; the Pagination links use <code class="inline">to={{ search }}</code> with no pathname. What does each keep?</div><div class="opts"><div class="opt correct">The name links keep the search (page, q, skill) and change the path; the page links keep the path (the open card) and change only the search</div></div><div class="why"><b>Why:</b> Links resolve relative to their route, and a path alone drops the query: on page 2, a name link without the search jumped back to Page 1 of 3 (Common Mistakes). Next page from /volunteers/v16?page=2 went to /volunteers/v16?page=3.</div></div>
+
+  <div class="sec"><h2>6.2 · Search Params, Nested Routes and Typed Navigation: predict, then check</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict, then check.</div><pre class="code"><span class="k">import</span> { readPageNumber, withParam } <span class="k">from</span> <span class="s">'./searchParams.ts'</span>
+
+<span class="k">for</span> (<span class="k">const</span> search <span class="k">of</span> [<span class="s">''</span>, <span class="s">'page=2'</span>, <span class="s">'page=zero'</span>, <span class="s">'page=2.5'</span>, <span class="s">'page=0'</span>]) {
+  console.log(JSON.stringify(search), <span class="s">'-&gt;'</span>, readPageNumber(<span class="k">new</span> URLSearchParams(search)))
+}
+<span class="k">const</span> current = <span class="k">new</span> URLSearchParams(<span class="s">'q=pelican&amp;status=completed'</span>)
+console.log(withParam(current, <span class="s">'status'</span>, <span class="s">''</span>).toString(), <span class="s">'|'</span>, current.toString())</pre><div class="opts"><div class="opt correct"><pre class="out">"" -&gt; 1
+"page=2" -&gt; 2
+"page=zero" -&gt; 1
+"page=2.5" -&gt; 1
+"page=0" -&gt; 1
+q=pelican | q=pelican&amp;status=completed</pre></div></div><div class="why"><b>Why:</b> A missing page is <code class="inline">Number(null)</code>, which is 0, so it fails <code class="inline">page &gt; 0</code> and becomes 1; <code class="inline">zero</code> is NaN, <code class="inline">2.5</code> is not an integer, 0 is not above 0: all page 1. <code class="inline">withParam</code> deleted the empty status on a COPY: the original still has both names.</div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict, then check.</div><pre class="code">http://localhost:4000/api/volunteers/v99</pre><div class="opts"><div class="opt correct"><pre class="out">HTTP/1.1 404 Not Found
+content-type: application/json; charset=utf-8
+
+{
+  "error": "not_found",
+  "message": "No volunteer with that id."
+}</pre></div></div><div class="why"><b>Why:</b> 404 with the API's own message. In the HQ, the crew page's card shows "Could not load this volunteer. Nothing was found at this address. Check the link.": describeError's new 404 sentence from Step 3 (Lesson 6.2, Step 7).</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the labs run exactly as <code class="inline">labs/check_labs.py</code> runs them (Node 24, in a terminal like a learner's, in a fresh copy of the lab folder, packages from the shared router lockfile). Test-runner durations are left out; React Router's error logs and the DOM dumps of failing tests are cut to the per-test lines.</p>
+<div class="blk lab"><div class="h">Lab 6.1 (guided): labs/module-15/l6_1-react-router-8/starter → solution</div>
+<p>As shipped, <code class="inline">npm test</code> fails 7 of 8 tests: no route matches <code class="inline">/sites</code>, so React Router renders its own error screen ("Unexpected Application Error!", <code class="inline">404 Not Found</code>). The one that passes is "the first page does not take the focus": nothing moves the focus yet. The summary:</p>
+<pre class="out">Tests  7 failed | 1 passed (8)</pre><p>The solution: <code class="inline">npm test</code>, then <code class="inline">npm run typecheck</code> (prints nothing after its two <code class="inline">&gt;</code> lines) and <code class="inline">npm run lint</code>:</p>
+<pre class="out">✓ Task 1: /sites shows the list of sites inside the layout
+✓ Task 1: an unknown address shows Page not found, and the header stays
+✓ Task 1: a page that crashes shows the error page, and the header stays
+✓ Task 2: a site name is a router link to that site
+✓ Task 2: the site page reads :siteId from the address
+✓ Task 2: an id that is not a site says so
+✓ Task 3: after a link changes the page, the focus is on main
+✓ Task 3: the first page does not take the focus
+Tests  8 passed (8)</pre><pre class="out">Found 0 warnings and 0 errors.
+Finished in …ms on 8 files with 96 rules using … threads.</pre><p>What each task shows: (1) the layout route keeps the header; a pathless route INSIDE it holds <code class="inline">errorElement: &lt;PageProblem /&gt;</code> and the pages, so <code class="inline">/reports</code> shows the error page with the header, and <code class="inline">/sites/driftwood-cove/photos</code> falls through to <code class="inline">*</code> (a parameter matches one segment); (2) <code class="inline">&lt;Link to={</code>/sites/${site.id}<code class="inline">}&gt;</code> (relative <code class="inline">to={site.id}</code> works too), <code class="inline">useParams&lt;'siteId'&gt;()</code> narrowed by a throw, an unknown id answered by a heading instead of a crash, and NavLinks in the header; (3) the lesson's focus effect, keyed on the pathname and guarded by a ref so the first page keeps the focus where the browser put it. Accept <code class="inline">Component: SitesPage</code> instead of <code class="inline">element</code>, and a separate NotFound for unknown ids.</p>
+</div>
+<div class="blk lab"><div class="h">Handout: labs/module-15/l6_1-react-router-8/debug_outside_router.test.tsx (deliberately broken)</div>
+<p>Copied into <code class="inline">src/</code> and run with <code class="inline">npx vitest run src/debug_outside_router.test.tsx</code>, it fails with (first line of the error):</p>
+<pre class="out">TypeError: Cannot destructure property 'basename' of 'React$1.useContext(...)' as it is null.
+Tests  1 failed (1)</pre><p>The lesson's "Link outside the router" message. The variable name before <code class="inline">.useContext</code> depends on the bundler (the browser build says <code class="inline">import_react</code>, Vitest says <code class="inline">React$1</code>); the rest is the same. SitesPage's Links look for a router in React context and find <code class="inline">null</code>. Fix the test: <code class="inline">render(&lt;RouterProvider router={createMemoryRouter([{ path: '/sites', element: &lt;SitesPage /&gt; }], { initialEntries: ['/sites'] })} /&gt;)</code>, then <code class="inline">findAllByRole('link')</code>. Then the test passes; the page was never the problem.</p>
+</div>
+<div class="blk lab"><div class="h">Lab 6.2 (guided): labs/module-15/l6_2-search-params-nested-routes-and-typed-navigation/starter → solution</div>
+<p>As shipped, <code class="inline">npm test</code> fails all 8 (the first message is <code class="inline">TODO 1</code>), and <code class="inline">npm run typecheck</code> reports one error, in the test file, because the non-generic <code class="inline">readChoice</code> returns <code class="inline">string | undefined</code>:</p>
+<pre class="out">Tests  8 failed (8)</pre><pre class="out">src/lab.test.tsx:21:9 - error TS2322: Type 'string | undefined' is not assignable to type 'EventStatus | undefined'.
+Found 1 error in src/lab.test.tsx:21</pre><p>The solution: <code class="inline">npm test</code> (<code class="inline">npm run typecheck</code> prints nothing after its two <code class="inline">&gt;</code> lines; lint as in Lab 6.1):</p>
+<pre class="out">✓ Task 1: readChoice keeps an allowed value and refuses anything else
+✓ Task 1: withParams changes a copy, keeps the rest and removes empty values
+✓ Task 2: the filters come from the address
+✓ Task 2: a value that is not allowed is ignored, an allowed one is kept
+✓ Task 2: choosing a site keeps the status, and Back undoes it
+✓ Task 3: /log shows the hint where the details go
+✓ Task 3: a title opens the cleanup beside the list and keeps the filters
+✓ Task 3: an id that is not in the log says so
+Tests  8 passed (8)</pre><p>What each task shows: (1) <code class="inline">readChoice&lt;T extends string&gt;(params, name, allowed: readonly T[]): T | undefined</code> returns <code class="inline">allowed.find((choice) =&gt; choice === value)</code>: the comparison does the checking and <code class="inline">find</code> hands back a value that is already a <code class="inline">T</code>, so there is no <code class="inline">as</code>; <code class="inline">withParams</code> copies with <code class="inline">new URLSearchParams(params)</code> and deletes empty values; (2) the filters read from the address with <code class="inline">readChoice</code>, written with <code class="inline">setSearchParams((current) =&gt; withParams(current, { [name]: value }))</code> (a push, so <code class="inline">router.navigate(-1)</code> brings back <code class="inline">?status=scheduled</code>), Clear filters = <code class="inline">setSearchParams({})</code> (the address becomes <code class="inline">/log</code>); (3) <code class="inline">/log</code> gets an index child (the hint) and <code class="inline">:cleanupId</code>, <code class="inline">&lt;Outlet /&gt;</code> sits in CleanupLog, and the links are <code class="inline">{ pathname: cleanup.id, search: searchParams.toString() }</code> NavLinks, so opening Sunset Stairs Cleanup from <code class="inline">?status=completed</code> keeps the filter and marks the title current. Accept a predicate-based helper like the lesson's <code class="inline">readParam</code> if the learner explains the difference.</p>
+</div>
+
+  <div class="sec"><h2>The Lesson Pages' Own Quick Quizzes</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 6.1 · React Router 8</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="6.1">
+  <li><b>C</b> Changes the address without a page load, and the router renders the sites page in the layout's Outlet: Link cancels the normal page load, the router writes the new address into history, matches the routes, and React renders SitesPage into the Outlet. The header, the session and the loaded code stay.</li>
+  <li><b>A</b> string | undefined, because TypeScript cannot know which route rendered the page: useParams cannot see which route rendered the component, so every parameter may be missing. The page narrows it with a check before using it as a string.</li>
+  <li><b>D</b> On a pathless route inside the layout route, around the pages: The error element replaces the route it belongs to, including that route's element. On a pathless route inside the layout, only the page area is replaced, so the header, footer and navigation keep working.</li>
+  <li><b>B</b> The route stayed the same, so React kept the components and the old selected tab, which the new cleanup does not have: The route was the same, so React kept the same components and their state. Tabs kept impact from the old cleanup, and useState ignores its default after the first render. A key from the event id makes React mount fresh components.</li>
+  <li><b>A</b> The reload asks the server for /events, and the host has no such file until a SPA fallback serves index.html for every address: A reload asks the server for the address. The host has only index.html and the assets, so it answers 404 unless a SPA fallback rule serves index.html for every address, after which the router takes over.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Lesson 6.2 · Search Params, Nested Routes and Typed Navigation</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="6.2">
+  <li><b>B</b> /events?q=pelican: The status change pushed a new entry, so Back removes it. The typing replaced entries instead of adding them, so the search stays and the menu shows All statuses again.</li>
+  <li><b>D</b> string | null: URLSearchParams.get returns the text of the first value with that name, or null when there is none. The HQ narrows it with readParam and a type predicate before using it as a StatusFilter.</li>
+  <li><b>A</b> At the &lt;Outlet /&gt; inside VolunteersPage, beside the list: The :volunteerId route is a child of the volunteers route, so it renders at the Outlet inside VolunteersPage. The search, the list and the layout stay mounted around it.</li>
+  <li><b>C</b> Nothing: in data mode href accepts any path, so the link would lead to "Page not found": href only checks paths against the route list that framework mode generates. In data mode it accepts any string, so the typo compiles and the link leads to Page not found. The measurement showed exactly that.</li>
+  <li><b>A</b> Router updates run as low-priority transitions; without it the box lost letters and the cursor jumped to the end: React Router applies its updates as transitions, which can wait. A text box whose value comes from the address then shows a stale value for a moment, so the cursor jumps and fast letters are lost. flushSync applies that one update immediately.</li>
+</ol>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>Three routes:</b> the layout route (AppLayout: header, footer, <code class="inline">&lt;Outlet /&gt;</code>, focus and scroll after a navigation), the pathless route (<code class="inline">errorElement: &lt;PageCrashed /&gt;</code>, so a crashing page keeps the layout), the index route (HomePage at <code class="inline">/</code>).</li>
+  <li><b>Who reads what:</b> the router reads the path (<code class="inline">/events</code>) to choose the page; the page reads the query string (<code class="inline">q</code>, <code class="inline">status</code>) to decide what to show. <code class="inline">searchParams.get('status')</code> is <code class="inline">string | null</code>.</li>
+  <li><b>Keep the search:</b> a link with only a path drops the query string, so on page 2 the list would jump back to Page 1 of 3 (and lose a search or skill filter). <code class="inline">{ pathname, search }</code> passes it along.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A ("six").</b> Still thinks of links as page loads. Open the Network panel filtered to Doc and click through the HQ: one document.</li>
+  <li><b>Q2 A or D.</b> Expects routes to be untyped configuration. Hover <code class="inline">createBrowserRouter</code>'s parameter: <code class="inline">RouteObject[]</code>.</li>
+  <li><b>Q4 A.</b> Has not separated "the route the error element sits on" from "the page that crashed". Draw the tree; cross out everything under the route with the error element.</li>
+  <li><b>Q5 B.</b> Believes useParams knows the route list. It does not, even with a type argument (Lesson 6.2).</li>
+  <li><b>Q7 B or D.</b> Has not met URL decoding: run P3's first line in the browser Console.</li>
+  <li><b>Q9 A.</b> Treats replace as "no history at all" rather than "overwrite the current entry". Walk Exercise 1 on the projector.</li>
+  <li><b>Q11 C or D.</b> Trusts a function's name. That is exactly the lesson's point: test the promise with a deliberate typo.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 15 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

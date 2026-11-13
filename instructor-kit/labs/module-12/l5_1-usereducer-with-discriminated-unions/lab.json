@@ -1,0 +1,57 @@
+{
+  "title": "A debris tally: a pure reducer, an exhaustive switch, useReducer in a component",
+  "lesson": "5.1",
+  "tasks": 3,
+  "runs": [
+    {
+      "name": "starter",
+      "dir": "starter",
+      "cmd": "npm test",
+      "exit": "nonzero",
+      "expect": [
+        "TODO 1",
+        "TODO 3",
+        "Tests  4 failed (4)"
+      ]
+    },
+    {
+      "name": "starter-types",
+      "dir": "starter",
+      "cmd": "npm run typecheck",
+      "exit": "nonzero",
+      "expect": [
+        "error TS2344: Type 'TallyAction' does not satisfy the constraint 'AnyActionArg'."
+      ]
+    },
+    {
+      "name": "solution",
+      "dir": "solution",
+      "cmd": "npm test",
+      "exit": 0,
+      "expect": [
+        "Tests  4 passed (4)"
+      ]
+    },
+    {
+      "name": "solution-types",
+      "dir": "solution",
+      "cmd": "npm run typecheck",
+      "exit": 0,
+      "absent": [
+        "error TS"
+      ]
+    },
+    {
+      "name": "demo-missing-case",
+      "dir": "solution",
+      "files": {
+        "src/tallyReducer.ts": "import { assertNever } from './assertNever.ts'\n\n// The debris tally of one cleanup: how many items of each kind, and the order they were counted in (for undo).\nexport type Debris = 'plastic' | 'glass' | 'metal' | 'fishing line'\n\nexport interface Tally {\n  counts: ReadonlyMap<Debris, number>\n  log: readonly { kind: Debris; count: number }[]\n}\n\nexport type TallyAction =\n  | { type: 'counted'; kind: Debris; count: number }\n  | { type: 'undoLast' }\n  | { type: 'reset' }\n\nexport const emptyTally: Tally = { counts: new Map(), log: [] }\n\n// A copy of the counts with `change` added to one kind (a kind back at 0 leaves the map)\nfunction withCount(counts: ReadonlyMap<Debris, number>, kind: Debris, change: number): ReadonlyMap<Debris, number> {\n  const next = new Map(counts)\n  const total = (next.get(kind) ?? 0) + change\n  if (total > 0) next.set(kind, total)\n  else next.delete(kind)\n  return next\n}\n\nexport function tallyReducer(tally: Tally, action: TallyAction): Tally {\n  switch (action.type) {\n    case 'counted':\n      if (action.count <= 0) return tally\n      return {\n        counts: withCount(tally.counts, action.kind, action.count),\n        log: [...tally.log, { kind: action.kind, count: action.count }],\n      }\n    case 'undoLast': {\n      const last = tally.log.at(-1)\n      if (last === undefined) return tally\n      return { counts: withCount(tally.counts, last.kind, -last.count), log: tally.log.slice(0, -1) }\n    }\n    default:\n      return assertNever(action)\n  }\n}\n"
+      },
+      "cmd": "npm run typecheck",
+      "exit": "nonzero",
+      "expect": [
+        "error TS2345: Argument of type '{ type: \"reset\"; }' is not assignable to parameter of type 'never'."
+      ]
+    }
+  ]
+}

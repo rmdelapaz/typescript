@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Answer Key: Session 13</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">answers &amp; solutions · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Answer Key</div>
+    <h1>Session 13: Typed Context</h1>
+    <p class="sub">Answers and reasoning for every Session 13 item: the warm-up, both halves of the self-check, the predict-then-check requests, the Lab 5.2 reference outputs and code, the Checkpoint 2 model answer and rubric, the lesson page's own quiz and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Session <b>13</b></span>
+      <span class="chip"><b>12</b> self-check items</span>
+      <span class="chip">Confidential</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Warm-up: Session 12 Retrieval</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b>EventDetails reads the cleanup with use(). Why does it go through eventPromises.ts instead of calling getEvent(id) itself?</b> use() needs the SAME promise on every render; a new getEvent() call would suspend again and start over. The module keeps one promise per cleanup.</li>
+  <li><b>On the event page, what does the ErrorBoundary catch that the Suspense boundary does not?</b> A rejected promise (or any error while rendering): Suspense only shows a fallback while the promise is pending; the boundary shows EventProblem when it fails (404 → Cleanup not found).</li>
+  <li><b>The desk dispatches { type: 'checkIn', signupId } for a row that is already marked attended. What should the reducer return, and why?</b> The SAME state object: nothing changed, so React can skip the render, and Undo gets no empty step.</li>
+  <li><b>What does assertNever(value: never) in a switch's default give you?</b> A compile error the day someone adds an action or a union member without a case, and a loud error if an unexpected value arrives at run time.</li>
+</ol>
+
+  <div class="sec"><h2>5.2 · Typed Context: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which of these values belongs in a context rather than a prop?</div><div class="opts"><div class="opt">A) The <code class="inline">showDrafts</code> flag EventsPage hands to EventGroups, its direct child</div><div class="opt">B) The text in the events search box, which changes on every keystroke</div><div class="opt correct">C) Who is signed in, which the header, the event cards and the desk all need</div><div class="opt">D) The list of cleanups the events page loaded from the API</div></div><div class="why"><b>Why:</b> Context is for values many components at different depths need, and that change rarely: the signed-in person is the lesson's example. A direct child gets a plain prop (it is explicit); server data stays with useApi (TanStack Query in Lesson 7.1); fast-changing values stay local state (Lesson 5.2, the beach radio table).<br><b>A</b> is wrong: One level down: a prop is clearer, and the lesson keeps it a prop on purpose.<br><b>B</b> is wrong: It changes many times a second and only the events page uses it: local state.<br><b>D</b> is wrong: Server data: useApi now, a data library later, not a context.</div></div>
+  <div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">A component in <code class="inline">src/Scratch.tsx</code> reads the HQ's context directly and tsc prints this. What does the HQ do instead?</div><pre class="code">src/Scratch.tsx:5:11 - error TS2339: Property 'isOrganizer' does not exist on type 'AuthValue | undefined'.
+
+5   const { isOrganizer } = useContext(AuthContext)
+            ~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:5</pre><div class="opts"><div class="opt">A) Write <code class="inline">useContext(AuthContext) as AuthValue</code> so the error goes away</div><div class="opt correct">B) Call <code class="inline">useAuth()</code>, which checks for <code class="inline">undefined</code> once, throws outside the provider and returns an <code class="inline">AuthValue</code></div><div class="opt">C) Give <code class="inline">createContext</code> a default object, so the value is never undefined</div><div class="opt">D) Turn off <code class="inline">strict</code> in tsconfig.app.json for this file</div></div><div class="why"><b>Why:</b> The type tells the truth: outside a provider the value is undefined. useAuth() narrows it once with an if that throws, so every caller gets an AuthValue and a missing provider is a loud error (Lesson 5.2, The Undefined Context Trap).<br><b>A</b> is wrong: A cast silences the check and keeps the bug: outside a provider the destructure crashes.<br><b>C</b> is wrong: That is the trap itself: it compiles, and a missing provider becomes a silent bug.<br><b>D</b> is wrong: Switching checks off is never the fix; the error is right.</div></div>
+  <div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">The lesson's "harmless" default: what do <code class="inline">npx tsc -b</code> and <code class="inline">npm run lint</code> say about this file, and what happens when the button is clicked outside any provider?</div><pre class="code"><span class="k">import</span> { createContext, useContext } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> <span class="k">type</span> { AuthValue } <span class="k">from</span> <span class="s">'./auth/AuthContext.ts'</span>
+
+<span class="c">// A "harmless" default so that nobody has to deal with undefined...</span>
+<span class="k">const</span> QuietAuthContext = createContext&lt;AuthValue&gt;({
+  session: <span class="k">null</span>,
+  isOrganizer: <span class="k">false</span>,
+  signIn: <span class="k">async</span> () =&gt; {},
+  signOut: () =&gt; {},
+})
+
+<span class="c">// ...used by a component that nobody wrapped in a provider</span>
+<span class="k">export</span> <span class="k">function</span> QuickSignIn() {
+  <span class="k">const</span> { session, signIn } = useContext(QuietAuthContext)
+  <span class="k">return</span> (
+    &lt;button
+      <span class="k">type</span>=<span class="s">"button"</span>
+      onClick={() =&gt; signIn({ email: <span class="s">'maya.okafor@example.com'</span>, password: <span class="s">'shoreline-demo'</span> })}
+    &gt;
+      {session === <span class="k">null</span> ? <span class="s">'Sign in as Maya'</span> : <span class="s">`Signed in as ${session.user.name}`</span>}
+    &lt;/button&gt;
+  )
+}</pre><div class="opts"><div class="opt correct">Nothing at all: it compiles and lints clean; the click does nothing (no request, no error)</div></div><div class="why"><b>Why:</b> The kit ran both: <code class="inline">npx tsc -b</code> printed nothing and oxlint said <code class="inline">Found 0 warnings and 0 errors.</code>. The default's <code class="inline">signIn</code> is an empty function, so the app is signed out forever and nothing says why: a setup mistake turned into a silent bug (Lesson 5.2).</div></div>
+  <div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Someone puts the context, its Hook and the provider in one AuthProvider.tsx. <code class="inline">npm run lint</code> prints this. What is the fix?</div><pre class="code">  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ╭─[src/auth/AuthProvider.tsx:20:17]
+ 19 │ /** The sign-in state. Only works inside &lt;AuthProvider&gt;. */
+ 20 │ export function useAuth(): AuthValue {
+    ·                 ───────
+ 21 │   const auth = useContext(AuthContext)
+    ╰────</pre><div class="opts"><div class="opt">A) Turn off react(only-export-components) in .oxlintrc.json</div><div class="opt">B) Rename AuthProvider.tsx to AuthProvider.ts</div><div class="opt">C) Stop exporting <code class="inline">useAuth</code> and copy it into every component</div><div class="opt correct">D) Keep the context, its type and <code class="inline">useAuth</code> in AuthContext.ts and only the provider component in AuthProvider.tsx</div></div><div class="why"><b>Why:</b> Vite's Fast Refresh can only keep a component's state when its file exports components and nothing else, so oxlint warns about the Hook and the context. The project splits them: AuthContext.ts (no JSX) and AuthProvider.tsx (Lesson 5.2, Common Mistakes).<br><b>A</b> is wrong: That hides a real problem: Fast Refresh would reload the whole page on every save of that file.<br><b>B</b> is wrong: The provider returns JSX, which a .ts file cannot hold.<br><b>C</b> is wrong: Then every component repeats the undefined check: the opposite of the pattern.</div></div>
+  <div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Step 1 changed <code class="inline">request(path, signal?)</code> to <code class="inline">request(path, init: RequestInit = {})</code>. Then <code class="inline">npx tsc -b</code> prints this. What does it mean?</div><pre class="code">src/api/client.ts:217:40 - error TS2345: Argument of type 'AbortSignal | undefined' is not assignable to parameter of type 'RequestInit | undefined'.
+  Type 'AbortSignal' has no properties in common with type 'RequestInit'.
+src/api/client.ts:246:40 - error TS2345: Argument of type 'AbortSignal | undefined' is not assignable to parameter of type 'RequestInit | undefined'.
+  Type 'AbortSignal' has no properties in common with type 'RequestInit'.
+Found 2 errors in the same file, starting at: src/api/client.ts:217</pre><div class="opts"><div class="opt correct">A) An AbortSignal shares no property with RequestInit, so it cannot be the options object: pass <code class="inline">{ signal }</code></div><div class="opt">B) fetch no longer accepts a signal: remove it from both calls</div><div class="opt">C) RequestInit needs every property: add method, headers and body</div><div class="opt">D) The callers must cast it: <code class="inline">signal as RequestInit</code></div></div><div class="why"><b>Why:</b> Every property of RequestInit is optional, so TypeScript checks options objects for at least one property in common (a weak type). Wrapping the signal, request(path, { signal }), puts it where fetch reads it (Lesson 5.2, Step 1).<br><b>B</b> is wrong: The signal still matters (aborting stale requests, Lesson 4.1): it moves into the object.<br><b>C</b> is wrong: All of RequestInit's properties are optional; that is why it is a weak type.<br><b>D</b> is wrong: A cast hides the bug: fetch would ignore the signal.</div></div>
+  <div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">The same request to <code class="inline">/api/events?perPage=1</code>, first as a guest, then with an organizer's token. Why does <code class="inline">useApi</code> now list the viewer in its dependencies?</div><pre class="code">HTTP/1.1 200 OK
+x-total-count: 15
+
+HTTP/1.1 200 OK
+x-total-count: 17</pre><div class="opts"><div class="opt">A) To send the token with the request</div><div class="opt correct">B) Because the API answers differently per person, so a new person must mean a new request</div><div class="opt">C) So that guests cannot see drafts</div><div class="opt">D) Because React requires every Hook to read the context</div></div><div class="why"><b>Why:</b> Who asks is part of the question: 15 public cleanups for a guest, 17 with the two drafts for an organizer. With the viewer in [key, viewer, attempt], signing in or out runs the effect again and the page follows without a reload. TanStack Query's keys do the same in Lesson 7.1.<br><b>A</b> is wrong: request() adds the token from the session; the dependency only decides WHEN to ask again.<br><b>C</b> is wrong: The API decides that (it sends drafts only to organizers); hiding is not security.<br><b>D</b> is wrong: No such rule: useApi calls useAuth() because it needs the viewer.</div></div>
+
+  <div class="sec"><h2>5.2 · Typed Context: predict, then check</h2><span class="rule"></span></div>
+<p>Real answers of the course API (the kit's private copy; outputs show the learners' address). P2 uses the API's documented test token for Theo (a volunteer); P3 a made-up token in the API's format, which the API treats exactly like one it has forgotten. Nothing here prints a real token.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the status code and what the answer says. (Maya's email with the wrong password.)</div><pre class="code">POST http://localhost:4000/api/auth/sign-in
+{"email": "maya.okafor@example.com", "password": "low-tide"}</pre><div class="opts"><div class="opt correct"><pre class="out">HTTP/1.1 401 Unauthorized
+content-type: application/json; charset=utf-8
+
+{
+  "error": "unauthorized",
+  "message": "Email or password is incorrect."
+}</pre></div></div><div class="why"><b>Why:</b> 401 with the API's own sentence, which SignInPage shows in its <code class="inline">role="alert"</code> paragraph. The email is kept in the form, the password never.</div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the status code and what the answer says. (Today's roster, asked for by a volunteer.)</div><pre class="code">GET http://localhost:4000/api/events/e17/signups
+Authorization: Bearer &lt;Theo's token: a volunteer&gt;</pre><div class="opts"><div class="opt correct"><pre class="out">HTTP/1.1 403 Forbidden
+content-type: application/json; charset=utf-8
+
+{
+  "error": "forbidden",
+  "message": "Only organizers can do that."
+}</pre></div></div><div class="why"><b>Why:</b> Signed in is not the same as allowed: the token says who asks, and the API refuses the roster (it has contact details) to anyone but organizers. The HQ never sends this request for Theo: TodaysDesk renders only for organizers.</div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the status code and what the answer says. (A token the API has forgotten, on a public list.)</div><pre class="code">GET http://localhost:4000/api/events?perPage=1
+Authorization: Bearer &lt;a token from before the API restarted&gt;</pre><div class="opts"><div class="opt correct"><pre class="out">HTTP/1.1 401 Unauthorized
+content-type: application/json; charset=utf-8
+
+{
+  "error": "unauthorized",
+  "message": "Your session has ended. Sign in again."
+}</pre></div></div><div class="why"><b>Why:</b> The API checks a token BEFORE routing, so an old token gets 401 everywhere, public lists too. The HQ's describeError turns it into "Your sign-in has ended. Sign out, then sign in again.", and Sign out always works.</div></div>
+
+  <div class="sec"><h2>Lab Reference Solutions</h2><span class="rule"></span></div>
+<p>Every output below is real: the lab runs exactly as <code class="inline">labs/check_labs.py</code> runs it (Node 24, Vitest, in a fresh copy of the lab folder, in a terminal like a learner's). Test durations are left out.</p>
+<div class="blk lab"><div class="h">Lab 5.2 (guided): labs/module-13/l5_2-typed-context/starter → solution</div>
+<p>As shipped, <code class="inline">npm test</code> (the failing tests and the first error of each), the type check and the linter:</p>
+<pre class="out">FAIL  src/lab.test.tsx &gt; Task 1: with no provider above it, a height uses the default unit
+  TestingLibraryElementError: Unable to find an element with the text: 1.5 m
+FAIL  src/lab.test.tsx &gt; Task 1: one click on the board switches every row to feet
+  TestingLibraryElementError: Unable to find an element with the text: 4.9 ft
+FAIL  src/lab.test.tsx &gt; Task 2: outside a provider, useShift() fails loudly and says what to fix
+  AssertionError: expected [Function] to throw an error
+FAIL  src/lab.test.tsx &gt; Task 3: starting a shift reaches the banner in another branch of the tree
+  Error: expect(element).toHaveTextContent()
+FAIL  src/lab.test.tsx &gt; Task 3: ending the shift clears it everywhere
+  TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "End shift"
+
+Tests  5 failed (5)</pre><pre class="out">src/lab.test.tsx:35:3 - error TS2578: Unused '@ts-expect-error' directive.
+
+35   // @ts-expect-error outside a provider the value is undefined, and undefined has no lead (TS2339)
+     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Found 1 error in src/lab.test.tsx:35</pre><pre class="out">  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ╭─[src/shift/ShiftProvider.tsx:14:17]
+ 13 │ // Task 3: oxlint warns about this export (a .tsx file should export components only): move it to ShiftContext.ts
+ 14 │ export function leadLabel(lead: string | null): string {
+    ·                 ─────────
+ 15 │   return lead === null ? 'No lead yet' : `Lead: ${lead}`
+    ╰────
+
+Found 1 warning and 0 errors.
+Finished in …ms on 11 files with 150 rules using … threads.</pre><p>After Tasks 1 and 2 (the checker's "midway" run: the solution with the starter's provider): the Task 3 tests fail with the Hook's own message.</p>
+<pre class="out">  ✓ Task 1: with no provider above it, a height uses the default unit
+  ✓ Task 1: one click on the board switches every row to feet
+  ✓ Task 2: outside a provider, useShift() fails loudly and says what to fix
+  × Task 3: starting a shift reaches the banner in another branch of the tree
+  × Task 3: ending the shift clears it everywhere
+Test Files  1 failed (1)
+Tests  2 failed | 3 passed (5)</pre><p>The solution: the tests, and <code class="inline">npm run lint</code> (<code class="inline">npm run typecheck</code> prints nothing after its two <code class="inline">&gt;</code> lines):</p>
+<pre class="out">  ✓ Task 1: with no provider above it, a height uses the default unit
+  ✓ Task 1: one click on the board switches every row to feet
+  ✓ Task 2: outside a provider, useShift() fails loudly and says what to fix
+  ✓ Task 3: starting a shift reaches the banner in another branch of the tree
+  ✓ Task 3: ending the shift clears it everywhere
+Test Files  1 passed (1)
+Tests  5 passed (5)</pre><pre class="out">Found 0 warnings and 0 errors.
+Finished in …ms on 11 files with 150 rules using … threads.</pre><p>The solution's changed files:</p>
+<pre class="code"><span class="k">import</span> { useContext } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> { HeightUnitContext } <span class="k">from</span> <span class="s">'./heightUnit.ts'</span>
+
+<span class="k">const</span> feetPerMeter = <span class="s">3.28</span>
+
+<span class="k">interface</span> TideHeightProps {
+  meters: <span class="k">number</span>
+}
+
+<span class="c">// Reads the unit from the nearest provider above it (or the default, 'm')</span>
+<span class="k">export</span> <span class="k">function</span> TideHeight({ meters }: TideHeightProps) {
+  <span class="k">const</span> unit = useContext(HeightUnitContext)
+  <span class="k">const</span> text = unit === <span class="s">'m'</span> ? <span class="s">`${meters.toFixed(1)} m`</span> : <span class="s">`${(meters * feetPerMeter).toFixed(1)} ft`</span>
+  <span class="k">return</span> &lt;strong&gt;{text}&lt;/strong&gt;
+}</pre><pre class="code"><span class="k">import</span> { useState } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> { HeightUnitContext, <span class="k">type</span> HeightUnit } <span class="k">from</span> <span class="s">'./heightUnit.ts'</span>
+<span class="k">import</span> { TideRow } <span class="k">from</span> <span class="s">'./TideRow.tsx'</span>
+
+<span class="c">// The board owns the unit; every TideHeight inside the provider hears it, whatever sits in between</span>
+<span class="k">export</span> <span class="k">function</span> TideBoard() {
+  <span class="k">const</span> [unit, setUnit] = useState&lt;HeightUnit&gt;(<span class="s">'m'</span>)
+  <span class="k">return</span> (
+    &lt;section aria-label=<span class="s">"Tide board"</span>&gt;
+      &lt;HeightUnitContext value={unit}&gt;
+        &lt;button <span class="k">type</span>=<span class="s">"button"</span> onClick={() =&gt; setUnit(unit === <span class="s">'m'</span> ? <span class="s">'ft'</span> : <span class="s">'m'</span>)}&gt;
+          Show {unit === <span class="s">'m'</span> ? <span class="s">'feet'</span> : <span class="s">'meters'</span>}
+        &lt;/button&gt;
+        &lt;TideRow label=<span class="s">"High tide"</span> meters={<span class="s">1.5</span>} /&gt;
+        &lt;TideRow label=<span class="s">"Low tide"</span> meters={<span class="s">0.3</span>} /&gt;
+      &lt;/HeightUnitContext&gt;
+    &lt;/section&gt;
+  )
+}</pre><pre class="code"><span class="k">import</span> { createContext, useContext } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="c">/** What every component can ask about today's shift at the supply shed */</span>
+<span class="k">export</span> <span class="k">interface</span> ShiftValue {
+  <span class="c">/** null while nobody leads the shift */</span>
+  lead: <span class="k">string</span> | <span class="k">null</span>
+  startShift: (name: <span class="k">string</span>) =&gt; <span class="k">void</span>
+  endShift: () =&gt; <span class="k">void</span>
+}
+
+<span class="c">// undefined is the value outside a ShiftProvider: a mistake that useShift() reports at once</span>
+<span class="k">export</span> <span class="k">const</span> ShiftContext = createContext&lt;ShiftValue | <span class="k">undefined</span>&gt;(<span class="k">undefined</span>)
+
+<span class="c">/** Today's shift. Only works inside &lt;ShiftProvider&gt;. */</span>
+<span class="k">export</span> <span class="k">function</span> useShift(): ShiftValue {
+  <span class="k">const</span> shift = useContext(ShiftContext)
+  <span class="k">if</span> (shift === <span class="k">undefined</span>) {
+    <span class="k">throw</span> <span class="k">new</span> Error(<span class="s">'useShift() must be used inside &lt;ShiftProvider&gt;'</span>)
+  }
+  <span class="k">return</span> shift
+}
+
+<span class="c">/** "Lead: NAME" or "No lead yet" (moved here from ShiftProvider.tsx: a .tsx file exports components only) */</span>
+<span class="k">export</span> <span class="k">function</span> leadLabel(lead: <span class="k">string</span> | <span class="k">null</span>): <span class="k">string</span> {
+  <span class="k">return</span> lead === <span class="k">null</span> ? <span class="s">'No lead yet'</span> : <span class="s">`Lead: ${lead}`</span>
+}</pre><pre class="code"><span class="k">import</span> { useState, <span class="k">type</span> ReactNode } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> { ShiftContext } <span class="k">from</span> <span class="s">'./ShiftContext.ts'</span>
+
+<span class="k">interface</span> ShiftProviderProps {
+  children: ReactNode
+}
+
+<span class="c">// Owns the shift: the only place that changes it</span>
+<span class="k">export</span> <span class="k">function</span> ShiftProvider({ children }: ShiftProviderProps) {
+  <span class="k">const</span> [lead, setLead] = useState&lt;<span class="k">string</span> | <span class="k">null</span>&gt;(<span class="k">null</span>)
+
+  <span class="k">function</span> startShift(name: <span class="k">string</span>) {
+    setLead(name)
+  }
+
+  <span class="k">function</span> endShift() {
+    setLead(<span class="k">null</span>)
+  }
+
+  <span class="k">return</span> &lt;ShiftContext value={{ lead, startShift, endShift }}&gt;{children}&lt;/ShiftContext&gt;
+}</pre><p>What each task shows: (1) the three parts, with the default doing real work (the test renders TideHeight with no provider) and TideRow untouched; (2) the trap fixed twice over: the behavior (a thrown sentence instead of a silent no-op) and the TYPE (the test file's <code class="inline">@ts-expect-error</code> is only used once reading the context directly fails with TS2339); (3) the provider as the only writer of its state, and oxlint's only-export-components on a helper exported from a .tsx (the same message the lesson's one-file mistake shows for the Hook). Accept the helper in its own <code class="inline">shift/labels.ts</code>; accept <code class="inline">use(ShiftContext)</code> inside <code class="inline">useShift()</code>.</p>
+</div>
+
+  <div class="sec"><h2>Checkpoint 2: model answer</h2><span class="rule"></span></div>
+<p>Verified like a lab (<code class="inline">labs/module-13/checkpoint-2/lab.json</code>): the starter's eight tests fail with TODO and its type check reports two unused <code class="inline">@ts-expect-error</code> lines; the model answer passes all eight and type-checks clean.</p>
+<div class="blk lab"><div class="h">labs/module-13/checkpoint-2/starter → solution</div>
+<p>As shipped:</p>
+<pre class="out">Tests  8 failed (8)</pre><pre class="out">src/checkpoint.test.tsx:81:3 - error TS2578: Unused '@ts-expect-error' directive.
+src/checkpoint.test.tsx:83:3 - error TS2578: Unused '@ts-expect-error' directive.
+Found 2 errors in the same file, starting at: src/checkpoint.test.tsx:81</pre><p>The model answer:</p>
+<pre class="out">  ✓ Task 1: loading first, then the site
+  ✓ Task 1: an error status becomes a message
+  ✓ Task 1: a new id loads the new site
+  ✓ Task 2: add counts each kind of bag, in order
+  ✓ Task 2: undo takes back the last bag, and changes nothing when there is none
+  ✓ Task 2: reset starts over
+  ✓ Task 3: the buttons and the line share one tally through the context
+  ✓ Task 3: outside a provider, useTally() says what to fix
+Test Files  1 passed (1)
+Tests  8 passed (8)</pre><pre class="code"><span class="k">import</span> { useEffect, useState } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> { isSite } <span class="k">from</span> <span class="s">'./isSite.ts'</span>
+<span class="k">import</span> <span class="k">type</span> { LoadState } <span class="k">from</span> <span class="s">'./loadState.ts'</span>
+<span class="k">import</span> <span class="k">type</span> { Site } <span class="k">from</span> <span class="s">'./types.ts'</span>
+
+<span class="c">/** One site from the API, loaded when the component appears and again whenever siteId changes */</span>
+<span class="k">export</span> <span class="k">function</span> useSite(apiUrl: <span class="k">string</span>, siteId: <span class="k">string</span>): LoadState&lt;Site&gt; {
+  <span class="k">const</span> [state, setState] = useState&lt;LoadState&lt;Site&gt;&gt;({ kind: <span class="s">'loading'</span> })
+
+  useEffect(() =&gt; {
+    <span class="k">const</span> controller = <span class="k">new</span> AbortController()
+    fetch(<span class="s">`${apiUrl}/api/sites/${encodeURIComponent(siteId)}`</span>, { signal: controller.signal })
+      .then(<span class="k">async</span> (response) =&gt; {
+        <span class="k">if</span> (!response.ok) {
+          setState({ kind: <span class="s">'failed'</span>, message: <span class="s">`Could not load the site (${response.status}).`</span> })
+          <span class="k">return</span>
+        }
+        <span class="k">const</span> data: <span class="k">unknown</span> = <span class="k">await</span> response.json()
+        <span class="k">if</span> (!isSite(data)) {
+          setState({ kind: <span class="s">'failed'</span>, message: <span class="s">'The API sent something that is not a site.'</span> })
+          <span class="k">return</span>
+        }
+        setState({ kind: <span class="s">'ready'</span>, data })
+      })
+      .catch((error: <span class="k">unknown</span>) =&gt; {
+        <span class="k">if</span> (controller.signal.aborted) <span class="k">return</span>     <span class="c">// we cancelled it: nothing went wrong</span>
+        console.error(error)
+        setState({ kind: <span class="s">'failed'</span>, message: <span class="s">'Could not reach the server.'</span> })
+      })
+    <span class="k">return</span> () =&gt; controller.abort()
+  }, [apiUrl, siteId])
+
+  <span class="k">return</span> state
+}</pre><pre class="code"><span class="k">import</span> { assertNever } <span class="k">from</span> <span class="s">'./assertNever.ts'</span>
+
+<span class="k">export</span> <span class="k">type</span> BagKind = <span class="s">'trash'</span> | <span class="s">'recycling'</span>
+
+<span class="c">/** The bag tally of one cleanup */</span>
+<span class="k">export</span> <span class="k">interface</span> TallyState {
+  trash: <span class="k">number</span>
+  recycling: <span class="k">number</span>
+  <span class="c">/** the kinds in the order they were added, for undo */</span>
+  history: <span class="k">readonly</span> BagKind[]
+}
+
+<span class="k">export</span> <span class="k">const</span> initialTally: TallyState = { trash: <span class="s">0</span>, recycling: <span class="s">0</span>, history: [] }
+
+<span class="k">export</span> <span class="k">type</span> TallyAction = { <span class="k">type</span>: <span class="s">'add'</span>; kind: BagKind } | { <span class="k">type</span>: <span class="s">'undo'</span> } | { <span class="k">type</span>: <span class="s">'reset'</span> }
+
+<span class="c">// One more (or one fewer) bag of a kind</span>
+<span class="k">function</span> counted(state: TallyState, kind: BagKind, change: <span class="s">1</span> | -<span class="s">1</span>): TallyState {
+  <span class="k">return</span> kind === <span class="s">'trash'</span>
+    ? { ...state, trash: state.trash + change }
+    : { ...state, recycling: state.recycling + change }
+}
+
+<span class="k">export</span> <span class="k">function</span> tallyReducer(state: TallyState, action: TallyAction): TallyState {
+  <span class="k">switch</span> (action.type) {
+    <span class="k">case</span> <span class="s">'add'</span>:
+      <span class="k">return</span> { ...counted(state, action.kind, <span class="s">1</span>), history: [...state.history, action.kind] }
+    <span class="k">case</span> <span class="s">'undo'</span>: {
+      <span class="k">const</span> last = state.history.at(-<span class="s">1</span>)
+      <span class="k">if</span> (last === <span class="k">undefined</span>) <span class="k">return</span> state       <span class="c">// nothing to undo: the same state, so nothing renders</span>
+      <span class="k">return</span> { ...counted(state, last, -<span class="s">1</span>), history: state.history.slice(<span class="s">0</span>, -<span class="s">1</span>) }
+    }
+    <span class="k">case</span> <span class="s">'reset'</span>:
+      <span class="k">return</span> initialTally
+    <span class="k">default</span>:
+      <span class="k">return</span> assertNever(action)
+  }
+}</pre><pre class="code"><span class="k">import</span> { createContext, useContext } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> <span class="k">type</span> { TallyAction, TallyState } <span class="k">from</span> <span class="s">'./tally.ts'</span>
+
+<span class="c">/** What the tally's components share */</span>
+<span class="k">export</span> <span class="k">interface</span> TallyValue {
+  state: TallyState
+  dispatch: (action: TallyAction) =&gt; <span class="k">void</span>
+}
+
+<span class="c">// No provider above = no tally: the type says so</span>
+<span class="k">export</span> <span class="k">const</span> TallyContext = createContext&lt;TallyValue | <span class="k">undefined</span>&gt;(<span class="k">undefined</span>)
+
+<span class="c">/** The tally. Only works inside &lt;TallyProvider&gt;. */</span>
+<span class="k">export</span> <span class="k">function</span> useTally(): TallyValue {
+  <span class="k">const</span> tally = useContext(TallyContext)
+  <span class="k">if</span> (tally === <span class="k">undefined</span>) {
+    <span class="k">throw</span> <span class="k">new</span> Error(<span class="s">'useTally() must be used inside &lt;TallyProvider&gt;'</span>)
+  }
+  <span class="k">return</span> tally
+}</pre><pre class="code"><span class="k">import</span> { useReducer, <span class="k">type</span> ReactNode } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> { initialTally, tallyReducer } <span class="k">from</span> <span class="s">'./tally.ts'</span>
+<span class="k">import</span> { TallyContext } <span class="k">from</span> <span class="s">'./TallyContext.ts'</span>
+
+<span class="k">interface</span> TallyProviderProps {
+  children: ReactNode
+}
+
+<span class="c">// Owns the tally; every component below reads it through useTally()</span>
+<span class="k">export</span> <span class="k">function</span> TallyProvider({ children }: TallyProviderProps) {
+  <span class="k">const</span> [state, dispatch] = useReducer(tallyReducer, initialTally)
+  <span class="k">return</span> &lt;TallyContext value={{ state, dispatch }}&gt;{children}&lt;/TallyContext&gt;
+}</pre><p>Scoring notes. Task 1: resetting to loading when the id changes (a <code class="inline">setState</code> in the effect body) is fine here; keeping the previous site until the new one arrives is what the HQ's useApi does; <code class="inline">async</code>/<code class="inline">await</code> inside the effect is equally right; a missing cleanup is "Partly" on row 1 even when the tests pass (they cannot see it: look at the code); <code class="inline">data as Site</code> instead of <code class="inline">isSite</code> is "Partly" on row 2. Task 2: a computed key (<code class="inline">[action.kind]: …</code>) instead of the helper is fine; an <code class="inline">if</code> chain without <code class="inline">assertNever</code> is "Partly". Task 3: <code class="inline">use(TallyContext)</code> instead of useContext is fine; a Hook that returns <code class="inline">TallyValue | undefined</code> and leaves the check to the callers is "Partly".</p>
+</div>
+<div class="blk"><div class="h">Rubric (the guide's, for reference)</div>
+<table class="rubric">
+<thead><tr><th>Criterion</th><th>Meets (2)</th><th>Partly (1)</th><th>Not yet (0)</th></tr></thead>
+<tbody>
+<tr><td class="crit">Effects and fetching (Task 1)</td><td>Loading, ready and failed all reached; <code class="inline">response.ok</code> checked; the JSON read as <code class="inline">unknown</code> and checked; the cleanup aborts; <code class="inline">[apiUrl, siteId]</code> as dependencies</td><td>Tests pass but one is missing in the code: no abort, or the JSON trusted with a cast</td><td>A Task 1 test still fails</td></tr>
+<tr><td class="crit">A typed custom Hook (Task 1)</td><td>Named <code class="inline">use…</code>, returns <code class="inline">LoadState&lt;Site&gt;</code> (a union, not three booleans), callers need nothing but the Hook</td><td>Works, but returns loose pieces or an <code class="inline">any</code></td><td>No Hook, or the fetch is in the component</td></tr>
+<tr><td class="crit">A reducer on a discriminated union (Task 2)</td><td>The union rejects <code class="inline">weigh</code> and an <code class="inline">add</code> without a kind (typecheck clean); one case per action; the same state when there is nothing to undo; <code class="inline">assertNever</code> in the default</td><td>Tests pass, but a TS2578 is left, or there is no assertNever</td><td>A Task 2 test still fails</td></tr>
+<tr><td class="crit">Typed context (Task 3)</td><td><code class="inline">useTally()</code> narrows by throwing the exact message; the provider owns <code class="inline">useReducer</code> and provides <code class="inline">{ state, dispatch }</code></td><td>Works, but <code class="inline">useTally()</code> returns <code class="inline">TallyValue | undefined</code> or uses a cast</td><td>A Task 3 test still fails</td></tr>
+<tr><td class="crit">Process</td><td>Runs the tests after each change and the type check at the end, reads the FIRST failure, can explain one decision</td><td>Runs the tests only at the end, or guesses from the summary line</td><td>Does not run the tests</td></tr>
+</tbody>
+</table>
+</div>
+
+  <div class="sec"><h2>Modules 4 and 5 review: self-check</h2><span class="rule"></span></div>
+  <div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">In development, the events page's request shows twice in the Network tab, the first one canceled. Why?</div><div class="opts"><div class="opt">A) The effect has no dependency array, so it runs after every render</div><div class="opt">B) fetch retries a request once when the API is slow</div><div class="opt correct">C) Strict Mode runs effect, cleanup, effect in development; the cleanup's abort() cancels the first request</div><div class="opt">D) useApi's reload() runs once when the page appears</div></div><div class="why"><b>Why:</b> Strict Mode checks that every effect cleans up by running it twice in development. The cleanup aborts the first request, and the aborted check ignores its error. The build sends one request (Lesson 4.1).<br><b>A</b> is wrong: Then it would loop or repeat forever, not exactly twice.<br><b>B</b> is wrong: fetch never retries on its own.<br><b>D</b> is wrong: reload() runs only when someone presses Try again.</div></div>
+  <div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt"><code class="inline">useApi(key, load)</code> keeps <code class="inline">load</code> in <code class="inline">useEffectEvent</code> and lists only <code class="inline">[key, viewer, attempt]</code>. Name the three things that make it load again.</div><div class="opts"><div class="opt correct">A new key (what is loaded), a new viewer (who asks), and reload() (Try again bumps attempt)</div></div><div class="why"><b>Why:</b> The key says WHAT is loaded (the API path), the viewer WHO asks (Lesson 5.2), attempt counts Try again clicks. The load function is read through useEffectEvent, so a new arrow on every render does not restart the request (Lesson 4.2). The stage's code: <code class="inline">}, [key, viewer, attempt])</code>.</div></div>
+  <div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">After Sign out, the button that had the focus is gone. Which of these moves the focus to the Sign in link that replaces it, and only after a sign-out?</div><div class="opts"><div class="opt">A) <code class="inline">document.querySelector('a').focus()</code> in the component body</div><div class="opt correct">B) A state flag set by the sign-out button, and a callback ref on the link that focuses it when the flag is true</div><div class="opt">C) <code class="inline">autoFocus</code> on the Sign in link</div><div class="opt">D) <code class="inline">useRef</code> on the link and <code class="inline">.focus()</code> during render</div></div><div class="why"><b>Why:</b> Lesson 5.2's Exercise 2: a callback ref runs when the element appears (Lesson 4.3), and the flag makes it happen only after a sign-out from this menu, never on a page that simply loads signed out. Touching the DOM during render is never right.<br><b>A</b> is wrong: During render, the link is not in the page yet, and it would grab the focus on every render.<br><b>C</b> is wrong: autoFocus fires on every page load as a guest: the page must not grab the focus by itself.<br><b>D</b> is wrong: During render the ref is still null (it is set after the commit).</div></div>
+  <div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">EventDetails calls <code class="inline">use(eventPromise(id, viewer))</code>. Why not <code class="inline">use(getEvent(id))</code>?</div><div class="opts"><div class="opt">A) getEvent returns a Response, not a promise</div><div class="opt">B) use() only accepts promises from the cache API</div><div class="opt">C) Hooks cannot call functions that fetch</div><div class="opt correct">D) A new promise on every render suspends again and starts over: use() needs the SAME promise each time</div></div><div class="why"><b>Why:</b> use() suspends until the promise settles, then React renders again; a fresh getEvent() call would create a new promise and suspend forever. eventPromises.ts keeps one promise per cleanup, and since Lesson 5.2 per viewer (Lesson 4.4, temporary until Lesson 7.1).<br><b>A</b> is wrong: getEvent returns Promise&lt;CleanupEventDetail&gt;.<br><b>B</b> is wrong: Any promise works; the problem is a new one each time.<br><b>C</b> is wrong: use() itself is how a component reads a promise; the problem is which promise.</div></div>
+  <div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">In the checkpoint's model answer, someone deletes the <code class="inline">case 'reset':</code> lines. What happened, and what is the fix?</div><pre class="code">src/tally.ts:34:26 - error TS2345: Argument of type '{ type: "reset"; }' is not assignable to parameter of type 'never'.
+
+34       return assertNever(action)
+                            ~~~~~~
+
+
+Found 1 error in src/tally.ts:34</pre><div class="opts"><div class="opt correct">A) A reset action can now reach the default case, so <code class="inline">action</code> is not <code class="inline">never</code> there: put the case back</div><div class="opt">B) <code class="inline">assertNever</code> is broken: change its parameter to <code class="inline">unknown</code></div><div class="opt">C) Reducers may not have a default case</div><div class="opt">D) <code class="inline">reset</code> must return a new object, not initialTally</div></div><div class="why"><b>Why:</b> With every case handled, nothing is left in the default and <code class="inline">action</code> is <code class="inline">never</code>. Remove one and TypeScript names the leftover member: <code class="inline">{ type: "reset"; }</code>. The same check made Lesson 5.1's SpotsLine exhaustive.<br><b>B</b> is wrong: That throws the check away: the error is assertNever doing its job.<br><b>C</b> is wrong: The default with assertNever is what makes the switch exhaustive.<br><b>D</b> is wrong: Returning the initial object is fine; React compares references only to skip renders.</div></div>
+  <div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">As shipped, the checkpoint's <code class="inline">npm run typecheck</code> prints this. What does it tell you, and what makes it go away?</div><pre class="code">src/checkpoint.test.tsx:81:3 - error TS2578: Unused '@ts-expect-error' directive.
+src/checkpoint.test.tsx:83:3 - error TS2578: Unused '@ts-expect-error' directive.
+Found 2 errors in the same file, starting at: src/checkpoint.test.tsx:81</pre><div class="opts"><div class="opt correct">TallyAction is still too loose: the test's two impossible actions compile; a discriminated union (add with a kind, undo, reset) makes them errors, so the directives are used</div></div><div class="why"><b>Why:</b> A @ts-expect-error line asserts that the next line is a type error; while the type accepts { type: 'weigh' } and an add without a kind, tsc reports the directive itself as unused (TS2578). It is how the kit tests a TYPE, not a value (Lab 1.1, Lab 5.2, Checkpoint 2 Task 2).</div></div>
+
+  <div class="sec"><h2>The Lesson Page's Own Quick Quiz</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Lesson 5.2 · Typed Context</div>
+<ol class="steps" style="overflow-wrap:anywhere" data-lesson-quiz="5.2">
+  <li><b>C</b> EventCard calls useAuth() and reads isOrganizer from the nearest AuthProvider: EventCard calls useAuth(), which reads the nearest AuthContext provider above it. Nothing in between has to carry the value, and when the session changes, React renders the card again.</li>
+  <li><b>A</b> An error: property isOrganizer does not exist on type AuthValue | undefined: TS2339: outside a provider the value is undefined, and undefined has no isOrganizer. That is why components call useAuth(), which checks once and returns AuthValue.</li>
+  <li><b>D</b> It compiles, then the page goes blank and the console says useAuth() must be used inside &lt;AuthProvider&gt;: Measured: it compiles, then UserMenu's useAuth() throws while rendering, React removes the whole app (the root element was empty) and the console's error says useAuth() must be used inside the AuthProvider component. A loud error that names the fix.</li>
+  <li><b>B</b> It survives the page reloads the HQ still has, but stays in one tab and ends when the tab closes: The HQ still reloads on every link (until Lesson 6.1), so memory alone would lose the sign-in. sessionStorage survives reloads but belongs to one tab and ends when the tab closes. It is readable by the page's scripts, like every storage, which is why the front end never decides what is secure.</li>
+  <li><b>D</b> useApi has the signed-in person in its dependencies, so it asks again, now without a token, and the API sends no drafts: useApi lists the viewer in its effect's dependencies. A new viewer means the effect runs again, the request goes out without a token, and the API's answer has no drafts. Measured: /events?perPage=50 and /sites were requested again right after Sign out.</li>
+</ol>
+</div>
+<div class="note tip"><div class="t">What the checks print at the end of the lesson</div>
+<p>On the finished Lesson 5.2 code, <code class="inline">npx tsc -b</code> prints nothing, and <code class="inline">npm run lint</code> and <code class="inline">npm run build</code> end like this (the kit's runs; times, thread counts and hashes differ on every machine):</p>
+<pre class="out">Found 0 warnings and 0 errors.
+Finished in …ms on 46 files with 150 rules using … threads.
+
+vite v8.3.8 building client environment for production...
+✓ 80 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:  0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-CfDMo7UZ.css                             6.97 kB │ gzip:  2.29 kB
+dist/assets/index-BbJZw3KA.js                            252.23 kB │ gzip: 78.51 kB
+
+✓ built in …ms</pre></div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<ol class="steps">
+  <li><b><code class="inline">AuthValue | undefined</code>:</b> outside a provider there is no sign-in. A fake default compiles and fails silently (signed out forever); <code class="inline">undefined</code> in the type makes the compiler force a check, which <code class="inline">useAuth()</code> does once, throwing "useAuth() must be used inside &lt;AuthProvider&gt;".</li>
+  <li><b>Two files:</b> Vite's Fast Refresh keeps a component's state only when its file exports components and nothing else; the context and its Hook go in <code class="inline">AuthContext.ts</code>, the provider in <code class="inline">AuthProvider.tsx</code> (oxlint's only-export-components warns otherwise).</li>
+  <li><b>Who protects:</b> the API. It sends drafts only with an organizer's token and answers 403 "Only organizers can do that." to a volunteer's roster request; the HQ only decides what is convenient to show.</li>
+</ol>
+
+  <div class="sec"><h2>Common Wrong Answers and What They Reveal</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li><b>Q1 A.</b> Has learned "context = shared" and applies it to a direct child. Show EventGroups' <code class="inline">showDrafts</code> prop: one level, explicit, clearer.</li>
+  <li><b>Q2 A or C.</b> Reaches for a cast or a default: the two ways to keep the bug. Run the lesson's QuickSignIn outside a provider: nothing happens, and nothing says why.</li>
+  <li><b>Q5 B or D.</b> Reads "no properties in common" as "remove it" or "cast it". Read RequestInit's properties aloud: all optional, signal among them.</li>
+  <li><b>Q6 A or C.</b> Mixes up sending the token (request()) with WHEN to ask again (the dependency), or thinks the front end protects drafts.</li>
+  <li><b>Q7 A.</b> Has not met Strict Mode's double effect run. Show the canceled request in the Network tab, then the build's single one.</li>
+  <li><b>Q10 A or C.</b> Has not separated the promise from the component. Draw two renders, each creating its own promise.</li>
+</ul>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 13 · Answer Key · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

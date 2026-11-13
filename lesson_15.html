@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Use refs in React and TypeScript: useRef for values and DOM elements, callback refs with React 19 cleanups, ref as a prop, focus management with a keyboard shortcut and form errors, and an accessible modal dialog in a portal for Shoreline Crew HQ. React + TypeScript: Build a Modern Web App Lesson 4.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Refs and the DOM - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🧷 Lesson 4.3: Refs and the DOM</h1>
+                <p class="lead">So far React has done all the talking to the page: you describe what the screen should show, and React changes the elements for you. Some jobs need a hand on the real element, though. Moving the keyboard focus, opening a modal dialog, remembering a timer between renders: none of these are "what the screen shows", so state is the wrong tool. Today you learn React's way to reach past itself, the ref, and use it for the job that matters most to keyboard and screen reader users: putting the focus where they need it. Shoreline Crew HQ gets a <kbd>/</kbd> shortcut to the search box, a form that takes you to the first thing to fix, and a "Cancel this cleanup?" dialog that behaves the way people expect.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain what a ref is, when to choose a ref over state, and why reading a ref while rendering is a mistake</li>
+                        <li>Type refs to values and to DOM elements (<code>useRef&lt;HTMLInputElement&gt;(null)</code>), and read the errors TypeScript gives for <code>null</code>, the wrong element and React 19's required argument</li>
+                        <li>Use callback refs, including React 19's cleanup function, and avoid the arrow-function return that React 19's types reject</li>
+                        <li>Pass a ref to your own component as an ordinary prop, the React 19 way</li>
+                        <li>Manage focus on purpose: a keyboard shortcut, the first invalid field, and a modal dialog rendered through a portal that gives the focus back when it closes</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 155 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_14.html">Lesson 4.2: Custom Hooks</a> (your <code>shoreline-hq</code> with <code>useApi</code> and the debounced events search)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A <kbd>/</kbd> shortcut to the events search, focus on the first field to fix in "Plan a cleanup", and reusable <code>Dialog</code> and <code>ConfirmDialog</code> components asking "Cancel this cleanup?"</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-15-start.zip">lesson-15-start.zip</a> · Finished code: <a href="downloads/lesson-15-end.zip">lesson-15-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#refs" class="toc-link">A Ref: a Value React Does Not Watch</a></li>
+                        <li><a href="#dom" class="toc-link">Refs to Elements, Typed</a></li>
+                        <li><a href="#callback" class="toc-link">Callback Refs</a></li>
+                        <li><a href="#ref-prop" class="toc-link">Passing a Ref to Your Own Component</a></li>
+                        <li><a href="#focus" class="toc-link">Focus Management</a></li>
+                        <li><a href="#portals" class="toc-link">Portals and Dialogs</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Focus Where It Belongs</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="refs" class="lesson-section">
+                <h2>🧷 A Ref: a Value React Does Not Watch</h2>
+                <p>State has one superpower: when it changes, React renders the component again and the screen catches up. Most of the time that is exactly what you want. But some values have nothing to do with what the screen shows. The id of a running timer. The element a dialog should give the focus back to. Re-rendering when those change would be wasted work, and putting them in a plain variable does not work either, because a component's local variables start fresh on every render.</p>
+                <p>A <strong>ref</strong> fills that gap. <code>useRef(initialValue)</code> gives the component an object with one property, <code>current</code>. React hands back the <em>same</em> object on every render, so whatever you put in <code>current</code> stays there, and changing it does not make React render again.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the whiteboard and the pocket notebook</h4>
+                    <p>At a Shoreline Crew cleanup, the whiteboard on the van shows the plan: who is on which stretch, how many bags are full. When the lead changes the whiteboard, everyone looks up and adjusts. That is state. The lead also carries a pocket notebook: the van key's hiding spot, the harbor office's number, when the last radio check was. Writing in it changes nothing for anyone else, and it is still there at the end of the day. That is a ref. If the crew needs to <em>see</em> something, it goes on the whiteboard.</p>
+                </div>
+                <p>Here is a ref doing a typical job: keeping a timer's id for a timed sweep. Try it as <code>src/Scratch.tsx</code> (this lesson's experiment file), shown by temporarily making <code>return &lt;SweepTimer /&gt;</code> the first line of <code>CurrentPage</code> in <code>App.tsx</code>:</p>
+                <pre data-snippet><code class="language-tsx">import { useEffect, useRef, useState } from 'react'
+
+// A timer for a timed sweep: the screen shows the seconds, the ref keeps the interval's id
+export function SweepTimer() {
+  const [seconds, setSeconds] = useState(0)
+  const timerRef = useRef&lt;number | null&gt;(null)
+
+  function start() {
+    if (timerRef.current !== null) return // already running
+    timerRef.current = window.setInterval(() =&gt; setSeconds((s) =&gt; s + 1), 1000)
+  }
+
+  function stop() {
+    if (timerRef.current === null) return
+    window.clearInterval(timerRef.current)
+    timerRef.current = null
+  }
+
+  // Leaving the page stops the timer too
+  useEffect(() =&gt; stop, [])
+
+  return (
+    &lt;section&gt;
+      &lt;h2&gt;Timed sweep&lt;/h2&gt;
+      &lt;p&gt;Seconds: {seconds}&lt;/p&gt;
+      &lt;button type="button" onClick={start}&gt;
+        Start
+      &lt;/button&gt;
+      &lt;button type="button" onClick={stop}&gt;
+        Stop
+      &lt;/button&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+                <ul>
+                    <li><code>seconds</code> is on the screen, so it is state. <code>timerRef</code> is the interval's id: nothing shows it, but <code>stop</code> needs it, so it is a ref.</li>
+                    <li><code>useRef&lt;number | null&gt;(null)</code> reads "a ref that holds a number or null, and starts as null". <code>window.setInterval</code> returns a <code>number</code> in the browser, and <code>null</code> means "not running". Unlike a DOM ref (next section), you write to <code>current</code> yourself, as often as you like.</li>
+                    <li>A second press of <strong>Start</strong> does nothing, because the ref still holds the first timer's id. Measured in the browser: three seconds after Start, then Stop, the page said "Seconds: 3", and two seconds later it still did.</li>
+                    <li><code>useEffect(() =&gt; stop, [])</code> returns <code>stop</code> as the cleanup, so leaving the page clears the timer (Lesson 4.1's cleanup, in one line).</li>
+                </ul>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>State (<code>useState</code>)</th><th>Ref (<code>useRef</code>)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Changing it</td><td>calls the setter; React renders again</td><td>assign to <code>.current</code>; nothing renders</td></tr>
+                            <tr><td>When the new value is visible</td><td>on the next render</td><td>at once, to any code that reads it</td></tr>
+                            <tr><td>Read it while rendering?</td><td>yes, that is what it is for</td><td>no (the linter warns, see Common Mistakes)</td></tr>
+                            <tr><td>Use it for</td><td>anything the screen shows</td><td>timer ids, the element to focus, the last value sent, DOM elements</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The rule of thumb: <strong>if the screen should change when the value changes, it is state. Otherwise, it can be a ref.</strong> And the third row matters: a ref is not a sneaky way to show a value without re-rendering. If you read <code>ref.current</code> in your JSX, the screen shows whatever it was at the last render and goes stale silently. That is why the linter flags it.</p>
+            </section>
+
+            <section id="dom" class="lesson-section">
+                <h2>🎯 Refs to Elements, Typed</h2>
+                <p>The second job of a ref is the one this lesson is named after: holding a real DOM element. Pass a ref object to an element's <code>ref</code> attribute, and React puts the element in <code>current</code> when it adds the element to the page (and puts <code>null</code> back when it removes it):</p>
+                <pre data-snippet><code class="language-tsx">import { useRef } from 'react'
+
+export function QuickNote() {
+  const noteRef = useRef&lt;HTMLTextAreaElement&gt;(null)
+
+  return (
+    &lt;&gt;
+      &lt;label htmlFor="note"&gt;Note for the crew&lt;/label&gt;
+      &lt;textarea id="note" ref={noteRef} /&gt;
+      &lt;button type="button" onClick={() =&gt; noteRef.current?.focus()}&gt;
+        Write a note
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p>Clicking <strong>Write a note</strong> moves the focus into the text area (measured: the focused element afterwards is <code>textarea#note</code>). <code>focus()</code> is a browser method on the element; there is no React way to say "focus this", because focus is not something you draw. That is the honest test for a DOM ref: you need it when you have to <em>call a method</em> on an element (<code>focus</code>, <code>showModal</code>, <code>scrollIntoView</code>, <code>select</code>) or <em>measure</em> it, not when you want to change what it shows.</p>
+                <h3>How the types work</h3>
+                <p>The type argument names the element: <code>HTMLTextAreaElement</code>, <code>HTMLInputElement</code>, <code>HTMLFormElement</code>, <code>HTMLDialogElement</code>. These are the browser's own types from TypeScript's DOM library, the same ones <code>document.querySelector</code> returns (Lesson 2.3). Passing <code>null</code> picks React's overload for DOM refs. Measured with this course's setup (making tsc print each type):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You write</th><th>The ref's type</th><th><code>current</code> is</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>useRef&lt;HTMLInputElement&gt;(null)</code></td><td><code>RefObject&lt;HTMLInputElement | null&gt;</code></td><td><code>HTMLInputElement | null</code></td></tr>
+                            <tr><td><code>useRef&lt;number | null&gt;(null)</code></td><td><code>RefObject&lt;number | null&gt;</code></td><td><code>number | null</code></td></tr>
+                            <tr><td><code>useRef(0)</code></td><td><code>RefObject&lt;number&gt;</code> (inferred)</td><td><code>number</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The <code>| null</code> is honest: before the first render finishes, and after the element leaves the page, there is no element. So TypeScript makes you check, and the strict settings you turned on in Module 2 report it:</p>
+                <pre data-snippet><code class="language-tsx">const noteRef = useRef&lt;HTMLTextAreaElement&gt;(null)
+
+function writeNote() {
+  noteRef.current.focus()
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:7:5 - error TS18047: 'noteRef.current' is possibly 'null'.
+
+7     noteRef.current.focus()
+      ~~~~~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:7</code></pre>
+                </div>
+                <p>The fix is the optional chaining you already use: <code>noteRef.current?.focus()</code> means "if there is an element, focus it". In an event handler the element is always there, but TypeScript cannot know that, and the <code>?.</code> costs nothing.</p>
+                <p>TypeScript also checks that the ref fits the element. A ref made for a <code>div</code> on an <code>input</code>:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b, first lines)</h4>
+                    <pre><code>src/Scratch.tsx:5:17 - error TS2322: Type 'RefObject&lt;HTMLDivElement | null&gt;' is not assignable to type 'Ref&lt;HTMLInputElement&gt; | undefined'.
+  Type 'RefObject&lt;HTMLDivElement | null&gt;' is not assignable to type 'RefObject&lt;HTMLInputElement | null&gt;'.
+    Type 'HTMLDivElement | null' is not assignable to type 'HTMLInputElement | null'.
+      Type 'HTMLDivElement' is missing the following properties from type 'HTMLInputElement': accept, alt, autocomplete, capture, and 54 more.
+
+5   return &lt;input ref={boxRef} aria-label="Bags" /&gt;
+                  ~~~</code></pre>
+                </div>
+                <p>Read it from the bottom up: a <code>div</code> lacks 58 properties an <code>input</code> has, so code that later calls <code>boxRef.current?.select()</code> would break. Change the type argument to the element you attach it to.</p>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Focus is the keyboard user's cursor. People who cannot use a mouse, and many screen reader users, move through a page one focusable element at a time. When an app removes the focused button, opens a dialog, or shows errors without moving the focus, those users are left somewhere unhelpful, often at the very top of the page. Teams treat "where does the focus go?" as part of every feature's design, and accessibility reviews check it. Refs are how React apps answer the question.</p>
+                </div>
+            </section>
+
+            <section id="callback" class="lesson-section">
+                <h2>📞 Callback Refs</h2>
+                <p>A ref object holds one element. Sometimes you need several, one for each item of a list, or you want to run code at the moment an element arrives. For that, the <code>ref</code> attribute also accepts a <strong>function</strong>, a <strong>callback ref</strong>: React calls it with the element when it is added to the page.</p>
+                <p>In React 19 the callback may <strong>return a cleanup function</strong>, which React calls when the element leaves the page, just like an effect's cleanup. Here three crew buttons are kept in a <code>Map</code> by name:</p>
+                <pre data-snippet><code class="language-tsx">import { useRef } from 'react'
+
+const crew = ['Maya', 'Luis', 'Hannah']
+
+export function CrewButtons() {
+  const buttons = useRef(new Map&lt;string, HTMLButtonElement&gt;())
+
+  function focusCrew(name: string) {
+    buttons.current.get(name)?.focus()
+  }
+
+  return (
+    &lt;&gt;
+      {crew.map((name) =&gt; (
+        &lt;button
+          key={name}
+          type="button"
+          ref={(el) =&gt; {
+            if (el) buttons.current.set(name, el) // the button is on the page
+            // React 19: the function you return runs when the button leaves the page
+            return () =&gt; {
+              buttons.current.delete(name)
+            }
+          }}
+        &gt;
+          {name}
+        &lt;/button&gt;
+      ))}
+      &lt;button type="button" onClick={() =&gt; focusCrew('Luis')}&gt;
+        Back to Luis
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p>Clicking <strong>Back to Luis</strong> focuses Luis's button (measured). Notice the braces around the cleanup's body. Without them, <code>() =&gt; buttons.current.delete(name)</code> returns what <code>delete</code> returns, a <code>boolean</code>, and React 19's types refuse it:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b, first lines)</h4>
+                    <pre><code>src/Scratch.tsx:18:11 - error TS2322: Type '(el: HTMLButtonElement | null) =&gt; () =&gt; boolean' is not assignable to type 'Ref&lt;HTMLButtonElement&gt; | undefined'.
+  Type '(el: HTMLButtonElement | null) =&gt; () =&gt; boolean' is not assignable to type '(instance: HTMLButtonElement | null) =&gt; void | (() =&gt; VoidOrUndefinedOnly)'.
+    Type '() =&gt; boolean' is not assignable to type 'void | (() =&gt; VoidOrUndefinedOnly)'.
+      Type '() =&gt; boolean' is not assignable to type '() =&gt; VoidOrUndefinedOnly'.
+        Type 'boolean' is not assignable to type 'VoidOrUndefinedOnly'.</code></pre>
+                </div>
+                <p>The last line says it plainly: a ref cleanup must return nothing. The same rule catches a pattern that is all over older tutorials, <code>ref={(el) =&gt; (refs.current[i] = el)}</code>; Common Mistakes shows it. The fix is always the same: give the arrow a body in braces, so it returns nothing unless you write <code>return</code>.</p>
+            </section>
+
+            <section id="ref-prop" class="lesson-section">
+                <h2>🔗 Passing a Ref to Your Own Component</h2>
+                <p>Refs on <code>&lt;input&gt;</code> and <code>&lt;form&gt;</code> are easy, because those are browser elements. But the HQ's search box lives inside <code>EventFilters</code>, your own component. How does the events page get hold of the input inside it?</p>
+                <p>In React 19, <strong><code>ref</code> is an ordinary prop</strong> for function components. Declare it in the props interface, destructure it, and put it on the element that should receive it:</p>
+                <pre data-snippet><code class="language-tsx">import { useRef, type Ref } from 'react'
+
+interface TextFieldProps {
+  id: string
+  label: string
+  /** React 19: ref is an ordinary prop */
+  ref?: Ref&lt;HTMLInputElement&gt;
+}
+
+export function TextField({ id, label, ref }: TextFieldProps) {
+  return (
+    &lt;div&gt;
+      &lt;label htmlFor={id}&gt;{label}&lt;/label&gt;
+      &lt;input id={id} ref={ref} /&gt;
+    &lt;/div&gt;
+  )
+}
+
+export function MeetingPointForm() {
+  const meetingRef = useRef&lt;HTMLInputElement&gt;(null)
+
+  return (
+    &lt;&gt;
+      &lt;TextField id="meeting" label="Meeting point" ref={meetingRef} /&gt;
+      &lt;button type="button" onClick={() =&gt; meetingRef.current?.focus()}&gt;
+        Edit the meeting point
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <ul>
+                    <li><code>Ref&lt;HTMLInputElement&gt;</code> is React's type for "anything you can put in a <code>ref</code> attribute for an input": a ref object or a callback ref. Using it means the parent can pass either.</li>
+                    <li>The prop is optional (<code>ref?:</code>), so <code>&lt;TextField id="…" label="…" /&gt;</code> still works without one.</li>
+                    <li>The parent writes <code>ref={meetingRef}</code> as with any element. Clicking <strong>Edit the meeting point</strong> focused <code>input#meeting</code> inside <code>TextField</code> (measured).</li>
+                </ul>
+                <p>The component decides which element the ref reaches. <code>TextField</code> renders a <code>div</code>, a <code>label</code> and an <code>input</code>, and it chooses to expose the input, because that is what a parent would want to focus. That choice is part of the component's API, like its other props.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: forwardRef</h4>
+                    <p>Before React 19, a function component never received <code>ref</code> as a prop, so components were wrapped in <code>forwardRef</code>, which passes the ref as a second argument. You will meet it in older code and libraries; it still works in React 19.3 (this compiles), but new code does not need it:</p>
+                    <pre data-snippet data-legacy><code class="language-tsx">import { forwardRef } from 'react'
+
+// Older code (React 18 and before): the ref arrives as a second argument
+export const OldTextField = forwardRef&lt;HTMLInputElement, { id: string; label: string }&gt;(
+  function OldTextField({ id, label }, ref) {
+    return (
+      &lt;div&gt;
+        &lt;label htmlFor={id}&gt;{label}&lt;/label&gt;
+        &lt;input id={id} ref={ref} /&gt;
+      &lt;/div&gt;
+    )
+  },
+)</code></pre>
+                </div>
+            </section>
+
+            <section id="focus" class="lesson-section">
+                <h2>⌨️ Focus Management</h2>
+                <p>"Focus management" means deciding, on purpose, where the keyboard focus goes when the screen changes. Browsers handle the simple cases: Tab moves forward, clicking a button focuses it. Your app handles the rest. Four situations come up again and again, and the HQ has all of them:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>When…</th><th>Move the focus to…</th><th>In the HQ (today)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>The focused element disappears</td><td>the nearest thing that makes sense next</td><td><strong>Clear filters</strong> hides itself: focus the search box</td></tr>
+                            <tr><td>A form finds problems</td><td>the first field to fix</td><td>"Plan a cleanup" after Publish</td></tr>
+                            <tr><td>A dialog opens</td><td>inside the dialog, usually the safest choice</td><td><strong>Keep it</strong> in "Cancel this cleanup?"</td></tr>
+                            <tr><td>A dialog closes</td><td>back to the control that opened it</td><td>the card's <strong>Cancel cleanup</strong> button</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The first row is easy to miss. In the HQ right now, type "pelican" in the events search, then Tab to <strong>Clear filters</strong> and press <kbd>Enter</kbd>. The button clears the filters, and since there is nothing to clear any more, it disappears. Measured: the focused element afterwards was the page's <code>body</code>. The next Tab starts again at the skip link at the very top. One line in the project fixes it.</p>
+                <h3>Keyboard shortcuts: listening to the whole document</h3>
+                <p>Many sites jump to their search box when you press <kbd>/</kbd>. A shortcut listens to key presses anywhere on the page, which means listening on <code>document</code>, outside anything React renders. That is a job for an effect (Lesson 4.1): add the listener when the page appears, remove it in the cleanup. The project's version, from <code>EventsPage</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="excerpt"><code class="language-tsx">// Press / anywhere on the page (except in a field) to jump to the search box
+useEffect(() =&gt; {
+  function handleKeyDown(event: KeyboardEvent) {
+    if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
+    if (isTyping(event.target)) return
+    event.preventDefault() // or the / would be typed into the search box
+    searchRef.current?.focus()
+  }
+  document.addEventListener('keydown', handleKeyDown)
+  return () =&gt; document.removeEventListener('keydown', handleKeyDown)
+}, [])</code></pre>
+                </div>
+                <ul>
+                    <li><code>KeyboardEvent</code> here is the <em>browser's</em> type (the one <code>addEventListener('keydown', …)</code> passes), not React's. They share a name; Common Mistakes shows what happens when you import React's by accident.</li>
+                    <li>Pressing <kbd>/</kbd> inside a text field must still type a slash, so key presses whose <code>target</code> is a field are left alone, and so are presses with <kbd>Ctrl</kbd>, <kbd>⌘ Cmd</kbd> or <kbd>Alt</kbd> held (other shortcuts).</li>
+                    <li><code>event.preventDefault()</code> stops the browser's own handling of the key. Without it, measured: the focus moves to the search box and the <kbd>/</kbd> lands in it, so the box says "/". (In Firefox, <kbd>/</kbd> also opens Quick Find; <code>preventDefault</code> keeps it for the page.)</li>
+                    <li>The effect reads <code>searchRef</code>, a ref, so the dependency array stays <code>[]</code>: React promises the ref object never changes.</li>
+                </ul>
+                <div class="card card-warning">
+                    <h4>⚠️ Single-key shortcuts and accessibility</h4>
+                    <p>WCAG, the web accessibility guidelines, asks that a shortcut made of a single character key can be turned off or remapped, or only works while a particular control has the focus. The reason: people using speech input can trigger a stray key by saying a word. The HQ's <kbd>/</kbd> skips form fields, which helps, but a full answer is a setting to turn shortcuts off. Going Further sketches it, and Lesson 7.3's settings store is where it would live. The search box also gets <code>aria-keyshortcuts="/"</code>, which tells assistive technology the shortcut exists.</p>
+                </div>
+            </section>
+
+            <section id="portals" class="lesson-section">
+                <h2>🪟 Portals and Dialogs</h2>
+                <p>A confirmation dialog belongs to the card that opens it: it needs that event's title, and the card decides what happens after "yes". But in the page's HTML it should not sit inside the card. The card is an <code>&lt;article&gt;</code> inside a list item; a dialog in there would be read as part of the list, pick up the card's styles, and live inside any container that clips or transforms it.</p>
+                <p>A <strong>portal</strong> separates the two trees. <code>createPortal(children, domNode)</code> (from <code>react-dom</code>) renders <code>children</code> into a different DOM element, usually <code>document.body</code>, while they stay in the same place in <em>React's</em> tree:</p>
+                <div class="mermaid">
+graph TD
+    A["React: EventCard"] --> B["ConfirmDialog"]
+    B --> C["Dialog"]
+    C -. "createPortal" .-> D["DOM: body ⟩ dialog"]
+    A --> E["DOM: #root ⟩ article"]
+</div>
+                <p>"Same place in React's tree" has real consequences. The dialog reads the card's props and state, context reaches it (Lesson 5.2), and <strong>events bubble through React's tree, not the DOM's</strong>. A small proof:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+import { createPortal } from 'react-dom'
+
+export function PortalBubble() {
+  const [clicks, setClicks] = useState(0)
+
+  return (
+    &lt;div onClick={() =&gt; setClicks((c) =&gt; c + 1)} role="presentation"&gt;
+      &lt;p&gt;Clicks that reached this div: {clicks}&lt;/p&gt;
+      {createPortal(&lt;button type="button"&gt;Inside a portal&lt;/button&gt;, document.body)}
+    &lt;/div&gt;
+  )
+}</code></pre>
+                <p>Measured: the button's DOM parent is <code>body</code>, nowhere inside <code>#root</code>, yet clicking it made the page say "Clicks that reached this div: 1". (The <code>div</code> with an <code>onClick</code> is only for the demo; real click targets are buttons.) For the HQ that means the dialog's buttons behave like any other part of <code>EventCard</code>.</p>
+                <h3>The browser's own dialog</h3>
+                <p>For years, a React dialog meant building everything yourself: a dimmed overlay, keeping Tab inside, closing on <kbd>Escape</kbd>, stacking it above the rest with <code>z-index</code>. Today the HTML <code>&lt;dialog&gt;</code> element does most of it. Its <code>showModal()</code> method, which you can only call through a ref, opens the dialog <strong>modally</strong>:</p>
+                <ul>
+                    <li>The dialog is drawn above everything else (the browser's "top layer"), with a <code>::backdrop</code> you can style. No <code>z-index</code> battles, and parents with <code>overflow: hidden</code> cannot clip it.</li>
+                    <li>The rest of the page becomes <strong>inert</strong>: it cannot be clicked, focused or read by a screen reader. Measured: with the dialog open, <kbd>Tab</kbd> went from <strong>Keep it</strong> to <strong>Cancel the cleanup</strong>, then out of the page (in a normal window, to the browser's own controls), then back to <strong>Keep it</strong>, never to the page behind; and the <kbd>/</kbd> shortcut could not reach the search box.</li>
+                    <li>The focus moves to the first focusable element inside, and <kbd>Escape</kbd> closes the dialog and fires its <code>close</code> event (React: <code>onClose</code>).</li>
+                </ul>
+                <p>So the HQ's <code>Dialog</code> combines the two: a portal puts the <code>&lt;dialog&gt;</code> in <code>body</code>, a ref calls <code>showModal()</code>, and a second ref remembers where the focus was, so it can go back there. The parent opens the dialog by rendering it and closes it by not rendering it, which keeps "is it open?" in ordinary state. You will build it in the project; here is the plan:</p>
+                <div class="mermaid">
+graph TD
+    A["Focus: Cancel cleanup"] --> B["Dialog renders"]
+    B --> C["showModal: focus Keep it"]
+    C --> D["Escape or a button"]
+    D --> E["Dialog removed"]
+    E --> F["Focus back: Cancel cleanup"]
+</div>
+                <figure class="screenshot">
+                    <img src="images/lesson_15/15-dialog.png" alt="The Cleanup events page dimmed behind a dialog titled Cancel this cleanup? The dialog reads Weekend Cove Cleanup, then its date, then Volunteers signed up: 18. They will need to hear about it. Below are two buttons: Keep it, which has the focus ring, and Cancel the cleanup." width="1100" height="688" loading="lazy">
+                    <figcaption>The dialog is modal: the page behind is dimmed and cannot be clicked or tabbed to, and the focus starts on the safe answer, <strong>Keep it</strong>.</figcaption>
+                </figure>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Showing a ref's value on the screen</h4>
+                    <p>A counter that also wants to show how often its button was pressed, without "wasting" a render:</p>
+                    <pre data-snippet><code class="language-tsx">export function BagCounter() {
+  const [bags, setBags] = useState(0)
+  const clicksRef = useRef(0)
+
+  function addBag() {
+    clicksRef.current += 1
+    setBags(bags + 1)
+  }
+
+  return (
+    &lt;p&gt;
+      Bags: {bags} (button pressed {clicksRef.current} times)
+      &lt;button type="button" onClick={addBag}&gt;
+        Add a bag
+      &lt;/button&gt;
+    &lt;/p&gt;
+  )
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint, trimmed)</h4>
+                        <pre><code>  ⚠ react(refs): Cannot access refs during render
+    ╭─[src/Scratch.tsx:14:37]
+ 13 │     &lt;p&gt;
+ 14 │       Bags: {bags} (button pressed {clicksRef.current} times)
+    ·                                     ────────┬────────
+    ·                                             ╰── Cannot access ref value during render
+ 15 │       &lt;button type="button" onClick={addBag}&gt;
+    ╰────
+  help: React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected</code></pre>
+                    </div>
+                    <p>It happens to look right here, because <code>setBags</code> renders again right after. Remove that line and the number freezes. If the screen shows it, it is state; <code>npx tsc -b</code> cannot tell you this, the linter's <code>react(refs)</code> rule can.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ An arrow function that returns from a callback ref</h4>
+                    <p>This line from older tutorials stores each button in an array:</p>
+                    <pre data-snippet><code class="language-tsx">&lt;button key={name} type="button" ref={(el) =&gt; (buttonRefs.current[i] = el)}&gt;</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_15/15-callback-ref.png" alt="A terminal in shoreline-hq. npx tsc -b reports error TS2322: the arrow function passed to ref, typed as a function from HTMLButtonElement or null to HTMLButtonElement or null, is not assignable to Ref of HTMLButtonElement. The last line of the chain says type null is not assignable to void or a cleanup function, and the code frame marks the ref attribute." width="1100" height="266" loading="lazy">
+                        <figcaption>An arrow without braces returns the assignment's value. React 19's types only allow a callback ref to return nothing or a cleanup function, so tsc stops it.</figcaption>
+                    </figure>
+                    <p>Read the chain from the top: the arrow's type is "takes the element, returns the element" (an assignment is an expression with a value), but a callback ref may only return nothing or a cleanup function. React 19 changed this so cleanups could exist; older React ignored the return value. Fix it with braces: <code>ref={(el) =&gt; { buttonRefs.current[i] = el }}</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ React's KeyboardEvent in a document listener</h4>
+                    <p>VS Code's auto-import is helpful, and sometimes wrong. If <code>KeyboardEvent</code> gets imported from <code>'react'</code> in the shortcut's file, the handler now expects React's event type:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b, trimmed)</h4>
+                        <pre><code>src/pages/EventsPage.tsx:78:42 - error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '(event: KeyboardEvent&lt;Element&gt;) =&gt; void' is not assignable to parameter of type 'EventListenerOrEventListenerObject'.
+      Type '(event: KeyboardEvent&lt;Element&gt;) =&gt; void' is not assignable to type 'EventListener'.
+        Types of parameters 'event' and 'evt' are incompatible.
+          Type 'Event' is missing the following properties from type 'KeyboardEvent&lt;Element&gt;': altKey, charCode, ctrlKey, code, and 15 more.
+
+78     document.addEventListener('keydown', handleKeyDown)
+                                            ~~~~~~~~~~~~~
+...
+Found 2 errors in the same file, starting at: src/pages/EventsPage.tsx:78</code></pre>
+                    </div>
+                    <p>"No overload matches this call" is long, but line 6 tells the story: a browser <code>Event</code> is missing React's properties. React's event types (<code>KeyboardEvent&lt;HTMLInputElement&gt;</code>, <code>ChangeEvent</code> from Lesson 3.4) are for props like <code>onKeyDown</code> in JSX; <code>addEventListener</code> gets the browser's. Remove the import and the global <code>KeyboardEvent</code> is used again.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ useRef with no argument</h4>
+                    <p>Older code writes <code>useRef&lt;number&gt;()</code>. React 19's types require the starting value:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b, first lines)</h4>
+                        <pre><code>src/Scratch.tsx:4:20 - error TS2554: Expected 1 arguments, but got 0.
+
+4   const timerRef = useRef&lt;number&gt;()
+                     ~~~~~~</code></pre>
+                    </div>
+                    <p>Say what it starts as: <code>useRef&lt;number | null&gt;(null)</code> or <code>useRef&lt;number | undefined&gt;(undefined)</code>.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Focus Where It Belongs</h2>
+                <p>At the end of this project, pressing <kbd>/</kbd> on the events page jumps to the search box, <strong>Clear filters</strong> leaves the focus in the search box, "Plan a cleanup" takes you to the first field to fix, and every upcoming cleanup's card has a <strong>Cancel cleanup</strong> button that opens a "Cancel this cleanup?" dialog. Two new components, <code>Dialog</code> and <code>ConfirmDialog</code>, are ready for every confirmation the HQ will need.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>) and delete <code>src/Scratch.tsx</code> (and the line you added to <code>CurrentPage</code>) if you still have them.</p>
+
+                <div class="card">
+                    <h3>Step 1: EventFilters accepts a ref <span class="step-time">(6 min)</span></h3>
+                    <p>In <code>src/components/EventFilters.tsx</code>, import the <code>Ref</code> type:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventFilters.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventFilters.tsx" data-match="diff"><code class="language-diff-tsx">-import type { ChangeEvent } from 'react'
++import type { ChangeEvent, Ref } from 'react'</code></pre>
+                    </div>
+                    <p>add the prop to the interface and the destructuring:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventFilters.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventFilters.tsx" data-match="diff"><code class="language-diff-tsx">   onClear: () =&gt; void
++  /** Points at the search box, so the page can move the focus there */
++  ref?: Ref&lt;HTMLInputElement&gt;
+ }
+
+ export function EventFilters({
+   query,
+   status,
+   onQueryChange,
+   onStatusChange,
+   onClear,
++  ref,
+ }: EventFiltersProps) {</code></pre>
+                    </div>
+                    <p>and give it to the search input, with the shortcut announced:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventFilters.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventFilters.tsx" data-match="diff"><code class="language-diff-tsx">         &lt;input
++          ref={ref}
+           id="event-search"
+           type="search"
++          aria-keyshortcuts="/"
+           value={query}</code></pre>
+                    </div>
+                    <p><code>EventFilters</code> exposes the search box, not the status menu or the whole <code>&lt;search&gt;</code> element: the search box is the one a page would want to focus. Run <code>npx tsc -b</code>: no errors, because the prop is optional and nothing passes it yet.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The / shortcut, and focus after Clear filters <span class="step-time">(14 min)</span></h3>
+                    <p>In <code>src/pages/EventsPage.tsx</code>, import two more Hooks:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">-import { useState } from 'react'
++import { useEffect, useRef, useState } from 'react'</code></pre>
+                    </div>
+                    <p>Add a helper above <code>EventGroups</code> that recognizes "someone is typing in a field". <code>EventTarget</code> is the browser's most general type for "something an event happened on"; <code>instanceof</code> narrows it, exactly as in Lesson 4.1's <code>describeError</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="excerpt"><code class="language-tsx">// True when a key press is meant for a field someone is typing in
+function isTyping(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  )
+}</code></pre>
+                    </div>
+                    <p>At the top of <code>EventsPage</code>, create the ref and add the shortcut's effect (shown in Focus Management above):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">   const [status, setStatus] = useState&lt;StatusFilter&gt;('all')
++  const searchRef = useRef&lt;HTMLInputElement&gt;(null)
+   useDocumentTitle('Cleanup events')
++
++  // Press / anywhere on the page (except in a field) to jump to the search box
++  useEffect(() =&gt; {
++    function handleKeyDown(event: KeyboardEvent) {
++      if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
++      if (isTyping(event.target)) return
++      event.preventDefault() // or the / would be typed into the search box
++      searchRef.current?.focus()
++    }
++    document.addEventListener('keydown', handleKeyDown)
++    return () =&gt; document.removeEventListener('keydown', handleKeyDown)
++  }, [])</code></pre>
+                    </div>
+                    <p>Keep the focus useful when <strong>Clear filters</strong> disappears:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">   function clearFilters() {
+     setQuery('')
+     setStatus('all')
++    // The Clear filters button is about to disappear: keep the focus somewhere useful
++    searchRef.current?.focus()
+   }</code></pre>
+                    </div>
+                    <p>and pass the ref to <code>EventFilters</code>, exactly as you would to an <code>&lt;input&gt;</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">       &lt;EventFilters
++        ref={searchRef}
+         query={query}</code></pre>
+                    </div>
+                    <p>Open <code>/events</code>, click somewhere on the page's background and press <kbd>/</kbd>: the focus ring appears on the search box, which stays empty. Type <code>pelican</code>, Tab to <strong>Clear filters</strong>, press <kbd>Enter</kbd>: all fifteen cleanups are back and the focus is in the search box, ready for the next search (measured, on the dev server and the build).</p>
+                    <p>Why does <code>clearFilters</code> focus the box right away, before React has rendered? The search box is already on the page; only the button is about to go. Focusing first means the focus is never on an element that disappears.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Focus the first field to fix <span class="step-time">(8 min)</span></h3>
+                    <p>Lesson 3.5's form shows every problem at once, but leaves the focus on the button you pressed. A keyboard user then has to Tab back up through the form to find the first message. In <code>src/components/NewEventForm.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx">-import { useActionState } from 'react'
++import { useActionState, useEffect, useRef } from 'react'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx">   const errors = state.kind === 'editing' ? state.errors : {}
++  const formRef = useRef&lt;HTMLFormElement&gt;(null)
++
++  // After every check that found problems, move the focus to the first field to fix
++  useEffect(() =&gt; {
++    if (state.kind !== 'editing') return
++    const firstInvalid = formRef.current?.querySelector&lt;HTMLElement&gt;('[aria-invalid="true"]')
++    firstInvalid?.focus()
++  }, [state])</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;form action={formAction} noValidate className={formStyles.form}&gt;
++      &lt;form ref={formRef} action={formAction} noValidate className={formStyles.form}&gt;</code></pre>
+                    </div>
+                    <ul>
+                        <li>Every submit makes the action return a <em>new</em> state object, so <code>[state]</code> runs the effect after every check, even when the same fields are still wrong. On the first render there are no errors, so nothing is found and nothing moves.</li>
+                        <li>The effect runs after React has updated the page, so the fields already carry <code>aria-invalid="true"</code> from Lesson 3.5. <code>querySelector</code> returns the first match in page order, which is the order people read the form.</li>
+                        <li><code>querySelector&lt;HTMLElement&gt;</code> is the generic overload from Lesson 2.3: without the type argument the result is <code>Element | null</code>, which has no <code>focus</code> method. With it, <code>HTMLElement | null</code> (both measured), and the <code>?.</code> after <code>formRef.current</code> adds <code>undefined</code>.</li>
+                    </ul>
+                    <p>Open <code>/events/new</code> and press <strong>Publish</strong> on the empty form: the focus lands on the title. Now type a good title and press <strong>Publish</strong> again:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_15/15-first-invalid.png" alt="The Plan a cleanup form after Publish. The title Dune Grass Cleanup is kept and has no error. The Beach site menu has a red border, the message Choose one of the cleanup sites, and the focus ring; the date, times, capacity and meeting point fields below also show their messages." width="664" height="797" loading="lazy">
+                        <figcaption>The title was fine, so the focus skips it and lands on the first field to fix: the <strong>Beach site</strong> menu.</figcaption>
+                    </figure>
+                    <p>Because the field also has <code>aria-describedby</code> pointing at its message (Lesson 3.5), a screen reader announces the field and "Choose one of the cleanup sites." together.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: A Dialog component <span class="step-time">(14 min)</span></h3>
+                    <p>Create <code>src/components/Dialog.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Dialog.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Dialog.tsx"><code class="language-tsx">import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import styles from './Dialog.module.css'
+
+interface DialogProps {
+  /** The dialog's heading, also its accessible name */
+  title: string
+  /** Called when the person presses Escape: the parent should stop rendering the dialog */
+  onClose: () =&gt; void
+  children: ReactNode
+}
+
+// A modal dialog: render it to open it, stop rendering it to close it
+export function Dialog({ title, onClose, children }: DialogProps) {
+  const dialogRef = useRef&lt;HTMLDialogElement&gt;(null)
+  const openerRef = useRef&lt;Element | null&gt;(null)
+  const titleId = useId()
+
+  useEffect(() =&gt; {
+    const dialog = dialogRef.current
+    if (dialog === null) return
+    if (!dialog.open) {
+      openerRef.current = document.activeElement // remember where the focus was
+      dialog.showModal() // focus moves into the dialog, the page behind it goes inert
+    }
+    return () =&gt; {
+      // Closing: give the focus back to the control that opened the dialog
+      const opener = openerRef.current
+      if (opener instanceof HTMLElement) opener.focus()
+    }
+  }, [])
+
+  return createPortal(
+    &lt;dialog ref={dialogRef} aria-labelledby={titleId} className={styles.dialog} onClose={onClose}&gt;
+      &lt;h2 id={titleId}&gt;{title}&lt;/h2&gt;
+      {children}
+    &lt;/dialog&gt;,
+    document.body,
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong>Two refs, two jobs.</strong> <code>dialogRef</code> holds the <code>&lt;dialog&gt;</code> element, so the effect can call <code>showModal()</code>. <code>openerRef</code> holds a plain value, the element that had the focus before the dialog opened (<code>document.activeElement</code> is typed <code>Element | null</code>). Nothing on the screen shows it, so it is a ref, not state.</li>
+                        <li><strong>Focus out.</strong> The cleanup runs when the parent stops rendering the dialog. It gives the focus back with <code>focus()</code>, after narrowing <code>Element</code> to <code>HTMLElement</code> (only HTML elements have <code>focus</code>). Measured: when <kbd>Escape</kbd> closes the dialog, the browser itself puts the focus back; when a button removes the dialog, the browser does not, and without this cleanup the focus fell to <code>body</code>.</li>
+                        <li><strong>The <code>!dialog.open</code> check is for Strict Mode.</strong> In development, React runs the effect, its cleanup, and the effect again (Lesson 4.1). Without the check, the second run would remember <strong>Keep it</strong> (already focused) as the opener. Measured on the dev server: with the check removed, pressing <strong>Keep it</strong> left the focus on <code>body</code>.</li>
+                        <li><code>useId()</code> makes an id that is unique on the page, so <code>aria-labelledby</code> can point at the heading even when several dialogs exist. The dialog's accessible name becomes its title.</li>
+                        <li>Escape fires the dialog's <code>close</code> event; <code>onClose</code> tells the parent, which stops rendering it.</li>
+                    </ul>
+                    <p>Create <code>src/components/Dialog.module.css</code>. The backdrop is Deep Tide, see-through:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Dialog.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Dialog.module.css"><code class="language-css">.dialog {
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.dialog::backdrop {
+  background: rgb(11 57 84 / 0.6);
+}
+
+.dialog h2 {
+  margin-top: 0;
+}</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: ConfirmDialog and the Cancel cleanup button <span class="step-time">(14 min)</span></h3>
+                    <p>A confirmation is a dialog with a question and two answers. Create <code>src/components/ConfirmDialog.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ConfirmDialog.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ConfirmDialog.tsx"><code class="language-tsx">import type { ReactNode } from 'react'
+import buttonStyles from './Button.module.css'
+import styles from './ConfirmDialog.module.css'
+import { Dialog } from './Dialog.tsx'
+
+interface ConfirmDialogProps {
+  title: string
+  /** The safe choice, first in the dialog: it gets the focus when the dialog opens */
+  keepLabel: string
+  confirmLabel: string
+  onKeep: () =&gt; void
+  onConfirm: () =&gt; void
+  children: ReactNode
+}
+
+// A question with two answers. Escape counts as the safe answer.
+export function ConfirmDialog({
+  title,
+  keepLabel,
+  confirmLabel,
+  onKeep,
+  onConfirm,
+  children,
+}: ConfirmDialogProps) {
+  return (
+    &lt;Dialog title={title} onClose={onKeep}&gt;
+      {children}
+      &lt;div className={styles.actions}&gt;
+        &lt;button type="button" className={buttonStyles.secondary} onClick={onKeep}&gt;
+          {keepLabel}
+        &lt;/button&gt;
+        &lt;button type="button" className={buttonStyles.primary} onClick={onConfirm}&gt;
+          {confirmLabel}
+        &lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/Dialog&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>and <code>src/components/ConfirmDialog.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ConfirmDialog.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/ConfirmDialog.module.css"><code class="language-css">.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}</code></pre>
+                    </div>
+                    <p>The safe answer comes first, so <code>showModal()</code> focuses it: an accidental <kbd>Enter</kbd> keeps the cleanup. <kbd>Escape</kbd> counts as the safe answer too (<code>onClose={onKeep}</code>). The labels say what happens ("Keep it", "Cancel the cleanup"), never just "OK" and "Cancel", which would be confusing in a dialog about cancelling.</p>
+                    <p>Now replace <code>src/components/EventCard.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx"><code class="language-tsx">import { useState } from 'react'
+import type { CleanupEvent, Site } from '../api/types.ts'
+import { getAvailability } from '../utils/availability.ts'
+import { formatDate } from '../utils/format.ts'
+import cardStyles from './Card.module.css'
+import { ConfirmDialog } from './ConfirmDialog.tsx'
+import styles from './EventCard.module.css'
+import { SpotsLine } from './SpotsLine.tsx'
+import { StatusBadge } from './StatusBadge.tsx'
+import { VisuallyHidden } from './VisuallyHidden.tsx'
+
+interface EventCardProps {
+  event: CleanupEvent
+  /** undefined when the event's site is not in the list */
+  site: Site | undefined
+}
+
+export function EventCard({ event, site }: EventCardProps) {
+  const [showDetails, setShowDetails] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [readyToCancel, setReadyToCancel] = useState(false)
+
+  function cancelCleanup() {
+    setConfirming(false)
+    setReadyToCancel(true)
+  }
+
+  return (
+    &lt;article className={cardStyles.card}&gt;
+      &lt;h3&gt;{event.title}&lt;/h3&gt;
+      &lt;p className={styles.badges}&gt;
+        &lt;StatusBadge status={event.status} /&gt;
+      &lt;/p&gt;
+      &lt;p&gt;
+        &lt;time dateTime={event.date}&gt;{formatDate(event.date)}&lt;/time&gt;, {event.startTime} to{' '}
+        {event.endTime}
+      &lt;/p&gt;
+      &lt;p&gt;{site ? site.name : 'Site to be confirmed'}: {event.meetingPoint}&lt;/p&gt;
+      &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
+      {event.suppliesProvided.length &gt; 0 &amp;&amp; (
+        &lt;p className={styles.supplies}&gt;We bring: {event.suppliesProvided.join(', ')}&lt;/p&gt;
+      )}
+      &lt;div className={styles.actions}&gt;
+        &lt;button
+          type="button"
+          className={styles.toggle}
+          aria-expanded={showDetails}
+          onClick={() =&gt; setShowDetails((shown) =&gt; !shown)}
+        &gt;
+          {showDetails ? 'Hide details' : 'Show details'}
+          &lt;VisuallyHidden&gt; for {event.title}&lt;/VisuallyHidden&gt;
+        &lt;/button&gt;
+        {event.status === 'scheduled' &amp;&amp; (
+          &lt;button
+            type="button"
+            className={styles.toggle}
+            aria-haspopup="dialog"
+            onClick={() =&gt; setConfirming(true)}
+          &gt;
+            Cancel cleanup&lt;VisuallyHidden&gt; for {event.title}&lt;/VisuallyHidden&gt;
+          &lt;/button&gt;
+        )}
+      &lt;/div&gt;
+      {showDetails &amp;&amp; &lt;p&gt;{event.description}&lt;/p&gt;}
+      {event.status === 'scheduled' &amp;&amp; (
+        // Always in the page, so screen readers notice when the text appears
+        &lt;p role="status" className={styles.note}&gt;
+          {readyToCancel &amp;&amp; 'Ready to cancel. Nothing is sent to shoreline-api yet (Lesson 7.2).'}
+        &lt;/p&gt;
+      )}
+      {confirming &amp;&amp; (
+        &lt;ConfirmDialog
+          title="Cancel this cleanup?"
+          keepLabel="Keep it"
+          confirmLabel="Cancel the cleanup"
+          onKeep={() =&gt; setConfirming(false)}
+          onConfirm={cancelCleanup}
+        &gt;
+          &lt;p&gt;
+            &lt;strong&gt;{event.title}&lt;/strong&gt;, {formatDate(event.date)}. Volunteers signed up:{' '}
+            {event.spotsTaken}. They will need to hear about it.
+          &lt;/p&gt;
+        &lt;/ConfirmDialog&gt;
+      )}
+    &lt;/article&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li>Only scheduled cleanups get the button. Its name for screen readers is "Cancel cleanup for Weekend Cove Cleanup", the same pattern as "Show details for…" in Lesson 3.6, and <code>aria-haspopup="dialog"</code> says it opens a dialog.</li>
+                        <li><code>confirming</code> is ordinary state: <code>true</code> renders the <code>ConfirmDialog</code> (which opens itself), <code>false</code> removes it (and the cleanup returns the focus). The dialog is written inside the <code>&lt;article&gt;</code>, but the portal puts it in <code>body</code>.</li>
+                        <li>Nothing is cancelled for real yet: changing a cleanup needs an organizer's sign-in (Lesson 5.2) and a request that changes data (Lesson 7.2). Until then the card says so in its status line, which is always in the page so screen readers notice when the text appears (as in Lesson 3.5).</li>
+                    </ul>
+                    <p>Add the row for the two buttons at the end of <code>src/components/EventCard.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.module.css" data-match="diff"><code class="language-diff-css">   cursor: pointer;
+ }
++
++/* The card's buttons, side by side (Lesson 4.3) */
++.actions {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 0.5rem 1.5rem;
++}
++
++.note:empty {
++  margin: 0;
++}</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Check it with the keyboard <span class="step-time">(6 min)</span></h3>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 15ms on 35 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>Then put the mouse aside and use only the keyboard on <code>/events</code>:</p>
+                    <ol>
+                        <li>Tab to <strong>Cancel cleanup</strong> on Weekend Cove Cleanup and press <kbd>Enter</kbd>. The page dims, and the focus ring is on <strong>Keep it</strong>.</li>
+                        <li>Press <kbd>Tab</kbd> a few times: the focus stays in the dialog (or visits the browser's own controls), never the page behind.</li>
+                        <li>Press <kbd>Escape</kbd>: the dialog closes and the focus is back on <strong>Cancel cleanup</strong>. Press <kbd>Enter</kbd> again and choose <strong>Keep it</strong>: same place.</li>
+                        <li>Open it once more and choose <strong>Cancel the cleanup</strong>: the card says "Ready to cancel. Nothing is sent to shoreline-api yet (Lesson 7.2)." and the focus is still on its button.</li>
+                    </ol>
+                    <p>All of it was measured in Chromium, on the dev server (with Strict Mode) and on the build. If your focus ends up on the page's top instead, check the cleanup in <code>Dialog</code> and the <code>!dialog.open</code> check.</p>
+                    <p><strong>Your own project:</strong> go through the screens you listed for your Lesson 11.1 app. Where does something disappear while it has the focus, where would a form send people after an error, and what needs a confirmation? Write one line per case: "When…, the focus goes to…".</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>EventFilters</code> takes an optional <code>ref</code> prop typed <code>Ref&lt;HTMLInputElement&gt;</code> and gives it to the search input</li>
+                        <li>☐ <kbd>/</kbd> on the events page focuses the search box without typing a slash, and still types a slash inside a field</li>
+                        <li>☐ After <strong>Clear filters</strong>, the focus is in the search box</li>
+                        <li>☐ "Plan a cleanup" moves the focus to the first field to fix after every check that finds problems</li>
+                        <li>☐ "Cancel this cleanup?" opens in a portal, starts on <strong>Keep it</strong>, closes with <kbd>Escape</kbd> or either button, and gives the focus back to the card's button</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: A useShortcut Hook</h3>
+                    <p>The shortcut's effect is a dozen lines of <code>EventsPage</code> that have nothing to do with events. Move them into <code>src/hooks/useShortcut.ts</code>, a Hook that takes the key and a function to call, so the page needs one line: <code>useShortcut('/', () =&gt; searchRef.current?.focus())</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The function is new on every render, like <code>load</code> in Lesson 4.2's <code>useApi</code>. Which React Hook lets the effect call the latest one without listing it as a dependency? And which value <em>should</em> be in the dependency array now?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/hooks/useShortcut.ts</div>
+                            <pre data-snippet><code class="language-ts">import { useEffect, useEffectEvent } from 'react'
+
+// True when a key press is meant for a field someone is typing in
+function isTyping(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement
+  )
+}
+
+/** Calls onPress when someone presses `key` outside a form field (without Ctrl, Cmd or Alt). */
+export function useShortcut(key: string, onPress: () =&gt; void): void {
+  const pressed = useEffectEvent(onPress)
+
+  useEffect(() =&gt; {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== key || event.ctrlKey || event.metaKey || event.altKey) return
+      if (isTyping(event.target)) return
+      event.preventDefault()
+      pressed()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () =&gt; document.removeEventListener('keydown', handleKeyDown)
+  }, [key])
+}</code></pre>
+                        </div>
+                        <p>In <code>EventsPage.tsx</code>, delete <code>isTyping</code> and the effect, import <code>useShortcut</code>, change the React import to <code>import { useRef, useState } from 'react'</code>, and call:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">// Press / anywhere on the page (except in a field) to jump to the search box
+useShortcut('/', () =&gt; searchRef.current?.focus())</code></pre>
+                        </div>
+                        <p><code>npx tsc -b</code> and <code>npm run lint</code> pass, and the page behaves exactly as before (measured: <kbd>/</kbd> focuses the empty search box, Clear filters keeps the focus there). The key is in the array, so a page that changed its shortcut would get a new listener. The course's code keeps the effect in the page.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: "Discard this plan?"</h3>
+                    <p>Give "Plan a cleanup" a <strong>Discard</strong> button after <strong>Publish</strong>. It asks "Discard this plan?" with the answers <strong>Keep editing</strong> and <strong>Discard</strong>; discarding goes back to <code>/events</code> (<code>window.location.assign('/events')</code> until Lesson 6.1 brings the router).</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>One piece of state, <code>discarding</code>, and a <code>ConfirmDialog</code> rendered when it is <code>true</code>. Which <code>type</code> must the Discard button have so it does not submit the form?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Import <code>useState</code> and <code>ConfirmDialog</code>, add <code>const [discarding, setDiscarding] = useState(false)</code> under <code>formRef</code>, then the button at the end of the actions and the dialog after the form:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                            <pre data-snippet><code class="language-tsx">    &lt;button
+      type="button"
+      className={buttonStyles.secondary}
+      onClick={() =&gt; setDiscarding(true)}
+    &gt;
+      Discard
+    &lt;/button&gt;
+  &lt;/div&gt;
+&lt;/form&gt;
+{discarding &amp;&amp; (
+  &lt;ConfirmDialog
+    title="Discard this plan?"
+    keepLabel="Keep editing"
+    confirmLabel="Discard"
+    onKeep={() =&gt; setDiscarding(false)}
+    onConfirm={() =&gt; window.location.assign('/events')}
+  &gt;
+    &lt;p&gt;What you typed in the form will be lost.&lt;/p&gt;
+  &lt;/ConfirmDialog&gt;
+)}</code></pre>
+                        </div>
+                        <p>Measured: the dialog opened with the focus on <strong>Keep editing</strong>; choosing it returned the focus to <strong>Discard</strong> with "Dune Grass Cleanup" still in the title; choosing <strong>Discard</strong> loaded <code>/events</code>. <code>type="button"</code> matters: a button in a form without a type is a submit button. One <code>ConfirmDialog</code>, two very different questions: that is the payoff of building it once. The course's code does not keep this button.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: The first invalid field, with callback refs (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 20 minutes).</em></p>
+                    <p>Step 3 finds the first invalid field by searching the form's HTML for <code>aria-invalid="true"</code>. Do it without <code>querySelector</code>: keep every field's element in a <code>Map&lt;EventField, HTMLElement&gt;</code> filled by a callback ref (with a React 19 cleanup), and pick the first field with an error in the form's order.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>fieldProps(field)</code> already returns the props every field needs; a <code>ref</code> can be one of them. The order: a module-level <code>EventField[]</code> listing the fields top to bottom, and <code>find</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Above <code>initialState</code>, the order; inside the component, the map and the effect (the form loses its <code>ref</code>):</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                            <pre data-snippet><code class="language-tsx">// The fields in the order the form shows them
+const fieldOrder: EventField[] = [
+  'title',
+  'siteId',
+  'date',
+  'startTime',
+  'endTime',
+  'capacity',
+  'meetingPoint',
+  'description',
+]
+// ...
+const fields = useRef(new Map&lt;EventField, HTMLElement&gt;())
+
+// After every check that found problems, move the focus to the first field to fix
+useEffect(() =&gt; {
+  if (state.kind !== 'editing') return
+  const first = fieldOrder.find((field) =&gt; state.errors[field] !== undefined)
+  if (first !== undefined) fields.current.get(first)?.focus()
+}, [state])</code></pre>
+                        </div>
+                        <p>and in <code>fieldProps</code>, after <code>'aria-describedby'</code>:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                            <pre data-snippet><code class="language-tsx">ref: (element: HTMLElement | null) =&gt; {
+  if (element) fields.current.set(field, element)
+  return () =&gt; {
+    fields.current.delete(field)
+  }
+},</code></pre>
+                        </div>
+                        <p>Measured: same results as Step 3 (the title first on an empty form, the Beach site menu after a good title). The ref is typed for <code>HTMLElement</code>, so the same function fits the inputs, the select and the text area. Why a fixed order and not the map's own order? The site menu has a <code>key</code> that changes (Lesson 3.5), so React replaces it, the cleanup deletes it and it is added again at the end of the map. Which version would you rather maintain?</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> A click handler runs <code>clicksRef.current += 1</code> and nothing else. What happens on the screen?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Which of the two, state or a ref, makes React render again when it changes?">
+                                A) The component renders again and shows the new number
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Writing to current in an event handler is exactly where refs are meant to be changed.">
+                                B) React throws an error, because refs are read-only
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Changing a ref does not render the component again. The new value is there for any code that reads it later, but the screen does not change. If the screen should show it, it belongs in state.">
+                                C) Nothing changes: the ref holds the new value, but React does not render again
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> <code>const searchRef = useRef&lt;HTMLInputElement&gt;(null)</code>. What is the type of <code>searchRef.current</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Passing null picks the overload for DOM refs: RefObject of HTMLInputElement or null. Before React attaches the input, and after it is removed, there is no element, so TypeScript makes you check, for example with searchRef.current?.focus().">
+                                A) <code>HTMLInputElement | null</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Is there an input before the component has been put on the page? What did TS18047 say?">
+                                B) <code>HTMLInputElement</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is the type of searchRef itself. What is inside its current property?">
+                                C) <code>RefObject&lt;HTMLInputElement | null&gt;</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The starting value was null, not undefined, and the type argument names the element.">
+                                D) <code>HTMLInputElement | undefined</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> In React 19, how should <code>EventsPage</code> get a ref to the search input that lives inside <code>EventFilters</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That still works, but it is the older way. What changed about the ref prop in React 19?">
+                                A) Wrap <code>EventFilters</code> in <code>forwardRef</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A ref created inside EventFilters belongs to EventFilters. How would the page reach it?">
+                                B) Create the ref with <code>useRef</code> inside <code>EventFilters</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="IDs work, but they skip React and TypeScript. Is there a typed way to hand an element up?">
+                                C) Use <code>document.getElementById('event-search')</code> in the page
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="React 19 passes ref to function components as an ordinary prop. EventFilters declares ref as an optional Ref of HTMLInputElement, destructures it and puts it on the input; the page writes ref equals searchRef.">
+                                D) Declare <code>ref?: Ref&lt;HTMLInputElement&gt;</code> in its props and put it on the input
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why does <code>ref={(el) =&gt; (buttonRefs.current[i] = el)}</code> fail <code>npx tsc -b</code> with React 19's types?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The array type allowed null. Read the last line of the TS2322 chain.">
+                                A) The array cannot hold <code>null</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="An arrow without braces returns its expression, and an assignment has a value: the element or null. A React 19 callback ref may only return nothing or a cleanup function. Braces around the body fix it.">
+                                B) The arrow returns the assigned value, and a callback ref may only return nothing or a cleanup function
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="React 19 still has callback refs, and even added cleanup functions to them.">
+                                C) React 19 removed callback refs
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Refs can hold any value, including arrays and maps. What does the arrow return?">
+                                D) A ref cannot hold an array
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> <code>EventCard</code> renders <code>ConfirmDialog</code>, and <code>Dialog</code> puts its <code>&lt;dialog&gt;</code> into <code>document.body</code> with <code>createPortal</code>. A click on <strong>Keep it</strong> bubbles to…</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="React events bubble through React's tree, where the dialog is still inside EventCard. The DOM position only decides where the element sits in the HTML. The PortalBubble demo measured exactly this.">
+                                A) The components above it in React's tree, such as <code>EventCard</code>, even though the element is in <code>body</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The demo's div was not an ancestor in the DOM, yet its counter went up. Which tree do React events follow?">
+                                B) Only <code>body</code> and <code>document</code>, because that is where the element is
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Portals do not stop events. What did the click counter show?">
+                                C) Nowhere: a portal stops events from bubbling
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why not just use the <code>autoFocus</code> attribute?</summary>
+                    <p>It only works when an element first appears, and moving the focus without the person asking for it can disorient screen reader users, which is why the course's linter flags it (<code>jsx-a11y/no-autofocus</code>, on since Lesson 3.6). Focus moves in this lesson all answer something the person did: pressed <kbd>/</kbd>, pressed Publish, opened or closed a dialog. Inside a <code>&lt;dialog&gt;</code>, <code>showModal()</code> already picks the first focusable element, so you rarely need anything else.</p>
+                </details>
+                <details>
+                    <summary>Could a parent get a smaller API instead of the whole element?</summary>
+                    <p>Yes: <code>useImperativeHandle(ref, () =&gt; ({ focus() { … } }))</code> lets a component decide what the parent's ref receives, for example only <code>focus</code> and <code>clear</code> instead of the full <code>HTMLInputElement</code>. It is useful for design-system components; for the HQ, passing the input is simpler and enough.</p>
+                </details>
+                <details>
+                    <summary>Should I use a library for dialogs?</summary>
+                    <p>For a complex app, many teams do: libraries such as React Aria or Radix handle menus, popovers and comboboxes, which have much more to get right than a dialog. For a confirmation, the native <code>&lt;dialog&gt;</code> plus the two refs in this lesson is small and does what users expect. Knowing how it works helps you judge any library you pick later.</p>
+                </details>
+                <details>
+                    <summary>Can a click on the dimmed backdrop close the dialog?</summary>
+                    <p>Not by default: a modal <code>&lt;dialog&gt;</code> closes with <kbd>Escape</kbd>, or when your code removes or closes it. Newer browsers support a <code>closedby="any"</code> attribute that adds "click outside to close" (React 19.3's types already list it); check current browser support before relying on it. For a "Cancel this cleanup?" question, closing only on purpose is the safer design anyway.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Make the <kbd>/</kbd> shortcut something people can turn off, as WCAG asks for single-key shortcuts. Add a "Keyboard shortcuts" checkbox to the events page's filters, remember the choice in <code>localStorage</code> (Lesson 4.2's bonus <code>useStoredState</code> fits), and only listen for <kbd>/</kbd> when it is on. If you did Exercise 1, give <code>useShortcut</code> an <code>enabled: boolean</code> parameter and think about which dependency array the effect needs now. Lesson 7.3 moves settings like this into a Zustand store.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Explain in your own words when you would use state and when a ref, with one example of each from the HQ. Then do the keyboard check from Step 6 on a website you use often: where did the focus go when a dialog opened, when it closed, and when a form showed errors? Write down one thing that site does well and one thing your own app will do better.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A ref is an object whose <code>current</code> survives renders; changing it does not render again. If the screen shows a value, it is state; otherwise it can be a ref, and refs are not read while rendering</li>
+                        <li>DOM refs are typed with the element and start as <code>null</code>: <code>useRef&lt;HTMLInputElement&gt;(null)</code> gives <code>current: HTMLInputElement | null</code>, so use <code>?.</code></li>
+                        <li>Callback refs run when an element arrives; in React 19 they may return a cleanup, and must return nothing else (braces, not an arrow's value)</li>
+                        <li>In React 19, <code>ref</code> is an ordinary prop: declare <code>ref?: Ref&lt;T&gt;</code> and pass it to the element your component chooses to expose; <code>forwardRef</code> is the older way</li>
+                        <li>Focus management is deciding where the focus goes when the screen changes: never on a removed element, to the first field to fix, into a dialog and back out</li>
+                        <li><code>createPortal</code> moves elements in the DOM but not in React's tree: props, context and event bubbling follow React's tree</li>
+                        <li>The native <code>&lt;dialog&gt;</code> with <code>showModal()</code> gives the top layer, an inert page and <kbd>Escape</kbd>; your component adds the portal, the label, and the focus return</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Look up DOM types and narrowing</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Read React's guide to refs</td><td><a href="https://react.dev/learn/referencing-values-with-refs" target="_blank" rel="noopener">React: Referencing Values with Refs</a></td></tr>
+                            <tr><td>Read React's guide to the DOM</td><td><a href="https://react.dev/learn/manipulating-the-dom-with-refs" target="_blank" rel="noopener">React: Manipulating the DOM with Refs</a></td></tr>
+                            <tr><td>Read about the dialog element</td><td><a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/dialog" target="_blank" rel="noopener">MDN: The dialog element</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You used refs for values React should not render for, and for real DOM elements, with the types to match</li>
+                        <li>You read TypeScript's errors for a possibly-null ref, the wrong element, a missing argument and a callback ref that returns a value</li>
+                        <li>You passed a ref to your own component as a plain prop and wired a <kbd>/</kbd> shortcut to it</li>
+                        <li>You fixed two places where the HQ lost or ignored the focus: Clear filters and the form's errors</li>
+                        <li>You built a reusable, accessible confirmation dialog with a portal, <code>showModal()</code> and focus that goes back where it came from</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Every page in the HQ still decides by hand what to show while data loads and what to do when it fails. In <a href="lesson_16.html"><strong>Lesson 4.4: Suspense, use() and Error Boundaries</strong></a> React takes over part of that job: a cleanup's own page that reads its data with <code>use()</code>, <code>Suspense</code> boundaries that show a fallback while it loads, and an error boundary that catches failures and offers a way back.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass and <code>src/Scratch.tsx</code> is gone</li>
+                    <li>Do the keyboard check from Step 6 once more, start to finish, without the mouse</li>
+                    <li>Keep your "When…, the focus goes to…" list with your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today's work is mostly invisible. Nobody notices a focus ring that lands in the right place; people notice when it does not, and some of them cannot use the app at all because of it. Caring about where the focus goes is a sign that you are building for everyone, and it is a skill many experienced developers have not picked up yet. If the difference between a ref and state still feels slippery, that is normal: it took the whiteboard and the notebook to make it click for a lot of people. Keep asking "does the screen need to know?" and it will settle.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_14.html" class="prev-lesson">← Previous: Custom Hooks</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_16.html" class="next-lesson">Next: Suspense, use() and Error Boundaries →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

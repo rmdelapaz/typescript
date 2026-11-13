@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Give Shoreline Crew HQ its first automated tests: Vitest in the app's own Vite config, unit tests for formatting, schemas and error lists, component tests with React Testing Library that find things by role and name, and a typed render helper with the cache, the sign-in state and a router. React + TypeScript: Build a Modern Web App Lesson 9.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Testing Components - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🧪 Lesson 9.1: Testing Components</h1>
+                <p class="lead">At the end of the last lesson you wrote down three things in the HQ you would hate to break without noticing. Maybe a guest opening the impact report, or the error summary losing its focus, or "each kind of debris once" quietly letting bottles through twice. Right now the only thing standing guard is you, clicking through the app after every change, and you will not click through all of it every time. Today you hire a tireless helper: a test suite that checks those things in about a second, every time you save a file, and tells you exactly what broke and where.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain what unit, component and end-to-end tests each check in the HQ, and why tests should describe what people see rather than how the code works inside</li>
+                        <li>Set up Vitest, jsdom and React Testing Library in a Vite project, sharing the app's own <code>vite.config.ts</code></li>
+                        <li>Write unit tests for functions and Zod schemas with <code>describe</code>, <code>it</code>, <code>expect</code>, <code>it.each</code> and typed sample-data factories</li>
+                        <li>Render components and find elements the way people do, by role and accessible name, choosing between <code>getBy</code>, <code>queryBy</code> and <code>findBy</code></li>
+                        <li>Build a typed <code>renderWithProviders</code> helper (cache, sign-in, router) and reset the app's module-level state between tests</li>
+                        <li>Read a failing test's output and decide whether the test or the app is wrong</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 135 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_28.html">Lesson 8.2: Complex Forms</a> (your <code>shoreline-hq</code> with the impact report, the error summary and <code>listErrors</code>)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> The HQ's first test suite: setup, sample-data factories, a typed render helper, and 29 tests for formatting, availability, the impact schema, the error list, the error summary, the event card and the header</li>
+                    <li><span class="meta-label">🧩 Stack</span> Vitest 5.1, jsdom 31, React Testing Library 16.3, jest-dom 7.0, React 19.3, TypeScript 7.0, Vite 8.3, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code with one terminal for the tests (no API or dev server needed today)</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-29-start.zip">lesson-29-start.zip</a> · Finished code: <a href="downloads/lesson-29-end.zip">lesson-29-end.zip</a>. Each folder has a README with the commands to run it. The tests in this lesson never call shoreline-api, so <code>npm test</code> works without it.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#why" class="toc-link">Why Tests, and Which Ones</a></li>
+                        <li><a href="#setup" class="toc-link">Vitest in a Vite Project</a></li>
+                        <li><a href="#first-tests" class="toc-link">Your First Tests</a></li>
+                        <li><a href="#queries" class="toc-link">Finding Things the Way People Do</a></li>
+                        <li><a href="#helper" class="toc-link">A Typed Render Helper</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The HQ's First Test Suite</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="why" class="lesson-section">
+                <h2>🛟 Why Tests, and Which Ones</h2>
+                <p>An automated test is a small program that runs a piece of your app and checks the result: "<code>formatDate('2026-07-04')</code> is <code>'Sat, Jul 4, 2026'</code>", or "a guest's header has three links". You write it once; a <strong>test runner</strong> runs all of them in a second or two, as often as you like. TypeScript already checks that your code fits together. Tests check that it <em>does the right thing</em>, which no type can say: that the duplicate message lands on row 3, not row 1.</p>
+                <div class="card card-info">
+                    <h3>💡 Mental model: the crew's kit check</h3>
+                    <p>Before every cleanup, the crew leader runs down the same list: first-aid kit, gloves in every size, bags, grabbers, sign-in sheet. It takes two minutes, it is boring on purpose, and it catches the missing first-aid kit in the parking lot instead of on the beach. A test suite is that list for your app: the same checks, in the same order, every time, so that a missing piece shows up at your desk instead of in front of the organizers.</p>
+                </div>
+                <p>Tests come in sizes. This module uses all three, and each one checks something the others cannot:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Kind</th><th>What it runs</th><th>An HQ example</th><th>Where</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>Unit test</strong></td><td>One function, with plain values in and out</td><td><code>impactReportSchema</code> refuses an empty bags box instead of counting 0</td><td>This lesson</td></tr>
+                            <tr><td><strong>Component test</strong></td><td>One component (or a few), rendered into a pretend page</td><td>The header shows organizers a Volunteers link and guests none</td><td>This lesson and <a href="lesson_30.html">Lesson 9.2</a></td></tr>
+                            <tr><td><strong>End-to-end test</strong></td><td>The whole app in a real browser, against the real API</td><td>Maya signs in, reports today's impact and sees the new totals</td><td><a href="lesson_31.html">Lesson 9.3</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Small tests are fast and point straight at the broken line; big tests are slower but prove the pieces work together. Most of a healthy suite is unit and component tests, with a few end-to-end tests on the journeys that matter most. Whatever the size, one rule from React Testing Library's guiding principle runs through this module: <strong>test what people see and do, not how the code does it inside</strong>. A test that checks "the header has a Volunteers link" survives any rewrite of the header; a test that checks "the header called <code>useAuth</code> once" breaks the day you refactor, even though nothing a person sees has changed.</p>
+                <div class="card card-info">
+                    <h4>🌱 Why this matters</h4>
+                    <p>On most teams a pull request without tests for its change is not finished, and "how would you test this?" is a standard interview question. Tests are also what make big changes safe: you upgraded nothing today, but when React, React Router or the Compiler release a new version, your suite is how you find out in a minute whether the HQ still works. And testing is a skill that grows with practice: your first tests will feel slow to write, and that is normal. They get faster, and they start to change how you design code.</p>
+                </div>
+            </section>
+
+            <section id="setup" class="lesson-section">
+                <h2>⚙️ Vitest in a Vite Project</h2>
+                <p><strong>Vitest</strong> is the test runner built for Vite: it reads the same <code>vite.config.ts</code> as <code>npm run dev</code> and <code>npm run build</code>, so your tests see the code exactly as the app does, CSS Modules, <code>.ts</code> imports and the React Compiler included. Its API (<code>describe</code>, <code>it</code>, <code>expect</code>) is the one most JavaScript test tools share, so what you learn here reads the same in other projects. Five packages make up today's toolkit:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Package</th><th>What it gives you</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>vitest</code></td><td>The runner: finds test files, runs them, prints the results, and watches for changes</td></tr>
+                            <tr><td><code>jsdom</code></td><td>A pretend browser page inside Node: <code>document</code>, elements, events, focus, <code>localStorage</code>. No real layout, no pictures, no network of its own</td></tr>
+                            <tr><td><code>@testing-library/react</code></td><td><code>render()</code> puts a component into that page; <code>cleanup()</code> takes it out again</td></tr>
+                            <tr><td><code>@testing-library/dom</code></td><td><code>screen</code> and the queries that find elements (<code>getByRole</code> and friends)</td></tr>
+                            <tr><td><code>@testing-library/jest-dom</code></td><td>Extra checks for elements: <code>toBeInTheDocument()</code>, <code>toHaveAttribute()</code>, <code>toHaveFocus()</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The configuration is a <code>test</code> block in <code>vite.config.ts</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                    <pre data-src="shoreline-hq/vite.config.ts"><code class="language-ts">/// &lt;reference types="vitest/config" /&gt;
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
+import { defineConfig } from 'vite'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [
+    react(),
+    // The React Compiler: works out what each component can reuse between renders
+    babel({ presets: [reactCompilerPreset()] }),
+  ],
+  // Vitest reads the same file, so tests run the code exactly as the app's build does
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+  },
+})</code></pre>
+                </div>
+                <ul>
+                    <li><strong>The first line</strong> is a triple-slash directive: it tells TypeScript to load Vitest's types for the config, which add the <code>test</code> key to Vite's <code>defineConfig</code>. Without it, <code>tsc -b</code> does not know what <code>test</code> is.</li>
+                    <li><strong><code>environment: 'jsdom'</code></strong> gives every test file the pretend page. Without it, tests run in plain Node, where there is no <code>document</code> to render into.</li>
+                    <li><strong><code>setupFiles</code></strong> runs a file before each test file: the place for anything every test needs.</li>
+                    <li><strong><code>include</code></strong> says which files are tests: files ending in <code>.test.ts</code> or <code>.test.tsx</code> under <code>src</code>, next to the code they test. Lesson 9.3's browser tests will live in another folder, and this keeps Vitest out of them.</li>
+                    <li><strong>The plugins stay.</strong> Measured: a component imported in a test is the Compiler's output (printing <code>StatusBadge</code> inside a test shows the cache it adds, <code>const $ = c(3)</code>), so the tests check the code you ship, not a different build of it.</li>
+                </ul>
+                <p>The setup file starts small:</p>
+                <pre data-snippet><code class="language-ts">// Runs before every test file (vite.config.ts → test.setupFiles)
+import '@testing-library/jest-dom/vitest'
+import { cleanup } from '@testing-library/react'
+import { afterEach } from 'vitest'
+
+afterEach(() =&gt; {
+  // Take the rendered components off the page, so each test starts with an empty one
+  cleanup()
+})</code></pre>
+                <p>The first import adds jest-dom's checks to Vitest's <code>expect</code> (and their types, so <code>tsc</code> knows them). Note the <code>/vitest</code> at the end: the plain package name is for a different runner, and Common Mistakes shows what happens without it. The <code>afterEach</code> removes whatever a test rendered. React Testing Library does that by itself only when the test functions are <strong>globals</strong>; this project imports <code>describe</code>, <code>it</code> and <code>expect</code> from <code>'vitest'</code> in each file instead (clearer, and the editor can see where they come from), so the setup file asks for the cleanup.</p>
+                <div class="mermaid">
+graph TD
+    A["npm test"] --> B["Vitest reads vite.config.ts"]
+    B --> C["setup.ts, then each test file"]
+    C --> D["Code built by the same plugins"]
+    D --> E["Rendered into jsdom's page"]
+    E --> F["expect checks the result"]
+                </div>
+                <p><code>npm test</code> runs Vitest in <strong>watch mode</strong>: it runs everything once, then waits, and runs the affected tests again each time you save a file. Press <kbd>q</kbd> to stop it. In a CI service (Lesson 10.2) the same command runs once and exits, because those services set a <code>CI</code> variable that Vitest notices; <code>npx vitest run</code> does the same on your machine.</p>
+            </section>
+
+            <section id="first-tests" class="lesson-section">
+                <h2>✅ Your First Tests</h2>
+                <p>Start where tests are easiest: a function with values in and a value out. <code>formatDate</code> from Lesson 3.4 is perfect, and it has a famous trap (the UTC day-before bug) that a test can pin down for good:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/utils/format.test.ts</div>
+                    <pre data-src="shoreline-hq/src/utils/format.test.ts"><code class="language-ts">import { describe, expect, it } from 'vitest'
+import { formatDate, toDateString } from './format.ts'
+
+describe('formatDate', () =&gt; {
+  it('shows a day of the crew calendar with its weekday', () =&gt; {
+    // Arrange: a date as the API sends it
+    const date = '2026-07-04'
+
+    // Act
+    const shown = formatDate(date)
+
+    // Assert
+    expect(shown).toBe('Sat, Jul 4, 2026')
+  })
+
+  it('keeps the first day of a month in that month', () =&gt; {
+    expect(formatDate('2026-03-01')).toBe('Sun, Mar 1, 2026')
+  })
+})
+
+describe('toDateString', () =&gt; {
+  it('writes a moment as YYYY-MM-DD with two-digit months and days', () =&gt; {
+    expect(toDateString(new Date(2026, 0, 5, 9, 30))).toBe('2026-01-05')
+  })
+})</code></pre>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Part</th><th>What it does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>describe(name, fn)</code></td><td>Groups tests under a heading (usually the function or component's name)</td></tr>
+                            <tr><td><code>it(name, fn)</code></td><td>One test. The name finishes the sentence "it…", so the output reads as a list of facts</td></tr>
+                            <tr><td><code>expect(value)</code></td><td>Starts a check; a <strong>matcher</strong> such as <code>.toBe(expected)</code> finishes it. A failed check stops the test and marks it failed</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The first test spells out the three parts most tests have, <strong>Arrange, Act, Assert</strong>: set up the input, run the code, check the result. Short tests often fit all three on one line, like the second one. The file sits next to <code>format.ts</code> and imports it with the same <code>.ts</code> extension as any other file in the app; it is TypeScript too, so <code>tsc -b</code> checks it along with everything else.</p>
+                <p>Run <code>npm test</code>:</p>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>&gt; shoreline-hq@0.0.0 test
+&gt; vitest
+
+
+ DEV  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+ ✓ src/utils/format.test.ts (3 tests) 3ms
+   ✓ formatDate (2)
+     ✓ shows a day of the crew calendar with its weekday 1ms
+     ✓ keeps the first day of a month in that month 0ms
+   ✓ toDateString (1)
+     ✓ writes a moment as YYYY-MM-DD with two-digit months and days 0ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  00:28:13
+   Duration  640ms (environment 53%, transform 34%, setup 11%, import 2%)
+
+ PASS  Waiting for file changes...
+       press h to show help, press q to quit</code></pre>
+                </div>
+                <p>Three green checks. Now <strong>make it fail on purpose</strong>, the most useful habit in testing: a test you have never seen fail might not be testing anything. Change <code>'Sat, Jul 4, 2026'</code> to <code>'Sat, July 4, 2026'</code> and save. Watch mode runs it again:</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_29/29-failing.png" alt="A terminal in shoreline-hq running npx vitest run on format.test.ts. One test is marked with a red cross: shows a day of the crew calendar with its weekday. The Failed Tests block shows an AssertionError, Expected Sat, July 4, 2026 in green and Received Sat, Jul 4, 2026 in red, and the test file&#x27;s line 13 with a caret under toBe. Summary: 1 failed, 2 passed." width="1029" height="782" loading="lazy">
+                    <figcaption>A failing test reads like a bug report: which test, what it expected, what it got, and the line. Here the test is wrong (the app writes month names short), not the app.</figcaption>
+                </figure>
+                <p>Read it top to bottom, like a TypeScript error: which test (the <code>describe</code> and <code>it</code> names joined with <code>&gt;</code>), what was expected, what was received (the differing letter highlighted), and the line with a caret under the check. Then ask the question every failure deserves: <strong>is the test wrong, or the app?</strong> Here the app writes short month names on purpose, so the test is wrong. Put <code>Jul</code> back. A red test is information, not a verdict on you.</p>
+                <h3>Matchers you will use most</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Matcher</th><th>Passes when</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>toBe(x)</code></td><td>The value <em>is</em> <code>x</code> (<code>Object.is</code>): for strings, numbers, booleans and the very same object</td></tr>
+                            <tr><td><code>toEqual(x)</code></td><td>The value has the same contents as <code>x</code>: for objects and arrays (<code>{ kind: 'full' }</code> is never <code>toBe</code> another <code>{ kind: 'full' }</code>)</td></tr>
+                            <tr><td><code>toHaveLength(n)</code></td><td>An array or string has <code>n</code> items or characters</td></tr>
+                            <tr><td><code>toContain(x)</code></td><td>An array includes <code>x</code> (or a string includes the text)</td></tr>
+                            <tr><td><code>.not.</code></td><td>Turns any matcher around: <code>expect(list).not.toContain('Volunteers')</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h3>Typed sample data</h3>
+                <p>Most HQ functions take a whole <code>CleanupEvent</code>: fifteen properties. Writing all fifteen in every test buries the one that matters, and leaving some out is a type error. A <strong>factory</strong> solves both: it returns a complete, valid object, and the test passes only the parts it is about:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/test/factories.ts</div>
+                    <pre data-src="shoreline-hq/src/test/factories.ts" data-match="excerpt"><code class="language-ts">/** A scheduled cleanup with 12 spots, 5 of them taken */
+export function makeEvent(changes: Partial&lt;CleanupEvent&gt; = {}): CleanupEvent {
+  return {
+    id: 'e17',
+    title: 'Tide Pool Morning Cleanup',
+    siteId: 'otter-creek',
+    status: 'scheduled',
+    date: '2026-07-04',
+    startTime: '08:00',
+    endTime: '10:30',
+    capacity: 12,
+    spotsTaken: 5,
+    meetingPoint: 'Gravel pull-out on Highway 1',
+    description: 'We clear trash caught in the willows and along the creek banks. Expect mud.',
+    suppliesProvided: ['gloves', 'bags'],
+    leadOrganizerId: 'v03',
+    createdAt: '2026-06-01T16:00:00.000Z',
+    updatedAt: '2026-06-01T16:00:00.000Z',
+    ...changes,
+  }
+}</code></pre>
+                </div>
+                <p><code>Partial&lt;CleanupEvent&gt;</code> (Lesson 2.4) makes every property optional, so <code>makeEvent({ spotsTaken: 18 })</code> is fine, and the spread puts the changes over the defaults. The types still guard you: <code>makeEvent({ status: 'finished' })</code> or <code>makeEvent({ capacity: '12' })</code> is a <code>tsc</code> error, so sample data can never drift from the API's shape. With it, tests read like the rules they check:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/utils/availability.test.ts</div>
+                    <pre data-src="shoreline-hq/src/utils/availability.test.ts"><code class="language-ts">import { describe, expect, it } from 'vitest'
+import { makeEvent } from '../test/factories.ts'
+import { getAvailability } from './availability.ts'
+
+describe('getAvailability', () =&gt; {
+  it('counts the spots left on a scheduled cleanup', () =&gt; {
+    const event = makeEvent({ capacity: 12, spotsTaken: 5 })
+    expect(getAvailability(event)).toEqual({ kind: 'open', spotsLeft: 7 })
+  })
+
+  it('says full when every spot is taken', () =&gt; {
+    expect(getAvailability(makeEvent({ capacity: 18, spotsTaken: 18 }))).toEqual({ kind: 'full' })
+  })
+
+  it.each(['draft', 'completed', 'cancelled'] as const)('takes no sign-ups for a %s cleanup', (status) =&gt; {
+    expect(getAvailability(makeEvent({ status }))).toEqual({ kind: 'closed' })
+  })
+})</code></pre>
+                </div>
+                <p><code>it.each(list)</code> runs one test per item, and <code>%s</code> in the name is replaced by the item, so the output lists "takes no sign-ups for a draft cleanup", "…for a completed cleanup" and so on. <code>as const</code> matters here: it keeps the items as the literal types <code>'draft' | 'completed' | 'cancelled'</code>. Without it they would be plain <code>string</code>s, and passing a <code>string</code> as <code>status</code> to <code>makeEvent</code> is the same TS2322 you met in Lesson 2.2.</p>
+            </section>
+
+            <section id="queries" class="lesson-section">
+                <h2>🔍 Finding Things the Way People Do</h2>
+                <p>A component test renders a component into jsdom's page and then looks at the page. <code>render(element)</code> does the first part; <code>screen</code> is the whole page, with a <strong>query</strong> for every way of finding an element. Here is the error summary from Lesson 8.2, tested:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/ErrorSummary.test.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/ErrorSummary.test.tsx"><code class="language-tsx">import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { ErrorSummary } from './ErrorSummary.tsx'
+
+const twoProblems = [
+  { id: 'bags', message: 'Bags must be a whole number from 0 to 500.' },
+  { id: 'items.1.count', message: 'Row 2: Count must be a whole number from 0 to 100000.' },
+]
+
+describe('ErrorSummary', () =&gt; {
+  it('names the number of problems and takes the focus', () =&gt; {
+    render(&lt;ErrorSummary errors={twoProblems} /&gt;)
+
+    const summary = screen.getByRole('region', { name: 'Fix these 2 before saving' })
+    expect(summary).toHaveFocus()
+  })
+
+  it('links each problem to its field', () =&gt; {
+    render(&lt;ErrorSummary errors={twoProblems} /&gt;)
+
+    const link = screen.getByRole('link', { name: 'Row 2: Count must be a whole number from 0 to 100000.' })
+    expect(link).toHaveAttribute('href', '#items.1.count')
+    expect(screen.getAllByRole('link')).toHaveLength(2)
+  })
+
+  it('says "this" for a single problem', () =&gt; {
+    render(&lt;ErrorSummary errors={twoProblems.slice(0, 1)} /&gt;)
+
+    expect(screen.getByRole('heading', { name: 'Fix this before saving' })).toBeInTheDocument()
+  })
+
+  it('shows nothing when there is nothing to fix', () =&gt; {
+    const { container } = render(&lt;ErrorSummary errors={[]} /&gt;)
+
+    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByRole('region')).not.toBeInTheDocument()
+  })
+})</code></pre>
+                </div>
+                <p>Look at how the elements are found: <code>getByRole('region', { name: 'Fix these 2 before saving' })</code>, <code>getByRole('link', { name: … })</code>, <code>getByRole('heading', …)</code>. A <strong>role</strong> is what an element <em>is</em> to assistive technology (a <code>section</code> with a name is a region, an <code>a href</code> is a link), and the <strong>name</strong> is what a screen reader announces with it. It is the same information you gave the browser in Lesson 3.6 for accessibility, and that is the point: if a test can find "the link named Row 2…", so can a screen reader user. A query that cannot find something is often an accessibility bug.</p>
+                <p>Testing Library suggests an order for choosing a query:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Prefer</th><th>Query</th><th>For</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>1</td><td><code>getByRole(role, { name })</code></td><td>Almost everything: buttons, links, headings, form fields, regions, lists</td></tr>
+                            <tr><td>2</td><td><code>getByLabelText(text)</code></td><td>Form fields, by their label (Lesson 9.2's forms)</td></tr>
+                            <tr><td>3</td><td><code>getByText(text)</code></td><td>Text that is not interactive: a paragraph, a badge</td></tr>
+                            <tr><td>Last</td><td><code>getByTestId(id)</code></td><td>Only when nothing a person can perceive identifies it (needs a <code>data-testid</code> in the markup)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Each query also comes in three variants, chosen by what you expect:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Variant</th><th>Returns</th><th>When nothing matches</th><th>Use it to say…</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>getBy…</code></td><td>The element</td><td>Throws, printing the page</td><td>"This is here now" (the everyday choice)</td></tr>
+                            <tr><td><code>queryBy…</code></td><td>The element or <code>null</code></td><td>Returns <code>null</code></td><td>"This is <em>not</em> here": <code>expect(screen.queryByRole('region')).not.toBeInTheDocument()</code></td></tr>
+                            <tr><td><code>findBy…</code></td><td>A <code>Promise</code> of the element</td><td>Waits (1 second by default), then rejects</td><td>"This will appear soon", after data loads (Lesson 9.2)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Add <code>All</code> (<code>getAllByRole</code>) to get an array of every match. When more than one element matches a <code>getBy</code>, that is an error too: it forces you to be specific. And the types follow: <code>getByRole</code> returns <code>HTMLElement</code>, <code>queryByRole</code> returns <code>HTMLElement | null</code>, so TypeScript reminds you that a <code>queryBy</code> result may be missing.</p>
+                <h3>Reading a query's error</h3>
+                <p>The best part of role queries is what they say when they fail. While writing the <code>EventCard</code> test for this lesson, this check failed, against Lesson 8.2's card:</p>
+                <pre data-snippet><code class="language-tsx">const button = screen.getByRole('button', { name: 'Show details for Tide Pool Morning Cleanup' })</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (shortened)</h4>
+                    <pre><code> FAIL  src/components/EventCard.test.tsx &gt; EventCard &gt; has a details button named after the cleanup, closed at first
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Show details for Tide Pool Morning Cleanup"
+
+Here are the accessible roles:
+...
+  button:
+
+  Name "Show detailsfor Tide Pool Morning Cleanup":</code></pre>
+                </div>
+                <p>The error lists every role on the page with its name, and there it is: "Show detail<strong>sf</strong>or". The card wrote <code>Show details&lt;VisuallyHidden&gt; for …&lt;/VisuallyHidden&gt;</code>, with the space at the start of the hidden text. Chromium keeps that space (the rts browser checks have found "Show details for…" since Lesson 3.6), but the accessibility-name code Testing Library uses drops it, and the rules for spaces in accessible names leave room for tools to differ. Which one is right? Both are reading the same markup, and the safe fix is to put the space where nobody can lose it: outside the hidden text, <code>{' '}&lt;VisuallyHidden&gt;for …</code>. Step 5 makes that change in the card and in the three other places the HQ uses the same pattern. The test did its job: it found a fragile spot nobody had noticed.</p>
+                <h3>jest-dom's checks</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Matcher</th><th>Checks</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>toBeInTheDocument()</code></td><td>The element is on the page (mostly with <code>.not</code> and <code>queryBy</code>)</td></tr>
+                            <tr><td><code>toHaveAttribute(name, value?)</code></td><td><code>href</code>, <code>aria-expanded</code>, <code>aria-current</code> and any other attribute</td></tr>
+                            <tr><td><code>toHaveFocus()</code></td><td>The element is <code>document.activeElement</code></td></tr>
+                            <tr><td><code>toHaveTextContent(text)</code></td><td>The element's text includes <code>text</code></td></tr>
+                            <tr><td><code>toBeEmptyDOMElement()</code></td><td>The element has no content (a component that rendered <code>null</code>)</td></tr>
+                            <tr><td><code>toContainElement(el)</code></td><td>One element is inside another</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="helper" class="lesson-section">
+                <h2>🧰 A Typed Render Helper</h2>
+                <p>The error summary needs nothing around it. Most HQ components do: <code>EventCard</code>'s title is a React Router <code>Link</code>, the header asks <code>useAuth()</code> who is signed in, and pages read the TanStack Query cache. Render <code>EventCard</code> on its own and it crashes (Common Mistakes has the message). In the app, <code>App.tsx</code> puts the providers around everything; tests need the same, in one place, typed:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/test/render.tsx</div>
+                    <pre data-src="shoreline-hq/src/test/render.tsx"><code class="language-tsx">// Render a component the way the app shows it: inside the cache, the sign-in state and a router
+import { QueryClientProvider } from '@tanstack/react-query'
+import { render } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { createMemoryRouter } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
+import { saveSession, type Session } from '../api/client.ts'
+import { queryClient } from '../api/queries.ts'
+import { AuthProvider } from '../auth/AuthProvider.tsx'
+
+export interface RenderOptions {
+  /** The address the test starts at (default '/') */
+  route?: string
+  /** The route pattern the component is shown at, for useParams (default: the same as route) */
+  path?: string
+  /** Who is signed in (default: nobody) */
+  session?: Session | null
+}
+
+export function renderWithProviders(
+  ui: ReactElement,
+  { route = '/', path = route, session = null }: RenderOptions = {},
+) {
+  saveSession(session)
+  // A router that keeps its history in memory: no browser address bar needed
+  const router = createMemoryRouter([{ path, element: ui }], { initialEntries: [route] })
+  const result = render(
+    &lt;QueryClientProvider client={queryClient}&gt;
+      &lt;AuthProvider&gt;
+        &lt;RouterProvider router={router} /&gt;
+      &lt;/AuthProvider&gt;
+    &lt;/QueryClientProvider&gt;,
+  )
+  return { ...result, router }
+}</code></pre>
+                </div>
+                <ul>
+                    <li><strong>The cache:</strong> the app's own <code>queryClient</code>, because the HQ's loaders and mutations import that one object (Lesson 7.2). A test can put an answer in it before rendering (Exercise 2).</li>
+                    <li><strong>The sign-in state:</strong> the session lives in <code>client.ts</code> (Lesson 6.3), so the helper saves the test's session there before rendering, and <code>AuthProvider</code> reads it as it would in the browser.</li>
+                    <li><strong>The router:</strong> <code>createMemoryRouter</code> is <code>createBrowserRouter</code>'s twin that keeps its history in memory instead of the address bar. The component is the element of one route; <code>route</code> is the address the test starts at, and <code>path</code> the pattern (<code>'/events/:eventId'</code>) when a component reads <code>useParams</code>.</li>
+                    <li><strong>The types:</strong> <code>RenderOptions</code> documents each option, and every one is optional with a default, so <code>renderWithProviders(&lt;Header /&gt;)</code> is a guest on the home page. The result is everything <code>render</code> returns plus the router (Lesson 9.2 uses it to check where a click went). TypeScript infers that return type; hover <code>renderWithProviders</code> to see it.</li>
+                </ul>
+                <h3>Module state needs a reset</h3>
+                <p>Each test file gets a fresh copy of the app's modules, but the tests <em>inside</em> a file share them. The HQ keeps state in modules on purpose: the query cache, the session store in <code>client.ts</code>, and the Zustand display store (Lesson 7.3). A test that switches the lists to compact, or signs Maya in, would leave that behind for the next test, and the next test would pass or fail depending on the order. So the setup file puts each piece back after every test:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/test/setup.ts</div>
+                    <pre data-src="shoreline-hq/src/test/setup.ts"><code class="language-ts">// Runs before every test file (vite.config.ts → test.setupFiles)
+import '@testing-library/jest-dom/vitest'
+import { cleanup } from '@testing-library/react'
+import { afterEach } from 'vitest'
+import { saveSession } from '../api/client.ts'
+import { queryClient } from '../api/queries.ts'
+import { useUiStore } from '../state/uiStore.ts'
+
+afterEach(() =&gt; {
+  // Take the rendered components off the page, so each test starts with an empty one
+  cleanup()
+  // The app keeps state in modules, outside React: put each piece back the way the app starts
+  queryClient.clear()
+  saveSession(null)
+  useUiStore.setState(useUiStore.getInitialState())
+  localStorage.clear()
+  sessionStorage.clear()
+})</code></pre>
+                </div>
+                <p><code>getInitialState()</code> is Zustand's record of the store as it was created, so the reset does not need to repeat the defaults. The storage is cleared too, because the session and the display settings are saved there and would be read back. Lesson 9.2 adds one more line here when the mock API arrives.</p>
+                <div class="mermaid">
+graph TD
+    A["Test starts"] --> B["renderWithProviders"]
+    B --> C["Query by role and name"]
+    C --> D["expect"]
+    D --> E["afterEach: cleanup"]
+    E --> F["Reset cache, session, store"]
+    F --> A
+                </div>
+                <p>With the helper, the header's rules for each kind of visitor are three short tests. <code>within(element)</code> runs queries inside one part of the page, here the navigation named Main:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/Header.test.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/Header.test.tsx"><code class="language-tsx">import { screen, within } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { organizer, volunteer } from '../test/factories.ts'
+import { renderWithProviders } from '../test/render.tsx'
+import { Header } from './Header.tsx'
+
+// The names of the links in the main navigation, in order
+function navLinks(): string[] {
+  const nav = screen.getByRole('navigation', { name: 'Main' })
+  return within(nav)
+    .getAllByRole('link')
+    .map((link) =&gt; link.textContent)
+}
+
+describe('Header', () =&gt; {
+  it('shows guests three pages and a way to sign in', () =&gt; {
+    renderWithProviders(&lt;Header /&gt;)
+
+    expect(navLinks()).toEqual(['Events', 'Sites', 'Impact'])
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/sign-in')
+  })
+
+  it('adds the crew list for organizers and says who is signed in', () =&gt; {
+    renderWithProviders(&lt;Header /&gt;, { session: organizer })
+
+    expect(navLinks()).toEqual(['Events', 'Sites', 'Impact', 'Volunteers'])
+    expect(screen.getByText('Maya Okafor (Organizer)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+  })
+
+  it('keeps the crew list from volunteers', () =&gt; {
+    renderWithProviders(&lt;Header /&gt;, { session: volunteer })
+
+    expect(navLinks()).not.toContain('Volunteers')
+    expect(screen.getByText('Theo Nakamura (Volunteer)')).toBeInTheDocument()
+  })
+
+  it('marks the page you are on', () =&gt; {
+    renderWithProviders(&lt;Header /&gt;, { route: '/impact' })
+
+    expect(screen.getByRole('link', { name: 'Impact' })).toHaveAttribute('aria-current', 'page')
+  })
+})</code></pre>
+                </div>
+                <p><code>organizer</code> and <code>volunteer</code> are two typed <code>Session</code> objects in <code>factories.ts</code>; the last test starts the router at <code>/impact</code> and checks <code>NavLink</code>'s <code>aria-current="page"</code>, the attribute your header's CSS styles (Lesson 6.1).</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Importing jest-dom without <code>/vitest</code></h3>
+                    <p>Older guides (and the course's own old pages) write <code>import '@testing-library/jest-dom'</code>. With Vitest, measured, it fails twice. <code>tsc -b</code> does not know the matchers:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (first of many)</h4>
+                        <pre><code>src/components/ErrorSummary.test.tsx:15:21 - error TS2339: Property 'toHaveFocus' does not exist on type 'Assertion&lt;void, HTMLElement&gt;'.
+
+15     expect(summary).toHaveFocus()
+                       ~~~~~~~~~~~</code></pre>
+                    </div>
+                    <p>and every test file fails before a single test runs, because that entry point expects a global <code>expect</code> that this project does not have:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>ReferenceError: expect is not defined
+ ❯ node_modules/@testing-library/jest-dom/dist/index.mjs:10:1
+ ❯ src/test/setup.ts:2:1
+      1| // Runs before every test file (vite.config.ts → test.setupFiles)
+      2| import '@testing-library/jest-dom'
+       | ^
+      3| import { cleanup } from '@testing-library/react'
+      4| import { afterEach } from 'vitest'
+...
+ Test Files  7 failed (7)
+      Tests  no tests</code></pre>
+                    </div>
+                    <p>Use <code>import '@testing-library/jest-dom/vitest'</code>: it adds the matchers to Vitest's <code>expect</code> and their types to <code>tsc</code>.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Forgetting the cleanup</h3>
+                    <p>Measured with <code>cleanup()</code> commented out: 8 of the 29 tests failed, because every <code>render</code> added another copy of the component to the same page:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code> FAIL  src/components/ErrorSummary.test.tsx &gt; ErrorSummary &gt; links each problem to its field
+TestingLibraryElementError: Found multiple elements with the role "link" and name "Row 2: Count must be a whole number from 0 to 100000."
+...
+ Test Files  3 failed | 4 passed (7)
+      Tests  8 failed | 21 passed (29)</code></pre>
+                    </div>
+                    <p>"Found multiple elements" in a test that worked alone is the sign. Keep <code>cleanup()</code> in <code>afterEach</code> (or turn on Vitest's <code>globals</code>, which lets Testing Library register it itself).</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ State that leaks from one test into the next</h3>
+                    <p>Measured without the display store's reset: the compact-lists test passed, and the next test, which expects the roomy card, failed. Nothing was wrong with either test:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>     × shows supplies in roomy lists (the store was reset after the last test) 7ms
+...
+ FAIL  src/components/EventCard.test.tsx &gt; EventCard &gt; shows supplies in roomy lists (the store was reset after the last test)
+TestingLibraryElementError: Unable to find an element with the text: We bring: gloves, bags. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+...
+ Test Files  1 failed | 6 passed (7)
+      Tests  1 failed | 28 passed (29)</code></pre>
+                    </div>
+                    <p>A test that passes alone and fails with the others (or the other way round) almost always means shared state. Find what the earlier test changed and reset it in <code>afterEach</code>, as <code>setup.ts</code> does for the cache, the session and the store.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Rendering a component without its providers</h3>
+                    <pre data-snippet><code class="language-tsx">render(&lt;EventCard event={makeEvent()} site={makeSite()} /&gt;)</code></pre>
+                    <p>Measured: plain <code>render</code> of the card fails inside React Router's <code>Link</code>, with a message that does not mention routers at all:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code> FAIL  src/components/NoRouter.test.tsx &gt; links the title to the cleanup page
+TypeError: Cannot destructure property 'basename' of 'React$1.useContext(...)' as it is null.
+ ❯ LinkWithRef node_modules/react-router/dist/development/lib/dom/lib.js:288:8</code></pre>
+                    </div>
+                    <p>"Cannot destructure property … of useContext(…) as it is null" means a component asked for a context nobody provided. The stack's second line names the component (<code>LinkWithRef</code>, React Router's <code>Link</code>). Use <code>renderWithProviders</code>. (The header without <code>AuthProvider</code> gives a much clearer message, because <code>useAuth()</code> throws one on purpose, Lesson 5.2.)</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ <code>getBy</code> to check that something is not there</h3>
+                    <pre data-snippet><code class="language-tsx">expect(screen.getByText(/Expect mud/)).not.toBeInTheDocument()</code></pre>
+                    <p>Measured: the test fails although the description really is hidden, because <code>getByText</code> throws before <code>expect</code> even runs:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code> FAIL  src/components/Absent.test.tsx &gt; hides the description at first
+TestingLibraryElementError: Unable to find an element with the text: /Expect mud/. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.</code></pre>
+                    </div>
+                    <p>For "not there", use <code>queryBy…</code>, which returns <code>null</code>: <code>expect(screen.queryByText(/Expect mud/)).not.toBeInTheDocument()</code>.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The HQ's First Test Suite</h2>
+                <p>Step 1 installs and configures the tools, Step 2 writes and breaks the first test, Step 3 adds the unit tests, Step 4 the first component test, Step 5 the render helper and the tests that need it (with the accessible-name fix), and Step 6 runs everything. You do not need shoreline-api or the dev server today: close them if they are running, and keep one terminal in <code>shoreline-hq</code> for <code>npm test</code>.</p>
+
+                <div class="card">
+                    <h3>Step 1: Install and configure <span class="step-time">(10 min)</span></h3>
+                    <p>In <code>shoreline-hq</code>, install the five packages as development dependencies (they are for you, not for the app's visitors, so they never reach the bundle):</p>
+                    <pre class="terminal"><code class="language-bash">npm install --save-dev vitest jsdom @testing-library/react @testing-library/dom @testing-library/jest-dom</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>added 65 packages, and audited 150 packages in 4s
+
+32 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities</code></pre>
+                    </div>
+                    <p>The course was checked with Vitest 5.1.0, jsdom 31.0.0, React Testing Library 16.3.3, @testing-library/dom 10.4.2 and jest-dom 7.0.1; newer patch versions are fine. In <code>vite.config.ts</code>, add the first line and the <code>test</code> block from "Vitest in a Vite Project":</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                        <pre data-src="shoreline-hq/vite.config.ts" data-match="diff"><code class="language-diff-ts diff-highlight">+/// &lt;reference types="vitest/config" /&gt;
+ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+ import babel from '@rolldown/plugin-babel'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                        <pre data-src="shoreline-hq/vite.config.ts" data-match="diff"><code class="language-diff-ts diff-highlight">     babel({ presets: [reactCompilerPreset()] }),
+   ],
++  // Vitest reads the same file, so tests run the code exactly as the app's build does
++  test: {
++    environment: 'jsdom',
++    setupFiles: ['./src/test/setup.ts'],
++    include: ['src/**/*.test.{ts,tsx}'],
++  },
+ })</code></pre>
+                    </div>
+                    <p>In <code>package.json</code>, add a <code>test</code> script (mind the comma after the <code>preview</code> line):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/package.json</div>
+                        <pre data-src="shoreline-hq/package.json" data-match="diff"><code class="language-diff-json diff-highlight">     "build": "tsc -b &amp;&amp; vite build",
+     "lint": "oxlint",
+-    "preview": "vite preview"
++    "preview": "vite preview",
++    "test": "vitest"
+   },
+   "dependencies": {</code></pre>
+                    </div>
+                    <p>Create the folder <code>src/test</code> and in it <code>setup.ts</code> with the first version from that section (the one that only imports jest-dom and calls <code>cleanup()</code>). Step 5 adds the resets.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The first test, and the first failure <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>src/utils/format.test.ts</code> with the code from "Your First Tests" and run:</p>
+                    <pre class="terminal"><code class="language-bash">npm test</code></pre>
+                    <p>You should see the three passing tests and "Waiting for file changes". Leave it running for the rest of the lesson. Change <code>Jul</code> to <code>July</code> in the first test, save, and read the failure (it is the picture in that section). Put <code>Jul</code> back and save: green again. Try one more break on the <em>app's</em> side: in <code>format.ts</code>, change <code>month: 'short'</code> to <code>month: 'long'</code> and save. Now two tests fail, and this time the test is right; undo the change.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Unit tests for the rules <span class="step-time">(14 min)</span></h3>
+                    <p>Create <code>src/test/factories.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/test/factories.ts</div>
+                        <pre data-src="shoreline-hq/src/test/factories.ts"><code class="language-ts">// Sample data for tests: complete, correctly typed objects. A test passes only the parts it is about.
+import type { Session } from '../api/client.ts'
+import type { CleanupEvent, Site } from '../api/types.ts'
+
+/** A scheduled cleanup with 12 spots, 5 of them taken */
+export function makeEvent(changes: Partial&lt;CleanupEvent&gt; = {}): CleanupEvent {
+  return {
+    id: 'e17',
+    title: 'Tide Pool Morning Cleanup',
+    siteId: 'otter-creek',
+    status: 'scheduled',
+    date: '2026-07-04',
+    startTime: '08:00',
+    endTime: '10:30',
+    capacity: 12,
+    spotsTaken: 5,
+    meetingPoint: 'Gravel pull-out on Highway 1',
+    description: 'We clear trash caught in the willows and along the creek banks. Expect mud.',
+    suppliesProvided: ['gloves', 'bags'],
+    leadOrganizerId: 'v03',
+    createdAt: '2026-06-01T16:00:00.000Z',
+    updatedAt: '2026-06-01T16:00:00.000Z',
+    ...changes,
+  }
+}
+
+/** Otter Creek Mouth, one of the six beach sites */
+export function makeSite(changes: Partial&lt;Site&gt; = {}): Site {
+  return {
+    id: 'otter-creek',
+    name: 'Otter Creek Mouth',
+    town: 'Seal Rock',
+    terrain: 'mixed',
+    accessible: false,
+    latitude: 36.979,
+    longitude: -122.1183,
+    parking: 'Gravel pull-out on Highway 1 (12 spaces).',
+    description: 'Where the creek meets the ocean.',
+    image: {
+      url: 'http://localhost:4000/images/sites/otter-creek.jpg',
+      alt: 'A creek flowing out of green willows across the beach into the ocean, with low hills behind.',
+      width: 1200,
+      height: 675,
+    },
+    ...changes,
+  }
+}
+
+/** Maya, signed in as an organizer */
+export const organizer: Session = {
+  token: 'test-organizer',
+  user: { id: 'v01', name: 'Maya Okafor', email: 'maya.okafor@example.com', role: 'organizer' },
+}
+
+/** Theo, signed in as a volunteer */
+export const volunteer: Session = {
+  token: 'test-volunteer',
+  user: { id: 'v04', name: 'Theo Nakamura', email: 'theo.nakamura@example.com', role: 'volunteer' },
+}</code></pre>
+                    </div>
+                    <p>The sessions use the API's people (Maya is an organizer, Theo a volunteer) with made-up tokens: these tests never reach the API. Now create <code>src/utils/availability.test.ts</code> with the code from "Typed sample data". Next, the impact report's schema from Lesson 8.2, the place where "bottles counted twice" would slip through. Create <code>src/api/schemas.test.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/schemas.test.ts</div>
+                        <pre data-src="shoreline-hq/src/api/schemas.test.ts"><code class="language-ts">import { describe, expect, it } from 'vitest'
+import { impactReportSchema, type ImpactFormValues } from './schemas.ts'
+
+// A report as an organizer types it: every value is text
+function typedReport(changes: Partial&lt;ImpactFormValues&gt; = {}): ImpactFormValues {
+  return {
+    volunteersAttended: '11',
+    bags: '6',
+    weightKg: '18.5',
+    items: [{ category: 'plastic-bottles', count: '40' }],
+    notes: '',
+    ...changes,
+  }
+}
+
+// Each problem the schema finds, as "path: message"
+function problems(values: ImpactFormValues): string[] {
+  const result = impactReportSchema.safeParse(values)
+  return result.success ? [] : result.error.issues.map((issue) =&gt; `${issue.path.join('.')}: ${issue.message}`)
+}
+
+describe('impactReportSchema', () =&gt; {
+  it('turns the typed text into numbers', () =&gt; {
+    const result = impactReportSchema.parse(typedReport())
+    expect(result).toEqual({
+      volunteersAttended: 11,
+      bags: 6,
+      weightKg: 18.5,
+      items: [{ category: 'plastic-bottles', count: 40 }],
+      notes: '',
+    })
+  })
+
+  it('refuses an empty box instead of counting it as 0', () =&gt; {
+    expect(problems(typedReport({ bags: '' }))).toEqual([
+      'bags: Bags must be a whole number from 0 to 500.',
+    ])
+  })
+
+  it('refuses half a bag', () =&gt; {
+    expect(problems(typedReport({ bags: '2.5' }))).toHaveLength(1)
+  })
+
+  it('puts the duplicate message on the repeated row, even while a count is wrong', () =&gt; {
+    const items: ImpactFormValues['items'] = [
+      { category: 'plastic-bottles', count: '40' },
+      { category: 'plastic-bags', count: 'lots' },
+      { category: 'plastic-bottles', count: '3' },
+    ]
+    expect(problems(typedReport({ items }))).toEqual([
+      'items.1.count: Count must be a whole number from 0 to 100000.',
+      'items.2.category: Plastic bottles is already in the list: add to its count.',
+    ])
+  })
+})</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>typedReport</code> and <code>problems</code> are small typed helpers for this file: a valid report as an organizer types it (text), and every issue as one readable <code>"path: message"</code> string. Comparing strings makes a failure easy to read.</li>
+                        <li>The test names are the rules from Lesson 8.2: "an empty box is a message, not 0", "the duplicate message goes on the repeated row, even while a count is wrong" (that is the <code>when</code> option).</li>
+                        <li><code>ImpactFormValues['items']</code> is an indexed access type: the type of one property of another type. The array is typed before it is used, so each <code>category</code> keeps its literal type.</li>
+                    </ul>
+                    <p>Last, the walker behind the error summary. Create <code>src/utils/formErrors.test.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/formErrors.test.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/formErrors.test.ts"><code class="language-ts">import type { FieldErrors } from 'react-hook-form'
+import { describe, expect, it } from 'vitest'
+import type { ImpactFormValues } from '../api/schemas.ts'
+import { listErrors } from './formErrors.ts'
+import { withRowNumbers } from './impactForm.ts'
+
+// What React Hook Form's formState.errors holds after a failed save: a tree shaped like the values
+const errors: FieldErrors&lt;ImpactFormValues&gt; = {
+  bags: { type: 'invalid_format', message: 'Bags must be a whole number from 0 to 500.' },
+  items: [
+    undefined,
+    { count: { type: 'invalid_format', message: 'Count must be a whole number from 0 to 100000.' } },
+  ],
+  root: { server: { type: 'server', message: 'Not saved.' } },
+}
+
+describe('listErrors', () =&gt; {
+  it('lists every field message with its path as the id, without the root errors', () =&gt; {
+    expect(listErrors(errors)).toEqual([
+      { id: 'bags', message: 'Bags must be a whole number from 0 to 500.' },
+      { id: 'items.1.count', message: 'Count must be a whole number from 0 to 100000.' },
+    ])
+  })
+
+  it('gives an empty list when there are no errors', () =&gt; {
+    expect(listErrors({})).toEqual([])
+  })
+})
+
+describe('withRowNumbers', () =&gt; {
+  it('starts each debris row message with its row number, counting from 1', () =&gt; {
+    expect(withRowNumbers(listErrors(errors))).toEqual([
+      { id: 'bags', message: 'Bags must be a whole number from 0 to 500.' },
+      { id: 'items.1.count', message: 'Row 2: Count must be a whole number from 0 to 100000.' },
+    ])
+  })
+})</code></pre>
+                    </div>
+                    <p>The <code>errors</code> object is typed as React Hook Form's own <code>FieldErrors&lt;ImpactFormValues&gt;</code>, so it can only be a tree the real form could produce. The watch window should now show:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (from <code>npx vitest run</code>; watch mode shows the same list)</h4>
+                        <pre><code> RUN  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+ ✓ src/utils/format.test.ts (3 tests) 3ms
+ ✓ src/utils/formErrors.test.ts (3 tests) 4ms
+ ✓ src/utils/availability.test.ts (5 tests) 4ms
+ ✓ src/api/schemas.test.ts (4 tests) 7ms
+
+ Test Files  4 passed (4)
+      Tests  15 passed (15)
+   Start at  00:28:31
+   Duration  542ms (environment 72%, setup 20%, import 4%, transform 3%, tests 1%, worker 1%)</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The first component test <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>src/components/ErrorSummary.test.tsx</code> with the code from "Finding Things the Way People Do" (a <code>.tsx</code> file, because it contains JSX). Five files and 19 tests should pass. Then prove one of them can fail: in <code>ErrorSummary.tsx</code>, comment out the line <code>summaryRef.current?.focus()</code> and save. The focus test fails, and its message shows the summary under "Expected element with focus" and the page's <code>&lt;body&gt;</code> under "Received", which is exactly the accessibility promise Lesson 8.2 made. Undo the change.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The render helper, the card and the header <span class="step-time">(15 min)</span></h3>
+                    <p>Create <code>src/test/render.tsx</code> with the helper from "A Typed Render Helper", and replace the contents of <code>src/test/setup.ts</code> with the version that resets the cache, the session and the store (also in that section). Then the card's tests. Create <code>src/components/EventCard.test.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.test.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.test.tsx"><code class="language-tsx">import { screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { useUiStore } from '../state/uiStore.ts'
+import { makeEvent, makeSite } from '../test/factories.ts'
+import { renderWithProviders } from '../test/render.tsx'
+import { EventCard } from './EventCard.tsx'
+
+describe('EventCard', () =&gt; {
+  it('links the title to the cleanup page', () =&gt; {
+    renderWithProviders(&lt;EventCard event={makeEvent()} site={makeSite()} /&gt;)
+
+    const link = screen.getByRole('link', { name: 'Tide Pool Morning Cleanup' })
+    expect(link).toHaveAttribute('href', '/events/e17')
+    expect(screen.getByRole('heading', { level: 3 })).toContainElement(link)
+  })
+
+  it('shows the date, the status, the meeting point and the spots left', () =&gt; {
+    renderWithProviders(&lt;EventCard event={makeEvent()} site={makeSite()} /&gt;)
+
+    expect(screen.getByText('Sat, Jul 4, 2026')).toBeInTheDocument()
+    expect(screen.getByText('Scheduled')).toBeInTheDocument()
+    expect(screen.getByText('Otter Creek Mouth: Gravel pull-out on Highway 1')).toBeInTheDocument()
+    expect(screen.getByText('7 of 12 spots left')).toBeInTheDocument()
+  })
+
+  it('says when the site is not known yet', () =&gt; {
+    renderWithProviders(&lt;EventCard event={makeEvent()} site={undefined} /&gt;)
+
+    expect(screen.getByText(/^Site to be confirmed/)).toBeInTheDocument()
+  })
+
+  it('has a details button named after the cleanup, closed at first', () =&gt; {
+    renderWithProviders(&lt;EventCard event={makeEvent()} site={makeSite()} /&gt;)
+
+    const button = screen.getByRole('button', { name: 'Show details for Tide Pool Morning Cleanup' })
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText(/Expect mud/)).not.toBeInTheDocument()
+  })
+
+  it('leaves out the meeting point and supplies in compact lists', () =&gt; {
+    useUiStore.getState().setDensity('compact')
+    renderWithProviders(&lt;EventCard event={makeEvent()} site={makeSite()} /&gt;)
+
+    expect(screen.queryByText(/Gravel pull-out/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/We bring/)).not.toBeInTheDocument()
+  })
+
+  it('shows supplies in roomy lists (the store was reset after the last test)', () =&gt; {
+    renderWithProviders(&lt;EventCard event={makeEvent()} site={makeSite()} /&gt;)
+
+    expect(screen.getByText('We bring: gloves, bags')).toBeInTheDocument()
+  })
+})</code></pre>
+                    </div>
+                    <p>The compact test changes the display store directly with <code>useUiStore.getState().setDensity('compact')</code>, the same action the radio buttons call; the reset in <code>setup.ts</code> is why the last test sees roomy lists again. Save: the button test fails with the "Show detailsfor" message from "Reading a query's error". Fix the card in <code>src/components/EventCard.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">       )}
+       &lt;div className={styles.actions}&gt;
++        {/* The space before the hidden text stays outside it: some tools drop a space at its start */}
+         &lt;Button
+           variant="link"</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">           onClick={() =&gt; setShowDetails((shown) =&gt; !shown)}
+         &gt;
+-          {showDetails ? 'Hide details' : 'Show details'}
+-          &lt;VisuallyHidden&gt; for {event.title}&lt;/VisuallyHidden&gt;
++          {showDetails ? 'Hide details' : 'Show details'}{' '}
++          &lt;VisuallyHidden&gt;for {event.title}&lt;/VisuallyHidden&gt;
+         &lt;/Button&gt;
+       &lt;/div&gt;</code></pre>
+                    </div>
+                    <p>The same pattern is in three more files that Lesson 9.2 will test. Fix them now, one line each. In <code>src/components/RosterTable.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/RosterTable.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/RosterTable.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">                   onClick={() =&gt; onMark(signupId, mark === 'attended' ? undefined : 'attended')}
+                 &gt;
+-                  Check in&lt;VisuallyHidden&gt; for {entry.volunteer.name}&lt;/VisuallyHidden&gt;
++                  Check in{' '}&lt;VisuallyHidden&gt;for {entry.volunteer.name}&lt;/VisuallyHidden&gt;
+                 &lt;/Button&gt;
+                 &lt;Button</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/RosterTable.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/RosterTable.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">                   onClick={() =&gt; onMark(signupId, mark === 'no-show' ? undefined : 'no-show')}
+                 &gt;
+-                  No-show&lt;VisuallyHidden&gt; for {entry.volunteer.name}&lt;/VisuallyHidden&gt;
++                  No-show{' '}&lt;VisuallyHidden&gt;for {entry.volunteer.name}&lt;/VisuallyHidden&gt;
+                 &lt;/Button&gt;
+               &lt;/td&gt;</code></pre>
+                    </div>
+                    <p>In <code>src/components/PhotoUpload.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/PhotoUpload.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/PhotoUpload.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">               &lt;span&gt;{photo.name}&lt;/span&gt;
+               &lt;Button variant="link" onClick={() =&gt; onRemove(photo.id)}&gt;
+-                Remove&lt;VisuallyHidden&gt; {photo.name}&lt;/VisuallyHidden&gt;
++                Remove{' '}&lt;VisuallyHidden&gt;{photo.name}&lt;/VisuallyHidden&gt;
+               &lt;/Button&gt;
+             &lt;/li&gt;</code></pre>
+                    </div>
+                    <p>And in <code>src/components/ImpactReportForm.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactReportForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactReportForm.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">                   &lt;/div&gt;
+                   &lt;Button variant="link" onClick={() =&gt; removeRow(index)}&gt;
+-                    Remove&lt;VisuallyHidden&gt; row {index + 1}&lt;/VisuallyHidden&gt;
++                    Remove{' '}&lt;VisuallyHidden&gt;row {index + 1}&lt;/VisuallyHidden&gt;
+                   &lt;/Button&gt;
+                 &lt;/li&gt;</code></pre>
+                    </div>
+                    <p>(<code>{' '}</code> is how JSX writes a space that a line break would otherwise swallow.) Nothing changes on screen, and the names in the browser stay "Check in for Diego Herrera" and "Remove row 1". Finally, create <code>src/components/Header.test.tsx</code> with the code from "A Typed Render Helper".</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Run everything <span class="step-time">(5 min)</span></h3>
+                    <p>Stop watch mode with <kbd>q</kbd> and run the whole suite once, then the usual checks:</p>
+                    <pre class="terminal"><code class="language-bash">npx vitest run
+npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_29/29-all-green.png" alt="A terminal in shoreline-hq running npx vitest run. Seven test files are listed with green check marks: formErrors, availability and format in src/utils, schemas in src/api, and ErrorSummary, Header and EventCard in src/components. Summary: Test Files 7 passed, Tests 29 passed." width="875" height="391" loading="lazy">
+                        <figcaption>The HQ's first test suite: four files of unit tests and three of component tests, 29 tests in about a second.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code> RUN  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+ ✓ src/utils/formErrors.test.ts (3 tests) 4ms
+ ✓ src/utils/availability.test.ts (5 tests) 5ms
+ ✓ src/utils/format.test.ts (3 tests) 4ms
+ ✓ src/api/schemas.test.ts (4 tests) 8ms
+ ✓ src/components/ErrorSummary.test.tsx (4 tests) 66ms
+ ✓ src/components/Header.test.tsx (4 tests) 83ms
+ ✓ src/components/EventCard.test.tsx (6 tests) 79ms
+
+ Test Files  7 passed (7)
+      Tests  29 passed (29)
+   Start at  00:28:11
+   Duration  706ms (environment 65%, setup 19%, tests 7%, import 5%, transform 4%, worker 1%)
+&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 15ms on 84 files with 150 rules using 20 threads.
+&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 351 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-CatUgjh8.css                            11.06 kB │ gzip:   3.08 kB
+dist/assets/index-CRveR_rM.js                            581.59 kB │ gzip: 182.28 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.32s</code></pre>
+                    </div>
+                    <p>The files may finish in a different order on your machine, and your times and hashes will differ. <code>tsc</code> prints nothing: it checked the tests too, since they live in <code>src</code>. The build still has 351 modules and 581.59 kB of JavaScript, within a few bytes of Lesson 8.2's (the four spaces): nothing under <code>src/test</code> or in a <code>.test</code> file is imported by the app, so none of it reaches the bundle.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>Vitest, jsdom and Testing Library are installed as dev dependencies, configured in <code>vite.config.ts</code>, and <code>npm test</code> runs them in watch mode</li>
+                        <li><code>src/test/setup.ts</code> loads jest-dom for Vitest, cleans up, and resets the cache, the session, the display store and storage after each test</li>
+                        <li><code>factories.ts</code> and <code>render.tsx</code> give every test typed sample data and the app's providers</li>
+                        <li>Unit tests cover <code>formatDate</code>, <code>getAvailability</code>, <code>impactReportSchema</code>, <code>listErrors</code> and <code>withRowNumbers</code></li>
+                        <li>Component tests find the error summary, the event card and the header by role and name</li>
+                        <li>Buttons with hidden text keep their space outside it, and all 29 tests pass</li>
+                        <li><code>npx tsc -b</code> and <code>npm run lint</code> pass with no errors or warnings, and <code>npm run build</code> succeeds</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, write your three "would hate to break" items as test names, each one a sentence that starts with a verb ("refuses…", "shows…", "keeps…"). Next to each, write which kind of test it needs (unit, component or end-to-end) and what sample data the test would need: that list is the start of your factories file.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 12 minutes together, included in the lesson time). Exercise 3 is an optional stretch, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Test the check-in desk's undo history</h3>
+                    <p>Write <code>src/reducers/rosterReducer.test.ts</code> for Lesson 7.2's <code>rosterReducer</code>: saved changes are remembered newest last, <code>undone</code> forgets the newest, undo on an empty history changes nothing, and the reducer never changes the state it was given.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A reducer is a function like any other: call it with a state and an action and check what it returns. Type the sample changes as <code>Change</code> (exported by the reducer file). For "never changes the state it was given", keep the old state in a variable and check it afterwards; <code>not.toBe</code> proves the reducer returned a <em>new</em> object.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">import { describe, expect, it } from 'vitest'
+import { initialRoster, rosterReducer, type Change } from './rosterReducer.ts'
+
+const checkedIn: Change = { signupId: 's088', before: undefined }
+const noShow: Change = { signupId: 's089', before: 'attended' }
+
+describe('rosterReducer', () =&gt; {
+  it('remembers saved changes, newest last', () =&gt; {
+    const once = rosterReducer(initialRoster, { type: 'saved', change: checkedIn })
+    const twice = rosterReducer(once, { type: 'saved', change: noShow })
+    expect(twice.history).toEqual([checkedIn, noShow])
+  })
+
+  it('forgets the newest change on undo', () =&gt; {
+    const state = { history: [checkedIn, noShow] }
+    expect(rosterReducer(state, { type: 'undone' })).toEqual({ history: [checkedIn] })
+  })
+
+  it('never changes the state it was given', () =&gt; {
+    const before = { history: [checkedIn] }
+    const after = rosterReducer(before, { type: 'saved', change: noShow })
+    expect(after).not.toBe(before)
+    expect(before.history).toEqual([checkedIn])
+  })
+
+  it('does nothing on undo with an empty history', () =&gt; {
+    expect(rosterReducer(initialRoster, { type: 'undone' })).toEqual({ history: [] })
+  })
+})</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output</h4>
+                            <pre><code> ✓ src/reducers/rosterReducer.test.ts (4 tests) 4ms
+   ✓ rosterReducer (4)
+     ✓ remembers saved changes, newest last 2ms
+     ✓ forgets the newest change on undo 0ms
+     ✓ never changes the state it was given 0ms
+     ✓ does nothing on undo with an empty history 0ms</code></pre>
+                        </div>
+                        <p>Type-checks and lints cleanly; the course's code continues without it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A report already in the cache</h3>
+                    <p><code>ImpactSummary</code> reads a cleanup's impact report with <code>useSuspenseQuery</code>. Test it without any API: put a report in the cache first, then render it, and check the totals line and that the debris list starts with the biggest count. Add a <code>makeImpactReport</code> factory to <code>factories.ts</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>queryClient.setQueryData(eventImpactQuery('e01').queryKey, report)</code> stores an answer where the component will look. When the data is already there, <code>useSuspenseQuery</code> does not suspend, so the summary renders at once. The reset in <code>setup.ts</code> clears it afterwards. <code>getAllByRole('listitem')</code> returns the list's items in order.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>The factory (in <code>factories.ts</code>; add <code>ImpactReport</code> to its type import):</p>
+                        <pre data-snippet><code class="language-ts">/** A saved impact report for a completed cleanup */
+export function makeImpactReport(changes: Partial&lt;ImpactReport&gt; = {}): ImpactReport {
+  return {
+    eventId: 'e01',
+    volunteersAttended: 12,
+    bags: 6,
+    weightKg: 18.5,
+    items: [
+      { category: 'plastic-bags', count: 120 },
+      { category: 'plastic-bottles', count: 40 },
+    ],
+    notes: '',
+    photoIds: [],
+    submittedAt: '2026-06-02T19:00:00.000Z',
+    ...changes,
+  }
+}</code></pre>
+                        <p>And <code>src/components/ImpactSummary.test.tsx</code>:</p>
+                        <pre data-snippet><code class="language-tsx">import { screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { eventImpactQuery, queryClient } from '../api/queries.ts'
+import { makeImpactReport } from '../test/factories.ts'
+import { renderWithProviders } from '../test/render.tsx'
+import { ImpactSummary } from './ImpactSummary.tsx'
+
+describe('ImpactSummary', () =&gt; {
+  it('shows a report that is already in the cache, biggest count first', () =&gt; {
+    // The key carries the type: TypeScript checks that this really is an ImpactReport
+    queryClient.setQueryData(eventImpactQuery('e01').queryKey, makeImpactReport())
+    renderWithProviders(&lt;ImpactSummary eventId="e01" /&gt;)
+
+    expect(screen.getByText('Volunteers: 12. Bags: 6. Weight: 18.5 kg.')).toBeInTheDocument()
+    const counts = screen.getAllByRole('listitem').map((item) =&gt; item.textContent)
+    expect(counts).toEqual(['Plastic bags: 120', 'Plastic bottles: 40'])
+  })
+
+  it('counts the photos instead of showing them', () =&gt; {
+    const report = makeImpactReport({ photoIds: ['p1', 'p2'] })
+    queryClient.setQueryData(eventImpactQuery('e01').queryKey, report)
+    renderWithProviders(&lt;ImpactSummary eventId="e01" /&gt;)
+
+    expect(screen.getByText('Photos uploaded with the report: 2.')).toBeInTheDocument()
+  })
+})</code></pre>
+                        <p>Measured: both tests pass, and the key's type guards the sample data. Seeding <code>{ ...makeImpactReport(), weightKg: '18.5' }</code> is a compile error, because <code>eventImpactQuery</code>'s key carries the type <code>ImpactReport</code> (Lesson 7.1):</p>
+                        <div class="card card-output">
+                            <h4>Expected output</h4>
+                            <pre><code>src/components/ImpactSummary.test.tsx:6:87 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+6   queryClient.setQueryData(eventImpactQuery('e01').queryKey, { ...makeImpactReport(), weightKg: '18.5' })
+                                                                                        ~~~~~~~~
+
+
+Found 1 error in src/components/ImpactSummary.test.tsx:6</code></pre>
+                        </div>
+                        <p>Vitest itself would have run that test happily: like Node in Lesson 1.1, it removes the types without checking them. That is why <code>tsc -b</code> (and <code>npm run build</code>) still matter when the tests are green. Type-checks and lints cleanly; not in the course's code.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): Test a rule that depends on today</h3>
+                    <p>Optional stretch, not counted in the lesson time. <code>canReportImpact</code> (Lesson 8.2) allows a report on the day of a scheduled cleanup or later. Test it for a fixed "today", so the test gives the same answer on any day you run it.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>vi.useFakeTimers({ now })</code> sets the clock that <code>new Date()</code> reads. But <code>impactForm.ts</code> reads today's date once, when the module is first loaded, so set the clock first, then load the module: <code>vi.resetModules()</code> and <code>await import('./impactForm.ts')</code>. Give the clock back with <code>vi.useRealTimers()</code> in <code>afterEach</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">import { afterEach, describe, expect, it, vi } from 'vitest'
+import { makeEvent } from '../test/factories.ts'
+
+// impactForm.ts reads today's date once, when it is first imported: set the clock, THEN import it
+async function loadOn(now: Date) {
+  vi.useFakeTimers({ now })
+  vi.resetModules()
+  return import('./impactForm.ts')
+}
+
+afterEach(() =&gt; {
+  vi.useRealTimers()
+})
+
+describe('canReportImpact', () =&gt; {
+  it('allows a report from the morning of the cleanup', async () =&gt; {
+    const { canReportImpact } = await loadOn(new Date(2026, 6, 4, 11, 0))
+    expect(canReportImpact(makeEvent({ date: '2026-07-04' }))).toBe(true)
+  })
+
+  it('refuses a report the day before', async () =&gt; {
+    const { canReportImpact } = await loadOn(new Date(2026, 6, 3, 23, 30))
+    expect(canReportImpact(makeEvent({ date: '2026-07-04' }))).toBe(false)
+  })
+
+  it('allows a completed cleanup and never a cancelled one, whatever the date', async () =&gt; {
+    const { canReportImpact } = await loadOn(new Date(2026, 6, 4, 11, 0))
+    expect(canReportImpact(makeEvent({ status: 'completed', date: '2026-08-01' }))).toBe(true)
+    expect(canReportImpact(makeEvent({ status: 'cancelled', date: '2026-07-01' }))).toBe(false)
+  })
+})</code></pre>
+                        <p>Measured: all three pass. Without the fake clock, "refuses a report the day before" fails on any real date after the sample one, which is exactly the kind of test that passes today and breaks next week. The awkward import order is a hint about the code, too: a function that took <code>today</code> as a parameter would be easier to test. Type-checks and lints cleanly; not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Which check best follows "test what people see and do"?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Would a person notice how many times a Hook was called? What happens to this test when the header is refactored?">
+                                A) The header calls <code>useAuth()</code> exactly once
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A role and an accessible name are what a person (and a screen reader) meets on the page, so the test survives any rewrite of the header that keeps the same result.">
+                                B) An organizer's navigation has a link named Volunteers
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Class names are hashed by CSS Modules and can change with any style edit. Is a class something a person perceives?">
+                                C) The header's <code>nav</code> has the CSS Module class <code>nav</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A test checks that the error summary is gone after every field is fixed. Which line?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="What does getByRole do when nothing matches, before expect even runs?">
+                                A) <code>expect(screen.getByRole('region')).not.toBeInTheDocument()</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="findBy waits for something to appear. Is appearing what this test is about?">
+                                B) <code>expect(await screen.findByRole('region')).toBeNull()</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="getAllByRole throws when there are no matches. Would the length ever be checked?">
+                                C) <code>expect(screen.getAllByRole('region')).toHaveLength(0)</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="queryByRole returns null when nothing matches instead of throwing, so the expect can check that the summary is not in the document.">
+                                D) <code>expect(screen.queryByRole('region')).not.toBeInTheDocument()</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> The compact-lists test passes, and the roomy-lists test after it fails, but passes when run alone. What is the most likely cause?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The display store is module state shared by every test in the file. The compact test changed it, and without a reset in afterEach the next test still sees compact lists.">
+                                A) The display store kept the compact setting from the earlier test
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="If the card were broken, would the test pass when run alone?">
+                                B) The card shows the supplies only sometimes
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Vitest runs the tests in one file one after another. What do the two tests share?">
+                                C) The two tests ran at the same time and raced
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> A teammate writes <code>queryClient.setQueryData(eventImpactQuery('e01').queryKey, { bags: 6 })</code> in a test. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Vitest strips types without checking them. Would it notice a missing property?">
+                                A) Vitest refuses to run the test
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The key from the factory carries a type. Which one?">
+                                B) Nothing: the cache accepts any data
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The key made by eventImpactQuery is typed with ImpactReport, so setQueryData expects a whole report. tsc -b (and npm run build) report the missing properties, even though Vitest alone would run the test.">
+                                C) <code>tsc -b</code> reports an error: the key's type says the data must be a whole <code>ImpactReport</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> <code>getByRole('button', { name: 'Show details for Tide Pool Morning Cleanup' })</code> failed, and the error listed a button named "Show detailsfor Tide Pool Morning Cleanup". What was the right response?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="A test id hides the problem. What does the name tell screen reader users?">
+                                A) Switch to <code>getByTestId</code> so the name no longer matters
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The name is part of what people hear, so the test pointed at a fragile spot: a space at the start of hidden text, which some accessibility engines drop. Moving the space outside the hidden text gives the same name everywhere.">
+                                B) Move the space outside the visually hidden text, so every tool computes the same name
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That would make the test agree with the odd name. Is that what a screen reader user should hear?">
+                                C) Change the test to expect "Show detailsfor"
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>How many tests should I write? Should I aim for 100% coverage?</summary>
+                    <p>Write tests for what would hurt if it broke: rules (schemas, availability, guards), things that are easy to break by accident (focus, names, who sees what), and every bug you fix (a test that fails before the fix and passes after it keeps the bug from coming back). Coverage, the share of lines a test ran, is a useful map of what is <em>not</em> tested, but 100% is not the goal: a line can run without anything checking its result. Vitest can measure it with <code>npx vitest run --coverage</code> once you install its coverage package; it asks you to install it the first time.</p>
+                </details>
+                <details>
+                    <summary>Why not test that <code>EventCard</code> receives the right props, or check its state?</summary>
+                    <p>Because people never see props or state, only what the component draws. Testing Library deliberately has no way to read a component's state: you render it, look at the page, and (from Lesson 9.2) use it like a person would. That keeps tests working through refactors such as Lesson 7.2's move of the check-in marks from the reducer to the cache, which changed the internals completely and nothing a person sees.</p>
+                </details>
+                <details>
+                    <summary>Should the tests live next to the code or in a separate <code>tests</code> folder?</summary>
+                    <p>Both work; this course puts each test next to its file (<code>EventCard.tsx</code> and <code>EventCard.test.tsx</code>), which keeps them easy to find and makes a missing test obvious. Shared test code lives in <code>src/test</code>. Whatever you choose, the <code>include</code> pattern in <code>vite.config.ts</code> must match it.</p>
+                </details>
+                <details>
+                    <summary>jsdom is not a real browser. Can I trust these tests?</summary>
+                    <p>For what they check, yes: the HTML, roles, names, attributes, focus and events. jsdom has no layout, so it cannot tell you that a button is hidden behind another one, that a page overflows on a phone, or what a color looks like, and today's space-in-a-name finding showed that small details can differ from Chromium. That is what Lesson 9.3's end-to-end tests in a real browser are for, and why the course's browser checks keep running alongside.</p>
+                </details>
+                <details>
+                    <summary>I have seen tests with <code>jest.fn()</code> and <code>import React from 'react'</code>. Are those wrong?</summary>
+                    <p>They are from Jest, an older runner with almost the same API, and from before React's automatic JSX runtime. In Vitest the helpers live on <code>vi</code> (<code>vi.fn()</code>, <code>vi.useFakeTimers()</code>, Exercise 3), and JSX needs no React import. When you copy a test from older material, those two are usually the only changes.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Write <code>src/components/StatusBadge.test.tsx</code> with one <code>it.each</code> that covers all four statuses and their labels (Draft, Scheduled, Completed, Cancelled), using a typed table: <code>it.each&lt;[EventStatus, string]&gt;([…])</code>. Then try Vitest's browser interface: <code>npx vitest --ui</code> offers to install <code>@vitest/ui</code> and opens a page that lists every test, its output and the module graph. Finally, find the HQ's next "would hate to break" item that needs no clicking (<code>nextCategory</code> returning <code>undefined</code> when all ten kinds are listed is a good one) and test it.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Today a test failed three ways: once because the test was wrong (July), once because the app was wrong (<code>month: 'long'</code>), and once because it found something nobody knew about (the missing space). For each, write how you could tell which kind it was. Then look at your three "would hate to break" items from the last lesson: which ones do today's tests cover, and which need clicking (Lesson 9.2) or a real browser (Lesson 9.3)?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Tests check behavior that types cannot; unit tests check functions, component tests check what a component draws, end-to-end tests check the whole app in a browser</li>
+                        <li>Vitest reads <code>vite.config.ts</code>, so tests run the same plugins as the app (the React Compiler included); jsdom gives them a pretend page, and the setup file loads <code>@testing-library/jest-dom/vitest</code></li>
+                        <li><code>describe</code>, <code>it</code> and <code>expect</code> with Arrange, Act, Assert; <code>toBe</code> for single values, <code>toEqual</code> for objects and arrays; see every test fail once</li>
+                        <li>Typed factories (<code>Partial&lt;T&gt;</code> over complete defaults) keep sample data short and always the right shape</li>
+                        <li>Find elements by role and accessible name first; <code>getBy</code> for "here now", <code>queryBy</code> for "not here", <code>findBy</code> for "soon"</li>
+                        <li>A render helper puts the app's providers around a component; module state (cache, session, stores, storage) is reset after every test</li>
+                        <li>Vitest strips types without checking them: <code>tsc -b</code> is still what checks your tests' types</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Review roles, names and accessible components</td><td><a href="lesson_12.html">Lesson 3.6: Styling and Accessible Components</a></td></tr>
+                            <tr><td>Review the impact schema and the error summary</td><td><a href="lesson_28.html">Lesson 8.2: Complex Forms</a></td></tr>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Choose the right query</td><td><a href="https://testing-library.com/docs/queries/about" target="_blank" rel="noopener">testing-library.com: About Queries</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>The HQ has a test suite: 29 tests that run in about a second, every time you save</li>
+                        <li>The impact schema's rules, the error list and the date formatting are pinned down by unit tests</li>
+                        <li>You tested components the way people meet them, by role and name, with a typed helper that gives them the app's providers</li>
+                        <li>Your tests found a real fragile spot in the accessible names of buttons in four components, and you fixed it</li>
+                        <li>You can read a failing test and tell whether the test, the app or something unexpected is wrong</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Today's tests looked at components but never touched them, and they never needed the API. Real use is clicking, typing and waiting for answers. In <a href="lesson_30.html"><strong>Lesson 9.2: Interactions and Async</strong></a> you add <code>user-event</code> to click and type like a person, and MSW 3 to answer the HQ's requests with shoreline-api's own code inside the tests, then test the forms, the uploads, the optimistic check-in and the guards that keep guests out.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx vitest run</code>, <code>npx tsc -b</code> and <code>npm run lint</code> all pass</li>
+                    <li>Click through the impact report form once and write down every place you type, click or wait for the API: those are Lesson 9.2's tests</li>
+                    <li>Add your three test names and their sample data to your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Writing tests can feel like writing the app twice, and the first ones are slow: a new vocabulary, a new error format, and a pretend page you cannot see. That feeling fades quickly. You already caught a real accessibility problem with your fifth test file, and from now on every change you make to the HQ gets checked in a second. Developers who test well are not the ones who never break things; they are the ones who find out first. That is you now.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_28.html" class="prev-lesson">← Previous: Complex Forms</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_30.html" class="next-lesson">Next: Interactions and Async →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

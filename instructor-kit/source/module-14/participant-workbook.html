@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 14</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 14: Rendering Performance and Component Patterns</h1>
+    <p class="sub">Your workbook for Session 14: a warm-up, the key ideas of Lessons 5.3 and 5.4, worked examples with real output, the guided labs, predict-then-check practice, a self-check for each lesson, and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lessons <b>5.3–5.4</b></span>
+      <span class="chip">Session <b>14</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Name the three reasons a component renders, and tell rendering apart from changing the page.</li>
+  <li>Measure before changing anything: the React DevTools Profiler and React's <code class="inline">&lt;Profiler&gt;</code>.</li>
+  <li>Use memo, useCallback and useMemo with their types, keep a context value still, and know when they only add noise.</li>
+  <li>Turn on the React Compiler in the HQ and check its work with numbers.</li>
+  <li>Build and type a compound component, a generic component with a render prop and a polymorphic component, and choose between them.</li>
+</ul>
+
+  <div class="sec"><h2>Start Here: Warm-up</h2><span class="rule"></span></div>
+<p>Three questions, no notes. Write a sentence for each.</p>
+<div class="q"><div class="qn">W1</div><div class="qt">useAuth() throws when the context value is undefined. Why is that better than a default value?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">AuthProvider's value is a new object on every render. Lesson 5.2 said that is fine for now. When would it not be?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">The check-in desk keeps its marks in a reducer (Lesson 5.1). What happens to them if the desk component is removed from the page and added back?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Lessons</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.3</span><h3>Rendering Performance</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Name the three reasons a component renders, and explain why rendering is not the same as changing the page</li>
+  <li>Measure renders with the React DevTools Profiler and React's &lt;Profiler&gt; component before you change anything</li>
+  <li>Use memo, useMemo and useCallback with their TypeScript types, and recognize when they only add noise</li>
+  <li>Keep a context value from rendering every reader again when nothing in it changed</li>
+  <li>Turn on the React Compiler in a Vite 8 project, check what it optimized, and decide what you still write by hand</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Three reasons to render:</b> its own state changed, its parent rendered, a context it reads changed. Rendering = React calls the function; commit = React changes only the DOM that differs.</li>
+  <li><b>Measure first:</b> the React DevTools Profiler (commits, flame graph, Ranked, "why did this render?") and <code class="inline">&lt;Profiler id onRender&gt;</code> with <code class="inline">ProfilerOnRenderCallback</code>, which only reports in development.</li>
+  <li><b>memo</b> skips a component whose props are all the same (Object.is); a new function, object or children each render defeats it. <b>useCallback</b> keeps a function, <b>useMemo</b> a value, until a dependency changes: they work as a pair with memo.</li>
+  <li><b>Context:</b> memo never blocks the third reason. Keep a provider's value the same object (useMemo + useCallback) when the provider renders for other reasons.</li>
+  <li><b>The React Compiler</b> memoizes values, functions and JSX at build time (a Babel preset through <code class="inline">@rolldown/plugin-babel</code> in Vite 8). It skips components that break the Rules of React: zero lint warnings matter.</li>
+  <li><b>Still yours:</b> pure components, low state and stable keys, a useMemo you measured as needed, fewer requests. The compiler is an assistant, not a guarantee.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: the price and the payoff of the compiler</div>
+<p>Before the compiler, <code class="inline">npm run build</code> on the HQ ends like this (times and hashes differ on your machine):</p>
+<pre class="out">dist/assets/index-6OdvjMRn.js                            252.23 kB │ gzip: 78.51 kB
+✓ built in …ms</pre><p>After Step 3's install and this <code class="inline">vite.config.ts</code>:</p>
+<div class="codefile">shoreline-hq/vite.config.ts</div>
+<pre class="code" data-src="shoreline-hq/vite.config.ts" data-stage="lesson_19"><span class="k">import</span> react, { reactCompilerPreset } <span class="k">from</span> <span class="s">'@vitejs/plugin-react'</span>
+<span class="k">import</span> babel <span class="k">from</span> <span class="s">'@rolldown/plugin-babel'</span>
+<span class="k">import</span> { defineConfig } <span class="k">from</span> <span class="s">'vite'</span>
+
+<span class="c">// https://vite.dev/config/</span>
+<span class="k">export</span> <span class="k">default</span> defineConfig({
+  plugins: [
+    react(),
+    <span class="c">// The React Compiler: works out what each component can reuse between renders</span>
+    babel({ presets: [reactCompilerPreset()] }),
+  ],
+})</pre><p>the same build ends:</p>
+<pre class="out">dist/assets/index-B_WIRHHo.js                            270.77 kB │ gzip: 85.10 kB
+✓ built in …ms</pre><p>The price: 2 more modules and 18.5 kB more JavaScript (6.6 kB gzipped). What it buys, measured by the lesson (render counts are the same on the dev server and the build):</p>
+<table class="timing">
+<thead><tr><th>Component renders</th><th>Lesson 5.2's code</th><th>memo(EventGroups)</th><th>Compiler, no memo</th></tr></thead>
+<tbody>
+<tr><td>Typing pelican, before the answer</td><td>560</td><td>14</td><td>14</td></tr>
+<tr><td>The whole search, answer included</td><td>660</td><td>114</td><td>28</td></tr>
+<tr><td>Show details on one card</td><td>5</td><td>5</td><td>1</td></tr>
+<tr><td>Signing out on /events as Maya (the sign-out's own commit)</td><td>82</td><td>82</td><td>19</td></tr>
+<tr><td>Check in one volunteer on the desk</td><td>23</td><td>23</td><td>23</td></tr>
+</tbody>
+</table>
+<p>And if you copy an older tutorial's setup instead, TypeScript stops you before the build:</p>
+<pre class="out">vite.config.ts:8:7 - error TS2353: Object literal may only specify known properties, and 'babel' does not exist in type 'Options'.
+
+8       babel: {
+        ~~~~~
+
+
+Found 1 error in vite.config.ts:8</pre></div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-14/l5_3-rendering-performance/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code>: three tests fail, each with a count.</li>
+  <li>Write the three counts here before you change anything, then fix one task at a time and run <code class="inline">npm test</code> again.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Task</th><th>Count as shipped</th><th>What was new on every render?</th><th>My fix</th></tr></thead>
+<tbody>
+<tr><td>1 rows</td><td></td><td></td><td></td></tr>
+<tr><td>2 labels</td><td></td><td></td><td></td></tr>
+<tr><td>3 totals</td><td></td><td></td><td></td></tr>
+</tbody>
+</table>
+<ul class="tick">
+  <li>Done when <code class="inline">npm test</code> ends with <code class="inline">Tests  7 passed (7)</code>, <code class="inline">npm run typecheck</code> is silent and <code class="inline">npm run lint</code> says <code class="inline">Found 0 warnings and 0 errors.</code> Then the stretches: the starter with the compiler on (<code class="inline">npm run test:compiler</code>: predict first), and the debug handout.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write what you think each command prints (the error code, or how many warnings) and what it means, then compare with the lesson's Common Mistakes.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict what <code class="inline">npx tsc -b</code> reports, then check with the lesson. (An older tutorial's compiler setup, with plugin-react 6.)</div><div class="codefile">vite.config.ts</div><pre class="code"><span class="k">import</span> react <span class="k">from</span> <span class="s">'@vitejs/plugin-react'</span>
+<span class="k">import</span> { defineConfig } <span class="k">from</span> <span class="s">'vite'</span>
+
+<span class="c">// From an older tutorial (plugin-react 4 and 5): the compiler as a Babel plugin inside react()</span>
+<span class="k">export</span> <span class="k">default</span> defineConfig({
+  plugins: [
+    react({
+      babel: {
+        plugins: [<span class="s">'babel-plugin-react-compiler'</span>],
+      },
+    }),
+  ],
+})</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict what <code class="inline">npm run lint</code> reports, then check with the lesson. (How many warnings, and what happens to the React Compiler's work on EventCard?)</div><div class="codefile">src/components/EventCard.tsx (added at the top of the component)</div><pre class="code"><span class="c">// How many times has this card rendered?</span>
+<span class="k">const</span> renders = useRef(<span class="s">0</span>)
+renders.current += <span class="s">1</span>
+console.log(<span class="s">`${event.title}: render ${renders.current}`</span>)</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Measure and Speed Up the Events Page</b> (lesson page, "Project"). In class: Steps 1 to 3. At home: Steps 4 and 5.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">&lt;Profiler&gt;</code> and <code class="inline">logRender</code> in EventsPage; one console line per key press</li>
+  <li>☐ Step 2: <code class="inline">memo(EventGroups)</code>; the lines dropped to 0.0 ms, and I can say why it worked</li>
+  <li>☐ Step 3: the four packages installed, <code class="inline">vite.config.ts</code> runs <code class="inline">reactCompilerPreset()</code>, the build shows 82 modules</li>
+  <li>☐ Step 4: with the compiler and without the memo, typing no longer re-renders the list; EventsPage.tsx back to Lesson 5.2's file</li>
+  <li>☐ Step 5: <code class="inline">npx tsc -b</code>, <code class="inline">npm run lint</code>, <code class="inline">npm run build</code> pass; the organizer walk-through; my "what would I measure" note</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">With the React Compiler on, Maya presses Sign out on /events, and every EventCard still renders. Why?</div><div class="opts"><div class="opt">A) The compiler skipped EventCard because it breaks a rule</div><div class="opt">B) Their parent rendered, and the compiler never caches JSX</div><div class="opt">C) Each card calls useAuth(), and the context really changed: no memoization blocks that reason</div><div class="opt">D) Strict Mode renders every component twice in development</div></div></div>
+<div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">oxlint prints this for the supply experiment. You ignore it and click Remove Gloves, then Remove Bags. What does the list show?</div><pre class="code">  ⚠ react-hooks(exhaustive-deps): React Hook useCallback has a missing dependency: 'supplies'
+    ╭─[src/Scratch.tsx:31:6]
+ 29 │   const removeSupply = useCallback((supply: string) =&gt; {
+ 30 │     setSupplies(supplies.filter((item) =&gt; item !== supply))
+    ·                 ────┬───
+    ·                     ╰── useCallback uses `supplies` here
+ 31 │   }, [])
+    ·      ──
+ 32 │
+    ╰────
+  help: Either include it or remove the dependency array.
+
+Found 1 warning and 0 errors.</pre><div class="opts"><div class="opt">A) Grabbers</div><div class="opt">B) Gloves, Grabbers: Gloves comes back</div><div class="opt">C) An error: supplies is not defined</div><div class="opt">D) Bags, Grabbers: the second click does nothing</div></div></div>
+<div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">You wrap EventGroups in <code class="inline">&lt;Profiler onRender={logRender}&gt;</code> and open the app with <code class="inline">npm run build</code> and <code class="inline">npm run preview</code>. What does the console show while you type?</div><div class="write"></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">You copied an older tutorial's <code class="inline">vite.config.ts</code>. Which change fixes what <code class="inline">npx tsc -b</code> prints?</div><pre class="code">vite.config.ts:8:7 - error TS2353: Object literal may only specify known properties, and 'babel' does not exist in type 'Options'.
+
+8       babel: {
+        ~~~~~
+
+
+Found 1 error in vite.config.ts:8</pre><div class="opts"><div class="opt">A) Install <code class="inline">@babel/core</code> so the babel option exists</div><div class="opt">B) Cast the options with <code class="inline">as any</code> so the config compiles</div><div class="opt">C) Keep <code class="inline">react()</code> and add <code class="inline">babel({ presets: [reactCompilerPreset()] })</code> from <code class="inline">@rolldown/plugin-babel</code></div><div class="opt">D) Downgrade TypeScript: version 7 does not check config files</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">A report screen sorts 100,000 log entries on every key press in its note box. Which change skips the sort while you type?</div><div class="opts"><div class="opt">A) Wrap the report component in <code class="inline">memo</code></div><div class="opt">B) Wrap the sort function in <code class="inline">useCallback</code></div><div class="opt">C) Move the sort into a <code class="inline">useEffect</code></div><div class="opt">D) <code class="inline">const top = useMemo(() =&gt; heaviest(logs, 3), [logs])</code></div></div></div>
+<div class="q" data-sc="6" data-kind="short"><div class="qn">Q6</div><div class="qt">Lab 5.3's untouched starter, run with the React Compiler on (<code class="inline">npm run test:compiler</code>), ends like this. Which test still fails, and what fixes it?</div><pre class="code"> ❯ src/lab.test.tsx (7 tests | 1 failed)
+   ✓ Task 1: the shift roster (2)
+     ✓ marking two volunteers in a row keeps both marks
+     ✓ typing a note draws no row again
+   ✓ Task 2: the sort order context (2)
+     ✓ the button still switches the order
+     ✓ typing a note draws no label again
+   ❯ Task 3: the weight report (3)
+     ✓ totals per beach, heaviest first
+     × typing a note adds nothing up again
+     ✓ new logs are added up again
+      Tests  1 failed | 6 passed (7)</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: write the three reasons a component renders, each with one HQ example. Then, in one sentence each, say what memo, useCallback, useMemo and the React Compiler do. Finish with the number from today that surprised you most, and why.</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.4</span><h3>Component Patterns</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Build compound components that share state through a private, typed context, and explain when they beat one big configuration prop</li>
+  <li>Make tabs that follow the accessible tabs pattern: roles, aria-selected, one tab stop and arrow keys</li>
+  <li>Write a generic component with a render prop, and let TypeScript infer its type parameter from the props</li>
+  <li>Type a polymorphic component whose props follow its as prop, with ElementType and ComponentPropsWithRef</li>
+  <li>Choose between plain props, children, compound components, render props and an as prop for a new component</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Compound components</b> split one component into parts written as plain JSX; the parent shares its state through a private context the parts read (<code class="inline">TabsValue | undefined</code> + a throwing <code class="inline">useTabs</code>).</li>
+  <li><b>Accessible tabs:</b> <code class="inline">role="tablist"</code> with a label, <code class="inline">role="tab"</code> + <code class="inline">aria-selected</code>, <code class="inline">aria-controls</code> / <code class="inline">aria-labelledby</code>, one tab stop (tabIndex 0 / -1), arrow keys, Home, End; panels hidden, not removed, so they keep their state.</li>
+  <li><b>Render props:</b> a prop that is a function returning something to render (<code class="inline">renderItem</code>). <b>Generic components</b> (<code class="inline">DataList&lt;T&gt;</code>) infer T from their props and check the callbacks against it.</li>
+  <li><b>Constraints</b> ask for exactly what the component uses: <code class="inline">getKey</code> beats requiring an <code class="inline">id</code>.</li>
+  <li><b>Polymorphic components:</b> <code class="inline">C extends ElementType = 'button'</code>, <code class="inline">ComponentPropsWithRef&lt;C&gt;</code>, <code class="inline">Omit</code> of the props the component owns: the props follow the <code class="inline">as</code> prop. Read long errors from the last line up.</li>
+  <li><b>Choosing:</b> plain props → children → compound → render prop → custom Hook → <code class="inline">as</code>. Move down only when the one above gets in the way.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: props that follow as</div>
+<p>One Button, typed so that its props follow its <code class="inline">as</code> prop:</p>
+<div class="codefile">shoreline-hq/src/components/Button.tsx</div>
+<pre class="code" data-src="shoreline-hq/src/components/Button.tsx" data-stage="lesson_20"><span class="k">import</span> <span class="k">type</span> { ComponentPropsWithRef, ElementType } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> styles <span class="k">from</span> <span class="s">'./Button.module.css'</span>
+
+<span class="k">export</span> <span class="k">type</span> ButtonVariant = <span class="s">'primary'</span> | <span class="s">'secondary'</span> | <span class="s">'link'</span>
+
+<span class="c">/** Button's own props, plus every prop of the element or component named in `as` */</span>
+<span class="k">type</span> ButtonProps&lt;C <span class="k">extends</span> ElementType&gt; = {
+  <span class="c">/** What to render: 'button' (the default), 'a', or a component such as a router link */</span>
+  <span class="k">as</span>?: C
+  variant?: ButtonVariant
+} &amp; Omit&lt;ComponentPropsWithRef&lt;C&gt;, <span class="s">'as'</span> | <span class="s">'className'</span>&gt;
+
+<span class="c">// The HQ's one button look, on whatever element the job needs</span>
+<span class="k">export</span> <span class="k">function</span> Button&lt;C <span class="k">extends</span> ElementType = <span class="s">'button'</span>&gt;({
+  <span class="k">as</span>,
+  variant = <span class="s">'secondary'</span>,
+  ...props
+}: ButtonProps&lt;C&gt;) {
+  <span class="k">const</span> Component = <span class="k">as</span> ?? <span class="s">'button'</span>
+  <span class="c">// A &lt;button&gt; in a form submits unless told otherwise: make "button" the default type</span>
+  <span class="k">const</span> <span class="k">type</span> = Component === <span class="s">'button'</span> ? <span class="s">'button'</span> : <span class="k">undefined</span>
+  <span class="k">return</span> &lt;Component <span class="k">type</span>={<span class="k">type</span>} {...props} className={styles[variant]} /&gt;
+}</pre><p>Three wrong uses in a scratch file, and the first line of each error <code class="inline">npx tsc -b</code> prints:</p>
+<pre class="code">&lt;p&gt;
+  &lt;Button href=<span class="s">"/events/new"</span>&gt;Plan a cleanup&lt;/Button&gt;
+  &lt;Button <span class="k">as</span>=<span class="s">"a"</span> href=<span class="s">"/events/new"</span> disabled&gt;
+    Plan a cleanup
+  &lt;/Button&gt;
+  &lt;Button variant=<span class="s">"danger"</span>&gt;Cancel cleanup&lt;/Button&gt;
+&lt;/p&gt;</pre><pre class="out">src/Scratch.tsx:6:15 - error TS2322: Type '{ href: string; children: string; }' is not assignable to type 'IntrinsicAttributes &amp; { as?: "button" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;ButtonHTMLAttributes&lt;HTMLButtonElement&gt;, HTMLButtonElement&gt;, "as" | "className"&gt;'.
+src/Scratch.tsx:7:41 - error TS2322: Type '{ as: "a"; href: string; disabled: true; children: string; }' is not assignable to type 'IntrinsicAttributes &amp; { as?: "a" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;AnchorHTMLAttributes&lt;HTMLAnchorElement&gt;, HTMLAnchorElement&gt;, "as" | "className"&gt;'.
+src/Scratch.tsx:10:15 - error TS2322: Type '"danger"' is not assignable to type 'ButtonVariant | undefined'.
+Found 3 errors in the same file, starting at: src/Scratch.tsx:6</pre><p>Each full error ends with the line that matters: a button has no href (the Did you mean 'ref' is only a spelling guess), a link has no disabled, "danger" is not a ButtonVariant. Read long errors from the last line up.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-14/l5_4-component-patterns/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code>, <code class="inline">npm test</code>, <code class="inline">npm run typecheck</code>.</li>
+  <li>Task 1: ChoiceGroup and Choice share the chosen value through a private context; a Choice outside its group throws a message that says what to fix.</li>
+  <li>Task 2: DataTable generic in its row type; Task 3: Chip polymorphic. Done when <code class="inline">Tests  9 passed (9)</code> and the type check is silent.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Which pattern is each component, and which HQ component is its model?</td><td></td></tr>
+<tr><td>Hover <code class="inline">item</code> and <code class="inline">report</code> in the test file: what did TypeScript infer?</td><td></td></tr>
+<tr><td>Why does <code class="inline">chipTypes.tsx</code> fail the type check while Chip accepts anything?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Predict the error code or the warnings and what each means, then compare with the lesson (Render Props, and Common Questions).</p>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict what <code class="inline">npx tsc -b</code> reports, then check with the lesson. (A list that requires an id on every item, given debris counts.)</div><div class="codefile">src/Scratch.tsx</div><pre class="code"><span class="k">import</span> <span class="k">type</span> { ReactNode } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> <span class="k">type</span> { DebrisCount } <span class="k">from</span> <span class="s">'./api/types.ts'</span>
+
+<span class="k">interface</span> IdListProps&lt;T <span class="k">extends</span> { id: <span class="k">string</span> }&gt; {
+  items: T[]
+  renderItem: (item: T) =&gt; ReactNode
+}
+
+<span class="c">// Only for items that have an id: the constraint lets the list use item.id as the key</span>
+<span class="k">function</span> IdList&lt;T <span class="k">extends</span> { id: <span class="k">string</span> }&gt;({ items, renderItem }: IdListProps&lt;T&gt;) {
+  <span class="k">return</span> (
+    &lt;ul&gt;
+      {items.map((item) =&gt; (
+        &lt;li key={item.id}&gt;{renderItem(item)}&lt;/li&gt;
+      ))}
+    &lt;/ul&gt;
+  )
+}
+
+<span class="k">export</span> <span class="k">function</span> PiecesCounted({ items }: { items: DebrisCount[] }) {
+  <span class="k">return</span> &lt;IdList items={items} renderItem={(item) =&gt; <span class="s">`${item.category}: ${item.count}`</span>} /&gt;
+}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P4</div><div class="qt">Predict what <code class="inline">npm run lint</code> reports, then check with the lesson. (The dot form libraries use: Tabs.List, Tabs.Tab, Tabs.Panel.)</div><div class="codefile">src/components/Tabs.tsx (last line)</div><pre class="code"><span class="k">export</span> <span class="k">const</span> Tabs = Object.assign(TabsRoot, { List: TabList, Tab, Panel: TabPanel })</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Tabs, Lists and One Button for the HQ</b> (lesson page, "Project"). In class: Steps 1, 3 and 4. At home: Steps 2, 5, 6 and 7.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">Button.tsx</code> and <code class="inline">Button.module.css</code> (+ the Plan a cleanup link as <code class="inline">&lt;Button as="a"&gt;</code>)</li>
+  <li>☐ Step 2: every <code class="inline">buttonStyles</code> button is a <code class="inline">&lt;Button&gt;</code>; only Button.tsx imports Button.module.css</li>
+  <li>☐ Step 3: <code class="inline">DataList.tsx</code>, EventList and SitesPage use it; <code class="inline">EventList.module.css</code> deleted</li>
+  <li>☐ Step 4: <code class="inline">Tabs.tsx</code> and <code class="inline">Tabs.module.css</code></li>
+  <li>☐ Step 5: <code class="inline">getImpact</code> in client.ts and <code class="inline">ImpactSummary.tsx</code></li>
+  <li>☐ Step 6: EventPage shows tabs only when there is more than one thing to show</li>
+  <li>☐ Step 7: arrow keys, Home and End work; the check-in marks survive a tab switch; tsc and lint clean</li>
+</ul>
+<figure class="shot"><img src="../../../images/lesson_20/20-impact-tab.png" alt="The Storm Debris Sweep page in Shoreline Crew HQ. Under the title, the Completed badge and the date, a row of two tabs, Details and Impact, outlined in red; Impact is underlined as the selected tab. Below it, the heading What the crew collected, a line with the number of volunteers, bags and kilograms, and a Pieces counted list that starts with cigarette butts."><figcaption>A completed cleanup gets two tabs. The Impact panel loads the cleanup's impact report and lists the pieces counted with DataList.</figcaption></figure></div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">Why does <code class="inline">Tabs.tsx</code> NOT export <code class="inline">TabsContext</code>?</div><div class="opts"><div class="opt">A) To keep the bundle smaller</div><div class="opt">B) So only the parts in the same file can read it: the rest of the app sees four components</div><div class="opt">C) Because a .tsx file may not export a context</div><div class="opt">D) Because createContext needs a default value to be exported</div></div></div>
+<div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt"><code class="inline">npx tsc -b</code> reports this for <code class="inline">&lt;Button href="/events/new"&gt;Plan a cleanup&lt;/Button&gt;</code> (first two lines). What is the right fix?</div><pre class="code">src/Scratch.tsx:6:15 - error TS2322: Type '{ href: string; children: string; }' is not assignable to type 'IntrinsicAttributes &amp; { as?: "button" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;ButtonHTMLAttributes&lt;HTMLButtonElement&gt;, HTMLButtonElement&gt;, "as" | "className"&gt;'.
+  Property 'href' does not exist on type 'IntrinsicAttributes &amp; { as?: "button" | undefined; variant?: ButtonVariant | undefined; } &amp; Omit&lt;DetailedHTMLProps&lt;ButtonHTMLAttributes&lt;HTMLButtonElement&gt;, HTMLButtonElement&gt;, "as" | "className"&gt;'. Did you mean 'ref'?</pre><div class="opts"><div class="opt">A) Add <code class="inline">as="a"</code>: a link needs the props of an a element</div><div class="opt">B) Rename <code class="inline">href</code> to <code class="inline">ref</code>, as TypeScript suggests</div><div class="opt">C) Add <code class="inline">href</code> to ButtonProps</div><div class="opt">D) Give the Button <code class="inline">variant="link"</code></div></div></div>
+<div class="q" data-sc="9" data-kind="short"><div class="qn">Q9</div><div class="qt">Three errors, one cause. Which do you fix first, and how does DataList avoid the problem altogether?</div><pre class="code">src/Scratch.tsx:21:18 - error TS2322: Type 'DebrisCount[]' is not assignable to type '{ id: string; }[]'.
+src/Scratch.tsx:21:62 - error TS2339: Property 'category' does not exist on type '{ id: string; }'.
+src/Scratch.tsx:21:80 - error TS2339: Property 'count' does not exist on type '{ id: string; }'.
+Found 3 errors in the same file, starting at: src/Scratch.tsx:21</pre><div class="write"></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">In <code class="inline">moveBetweenTabs</code>, why must the code check <code class="inline">move === undefined</code> and <code class="inline">next === undefined</code> before <code class="inline">next.focus()</code>?</div><div class="opts"><div class="opt">A) noUncheckedIndexedAccess types <code class="inline">moves[event.key]</code> and <code class="inline">tabs[...]</code> as possibly undefined</div><div class="opt">B) React requires every event handler to return early</div><div class="opt">C) Arrow keys can fire twice in Strict Mode</div><div class="opt">D) oxlint's jsx-a11y rules ask for it</div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">On Storm Debris Sweep (Details and Impact tabs), the focus is on Details. You press End, then ←, then the letter a. Which tab is selected?</div><div class="opts"><div class="opt">A) Impact</div><div class="opt">B) None: the letter a clears the selection</div><div class="opt">C) The focus has moved into the panel</div><div class="opt">D) Details</div></div></div>
+<div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">You switch the HQ's Tabs to the dot form (<code class="inline">Tabs.List</code>, <code class="inline">Tabs.Tab</code>, <code class="inline">Tabs.Panel</code>) with Object.assign. It type-checks; what does <code class="inline">npm run lint</code> say (first warning shown), and what does it cost?</div><pre class="code">  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Move your component(s) to a separate file.
+    ╭─[src/components/Tabs.tsx:37:10]
+ 36 │ // The parent: owns which tab is selected and shares it with the parts inside
+ 37 │ function TabsRoot({ defaultTab, children }: TabsProps) {
+    ·          ────────
+ 38 │   const [selected, setSelected] = useState(defaultTab)</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: for each of today's three patterns, write one sentence on the problem it solves and one HQ component that uses it. Then write down the longest TypeScript error you met today and, in your own words, what its last line was telling you.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Name the three reasons a component renders.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">A memo component with no props still renders on every key press. What is the likely cause, and the fix?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Name one pattern from Lesson 5.4 and the HQ component that uses it.</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish Measure and Speed Up the Events Page (Steps 4 and 5)</li>
+  <li>☐ Finish Tabs, Lists and One Button for the HQ (Steps 2, 5, 6 and 7)</li>
+  <li>☐ Lesson 5.3 Exercises 1 and 2; Lesson 5.4 Exercises 1 and 2 (each Exercise 3 is a stretch)</li>
+  <li>☐ Both Quick Quizzes on the lesson pages</li>
+  <li>☐ Lab 5.3 Task 3 and the stretches; Lab 5.4 Tasks 2 and 3</li>
+  <li>☐ Both journal entries; my "what would I measure" and "one line per pattern" notes for the final project</li>
+  <li>☐ A list of every plain <code class="inline">&lt;a href="/..."&gt;</code> link in the HQ (Lesson 6.1 changes them)</li>
+  <li>☐ Bring to Session 15: the HQ at the end of Lesson 5.4 with tsc, lint and build clean, an internet connection for <code class="inline">npm install react-router</code>, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>render / commit</td><td>React calling a component to see what it returns / React changing the DOM where the result differs</td></tr>
+<tr><td>memoization</td><td>Remembering a result and reusing it until its inputs change</td></tr>
+<tr><td><code class="inline">memo</code></td><td>Wraps a component: React skips it when every prop is the same (Object.is) as last time</td></tr>
+<tr><td><code class="inline">useCallback</code> / <code class="inline">useMemo</code></td><td>Keep the same function / the same calculated value between renders until a dependency changes</td></tr>
+<tr><td>Object.is, referential equality</td><td>Same string, number or boolean value; for objects, arrays and functions: the same object, not a look-alike</td></tr>
+<tr><td>stale value</td><td>A function that keeps a value from an older render because a dependency was left out</td></tr>
+<tr><td>React DevTools Profiler</td><td>The browser extension's tab that records commits, a flame graph and why each component rendered</td></tr>
+<tr><td><code class="inline">&lt;Profiler&gt;</code>, <code class="inline">ProfilerOnRenderCallback</code></td><td>React's component for measuring from code, and its callback's type (development builds only)</td></tr>
+<tr><td>React Compiler</td><td>A build step that memoizes components and Hooks for you; it skips code that breaks the Rules of React</td></tr>
+<tr><td><code class="inline">'use no memo'</code></td><td>A directive that turns the compiler off for one function</td></tr>
+<tr><td>compound component</td><td>Parts that only work together (Tabs, TabList, Tab, TabPanel) sharing state through a private context</td></tr>
+<tr><td>render prop</td><td>A prop whose value is a function that returns something to render (<code class="inline">renderItem</code>)</td></tr>
+<tr><td>generic component</td><td>A component with a type parameter that TypeScript infers from its props (<code class="inline">DataList&lt;T&gt;</code>)</td></tr>
+<tr><td>polymorphic component, <code class="inline">as</code></td><td>A component that renders the element or component named in its <code class="inline">as</code> prop, with that element's props</td></tr>
+<tr><td><code class="inline">ElementType</code>, <code class="inline">ComponentPropsWithRef&lt;C&gt;</code></td><td>Anything you can render as a tag / the props (ref included) of that tag or component</td></tr>
+<tr><td>roving tabindex</td><td>Only the selected tab has tabIndex 0, so Tab enters the tab list once; arrow keys move inside it</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 14 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

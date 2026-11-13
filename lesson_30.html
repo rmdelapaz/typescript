@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Teach Shoreline Crew HQ's tests to click, type, upload and wait: user-event for real interactions, MSW 3 running shoreline-api's own code inside the tests, per-test overrides for errors, whole pages with the real routes and guards, and Hooks tested with renderHook, including the optimistic check-in and its rollback. React + TypeScript: Build a Modern Web App Lesson 9.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Interactions and Async - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🖱️ Lesson 9.2: Interactions and Async</h1>
+                <p class="lead">At the end of the last lesson you walked through the impact report and wrote down every place you type, click or wait for the API. Your 29 tests could check none of them: they looked at components but never touched one, and nothing in them ever waited for an answer. Today the tests learn to use the HQ the way an organizer does. They type into the edit form, upload a photo, tick someone off at the check-in desk and knock on an organizers-only door as a guest, and shoreline-api's own code answers every request, right inside the test run, with no server started.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Click, type, tab and upload in tests with <code>user-event</code>, and explain why each action is awaited</li>
+                        <li>Answer the app's requests in tests with MSW 3 running the API's own code, reset it between tests and fail on requests nobody answers</li>
+                        <li>Wait for data with <code>findBy</code> and <code>waitFor</code>, and replace one answer for one test with <code>server.use()</code>, typed with the API's own types</li>
+                        <li>Test whole pages through the app's real routes, including loaders, redirects and the organizers-only guard</li>
+                        <li>Test custom Hooks and TanStack Query mutations with <code>renderHook</code>, including an optimistic update and its rollback</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_29.html">Lesson 9.1: Testing Components</a> (your <code>shoreline-hq</code> with Vitest, <code>setup.ts</code>, the factories and <code>renderWithProviders</code>)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> The mock API inside the tests, a whole-app render helper, and 17 new tests: clicks on the event card, the edit form against the API's rules, the guards, a failing page, photo uploads, the document title Hook and the check-in mutation</li>
+                    <li><span class="meta-label">🧩 Stack</span> user-event 14.6, MSW 3.0, Vitest 5.1, React Testing Library 16.3, React Router 8.5, TanStack Query 5.107, React 19.3, TypeScript 7.0 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code with one terminal for the tests (shoreline-api's code runs inside them: no API server or dev server needed)</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-30-start.zip">lesson-30-start.zip</a> · Finished code: <a href="downloads/lesson-30-end.zip">lesson-30-end.zip</a>. Each folder has a README with the commands to run it. From this lesson on, <code>npm test</code> runs shoreline-api's own code inside the tests, so it still works without the API running.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#acting" class="toc-link">Tests That Act Like a Person</a></li>
+                        <li><a href="#user-event" class="toc-link">Clicking and Typing with user-event</a></li>
+                        <li><a href="#msw" class="toc-link">The Mock API Inside the Tests</a></li>
+                        <li><a href="#waiting" class="toc-link">Waiting, and Changing One Answer</a></li>
+                        <li><a href="#pages" class="toc-link">Whole Pages: Routes, Loaders and Guards</a></li>
+                        <li><a href="#hooks" class="toc-link">Testing Hooks</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Tests That Click and Wait</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="acting" class="lesson-section">
+                <h2>🎭 Tests That Act Like a Person</h2>
+                <p>Most of what can go wrong in the HQ happens <em>between</em> renders: after a click, while a request is on its way, when the API says no. To test that, a test needs two new abilities. It has to <strong>act</strong> (click, type, press Tab, choose a file) the way a person does, and it has to <strong>wait</strong> for the app's requests to come back. And something has to answer those requests. Starting shoreline-api for every test run would be slow and fragile; pretending with hand-written fake answers would let the tests and the real API drift apart. This course does something better: the tests run <strong>shoreline-api's own code</strong>, the same file <code>node server.ts</code> runs, right inside Vitest.</p>
+                <div class="card card-info">
+                    <h3>💡 Mental model: the training beach</h3>
+                    <p>New crew leaders practice on a training beach: the same tide tables, the same gear, the same sign-in sheets, but nobody gets hurt when something goes wrong, and the trainer can call "the tide is coming in early" whenever they like. The mock API is that training beach. Your tests use the real rules and the real sample data, they can reset the beach between drills (<code>api.reset()</code>), and a test can call a surprise for one drill only: "this time the server fails", "this time the photo is too big".</p>
+                </div>
+                <div class="mermaid">
+graph TD
+    A["user.click(Save changes)"] --> B["The app calls fetch"]
+    B --> C["MSW catches the request"]
+    C --> D["shoreline-api's core answers"]
+    D --> E["The app shows the result"]
+    E --> F["findBy waits for it"]
+                </div>
+                <p>The request never leaves your computer: <strong>MSW</strong> (Mock Service Worker) catches it inside Node and hands it to the API's code, which returns a real <code>Response</code> with the real status codes, headers and messages. The app cannot tell the difference, and that is the point. A test that passes here passes against the same rules the server enforces.</p>
+                <div class="card card-info">
+                    <h4>🌱 Why this matters</h4>
+                    <p>Interaction tests are where testing pays for itself: forms, sign-in and permissions are what users touch and what breaks in production. "How do you test code that calls an API?" is a classic interview question, and "with a network-level mock that shares code with the real API" is a strong answer. This lesson is denser than the last one; if a section feels like a lot, that is the size of the topic, not a sign you are slow. Take the steps one at a time.</p>
+                </div>
+            </section>
+
+            <section id="user-event" class="lesson-section">
+                <h2>⌨️ Clicking and Typing with user-event</h2>
+                <p><code>@testing-library/user-event</code> plays the person at the keyboard. Each action fires the whole chain of events a browser would: a click is pointer down, mouse down, focus, pointer up, mouse up and click; typing a letter is a key down, a key press, an input event and a key up, for every letter. That is why a test with user-event catches the same things a person would, such as a button that only reacts to <code>onMouseDown</code>, or a field that cannot get focus.</p>
+                <p>The pattern is always the same: call <code>userEvent.setup()</code> <em>before</em> rendering, then <strong>await</strong> every action. The HQ's render helpers will do the setup for you and hand you the <code>user</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/EventCard.test.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/EventCard.test.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   })
+ 
++  it('opens and closes the details with a click', async () =&gt; {
++    const { user } = renderWithProviders(&lt;EventCard event={makeEvent()} site={makeSite()} /&gt;)
++
++    await user.click(screen.getByRole('button', { name: 'Show details for Tide Pool Morning Cleanup' }))
++
++    // The same button, now named for what it does next
++    const button = screen.getByRole('button', { name: 'Hide details for Tide Pool Morning Cleanup' })
++    expect(button).toHaveAttribute('aria-expanded', 'true')
++    expect(screen.getByText(/Expect mud/)).toBeInTheDocument()
++
++    await user.click(button)
++    expect(screen.queryByText(/Expect mud/)).not.toBeInTheDocument()
++  })
++
++  it('opens the details from the keyboard', async () =&gt; {
++    const { user } = renderWithProviders(&lt;EventCard event={makeEvent()} site={makeSite()} /&gt;)
++
++    // Tab moves through the card in order: the title's link, then the details button
++    await user.tab()
++    await user.tab()
++    expect(screen.getByRole('button', { name: /^Show details/ })).toHaveFocus()
++
++    await user.keyboard('{Enter}')
++    expect(screen.getByText(/Expect mud/)).toBeInTheDocument()
++  })
++
+   it('leaves out the meeting point and supplies in compact lists', () =&gt; {
+     useUiStore.getState().setDensity('compact')</code></pre>
+                </div>
+                <p>Every user-event action returns a <code>Promise</code>: the events are fired one after another, and React gets to finish its updates in between. <code>await</code> waits for all of that, so the next line sees the page after the click. The second test is an accessibility check for free: <kbd>Tab</kbd> twice must land on the details button, and <kbd>Enter</kbd> must open it, exactly as a keyboard user would do it.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Action</th><th>What it does</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>await user.click(element)</code></td><td>Moves the pointer to it and clicks (focus moves too)</td></tr>
+                            <tr><td><code>await user.type(element, 'text')</code></td><td>Clicks the field, then types each character</td></tr>
+                            <tr><td><code>await user.clear(element)</code></td><td>Selects everything in a field and deletes it</td></tr>
+                            <tr><td><code>await user.tab()</code></td><td>Presses <kbd>Tab</kbd>: focus moves to the next focusable element</td></tr>
+                            <tr><td><code>await user.keyboard('{Enter}')</code></td><td>Presses keys in the element that has focus; <code>{Enter}</code>, <code>{Escape}</code> and other names in braces, plain text as is</td></tr>
+                            <tr><td><code>await user.upload(input, file)</code></td><td>Chooses a <code>File</code> in an <code>&lt;input type="file"&gt;</code>, as the file picker would</td></tr>
+                            <tr><td><code>await user.selectOptions(select, 'value')</code></td><td>Picks an option in a <code>&lt;select&gt;</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>You may also meet <code>fireEvent</code> from Testing Library: it fires a single event (<code>fireEvent.click</code> is only the click, without the pointer, focus or keyboard around it). It still works, but Testing Library recommends user-event for anything a person does, and this course uses it everywhere.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: user-event 14.6.10</h4>
+                    <p>The course pins user-event 14.6.10, which came out just before this lesson was written (14.6.9 was two days older). It was checked again for this lesson: still the latest release, and every test and exercise here passes with it. If a newer 14.x is out when you install, it should behave the same.</p>
+                </div>
+            </section>
+
+            <section id="msw" class="lesson-section">
+                <h2>🌊 The Mock API Inside the Tests</h2>
+                <p>shoreline-api was built for this moment. Its <code>core</code> folder answers web-standard <code>Request</code> objects with web-standard <code>Response</code> objects and uses no Node features, and its <code>msw</code> folder has a function, <code>createHandlers()</code>, that turns that core into MSW <strong>request handlers</strong>. Copy both folders into <code>src/mocks</code> once (Step 1), and never edit them there: when shoreline-api changes, you copy them again.</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/mocks/msw/handlers.ts</div>
+                    <pre data-src="shoreline-hq/src/mocks/msw/handlers.ts" data-match="excerpt"><code class="language-ts">import { http } from 'msw'
+import { createApi, type ApiOptions } from '../core/api.ts'
+
+/** Where the apps expect the API in development (VITE_API_URL in .env.local). */
+export const API_URL = 'http://localhost:4000'
+
+export function createHandlers(options: ApiOptions &amp; { baseUrl?: string } = {}) {
+  const { baseUrl = API_URL, ...apiOptions } = options
+  const api = createApi(apiOptions)
+  const handlers = [
+    http.all(`${baseUrl}/api`, ({ request }) =&gt; api.handle(request)),
+    http.all(`${baseUrl}/api/*`, ({ request }) =&gt; api.handle(request)),
+  ]
+  return { handlers, api }
+}</code></pre>
+                </div>
+                <p>Two handlers send everything under <code>/api</code> to <code>api.handle(request)</code>, and MSW 3 accepts the native <code>Response</code> it returns. <code>createHandlers</code> also hands back <code>api</code> itself, with <code>reset()</code> (the sample data, fresh) and <code>data</code> (the live data, for checking what a test saved). The HQ's tests share one mock server, set up in a small file of its own:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/test/server.ts</div>
+                    <pre data-src="shoreline-hq/src/test/server.ts"><code class="language-ts">// The mock API for tests: shoreline-api's own code answers the app's requests inside the test run
+import { setupServer } from 'msw/node'
+import { createHandlers } from '../mocks/msw/handlers.ts'
+
+// The same address the app sends its requests to (vite.config.ts sets it for tests)
+export const API_URL = import.meta.env.VITE_API_URL
+
+// api = the API's code with its sample data; handlers = MSW's way in to it
+export const { handlers, api } = createHandlers({ baseUrl: API_URL })
+export const server = setupServer(...handlers)
+
+/** Every request the app sends from now on, written as 'PATCH /api/events/e08' */
+export function recordRequests(): string[] {
+  const requests: string[] = []
+  server.events.on('request:start', ({ request }) =&gt; {
+    requests.push(`${request.method} ${new URL(request.url).pathname}`)
+  })
+  return requests
+}</code></pre>
+                </div>
+                <ul>
+                    <li><strong><code>setupServer</code></strong> comes from <code>msw/node</code>: in Node, MSW intercepts requests inside the process (in a browser it would use a service worker instead, which Lesson 10.2's demo build does).</li>
+                    <li><strong><code>baseUrl</code></strong> is the address the app sends requests to, so the handlers listen exactly where the app calls. Vitest has no <code>.env.local</code> on a fresh copy of the project or in a CI service, so the address comes from the <code>test</code> block in <code>vite.config.ts</code> (Step 1). Measured: <code>test.env</code> wins over a learner's own <code>.env.local</code>, so every machine tests against the same address.</li>
+                    <li><strong><code>recordRequests()</code></strong> listens to MSW's <code>request:start</code> event and writes down every request as <code>'GET /api/sites'</code>. Tests use it to prove that something was <em>not</em> asked for.</li>
+                </ul>
+                <p>The setup file starts the server once per test file, resets the API before every test, and puts everything back after every test:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/test/setup.ts</div>
+                    <pre data-src="shoreline-hq/src/test/setup.ts"><code class="language-ts">// Runs before every test file (vite.config.ts → test.setupFiles)
+import '@testing-library/jest-dom/vitest'
+import { cleanup } from '@testing-library/react'
+import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
+import { saveSession } from '../api/client.ts'
+import { queryClient } from '../api/queries.ts'
+import { useUiStore } from '../state/uiStore.ts'
+import { api, server } from './server.ts'
+
+// jsdom draws nothing, so it cannot scroll: React Router's ScrollRestoration calls this
+window.scrollTo = () =&gt; {}
+
+// In tests a failed request should fail at once: no retries with pauses in between
+queryClient.setDefaultOptions({
+  queries: { ...queryClient.getDefaultOptions().queries, retry: false },
+})
+
+// Answer requests with the mock API. A request it does not know fails the test.
+beforeAll(() =&gt; server.listen({ onUnhandledFrame: 'error' }))
+// Every test starts from the sample data, with only the API's own handlers
+beforeEach(() =&gt; api.reset())
+
+afterEach(() =&gt; {
+  // Take the rendered components off the page, so each test starts with an empty one
+  cleanup()
+  // Forget the overrides a test added with server.use()
+  server.resetHandlers()
+  server.events.removeAllListeners()
+  // The app keeps state in modules, outside React: put each piece back the way the app starts
+  queryClient.clear()
+  saveSession(null)
+  useUiStore.setState(useUiStore.getInitialState())
+  localStorage.clear()
+  sessionStorage.clear()
+})
+
+afterAll(() =&gt; server.close())</code></pre>
+                </div>
+                <ul>
+                    <li><strong><code>onUnhandledFrame: 'error'</code></strong> (MSW 3's name; older guides say <code>onUnhandledRequest</code>, which is now a type error) makes any request no handler answers fail loudly instead of trying the real network. Measured, a request to <code>http://127.0.0.1:4000</code> instead of <code>localhost</code>: "[MSW] Error: intercepted a request without a matching request handler", and the app's <code>fetch</code> fails. (MSW lets requests for common files such as pictures pass without the error.)</li>
+                    <li><strong><code>retry: false</code></strong>: the app's cache retries a failed request twice, with a pause before each try (Lesson 7.1). Good for organizers on a shaky connection, bad for a test that wants to see the error now. Common Mistakes shows what happens without this line.</li>
+                    <li><strong><code>server.resetHandlers()</code></strong> removes the answers a test added for itself, and <code>removeAllListeners()</code> stops <code>recordRequests</code> listening.</li>
+                    <li><strong><code>window.scrollTo</code></strong>: jsdom draws nothing, so it has no scrolling; React Router's <code>ScrollRestoration</code> calls it, and jsdom would print "Not implemented: Window's scrollTo() method" for every page change. A function that does nothing is the honest stand-in.</li>
+                </ul>
+            </section>
+
+            <section id="waiting" class="lesson-section">
+                <h2>⏳ Waiting, and Changing One Answer</h2>
+                <p>A request takes time, even to a mock API. Right after <code>render</code>, a page with a loader shows nothing of its own yet, so <code>getBy</code> fails at once (Common Mistakes has the measured message). Lesson 9.1's table had the answer waiting: the <code>findBy</code> queries return a <code>Promise</code> and keep looking until the element appears, for up to one second by default.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Tool</th><th>Waits until…</th><th>Use it for</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>await screen.findByRole(…)</code></td><td>The element appears</td><td>Data from the API, a page after a redirect, a message after saving</td></tr>
+                            <tr><td><code>await waitFor(() =&gt; expect(…))</code></td><td>The check inside stops throwing</td><td>Things that are not elements: a function was called, a Hook's result changed</td></tr>
+                            <tr><td><code>getBy…</code> after an awaited action</td><td>Does not wait</td><td>Whatever the action changed at once (the details opening after a click)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>A test with <code>await</code> in it is an <code>async</code> function, and Vitest waits for its <code>Promise</code> before it moves on. Inside, read it top to bottom like a story: act, wait for the result, check it.</p>
+                <h3>One answer, for one test: <code>server.use()</code></h3>
+                <p>The mock API answers like the real one, so most tests need nothing else: a full cleanup really is full, a wrong password really gets a 401. But some answers are hard to cause on purpose: a server failure, or a photo the API refuses even though the app's own check let it through. <code>server.use()</code> puts a handler in front of the API's own, for the rest of this test only:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/components/PhotoUpload.test.tsx</div>
+                    <pre data-src="shoreline-hq/src/components/PhotoUpload.test.tsx" data-match="excerpt"><code class="language-tsx">// This test only: the API refuses every photo with this status
+server.use(
+  http.post(`${API_URL}/api/photos`, () =&gt;
+    HttpResponse.json({ error, message } satisfies ApiErrorBody, { status }),
+  ),
+)</code></pre>
+                </div>
+                <p><code>http.post(url, resolver)</code> matches one method and address (<code>:signupId</code>-style parameters work too), and <code>HttpResponse.json(body, { status })</code> builds the answer. <code>satisfies ApiErrorBody</code> is a TypeScript touch worth copying: the made-up answer is checked against the API's own error type, so a typo such as <code>error: 'too_large'</code> is a compile error instead of a test that checks something the real API never sends. After the test, <code>resetHandlers()</code> in the setup file removes the override.</p>
+                <div class="card card-info">
+                    <h4>💡 Prefer the real rule over an override</h4>
+                    <p>Before you reach for <code>server.use()</code>, check whether the API's own rules can produce the answer. The edit form's server-side error in Step 4 needs no override: Weekend Cove Cleanup really has 18 people signed up, so the API really refuses a capacity of 10. Overrides are for what you cannot cause: failures, rare statuses, and slow or odd answers.</p>
+                </div>
+            </section>
+
+            <section id="pages" class="lesson-section">
+                <h2>🗺️ Whole Pages: Routes, Loaders and Guards</h2>
+                <p>Lesson 9.1's <code>renderWithProviders</code> puts one component at one route. That is right for a card or a header, but the HQ's pages depend on their routes: the edit page's data comes from <code>editEventLoader</code>, the guard is a loader on a pathless route, and saving <em>navigates</em> to another page. A one-route router has none of that. There were two ways to give the tests real routes:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Option</th><th>Gains</th><th>Costs</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A catch-all <code>*</code> route in <code>renderWithProviders</code></td><td>Links and <code>navigate()</code> land somewhere instead of React Router's 404</td><td>No loaders, no guards: the test checks a page that never exists in the app</td></tr>
+                            <tr><td><strong>Export the app's route array</strong> and render it in a memory router</td><td>The real loaders, guards, redirects, error pages and layout; a test checks what a person gets</td><td>A small move in <code>App.tsx</code>; the test starts at an address instead of a component</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The course takes the second: the guards are the rule most worth testing, and they only exist on the real routes. The array moves to its own file, <code>routes.tsx</code>, because a file that exports a component (<code>App</code>) and something else is what oxlint's <code>only-export-components</code> rule warns about. <code>App.tsx</code> imports it:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                    <pre data-src="shoreline-hq/src/App.tsx"><code class="language-tsx">import { QueryClientProvider } from '@tanstack/react-query'
+import { createBrowserRouter } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
+import { queryClient } from './api/queries.ts'
+import { AuthProvider } from './auth/AuthProvider.tsx'
+import { routes } from './routes.tsx'
+
+// The browser's router: the address bar decides which of the HQ's routes is shown
+const router = createBrowserRouter(routes)
+
+export function App() {
+  return (
+    // The cache is outside everything else: every page and loader shares it
+    &lt;QueryClientProvider client={queryClient}&gt;
+      &lt;AuthProvider&gt;
+        &lt;RouterProvider router={router} /&gt;
+      &lt;/AuthProvider&gt;
+    &lt;/QueryClientProvider&gt;
+  )
+}</code></pre>
+                </div>
+                <p>And the render helpers share their providers, with a new <code>renderApp(route, session)</code> next to the old helper:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/test/render.tsx</div>
+                    <pre data-src="shoreline-hq/src/test/render.tsx"><code class="language-tsx">// Render a component the way the app shows it: inside the cache, the sign-in state and a router
+import { QueryClientProvider } from '@tanstack/react-query'
+import { render } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { ReactElement } from 'react'
+import { createMemoryRouter, type DataRouter } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
+import { saveSession, type Session } from '../api/client.ts'
+import { queryClient } from '../api/queries.ts'
+import { AuthProvider } from '../auth/AuthProvider.tsx'
+import { routes } from '../routes.tsx'
+
+export interface RenderOptions {
+  /** The address the test starts at (default '/') */
+  route?: string
+  /** The route pattern the component is shown at, for useParams (default: the same as route) */
+  path?: string
+  /** Who is signed in (default: nobody) */
+  session?: Session | null
+}
+
+// The providers App.tsx puts around the router, around a router made for the test
+function renderRouter(router: DataRouter, session: Session | null) {
+  saveSession(session)
+  // A pretend person who types and clicks: set up before rendering
+  const user = userEvent.setup()
+  const result = render(
+    &lt;QueryClientProvider client={queryClient}&gt;
+      &lt;AuthProvider&gt;
+        &lt;RouterProvider router={router} /&gt;
+      &lt;/AuthProvider&gt;
+    &lt;/QueryClientProvider&gt;,
+  )
+  return { ...result, router, user }
+}
+
+/** One component, shown at one route */
+export function renderWithProviders(
+  ui: ReactElement,
+  { route = '/', path = route, session = null }: RenderOptions = {},
+) {
+  // A router that keeps its history in memory: no browser address bar needed
+  const router = createMemoryRouter([{ path, element: ui }], { initialEntries: [route] })
+  return renderRouter(router, session)
+}
+
+/** The whole app at an address: the layout, the real routes, their loaders and guards */
+export function renderApp(route: string, session: Session | null = null) {
+  const router = createMemoryRouter(routes, { initialEntries: [route] })
+  return renderRouter(router, session)
+}</code></pre>
+                </div>
+                <p><code>DataRouter</code> is React Router's type for what <code>createMemoryRouter</code> and <code>createBrowserRouter</code> return. The helpers return it, so a test can read <code>router.state.location.pathname</code> to see where a click or a redirect went.</p>
+                <h3>Testing a guard</h3>
+                <p>Lesson 6.3 gave the organizers-only pages a rule with two halves: guests are sent to sign in with <code>?next=</code>, and they are sent away <em>before any request goes out</em>, which is why <code>editEventLoader</code> calls <code>organizersOnly(args)</code> first. The second half is invisible on screen, so only a test can keep it true:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/routes.test.tsx</div>
+                    <pre data-src="shoreline-hq/src/routes.test.tsx" data-match="excerpt"><code class="language-tsx">it('send guests to sign in first, without asking the API for anything', async () =&gt; {
+  const requests = recordRequests()
+  const { router } = renderApp('/events/e08/edit')
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeInTheDocument()
+  expect(router.state.location.pathname).toBe('/sign-in')
+  expect(router.state.location.search).toBe('?next=%2Fevents%2Fe08%2Fedit')
+  // The guard ran first: no cleanup, no sites, nothing a guest may not see
+  expect(requests).toEqual([])
+})</code></pre>
+                </div>
+                <div class="mermaid">
+graph TD
+    A["renderApp('/events/e08/edit')"] --> B["Guard loader: no session"]
+    B --> C["Redirect to /sign-in?next=..."]
+    C --> D["Sign in page"]
+    B -.-> E["No request to the API"]
+                </div>
+                <p>Step 5 breaks the rule on purpose to watch the test catch it.</p>
+            </section>
+
+            <section id="hooks" class="lesson-section">
+                <h2>🪝 Testing Hooks</h2>
+                <p>A Hook can only run inside a component, so <code>renderHook</code> renders a tiny one for you that calls your Hook and keeps its latest return value in <code>result.current</code>. <code>rerender(newProps)</code> calls it again with new arguments, and <code>unmount()</code> removes it, which runs the effects' cleanups:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/hooks/useDocumentTitle.test.ts</div>
+                    <pre data-src="shoreline-hq/src/hooks/useDocumentTitle.test.ts"><code class="language-ts">import { renderHook } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { useDocumentTitle } from './useDocumentTitle.ts'
+
+describe('useDocumentTitle', () =&gt; {
+  it('names the tab while the component is shown, then puts the old name back', () =&gt; {
+    document.title = 'Shoreline Crew HQ'
+    // renderHook calls the Hook inside a small test component; props can change later
+    const { rerender, unmount } = renderHook(({ title }) =&gt; useDocumentTitle(title), {
+      initialProps: { title: 'Beach sites' },
+    })
+    expect(document.title).toBe('Beach sites · Shoreline Crew HQ')
+
+    rerender({ title: 'Cleanup events' })
+    expect(document.title).toBe('Cleanup events · Shoreline Crew HQ')
+
+    unmount()
+    expect(document.title).toBe('Shoreline Crew HQ')
+  })
+})</code></pre>
+                </div>
+                <p>The <code>initialProps</code> object gives the callback's parameter its type: TypeScript knows <code>title</code> is a <code>string</code>, and <code>rerender({ title: 3 })</code> would not compile. Hooks that need a provider get a <code>wrapper</code> component. That is how Step 7 tests the most delicate code in the HQ, the optimistic check-in from Lesson 7.2: <code>renderHook(() =&gt; useMutation(markMutation('e17', 'v01')), { wrapper })</code>, then <code>result.current.mutate(…)</code>, then a look into the cache before and after the API answers.</p>
+                <div class="card card-info">
+                    <h4>💡 When to use renderHook</h4>
+                    <p>Test a Hook on its own when it is shared logic with no screen of its own (<code>useDebouncedValue</code>, a mutation's cache handling). When a Hook only exists to serve one component, test the component instead: what a person sees is the better contract.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Forgetting <code>await</code> before a user-event action</h3>
+                    <pre data-snippet><code class="language-tsx">user.click(screen.getByRole('button', { name: /^Show details/ }))
+
+expect(screen.getByText(/Expect mud/)).toBeInTheDocument()</code></pre>
+                    <p>Measured: the click starts, but the next line checks the page before it has happened:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>     × opens the details with a click 72ms
+...
+ FAIL  src/components/NoAwait.test.tsx &gt; EventCard &gt; opens the details with a click
+TestingLibraryElementError: Unable to find an element with the text: /Expect mud/. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.</code></pre>
+                    </div>
+                    <p>Put <code>await</code> before every <code>user.…</code> call (and make the test <code>async</code>). The error says the text is not there, which is true at that moment: the test simply looked too early.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ <code>getBy</code> for data that is still loading</h3>
+                    <pre data-snippet><code class="language-tsx">renderApp('/events/e08/edit', organizer)
+
+expect(screen.getByLabelText('Title (5 to 80 characters)')).toHaveValue('Weekend Cove Cleanup')</code></pre>
+                    <p>Measured: the page printed in the error is the app's first-load placeholder, because the loader has not finished:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code> FAIL  src/pages/GetBy.test.tsx &gt; EditEventPage &gt; starts from the saved title
+TestingLibraryElementError: Unable to find a label with the text of: Title (5 to 80 characters)
+...
+&lt;body&gt;
+  &lt;div&gt;
+    &lt;p
+      role="status"
+    &gt;
+      Loading Shoreline Crew HQ…
+    &lt;/p&gt;</code></pre>
+                    </div>
+                    <p>Use <code>await screen.findByLabelText(…)</code> for the first thing that depends on the API; after it, the rest of the page is there and <code>getBy</code> is fine.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Leaving the app's retries on in tests</h3>
+                    <p>Measured without the <code>retry: false</code> lines in <code>setup.ts</code>: the 500 test failed after one second, although the app was doing exactly the right thing. It was still retrying when <code>findByRole</code> gave up:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>     × says what went wrong and offers to try again 1016ms
+...
+ FAIL  src/routes.test.tsx &gt; a page whose data does not load &gt; says what went wrong and offers to try again
+TestingLibraryElementError: Unable to find role="alert"
+...
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)</code></pre>
+                    </div>
+                    <p>A test that fails after a round 1000 ms, or that passes alone and times out on a slow machine, is often waiting for something with a built-in delay: retries, debouncing, animations. Turn the delay off for tests, or control the clock (Exercise 1).</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ MSW 2 code in an MSW 3 project</h3>
+                    <pre data-snippet data-legacy><code class="language-ts">server.listen({ onUnhandledRequest: 'error' })</code></pre>
+                    <p>Most MSW guides online are for version 2, and the option was renamed. Measured with <code>npx tsc -b</code>:</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/test/OldOption.ts:3:17 - error TS2353: Object literal may only specify known properties, and 'onUnhandledRequest' does not exist in type 'PartialObjectDeep&lt;SharedOptions, { recurseIntoArrays: false; allowUndefinedInNonTupleArrays: false; }&gt;'.
+
+3 server.listen({ onUnhandledRequest: 'error' })
+                  ~~~~~~~~~~~~~~~~~~
+
+
+Found 1 error in src/test/OldOption.ts:3</code></pre>
+                    </div>
+                    <p>Use <code>onUnhandledFrame</code>. (Even older guides import <code>rest</code> from <code>msw</code>; that was MSW 1. Today it is <code>http</code> and <code>HttpResponse</code>.)</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A request the mock API does not answer</h3>
+                    <p>If the app calls an address the handlers do not cover (here <code>127.0.0.1</code> instead of <code>localhost</code>, as happens when <code>.env.local</code> and the tests disagree), measured:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>[MSW] Error: intercepted a request without a matching request handler:
+
+  • GET http://127.0.0.1:4000/api/events
+
+If you still wish to intercept this unhandled request, please create a request handler for it.
+Read more: https://mswjs.io/docs/http/intercepting-requests
+...
+ FAIL  src/test/Unhandled.test.ts &gt; asks a server the mock API does not stand in for
+TypeError: fetch failed
+Caused by: InternalError: [MSW] Cannot bypass a request when using the "error" strategy for the "onUnhandledFrame" option.</code></pre>
+                    </div>
+                    <p>Read MSW's message first: it names the method and the full address. Then compare the address with <code>API_URL</code>. Without any address at all (no <code>.env.local</code> and no <code>test.env</code>), measured: every page test shows the app's "Something went wrong on this page", because <code>client.ts</code> throws "VITE_API_URL is not set" inside the loader.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Tests That Click and Wait</h2>
+                <p>Step 1 installs the tools and puts the mock API into the tests, Step 2 writes the first clicks, Step 3 gives the tests the app's real routes, Steps 4 to 6 test the edit form, the guards and the uploads, Step 7 tests two Hooks including the optimistic check-in, and Step 8 runs everything. Keep <code>npm test</code> running in watch mode in one terminal; you do not need shoreline-api or the dev server.</p>
+
+                <div class="card">
+                    <h3>Step 1: Install, and bring the mock API into the tests <span class="step-time">(12 min)</span></h3>
+                    <p>In <code>shoreline-hq</code>, install the two packages as development dependencies:</p>
+                    <pre class="terminal"><code class="language-bash">npm install --save-dev @testing-library/user-event msw</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>added 42 packages, and audited 192 packages in 3s
+
+46 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities</code></pre>
+                    </div>
+                    <p>The course was checked with user-event 14.6.10 and MSW 3.0.5. Now copy shoreline-api's <code>core</code> and <code>msw</code> folders into a new <code>src/mocks</code> folder (your file manager's copy and paste works too). On macOS and Linux, from <code>shoreline-hq</code>:</p>
+                    <pre class="terminal"><code class="language-bash">mkdir -p src/mocks
+cp -r ../shoreline-api/core ../shoreline-api/msw src/mocks/</code></pre>
+                    <p>In PowerShell on Windows:</p>
+                    <pre class="terminal"><code class="language-bash">New-Item -ItemType Directory -Force src/mocks
+Copy-Item -Recurse ../shoreline-api/core, ../shoreline-api/msw src/mocks/</code></pre>
+                    <p>You should now have <code>src/mocks/core/api.ts</code>, <code>seed.ts</code>, <code>types.ts</code> and <code>src/mocks/msw/handlers.ts</code>. <code>npx tsc -b</code> and <code>npm run lint</code> stay clean: the API was written to the same strict settings as the HQ. Nothing in the app imports these files, so they never reach the bundle. Next, give the tests the API's address in <code>vite.config.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                        <pre data-src="shoreline-hq/vite.config.ts" data-match="diff"><code class="language-diff-ts diff-highlight">     setupFiles: ['./src/test/setup.ts'],
+     include: ['src/**/*.test.{ts,tsx}'],
++    env: { VITE_API_URL: 'http://localhost:4000' },
+   },
+ })</code></pre>
+                    </div>
+                    <p>Create <code>src/test/server.ts</code> and replace <code>src/test/setup.ts</code> with the two files from "The Mock API Inside the Tests". Finally, the test sessions now reach the API's code, which only accepts tokens it knows. shoreline-api has two development tokens for exactly this (the same ones its README uses with curl). In <code>src/test/factories.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/test/factories.ts</div>
+                        <pre data-src="shoreline-hq/src/test/factories.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> }
+ 
+-/** Maya, signed in as an organizer */
++/** Maya, signed in as an organizer (dev-organizer: a token the API accepts without signing in) */
+ export const organizer: Session = {
+-  token: 'test-organizer',
++  token: 'dev-organizer',
+   user: { id: 'v01', name: 'Maya Okafor', email: 'maya.okafor@example.com', role: 'organizer' },
+ }
+ 
+-/** Theo, signed in as a volunteer */
++/** Theo, signed in as a volunteer (dev-volunteer: the API's volunteer token) */
+ export const volunteer: Session = {
+-  token: 'test-volunteer',
++  token: 'dev-volunteer',
+   user: { id: 'v04', name: 'Theo Nakamura', email: 'theo.nakamura@example.com', role: 'volunteer' },
+ }</code></pre>
+                    </div>
+                    <p>Save: all 29 tests from Lesson 9.1 should still pass, now with the mock server listening.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The first clicks <span class="step-time">(6 min)</span></h3>
+                    <p>In <code>src/test/render.tsx</code>, add the user-event setup to <code>renderWithProviders</code> for now: import <code>userEvent</code>, call <code>const user = userEvent.setup()</code> before <code>render</code>, and return <code>user</code> along with the rest (Step 3 replaces the whole file with the version shown in "Whole Pages", which does the same). Then add the two tests from "Clicking and Typing with user-event" to <code>EventCard.test.tsx</code>, after the details-button test.</p>
+                    <div class="card card-output">
+                        <h4>Expected output (from <code>npx vitest run src/components/EventCard.test.tsx</code>)</h4>
+                        <pre><code> RUN  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+ ✓ src/components/EventCard.test.tsx (8 tests) 137ms
+   ✓ EventCard (8)
+     ✓ links the title to the cleanup page 54ms
+     ✓ shows the date, the status, the meeting point and the spots left 8ms
+     ✓ says when the site is not known yet 5ms
+     ✓ has a details button named after the cleanup, closed at first 6ms
+     ✓ opens and closes the details with a click 31ms
+     ✓ opens the details from the keyboard 21ms
+     ✓ leaves out the meeting point and supplies in compact lists 3ms
+     ✓ shows supplies in roomy lists (the store was reset after the last test) 3ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  00:57:49
+   Duration  989ms (environment 39%, setup 17%, tests 15%, import 14%, transform 14%)</code></pre>
+                    </div>
+                    <p>Make one fail on purpose: change <code>/Expect mud/</code> in the keyboard test to <code>/Expect sand/</code>, read the message, and put it back.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: The app's real routes in the tests <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>src/routes.tsx</code>. Move the route array out of <code>App.tsx</code> into it, together with the imports it needs (the pages, loaders, guards, <code>signInAction</code>, <code>AppLayout</code>), name it <code>routes</code>, export it, and type it as <code>RouteObject[]</code>. The routes themselves do not change, apart from one new line explained below:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/routes.tsx</div>
+                        <pre data-src="shoreline-hq/src/routes.tsx" data-match="excerpt"><code class="language-tsx">// Every address the HQ knows, and the page it shows there. App.tsx gives these routes to the
+// browser's router; the tests give the same ones to a router in memory (Lesson 9.2).
+import type { RouteObject } from 'react-router'
+import { guestsOnly, onlyWhenThePathChanges, organizersOnly } from './auth/guards.ts'
+// ...
+export const routes: RouteObject[] = [
+  {
+    path: '/',
+    element: &lt;AppLayout /&gt;,
+    // Shown on the very first load while the first page's loaders fetch its data
+    hydrateFallbackElement: &lt;p role="status"&gt;Loading Shoreline Crew HQ…&lt;/p&gt;,
+    children: [
+      {
+        // A route without a path: it adds the error page and keeps the layout around it
+        errorElement: &lt;ErrorPage /&gt;,
+        children: [
+// ...
+        ],
+      },
+    ],
+  },
+]</code></pre>
+                    </div>
+                    <p>Replace <code>App.tsx</code> and <code>src/test/render.tsx</code> with the versions in "Whole Pages". Then create <code>src/pages/EditEventPage.test.tsx</code> with only its first test from Step 4 and watch it run. Measured before the new line in <code>routes.tsx</code> and before the <code>scrollTo</code> stub in <code>setup.ts</code>, the test passed but printed this on stderr:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>stderr | src/pages/EditEventPage.test.tsx &gt; EditEventPage &gt; saves new details and shows the cleanup
+No `HydrateFallback` element provided to render during initial hydration
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method</code></pre>
+                    </div>
+                    <p>stderr lines never fail a test, but they are worth reading, and these two are findings. The second is jsdom (no scrolling, fixed by the stub). The first is about the app: on the very first load, the HQ shows <em>nothing</em> while the first page's loaders fetch (the same React Router code warns about it in the browser's console during development). <code>hydrateFallbackElement</code> on the layout route fills that gap with a status message, for the tests and for organizers on a slow connection.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The edit form, against the API's rules <span class="step-time">(10 min)</span></h3>
+                    <p>Complete <code>src/pages/EditEventPage.test.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EditEventPage.test.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EditEventPage.test.tsx"><code class="language-tsx">import { screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { organizer } from '../test/factories.ts'
+import { renderApp } from '../test/render.tsx'
+import { api, recordRequests } from '../test/server.ts'
+
+describe('EditEventPage', () =&gt; {
+  it('saves new details and shows the cleanup', async () =&gt; {
+    const { user, router } = renderApp('/events/e08/edit', organizer)
+
+    // The loader fetches the cleanup first: wait for the form
+    const title = await screen.findByLabelText('Title (5 to 80 characters)')
+    expect(title).toHaveValue('Weekend Cove Cleanup')
+
+    await user.clear(title)
+    await user.type(title, 'Weekend Cove Big Sweep')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    // After saving, the app goes to the cleanup's page, which shows the new title
+    expect(await screen.findByRole('heading', { level: 1, name: 'Weekend Cove Big Sweep' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/events/e08')
+    // And the API has it: the same code the real server runs
+    expect(api.data.events.find((event) =&gt; event.id === 'e08')?.title).toBe('Weekend Cove Big Sweep')
+  })
+
+  it("shows the form's own message and sends nothing", async () =&gt; {
+    const { user } = renderApp('/events/e08/edit', organizer)
+    const title = await screen.findByLabelText('Title (5 to 80 characters)')
+    const requests = recordRequests()
+
+    await user.clear(title)
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Add a title.')).toBeInTheDocument()
+    expect(title).toHaveAttribute('aria-invalid', 'true')
+    expect(requests).toEqual([])
+  })
+
+  it("puts the API's message under the field when its rules say no", async () =&gt; {
+    const { user } = renderApp('/events/e08/edit', organizer)
+    const capacity = await screen.findByLabelText('Volunteers needed (1 to 200)')
+
+    // Weekend Cove Cleanup is full: 18 people hold a spot. Only the API knows that.
+    await user.clear(capacity)
+    await user.type(capacity, '10')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(
+      await screen.findByText('18 volunteers already hold a spot: capacity cannot be lower.'),
+    ).toBeInTheDocument()
+    expect(capacity).toHaveFocus()
+    expect(screen.getByText('Some fields need attention.')).toBeInTheDocument()
+  })
+})</code></pre>
+                    </div>
+                    <ul>
+                        <li>The first test is a whole journey: the loader fetches, the person edits and saves, React Hook Form and Zod check, the mutation sends <code>PATCH</code>, the app navigates, and the event page loads the new title. <code>api.data</code> confirms the API saved it.</li>
+                        <li>The second proves the form's own check stops the save: <code>recordRequests()</code> starts after the page has loaded, so it sees only what the click caused, which is nothing.</li>
+                        <li>The third gets a real 400 from the API's rule (no override) and checks Lesson 8.1's promise: the API's message under the field, and the focus on it.</li>
+                    </ul>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code> RUN  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+ ✓ src/pages/EditEventPage.test.tsx (3 tests) 323ms
+   ✓ EditEventPage (3)
+     ✓ saves new details and shows the cleanup 223ms
+     ✓ shows the form's own message and sends nothing 41ms
+     ✓ puts the API's message under the field when its rules say no 54ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  00:57:53
+   Duration  1.05s (tests 33%, environment 30%, import 13%, setup 12%, transform 11%)</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Guards, and a page that fails <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>src/routes.test.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/routes.test.tsx</div>
+                        <pre data-src="shoreline-hq/src/routes.test.tsx"><code class="language-tsx">import { screen } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
+import { describe, expect, it } from 'vitest'
+import { organizer, volunteer } from './test/factories.ts'
+import { renderApp } from './test/render.tsx'
+import { API_URL, recordRequests, server } from './test/server.ts'
+
+describe('organizers-only pages', () =&gt; {
+  it('send guests to sign in first, without asking the API for anything', async () =&gt; {
+    const requests = recordRequests()
+    const { router } = renderApp('/events/e08/edit')
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/sign-in')
+    expect(router.state.location.search).toBe('?next=%2Fevents%2Fe08%2Fedit')
+    // The guard ran first: no cleanup, no sites, nothing a guest may not see
+    expect(requests).toEqual([])
+  })
+
+  it('turn volunteers away with a 403 page', async () =&gt; {
+    renderApp('/volunteers', volunteer)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Organizers only' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Volunteers' })).not.toBeInTheDocument()
+  })
+
+  it('open for organizers', async () =&gt; {
+    renderApp('/volunteers', organizer)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Volunteers' })).toBeInTheDocument()
+    expect(await screen.findByText('Found 24 people.')).toBeInTheDocument()
+  })
+
+  it('come back after signing in', async () =&gt; {
+    const { user, router } = renderApp('/events/new')
+
+    await user.type(await screen.findByLabelText('Email'), 'maya.okafor@example.com')
+    await user.type(screen.getByLabelText('Password'), 'shoreline-demo')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Plan a cleanup' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/events/new')
+  })
+})
+
+describe('a page whose data does not load', () =&gt; {
+  it('says what went wrong and offers to try again', async () =&gt; {
+    server.use(
+      http.get(`${API_URL}/api/events`, () =&gt;
+        HttpResponse.json({ error: 'server_error', message: 'Down for repairs.' }, { status: 500 }),
+      ),
+    )
+    const { user } = renderApp('/events')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The server had a problem (500).')
+    // The API is back: Try again asks once more
+    server.resetHandlers()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('Weekend Cove Cleanup')).toBeInTheDocument()
+  })
+})</code></pre>
+                    </div>
+                    <p>The four guard tests cover the whole rule: guests (no request), volunteers (403 page), organizers (the page), and the way back after signing in through the real sign-in form and the API's real password check. The last test fails <code>GET /api/events</code> for one moment, then calls <code>server.resetHandlers()</code> itself, which is what "the server is back" looks like, and clicks <strong>Try again</strong>.</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code> RUN  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+stderr | src/routes.test.tsx &gt; organizers-only pages &gt; open for organizers
+The tag &lt;search&gt; is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+
+ ✓ src/routes.test.tsx (5 tests) 342ms
+   ✓ organizers-only pages (4)
+     ✓ send guests to sign in first, without asking the API for anything 75ms
+     ✓ turn volunteers away with a 403 page 17ms
+     ✓ open for organizers 58ms
+     ✓ come back after signing in 135ms
+   ✓ a page whose data does not load (1)
+     ✓ says what went wrong and offers to try again 52ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  00:57:55
+   Duration  1.07s (tests 34%, environment 30%, import 13%, setup 12%, transform 11%)</code></pre>
+                    </div>
+                    <p>The stderr note is jsdom again: it does not know the <code>&lt;search&gt;</code> element yet (browsers do), and React warns about the unknown tag. The page still works and the test passes; Lesson 9.3's real browser has no such gap. Now break the rule the first test protects. In <code>src/pages/loaders.ts</code>, comment out <code>organizersOnly(args)</code> in <code>editEventLoader</code> and save:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_30/30-guard-caught.png" alt="A terminal in shoreline-hq running npx vitest run on routes.test.tsx with the guard call in editEventLoader commented out. One test has a red cross: send guests to sign in first, without asking the API for anything. The failure shows Expected an empty list in green and Received a list of two requests in red, GET /api/events/e08 and GET /api/sites, with a caret under toEqual on line 17. Summary: 1 failed, 4 passed." width="1100" height="1025" loading="lazy">
+                        <figcaption>The guard test at work: with the guard call commented out, a guest's visit sends two requests before the redirect, and the test names both of them.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code> FAIL  src/routes.test.tsx &gt; organizers-only pages &gt; send guests to sign in first, without asking the API for anything
+AssertionError: expected [ 'GET /api/events/e08', …(1) ] to deeply equal []
+...
+- Expected
++ Received
+
+- []
++ [
++   "GET /api/events/e08",
++   "GET /api/sites",
++ ]
+...
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 passed (5)</code></pre>
+                    </div>
+                    <p>The guest still ends up on the sign-in page (the guard route's own loader redirects), so a person clicking through would see nothing wrong. But the child loader already asked the API for the cleanup and the sites, and the test names both requests. Put the line back.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Uploads, and answers you choose <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>src/components/PhotoUpload.test.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/PhotoUpload.test.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/PhotoUpload.test.tsx"><code class="language-tsx">import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
+import { describe, expect, it, vi } from 'vitest'
+import type { ApiErrorBody, Photo } from '../api/types.ts'
+import { organizer } from '../test/factories.ts'
+import { renderWithProviders } from '../test/render.tsx'
+import { API_URL, recordRequests, server } from '../test/server.ts'
+import { PhotoUpload } from './PhotoUpload.tsx'
+
+// A tiny file with a name and a type: the API checks the type and the size, not the picture
+function photoFile(name: string, type: string, bytes = 2048) {
+  return new File([new Uint8Array(bytes)], name, { type })
+}
+
+// What POST /api/photos answers: the saved photo
+const savedPhoto: Photo = {
+  id: 'p1',
+  url: `${API_URL}/api/photos/p1`,
+  contentType: 'image/jpeg',
+  bytes: 2048,
+  uploadedBy: 'v01',
+  createdAt: '2026-07-04T18:00:00.000Z',
+}
+
+// The props the form passes: vi.fn() records every call, so the test can check them
+function renderUpload() {
+  const onUploaded = vi.fn()
+  const view = renderWithProviders(
+    &lt;PhotoUpload photos={[]} onUploaded={onUploaded} onRemove={vi.fn()} /&gt;,
+    { session: organizer },
+  )
+  return { ...view, onUploaded, input: screen.getByLabelText(/^Add a photo/) }
+}
+
+describe('PhotoUpload', () =&gt; {
+  it('uploads a JPEG as form data and hands the saved photo to the form', async () =&gt; {
+    // jsdom's File cannot be read by the API's code in Node, so this answer is the test's own
+    let contentType: string | null = null
+    server.use(
+      http.post(`${API_URL}/api/photos`, ({ request }) =&gt; {
+        contentType = request.headers.get('Content-Type')
+        return HttpResponse.json(savedPhoto, { status: 201 })
+      }),
+    )
+    const { user, input, onUploaded } = renderUpload()
+
+    await user.upload(input, photoFile('bags-at-the-stairs.jpg', 'image/jpeg'))
+
+    await waitFor(() =&gt; expect(onUploaded).toHaveBeenCalledTimes(1))
+    expect(onUploaded).toHaveBeenCalledWith({
+      id: 'p1',
+      url: savedPhoto.url,
+      name: 'bags-at-the-stairs.jpg',
+    })
+    // fetch wrote the multipart header and its boundary (Lesson 8.2): the app did not
+    expect(contentType).toMatch(/^multipart\/form-data; boundary=/)
+  })
+
+  it('refuses a GIF before sending anything', async () =&gt; {
+    const { input, onUploaded } = renderUpload()
+    const requests = recordRequests()
+    // user-event skips files that do not match accept, like a file picker. Some pickers let
+    // people choose "All files": applyAccept: false chooses it anyway.
+    const user = userEvent.setup({ applyAccept: false })
+
+    await user.upload(input, photoFile('crew-photo.gif', 'image/gif'))
+
+    expect(screen.getByText('crew-photo.gif is not a JPEG, PNG or WebP image.')).toBeInTheDocument()
+    expect(input).toHaveAttribute('aria-invalid', 'true')
+    expect(requests).toEqual([])
+    expect(onUploaded).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [413, 'payload_too_large', 'Photos must be 5 MB or smaller.'],
+    [415, 'unsupported_media_type', 'Photos must be JPEG, PNG or WebP images.'],
+  ] as const)('shows the message of a %i answer', async (status, error, message) =&gt; {
+    // This test only: the API refuses every photo with this status
+    server.use(
+      http.post(`${API_URL}/api/photos`, () =&gt;
+        HttpResponse.json({ error, message } satisfies ApiErrorBody, { status }),
+      ),
+    )
+    const { user, input, onUploaded } = renderUpload()
+
+    await user.upload(input, photoFile('bags-at-the-stairs.jpg', 'image/jpeg'))
+
+    expect(
+      await screen.findByText(`bags-at-the-stairs.jpg was not uploaded. ${message}`),
+    ).toBeInTheDocument()
+    expect(onUploaded).not.toHaveBeenCalled()
+  })
+})</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong><code>vi.fn()</code></strong> makes a <strong>mock function</strong>: it does nothing, but remembers every call, so <code>toHaveBeenCalledWith</code> can check what the component handed to the form. <code>expect.any(String)</code> and friends match "any value of this kind" inside such checks.</li>
+                        <li><strong>The JPEG test answers for itself.</strong> Measured: when the API's code reads a <code>File</code> made by jsdom, Node's <code>fetch</code> fails ("Request body length does not match content-length header", which the app shows as "Could not reach the server"). jsdom's files and Node's networking do not fully agree yet. So this one test answers <code>201</code> itself, and checks what it can: the request was multipart form data with a boundary that <code>fetch</code> wrote, not the app. The real upload, with real bytes, is a job for Lesson 9.3's real browser.</li>
+                        <li><strong>The GIF test</strong> needs its own <code>user</code>. Measured: with the default setup, user-event skips a file that does not match the input's <code>accept</code> list, just as a file picker hides it, and nothing happens at all. <code>applyAccept: false</code> chooses it anyway, as a person can by switching the picker to "All files".</li>
+                        <li><strong>The 413 and 415 tests</strong> are one <code>it.each</code> with a typed table (<code>as const</code> keeps the status numbers and error codes as literal types, which <code>satisfies ApiErrorBody</code> then checks).</li>
+                    </ul>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code> RUN  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+ ✓ src/components/PhotoUpload.test.tsx (4 tests) 161ms
+   ✓ PhotoUpload (4)
+     ✓ uploads a JPEG as form data and hands the saved photo to the form 96ms
+     ✓ refuses a GIF before sending anything 19ms
+     ✓ shows the message of a 413 answer 19ms
+     ✓ shows the message of a 415 answer 22ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  00:58:00
+   Duration  920ms (environment 37%, tests 19%, setup 15%, import 15%, transform 14%)</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 7: Hooks, and the optimistic check-in <span class="step-time">(12 min)</span></h3>
+                    <p>Create <code>src/hooks/useDocumentTitle.test.ts</code> with the test from "Testing Hooks". Then the mutation behind today's check-in desk. Create <code>src/api/mutations.test.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/mutations.test.tsx</div>
+                        <pre data-src="shoreline-hq/src/api/mutations.test.tsx"><code class="language-tsx">import { QueryClientProvider, useMutation } from '@tanstack/react-query'
+import { renderHook, waitFor } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
+import type { ReactNode } from 'react'
+import { describe, expect, it } from 'vitest'
+import { organizer } from '../test/factories.ts'
+import { API_URL, server } from '../test/server.ts'
+import { saveSession } from './client.ts'
+import { markMutation } from './mutations.ts'
+import { eventsQuery, queryClient, rosterQuery } from './queries.ts'
+import type { ApiErrorBody } from './types.ts'
+
+// renderHook renders a Hook inside a tiny test component; the wrapper gives it the cache
+function withCache({ children }: { children: ReactNode }) {
+  return &lt;QueryClientProvider client={queryClient}&gt;{children}&lt;/QueryClientProvider&gt;
+}
+
+// Today's check-in desk at the Tide Pool Morning Cleanup, as Maya sees it
+const roster = rosterQuery('e17', 'v01')
+
+/** The status of one sign-up in the cached roster */
+function cachedStatus(signupId: string) {
+  return queryClient.getQueryData(roster.queryKey)?.find((entry) =&gt; entry.id === signupId)?.status
+}
+
+async function deskWithRoster() {
+  saveSession(organizer)
+  // Fill the cache the way the page's query would: a real request to the mock API
+  const entries = await queryClient.query(roster)
+  const first = entries.find((entry) =&gt; entry.status === 'confirmed')
+  if (first === undefined) throw new Error('The sample data has no confirmed sign-up for e17')
+  const { result } = renderHook(() =&gt; useMutation(markMutation('e17', 'v01')), { wrapper: withCache })
+  return { result, signupId: first.id }
+}
+
+describe('markMutation', () =&gt; {
+  it('saves a check-in and marks the lists as out of date', async () =&gt; {
+    const { result, signupId } = await deskWithRoster()
+    // A list of cleanups someone looked at earlier
+    const { queryKey: listKey } = eventsQuery('perPage=50', 'v01')
+    queryClient.setQueryData(listKey, {
+      items: [],
+      page: { page: 1, perPage: 50, total: 0, totalPages: 0 },
+    })
+
+    result.current.mutate({ signupId, mark: 'attended' })
+
+    await waitFor(() =&gt; expect(result.current.isSuccess).toBe(true))
+    expect(cachedStatus(signupId)).toBe('attended')
+    // ['events'] was invalidated: the next time a list is shown, it is fetched again
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true)
+  })
+
+  it('shows the mark at once, and takes it back when the API says no', async () =&gt; {
+    const { result, signupId } = await deskWithRoster()
+    // What the cache said while the request was on its way to the API
+    let statusDuringRequest: string | undefined
+    server.use(
+      http.patch(`${API_URL}/api/signups/:signupId`, () =&gt; {
+        statusDuringRequest = cachedStatus(signupId)
+        const body: ApiErrorBody = { error: 'server_error', message: 'Something went wrong.' }
+        return HttpResponse.json(body, { status: 500 })
+      }),
+    )
+
+    result.current.mutate({ signupId, mark: 'attended' })
+
+    await waitFor(() =&gt; expect(result.current.isError).toBe(true))
+    expect(statusDuringRequest).toBe('attended')
+    expect(cachedStatus(signupId)).toBe('confirmed')
+  })
+})</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>queryClient.query(roster)</code> fills the cache the way the page's loader does: a real request to the mock API, as Maya. The first confirmed sign-up comes from the sample data, so the test needs no hard-coded id.</li>
+                        <li>The first test checks both halves of a successful save: the cached roster has the new mark, and every list of cleanups is marked out of date (<code>isInvalidated</code>), so the spots left are fetched again the next time a list is shown.</li>
+                        <li>The second test's override does something clever: before it answers 500, it looks into the cache. That records what the desk showed <em>while the request was on its way</em>: already "attended", which is what optimistic means. After the error, the cache is back to "confirmed".</li>
+                    </ul>
+                    <div class="card card-output">
+                        <h4>Expected output (from <code>npx vitest run src/hooks src/api/mutations.test.tsx</code>)</h4>
+                        <pre><code> RUN  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+ ✓ src/hooks/useDocumentTitle.test.ts (1 test) 17ms
+ ✓ src/api/mutations.test.tsx (2 tests) 160ms
+
+ Test Files  2 passed (2)
+      Tests  3 passed (3)
+   Start at  00:58:06
+   Duration  680ms (environment 54%, setup 23%, tests 17%, transform 4%, import 1%, worker 1%)</code></pre>
+                    </div>
+                    <p>Prove the rollback test is guarding something: in <code>src/api/mutations.ts</code>, delete the <code>onError</code> option of <code>markMutation</code> (with its comment) and save:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code> FAIL  src/api/mutations.test.tsx &gt; markMutation &gt; shows the mark at once, and takes it back when the API says no
+AssertionError: expected 'attended' to be 'confirmed' // Object.is equality
+
+Expected: "confirmed"
+Received: "attended"
+...
+ ❯ src/api/mutations.test.tsx:70:36
+     68|     await waitFor(() =&gt; expect(result.current.isError).toBe(true))
+     69|     expect(statusDuringRequest).toBe('attended')
+     70|     expect(cachedStatus(signupId)).toBe('confirmed')
+       |                                    ^
+     71|   })</code></pre>
+                    </div>
+                    <p>Without the rollback, the desk would keep showing someone as checked in although the API never saved it: the kind of bug that only shows up on the beach, on a bad connection. Undo the deletion.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 8: Run everything <span class="step-time">(4 min)</span></h3>
+                    <p>Stop watch mode with <kbd>q</kbd> and run the suite once, then the usual checks:</p>
+                    <pre class="terminal"><code class="language-bash">npx vitest run
+npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_30/30-all-green.png" alt="A terminal in shoreline-hq running npx vitest run. Twelve test files are listed with green check marks, among them routes.test.tsx, EditEventPage, PhotoUpload, mutations and useDocumentTitle, with one stderr note from jsdom about the search element. Summary: Test Files 12 passed, Tests 46 passed." width="1100" height="577" loading="lazy">
+                        <figcaption>Forty-six tests that click, type, upload and wait for shoreline-api's own code, in under two seconds and with no server running.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code> RUN  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+ ✓ src/utils/availability.test.ts (5 tests) 24ms
+ ✓ src/hooks/useDocumentTitle.test.ts (1 test) 27ms
+ ✓ src/utils/format.test.ts (3 tests) 17ms
+ ✓ src/utils/formErrors.test.ts (3 tests) 15ms
+ ✓ src/api/schemas.test.ts (4 tests) 21ms
+ ✓ src/components/ErrorSummary.test.tsx (4 tests) 104ms
+ ✓ src/api/mutations.test.tsx (2 tests) 176ms
+ ✓ src/components/Header.test.tsx (4 tests) 110ms
+stderr | src/routes.test.tsx &gt; organizers-only pages &gt; open for organizers
+The tag &lt;search&gt; is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+
+ ✓ src/components/EventCard.test.tsx (8 tests) 165ms
+ ✓ src/components/PhotoUpload.test.tsx (4 tests) 185ms
+ ✓ src/pages/EditEventPage.test.tsx (3 tests) 365ms
+ ✓ src/routes.test.tsx (5 tests) 389ms
+
+ Test Files  12 passed (12)
+      Tests  46 passed (46)
+   Start at  00:57:41
+   Duration  1.51s (environment 50%, setup 20%, tests 14%, import 8%, transform 8%)
+&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 19ms on 95 files with 150 rules using 20 threads.
+&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 352 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-CatUgjh8.css                            11.06 kB │ gzip:   3.08 kB
+dist/assets/index-B-Vm3u1y.js                            581.69 kB │ gzip: 182.31 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.33s</code></pre>
+                    </div>
+                    <p>The files may finish in a different order on your machine, and your times and hashes will differ. The build has one module more than in Lesson 8.2 (352: <code>routes.tsx</code>, which only moved code that was already there) and 581.69 kB of JavaScript, 0.11 kB more: the first-load message. <code>src/mocks</code>, <code>src/test</code> and the test files are never imported by the app, so none of them reach the bundle.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>user-event and MSW are installed as dev dependencies, and <code>src/mocks</code> is an unedited copy of shoreline-api's <code>core</code> and <code>msw</code> folders</li>
+                        <li><code>server.ts</code> and <code>setup.ts</code> start the mock API, reset it before each test, remove overrides and listeners after each test, fail on unanswered requests and turn retries off</li>
+                        <li><code>routes.tsx</code> holds the app's routes (with the first-load message), <code>App.tsx</code> and <code>renderApp</code> both use it</li>
+                        <li>Tests click and type through the event card, the edit form (including the API's capacity rule) and the sign-in form</li>
+                        <li>The guard tests prove guests are redirected with no API request and volunteers get the 403 page</li>
+                        <li>Upload tests cover a good photo, a GIF that never leaves the browser, and the API's 413 and 415 answers</li>
+                        <li><code>renderHook</code> tests cover <code>useDocumentTitle</code> and the check-in mutation's cache update, invalidation and rollback; all 46 tests, <code>tsc -b</code>, lint and the build pass</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, pick the one rule that would hurt most if it broke silently (a permission, a payment step, a rule only the server knows) and write its test as three lines of plain English: what the person does, what they should see, and what must <em>not</em> happen (a request, a save, a page). That third line is the one people forget, and the one Step 5 showed is worth a test.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercise 1 is part of the lesson (about 7 minutes, included in the lesson time). Exercises 2 and 3 are optional stretches, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Test the search box's pause</h3>
+                    <p>Write <code>src/hooks/useDebouncedValue.test.ts</code> for Lesson 4.2's <code>useDebouncedValue</code>: the old value stays until the new one has been still for the whole delay, and every change starts the wait again. Do not make the test actually wait 300 milliseconds.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Use <code>renderHook</code> with <code>initialProps: { value: 'pel' }</code> and <code>rerender({ value: 'pelican' })</code>. <code>vi.useFakeTimers()</code> (in a <code>beforeEach</code>, with <code>vi.useRealTimers()</code> in an <code>afterEach</code>) lets you move time yourself with <code>vi.advanceTimersByTime(ms)</code>. The timer sets state, so wrap the advance in <code>act(() =&gt; …)</code> from Testing Library: it tells React to finish that update before your next line.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">import { act, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useDebouncedValue } from './useDebouncedValue.ts'
+
+describe('useDebouncedValue', () =&gt; {
+  // Pretend clocks: the test decides when 300 milliseconds have passed
+  beforeEach(() =&gt; vi.useFakeTimers())
+  afterEach(() =&gt; vi.useRealTimers())
+
+  it('keeps the old value until the new one has settled', () =&gt; {
+    const { result, rerender } = renderHook(({ value }) =&gt; useDebouncedValue(value, 300), {
+      initialProps: { value: 'pel' },
+    })
+    expect(result.current).toBe('pel')
+
+    rerender({ value: 'pelican' })
+    act(() =&gt; vi.advanceTimersByTime(299))
+    expect(result.current).toBe('pel')
+
+    act(() =&gt; vi.advanceTimersByTime(1))
+    expect(result.current).toBe('pelican')
+  })
+
+  it('starts the wait again on every change', () =&gt; {
+    const { result, rerender } = renderHook(({ value }) =&gt; useDebouncedValue(value, 300), {
+      initialProps: { value: '' },
+    })
+
+    rerender({ value: 'p' })
+    act(() =&gt; vi.advanceTimersByTime(200))
+    rerender({ value: 'pe' })
+    act(() =&gt; vi.advanceTimersByTime(200))
+    expect(result.current).toBe('')
+
+    act(() =&gt; vi.advanceTimersByTime(100))
+    expect(result.current).toBe('pe')
+  })
+})</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output</h4>
+                            <pre><code> ✓ src/hooks/useDebouncedValue.test.ts (2 tests) 21ms
+   ✓ useDebouncedValue (2)
+     ✓ keeps the old value until the new one has settled 13ms
+     ✓ starts the wait again on every change 3ms</code></pre>
+                        </div>
+                        <p>Measured: both pass in milliseconds, and 299 versus 300 shows the delay is exact. Type-checks and lints cleanly; the course's code continues without it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A sign-in that does not work (optional stretch)</h3>
+                    <p>Optional stretch, not counted in the lesson time. Write <code>src/pages/SignInPage.test.tsx</code>: a wrong password shows the API's message, keeps the email, empties the password box and puts the focus there (Lesson 6.3's promises); an empty password names the field.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>renderApp('/sign-in')</code> uses the real sign-in action and the API's real password check, so no override is needed. <code>toHaveValue('')</code> checks a field's value. The page always has an (empty) <code>role="alert"</code> paragraph, so <code>findByRole('alert')</code> would find it at once, before the message arrives: wait for the message's text instead.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import { screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { renderApp } from '../test/render.tsx'
+
+describe('SignInPage', () =&gt; {
+  it('says why a sign-in failed, keeps the email and empties the password', async () =&gt; {
+    const { user, router } = renderApp('/sign-in')
+    const email = await screen.findByLabelText('Email')
+    const password = screen.getByLabelText('Password')
+
+    await user.type(email, 'maya.okafor@example.com')
+    await user.type(password, 'low-tide')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByText('Email or password is incorrect.')).toBeInTheDocument()
+    expect(email).toHaveValue('maya.okafor@example.com')
+    expect(password).toHaveValue('')
+    expect(password).toHaveFocus()
+    expect(router.state.location.pathname).toBe('/sign-in')
+  })
+
+  it('names the empty field', async () =&gt; {
+    const { user } = renderApp('/sign-in')
+
+    await user.type(await screen.findByLabelText('Email'), 'maya.okafor@example.com')
+    await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByText('Enter your password.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Password')).toHaveFocus()
+  })
+})</code></pre>
+                        <p>Measured: both pass. Type-checks and lints cleanly; not in the course's code.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): The impact report, end to end in jsdom</h3>
+                    <p>Optional stretch, not counted in the lesson time. Test Lesson 8.2's impact report form on Storm Debris Sweep (<code>e01</code>, which already has a report): clearing two boxes and saving shows a summary named "Fix these 2 before saving" that has the focus and sends nothing; changing the bags to 12 and saving lands on the cleanup's page with the API holding <code>12</code> as a number.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The summary is a <code>region</code> named by its heading, and <code>within(summary).getAllByRole('link')</code> counts its links. <code>api.data.reports</code> holds the saved reports. Why <code>e01</code> and not today's cleanup? The app and the API each work out "today" (the app from your computer's clock and time zone, the API in the crew's), so a test that depends on today could fail near midnight; a completed cleanup does not care.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import { screen, within } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { organizer } from '../test/factories.ts'
+import { renderApp } from '../test/render.tsx'
+import { api, recordRequests } from '../test/server.ts'
+
+describe('ImpactReportPage', () =&gt; {
+  it('lists every problem in the summary and sends nothing', async () =&gt; {
+    const { user } = renderApp('/events/e01/impact', organizer)
+    await user.clear(await screen.findByLabelText('Bags filled'))
+    await user.clear(screen.getByLabelText('Weight (kg)'))
+    const requests = recordRequests()
+
+    await user.click(screen.getByRole('button', { name: 'Save the report' }))
+
+    const summary = await screen.findByRole('region', { name: 'Fix these 2 before saving' })
+    expect(summary).toHaveFocus()
+    expect(within(summary).getAllByRole('link')).toHaveLength(2)
+    expect(requests).toEqual([])
+  })
+
+  it('saves the counts as numbers', async () =&gt; {
+    const { user, router } = renderApp('/events/e01/impact', organizer)
+    const bags = await screen.findByLabelText('Bags filled')
+
+    await user.clear(bags)
+    await user.type(bags, '12')
+    await user.click(screen.getByRole('button', { name: 'Save the report' }))
+
+    // Saved: the app goes back to the cleanup's page
+    await screen.findByRole('heading', { level: 1, name: 'Storm Debris Sweep' })
+    expect(router.state.location.pathname).toBe('/events/e01')
+    const saved = api.data.reports.find((report) =&gt; report.eventId === 'e01')
+    expect(saved?.bags).toBe(12)
+    expect(typeof saved?.weightKg).toBe('number')
+  })
+})</code></pre>
+                        <p>Measured: both pass. Type-checks and lints cleanly; not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Why does every user-event action need <code>await</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Speed is not the issue. What does the next line of the test need to see?">
+                                A) It slows the test down so React can keep up with a real person's speed
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Each action fires a chain of events and lets React finish its updates in between. Its Promise resolves when that is done, so the next line checks the page after the click, not before it.">
+                                B) Each action returns a Promise that resolves once its events have fired and React has updated the page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="user-event runs in jsdom here. Which network does a click use?">
+                                C) It waits for the API to answer the request the click sends
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> <code>renderApp('/events/e08/edit', organizer)</code> has just returned. Which line finds the title field?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Has the loader finished at the moment render returns?">
+                                A) <code>screen.getByLabelText('Title (5 to 80 characters)')</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This returns null instead of throwing. Does it wait for the field?">
+                                B) <code>screen.queryByLabelText('Title (5 to 80 characters)')</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Turning off the guard does not make the data arrive sooner. What is the test missing?">
+                                C) <code>screen.getByLabelText(…)</code> after removing the organizers-only guard
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The page appears only after the loader has fetched the cleanup and the sites. findByLabelText keeps looking (up to a second by default) and resolves when the field is there.">
+                                D) <code>await screen.findByLabelText('Title (5 to 80 characters)')</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> A test calls <code>server.use()</code> to make <code>POST /api/photos</code> answer 413. What does the next test get?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="setup.ts calls server.resetHandlers() after every test, which removes the overrides and leaves only the API's own handlers, so the next test talks to the real rules again.">
+                                A) The API's own answer again, because <code>server.resetHandlers()</code> runs after every test
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Look at the afterEach in setup.ts. What does resetHandlers remove?">
+                                B) 413 again, until the test file ends
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="MSW has no rule like that. What runs between two tests?">
+                                C) An error, because two tests cannot change the same address
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> The guard test ends with <code>expect(requests).toEqual([])</code>. What would go wrong unnoticed without that line?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The redirect is checked by the lines above. What else happens during a guest's visit?">
+                                A) Guests could open the edit page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The sign-in page is where the guest ends up either way. Is the line about speed?">
+                                B) The sign-in page could load slowly
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="With the guard call removed from editEventLoader, the guest is still redirected, so the page looks right, but the loader has already asked the API for the cleanup and the sites. Only the request list shows it.">
+                                C) A child loader could ask the API for data before the guard sends the guest away, while the page still looks right
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Without <code>retry: false</code> in <code>setup.ts</code>, the "page whose data does not load" test fails with "Unable to find role alert" after about a second. Why?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The override returns a 500 perfectly well. What does the app do with it?">
+                                A) MSW cannot send a 500 status
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The same test passes with retries off. Did the markup change?">
+                                B) The error message has the wrong role
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Vitest does not look at HTTP statuses. What is the cache doing during that second?">
+                                C) Vitest stops a test when a request fails
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The app's query client retries a failed request twice with a pause before each try, so the error message is still on its way when findByRole gives up after its default one second.">
+                                D) The app's cache is still retrying with pauses when <code>findByRole</code> gives up after one second
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why not mock <code>fetch</code>, or the whole <code>client.ts</code>, with <code>vi.mock()</code>?</summary>
+                    <p>You can, and older material often does. But a mocked <code>getEvent</code> skips everything between the component and the network: the session header, the response checks, <code>ApiError</code>, the 401 sign-out. And the fake answers are written by hand, so they drift from the real API. MSW sits where the network would be, so all of the app's own code runs, and here the answers come from the API's own code too. Keep <code>vi.mock()</code> for things you truly cannot run in a test, which in the HQ is nothing yet.</p>
+                </details>
+                <details>
+                    <summary>What is an "act(...)" warning, and why did I not see one?</summary>
+                    <p>React prints "An update to … inside a test was not wrapped in act(…)" when state changes while no test code is waiting for it, usually because a test ended (or checked) before the app finished. user-event, <code>findBy</code> and <code>waitFor</code> already wrap their work in <code>act</code>, so tests that await them rarely see the warning. When you do see one, look for a missing <code>await</code> or a timer, as in Exercise 1, where <code>act</code> is needed because nothing else is waiting.</p>
+                </details>
+                <details>
+                    <summary>Should every test render the whole app with <code>renderApp</code>?</summary>
+                    <p>No. Use the smallest thing that can show the behavior: a plain function call for rules (Lesson 9.1), <code>renderWithProviders</code> for a component's own behavior (the card, the uploader), and <code>renderApp</code> when the behavior lives in the routes: loaders, guards, redirects, saving and moving on. Whole-page tests are slower and print bigger errors, but they are the only way to test a guard.</p>
+                </details>
+                <details>
+                    <summary>The tests and the API both say "today". Can they disagree?</summary>
+                    <p>Yes, near midnight. The mock API works out today in the crew's time zone (America/Los_Angeles), while the app's <code>today</code> comes from your computer's clock and time zone. That is why this lesson's tests use cleanups whose dates do not matter (a full upcoming one, a completed one) and Exercise 3 avoids today's cleanup. Lesson 9.1's Exercise 3 showed how to fix the clock when a test truly depends on the date.</p>
+                </details>
+                <details>
+                    <summary>jsdom could not send a real file to the API's code, and does not know <code>&lt;search&gt;</code>. Is jsdom good enough?</summary>
+                    <p>For what this lesson tests (roles, names, focus, events, requests, cache), yes, and both gaps were found and handled honestly rather than hidden. But it is a reminder of what jsdom is: a pretend browser. Real file bytes, real layout and real browser elements are checked in a real browser in <a href="lesson_31.html">Lesson 9.3</a>.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Test the <strong>Plan a cleanup</strong> form (Lesson 7.2) through <code>renderApp('/events/new', organizer)</code>: fill every field (<code>user.selectOptions</code> for the beach site, <code>user.type</code> for the date as <code>YYYY-MM-DD</code>, a date well in the future so the "today" question never comes up), click <strong>Publish</strong>, and check that the app lands on the new cleanup's page and that <code>api.data.events</code> has one more cleanup. Then read about <code>server.boundary()</code> in MSW's documentation, which keeps an override inside one function, for tests that run at the same time.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Twice today you broke the app on purpose (the guard, the rollback) and a test caught something a person clicking through would never have noticed. Describe one of them in your own words: what was wrong, why the screen still looked fine, and what in the test made the difference. Then look at your list of types, clicks and waits from the impact report: which of them does the HQ now test, and which would you add next?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li><code>userEvent.setup()</code> before rendering, then <code>await</code> every action: <code>click</code>, <code>type</code>, <code>clear</code>, <code>tab</code>, <code>keyboard</code>, <code>upload</code></li>
+                        <li>MSW 3's <code>setupServer</code> with handlers that run the API's own code: <code>listen({ onUnhandledFrame: 'error' })</code>, <code>api.reset()</code> before each test, <code>resetHandlers()</code> after</li>
+                        <li><code>findBy</code> and <code>waitFor</code> wait for the app; turn off built-in delays such as retries in tests</li>
+                        <li><code>server.use()</code> changes one answer for one test; <code>satisfies ApiErrorBody</code> keeps made-up answers honest; prefer the API's real rules when they can produce the answer</li>
+                        <li>Rendering the app's real route array in a memory router tests loaders, guards and navigation as people meet them, and a request log proves what must not happen</li>
+                        <li><code>renderHook</code> tests Hooks directly (with <code>initialProps</code>, <code>rerender</code>, <code>unmount</code> and a <code>wrapper</code>), including a mutation's optimistic update and rollback</li>
+                        <li>Make every important test fail once on purpose, and read stderr: it found two real gaps today</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Review the guards and loaders</td><td><a href="lesson_23.html">Lesson 6.3: Data Loading and Protected Routes</a></td></tr>
+                            <tr><td>Review the optimistic check-in</td><td><a href="lesson_25.html">Lesson 7.2: Mutations</a></td></tr>
+                            <tr><td>See every endpoint and error the mock API answers</td><td><a href="api.html">The shoreline-api reference</a></td></tr>
+                            <tr><td>Look up user-event's actions</td><td><a href="https://testing-library.com/docs/user-event/intro" target="_blank" rel="noopener">testing-library.com: user-event</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>The HQ's tests now click, type, tab and upload like an organizer, and wait for real answers</li>
+                        <li>shoreline-api's own code answers every request inside the tests, reset for every test, with no server running</li>
+                        <li>The guards, the edit form's server rule, the uploads' error answers and the optimistic check-in are all pinned down</li>
+                        <li>Your tests found a blank first load and fixed it with a first-load message</li>
+                        <li>46 tests run in under two seconds, and you have watched two of them catch a bug on purpose</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>jsdom took you a long way today, and twice it showed its limits: no real file bytes, and an HTML element it does not know. In <a href="lesson_31.html"><strong>Lesson 9.3: End-to-End and Accessibility Tests</strong></a> you test the HQ in a real browser with Playwright, against the real shoreline-api server: Maya signs in, reports today's impact with a real photo, and sees the new totals. And you add automated accessibility checks with axe, then settle the question every team asks: which test belongs where?</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx vitest run</code> (46 tests), <code>npx tsc -b</code> and <code>npm run lint</code> all pass</li>
+                    <li>Write down two journeys through the HQ that only make sense in a real browser (a real file, a phone-sized screen, a real server restart): those are Lesson 9.3's tests</li>
+                    <li>Add your "what must not happen" test line to your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>This was one of the densest lessons in the course: a new library for acting, a new one for the network, routes and Hooks in tests, and a handful of honest surprises from jsdom. If parts of it are still settling, that is expected. Interaction tests get easier with every one you write, because they all follow the same story: act like a person, wait for the app, check what the person would see, and check what must not have happened. You now write that story better than most people who ship React apps.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_29.html" class="prev-lesson">← Previous: Testing Components</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_31.html" class="next-lesson">Next: End-to-End and Accessibility Tests →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

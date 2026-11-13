@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Load Shoreline Crew HQ's pages before they render with React Router 8 loaders, turn API errors into route answers, protect organizer pages with guard loaders that send people to sign in and back, sign in with a route action, and sign out automatically when the API ends a session. React + TypeScript: Build a Modern Web App Lesson 6.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Data Loading and Protected Routes - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🛂 Lesson 6.3: Data Loading and Protected Routes</h1>
+                <p class="lead">At the end of the last lesson you opened <code>/events/new</code> while signed out, and the planning form appeared for anyone who knew the address. Today every page that belongs to organizers gets a guard at the door: guests are sent to sign in and then straight back to where they were going, and volunteers get a clear "Organizers only" page. On the way, pages stop flashing "Loading…": React Router's loaders fetch a page's data before the page appears, its actions handle the sign-in form, and a sign-in that the API has forgotten ends by itself instead of leaving the HQ stuck. Nearly every real app you will work on has this layer, and you are about to build all of it.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain the difference between rendering then fetching and loading then rendering, and when each fits</li>
+                        <li>Write typed route loaders and read their data with <code>useLoaderData&lt;typeof loader&gt;()</code></li>
+                        <li>Turn failures while loading into route answers with <code>data()</code>, and show them with <code>useRouteError</code> and <code>isRouteErrorResponse</code></li>
+                        <li>Protect routes with guard loaders that redirect to sign-in with a safe <code>?next=</code> address, and answer 403 to people without the right role</li>
+                        <li>Handle a form with a route action, <code>&lt;Form&gt;</code>, <code>useActionData</code> and a redirect</li>
+                        <li>Keep a session that React and the router both read, with <code>useSyncExternalStore</code>, and sign out automatically on a 401</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 155 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_22.html">Lesson 6.2: Search Params, Nested Routes and Typed Navigation</a> (your <code>shoreline-hq</code> with the Volunteers page), and the sign-in from <a href="lesson_18.html">Lesson 5.2</a></li>
+                    <li><span class="meta-label">🛠️ You will build</span> Loaders for the sites and event pages, one error page for every route, an organizers-only guard with a way back after sign-in, a sign-in action, and automatic sign-out when the API ends a session</li>
+                    <li><span class="meta-label">🧩 Stack</span> React Router 8.5, React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and the browser, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-23-start.zip">lesson-23-start.zip</a> · Finished code: <a href="downloads/lesson-23-end.zip">lesson-23-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#when" class="toc-link">Render Then Fetch, or Load Then Render</a></li>
+                        <li><a href="#loaders" class="toc-link">Loaders</a></li>
+                        <li><a href="#errors" class="toc-link">When Loading Fails, and What Can Wait</a></li>
+                        <li><a href="#protect" class="toc-link">Protected Routes</a></li>
+                        <li><a href="#session" class="toc-link">A Session Outside React</a></li>
+                        <li><a href="#actions" class="toc-link">Actions: Forms the Router Handles</a></li>
+                        <li><a href="#next" class="toc-link">What Lesson 7.1 Changes</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Guarded, Preloaded HQ</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="when" class="lesson-section">
+                <h2>⏳ Render Then Fetch, or Load Then Render</h2>
+                <p>Since Lesson 4.1 every HQ page has worked the same way: the router shows the page, the page's effect (now inside <code>useApi</code>) starts a request, and until the answer arrives the page says "Loading…". That is <strong>render then fetch</strong>. It is simple, and for some data it is exactly right, but it has three costs you have already met:</p>
+                <ul>
+                    <li><strong>A flash on every visit.</strong> Click a cleanup and the page appears empty, says "Loading the cleanup…", then fills in.</li>
+                    <li><strong>Back cannot find your place.</strong> Lesson 6.1 measured it: scroll down a list, open something, press Back, and you land at the top, because the router restores the scroll position before the list has arrived.</li>
+                    <li><strong>Rules arrive late.</strong> The Volunteers page decides in its own render whether you may see it. A page that guards itself has already started to draw, and every page has to remember to do it.</li>
+                </ul>
+                <p>React Router's data mode, which the HQ has used since Lesson 6.1, offers the other order: <strong>load then render</strong>. A route can have a <strong>loader</strong>, a function the router calls as soon as someone navigates to the address. The router waits for it, and only then swaps the new page in, already holding its data. Meanwhile the old page stays on screen.</p>
+
+                <div class="mermaid">
+graph TD
+    A["Click a link"] --> B["Router matches the route"]
+    B --> C["Loader runs: fetch, checks"]
+    C --> D{"Loader result"}
+    D -->|"data"| E["Page renders with data"]
+    D -->|"throws"| F["Redirect or error page"]
+                </div>
+
+                <div class="card card-info">
+                    <h3>💡 Mental model: the harbor master</h3>
+                    <p>Before a crew boat leaves the dock, the harbor master checks two things: the tide table (is the information ready?) and the permit (is this crew allowed out?). Only then does the boat move. A loader is the harbor master for a route. It can hand over the tide table (data), send the boat to another dock first (a redirect to sign-in), or post a notice explaining why the trip is off (an error page). The page itself only ever sees a boat that was cleared to go.</p>
+                </div>
+                <p>Why this matters: "no flash, Back works, rules in one place" is what makes an app feel solid, and the loader pattern is how React Router, Remix-style frameworks and TanStack Router all approach it. Lesson 7.1 adds a cache under these loaders; the shape you learn today stays.</p>
+                <p>Load then render is not always better. A search box that changes the list with every letter should not freeze the page while each request runs. The events list keeps its <code>useApi</code> today for that reason, and you will measure why in the Common Mistakes.</p>
+            </section>
+
+            <section id="loaders" class="lesson-section">
+                <h2>🚚 Loaders</h2>
+                <p>A loader is a plain function on a route object. The router calls it with an object of type <code>LoaderFunctionArgs</code>: <code>params</code> (the <code>:eventId</code> parts of the address, as in <code>useParams</code>) and <code>request</code>, a standard web <code>Request</code> whose <code>url</code> is the full address and whose <code>signal</code> is aborted if the person navigates away before the loader finishes. Whatever the loader returns (or the value its promise resolves to) becomes the route's data. The smallest useful one is the sites page's:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/loaders.ts</div>
+                    <pre data-src="shoreline-hq/src/pages/loaders.ts" data-match="excerpt"><code class="language-ts">// Route loaders: the router calls them when an address is opened, and shows the page once they finish (Lesson 6.3)
+import { data, type LoaderFunctionArgs } from 'react-router'
+import { ApiError, getEvent, getImpact, getSites } from '../api/client.ts'
+
+/** /sites: the six beach sites */
+export function sitesLoader({ request }: LoaderFunctionArgs) {
+  // request.signal: leaving the page before the answer arrives cancels the request
+  return getSites(request.signal)
+}
+// ...</code></pre>
+                </div>
+                <p>It goes on the route with <code>loader: sitesLoader</code>, and the page reads the result with <code>useLoaderData</code>. TypeScript cannot know which loader belongs to which component (they meet only in the route list), so you tell it: <code>useLoaderData&lt;typeof sitesLoader&gt;()</code>. The type argument is the loader function's type; React Router works out the data type from what it returns, unwrapping the promise. Two things to notice:</p>
+                <ul>
+                    <li><code>import type { sitesLoader }</code> is enough. <code>typeof</code> in a type position only needs the type, so the page does not import the loader's code.</li>
+                    <li>Without the type argument, <code>useLoaderData()</code> returns <code>any</code>: whatever you write after it compiles, typos included.</li>
+                </ul>
+                <p>A handy trick to see what a Hook returns: assign it to a variable of a type it cannot be, and read the error.</p>
+                <pre data-snippet><code class="language-tsx">import { useActionData, useLoaderData } from 'react-router'
+import type { signInAction } from './auth/signInAction.ts'
+import type { eventLoader, sitesLoader } from './pages/loaders.ts'
+
+// Ask TypeScript what each Hook returns: put the answer where a number is expected
+export function Scratch() {
+  const sites: number = useLoaderData&lt;typeof sitesLoader&gt;()
+  const page: number = useLoaderData&lt;typeof eventLoader&gt;()
+  const result: number = useActionData&lt;typeof signInAction&gt;()
+  const untyped: number = useLoaderData()
+  return &lt;p&gt;{sites}{page}{result}{untyped}&lt;/p&gt;
+}</code></pre>
+                <figure class="screenshot">
+                    <img src="images/lesson_23/23-loader-types.png" alt="A terminal in shoreline-hq. npx tsc -b reports three TS2322 errors in src/Scratch.tsx: Type Site array is not assignable to type number; the event loader&#x27;s object with event: CleanupEventDetail and impact: Promise of ImpactReport or null is not assignable to type number; SignInResult or undefined is not assignable to type number. The untyped useLoaderData call on line 10 is not reported." width="1100" height="386" loading="lazy">
+                    <figcaption>A quick way to ask TypeScript what a Hook returns: put its result where a <code>number</code> is expected and read the error. With <code>typeof sitesLoader</code> the router's Hooks know the exact shapes; the untyped call is <code>any</code> and says nothing.</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:7:9 - error TS2322: Type 'Site[]' is not assignable to type 'number'.
+
+7   const sites: number = useLoaderData&lt;typeof sitesLoader&gt;()
+          ~~~~~
+
+src/Scratch.tsx:8:9 - error TS2322: Type '{ event: CleanupEventDetail; impact: Promise&lt;ImpactReport&gt; | null; }' is not assignable to type 'number'.
+
+8   const page: number = useLoaderData&lt;typeof eventLoader&gt;()
+          ~~~~
+
+src/Scratch.tsx:9:9 - error TS2322: Type 'SignInResult | undefined' is not assignable to type 'number'.
+  Type 'undefined' is not assignable to type 'number'.
+
+9   const result: number = useActionData&lt;typeof signInAction&gt;()
+          ~~~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:7</code></pre>
+                </div>
+                <p>Three exact types: <code>Site[]</code>, the event loader's object (you write it in the project), and the sign-in action's result or <code>undefined</code>. Line 10, the untyped call, produced no error at all: <code>any</code> is assignable to <code>number</code>, and to everything else. Always pass <code>typeof yourLoader</code>.</p>
+
+                <h3>While the loader runs: <code>useNavigation</code></h3>
+                <p>With a loader, a click does not swap in a half-empty page. The current page stays until the next one is ready, which means people need a sign that the click worked. <code>useNavigation()</code> describes the navigation in progress: <code>state</code> is <code>'idle'</code>, <code>'loading'</code> (loaders running) or <code>'submitting'</code> (an action running). The HQ's layout uses it once for every page: it fades the old page a little and shows a small "Loading…" sign at the bottom of the window.</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_23/23-pending.png" alt="The Cleanup events page of Shoreline Crew HQ a moment after clicking Tide Pool Morning Cleanup. The list is still on screen, slightly faded, and a small orange pill at the bottom of the window, outlined in red, says Loading." width="1100" height="688" loading="lazy">
+                    <figcaption>With a loader, the click does not swap in an empty page with "Loading…": the list stays (faded) until the cleanup has arrived, and the layout shows one small sign that something is on its way. The API was slowed down with <code>--latency=1500</code> to catch this.</figcaption>
+                </figure>
+                <p>Measured with the API slowed down by <code>--latency=1500</code>: 300 ms after the click the address still said <code>/events</code>, the heading was still "Cleanup events", the sign said "Loading…" and <code>main</code> had <code>aria-busy="true"</code>; the text "Loading the cleanup" never appeared. Once the cleanup arrived, the sign was empty again. The sign is a <code>role="status"</code> region, so screen readers announce "Loading…" too.</p>
+
+                <h3>Back finds your place again</h3>
+                <p>Because the data comes before the page, a list is already full height when the router restores the scroll position. Measured on the Beach sites page: scrolled down 670 px, then <strong>Events</strong> in the header, then Back: the page came back at 670 px. The same steps with the sites page from Lesson 6.2 (fetching in <code>useApi</code>) came back at 0. The events list, which keeps <code>useApi</code>, still comes back at 0 (from 1200 px); Lesson 7.1's cache fixes that one, because a cached list can render at once.</p>
+            </section>
+
+            <section id="errors" class="lesson-section">
+                <h2>🧯 When Loading Fails, and What Can Wait</h2>
+                <p>Anything a loader throws ends up in the nearest <code>errorElement</code> of its route, the same place render crashes have gone since Lesson 6.1. That covers the surprises (the API is down) for free. For the expected failures, such as "there is no cleanup with this id", a loader throws an <strong>answer</strong> instead of a crash, built with <code>data()</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/loaders.ts</div>
+                    <pre data-src="shoreline-hq/src/pages/loaders.ts" data-match="excerpt"><code class="language-ts">if (error instanceof ApiError &amp;&amp; error.status === 404) {
+  const message = 'There is no cleanup at this address. The link may be wrong, or the cleanup is not public.'
+  throw data(message, { status: 404, statusText: 'Cleanup not found' })
+}</code></pre>
+                </div>
+                <p>The error page reads whatever was thrown with <code>useRouteError()</code>. Its return type is <code>unknown</code>, honestly: a loader can throw anything. <code>isRouteErrorResponse(error)</code> is a type predicate that narrows it to <code>ErrorResponse</code>, with <code>status</code>, <code>statusText</code> and <code>data</code>. <code>data</code> is typed <code>any</code> (it is whatever you passed), so the HQ checks <code>typeof answer.data === 'string'</code> before showing it. The result is one <code>ErrorPage</code> for every route: answers show their own heading and message, crashes and network failures show "Something went wrong on this page" with <code>describeError</code>'s explanation and <strong>Try again</strong>.</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_23/23-cleanup-not-found.png" alt="Shoreline Crew HQ at slash events slash e99, signed out. The heading says Cleanup not found, then: There is no cleanup at this address. The link may be wrong, or the cleanup is not public. Go to the home page or the list of cleanups." width="1100" height="292" loading="lazy">
+                    <figcaption>The event loader turned the API's 404 into a route answer before anything rendered; the header and footer stay, and the same <code>ErrorPage</code> handles every route.</figcaption>
+                </figure>
+                <p>Measured: <code>/events/e99</code> showed "Cleanup not found" with the loader's sentence, the title "Cleanup not found · Shoreline Crew HQ", and no <code>role="alert"</code> (it is an answer, not an alarm). With the API stopped, clicking <strong>Sites</strong> showed "Could not reach the server. Check that shoreline-api is running, then try again."; after starting the API, <strong>Try again</strong> brought the Beach sites page.</p>
+
+                <h3>Await what the page needs, start what can wait</h3>
+                <p>A completed cleanup's page also shows its impact report, in the Impact tab. The page can appear without it, so there is no reason to make everyone wait for two requests. A loader may put an <em>unawaited</em> promise in its result: the router does not wait for it, and the page hands it to a component that calls <code>use()</code> inside <code>&lt;Suspense&gt;</code>, exactly as in Lesson 4.4. The rule for which is which:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Await it in the loader</th><th>Return it as a promise</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>The page makes no sense without it (the cleanup itself)</td><td>A part of the page can say "Loading…" for a moment (the impact report)</td></tr>
+                            <tr><td>It decides the answer (404, redirect)</td><td>It is slow or optional, and an error in it should not cost the whole page</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The promise must be the <em>same</em> promise on every render, which Lesson 4.4 solved with a module-level cache in <code>eventPromises.ts</code>. Loader data is kept by the router until the next navigation, so it is stable by design: that file can go. Measured with <code>--latency=1500</code>: the cleanup appeared, the Impact tab showed "Loading the impact report…", then the report.</p>
+            </section>
+
+            <section id="protect" class="lesson-section">
+                <h2>🛂 Protected Routes</h2>
+                <p>A <strong>guard</strong> is a loader that returns nothing useful; its job is to throw. Two kinds of throw do the work:</p>
+                <ul>
+                    <li><code>redirect('/sign-in?next=…')</code> for guests. <code>redirect</code> builds a 302 <code>Response</code>; thrown from a loader, the router follows it before anything renders.</li>
+                    <li><code>data(message, { status: 403, statusText: 'Organizers only' })</code> for people who are signed in but not allowed. A 403 is not a sign-in problem: signing in again would not help Theo, a volunteer, so he gets an explanation instead of a loop back to the sign-in page.</li>
+                </ul>
+                <p>The <code>next</code> parameter is the way back: the guard puts the path and search the person asked for into it (encoded with <code>encodeURIComponent</code>, because it is an address inside an address), and the sign-in action sends them there afterwards. Measured: a guest opening <code>/volunteers?skill=first-aid</code> landed on <code>/sign-in?next=%2Fvolunteers%3Fskill%3Dfirst-aid</code>, with no request to the API for the crew; after signing in, the address was <code>/volunteers?skill=first-aid</code> with "First aid" chosen.</p>
+                <p>One guard can protect many pages. A route with no <code>path</code> (a pathless route, from Lesson 6.1) and a <code>loader</code> runs for every child below it:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                    <pre data-src="shoreline-hq/src/App.tsx" data-match="excerpt"><code class="language-tsx">{
+  // Organizers only: this guard runs before any of these pages appears
+  loader: organizersOnly,
+  shouldRevalidate: onlyWhenThePathChanges,
+  children: [
+    { path: 'events/new', element: &lt;NewEventPage /&gt; },
+    // ...</code></pre>
+                </div>
+                <p>(<code>shouldRevalidate</code> is explained in the Common Mistakes.)</p>
+
+                <div class="card card-danger">
+                    <h3>🛑 Two security rules for guards</h3>
+                    <p><strong>A guard is a courtesy; the API is the lock.</strong> Everything in the HQ runs in the visitor's browser, where they can change the code. The guard gives people a clear path, and the API's 401 and 403 answers (Lesson 5.2) keep the data safe. Never put anything in front-end code that a guard is supposed to hide.</p>
+                    <p><strong>Never redirect to whatever <code>?next=</code> says.</strong> Anyone can send an organizer a link like <code>/sign-in?next=https://elsewhere.example</code>; after a real sign-in, the HQ would hand them to someone else's page, which could ask for the password "again". This is called an <strong>open redirect</strong>. Accept only paths inside the app: they start with one <code>/</code>, not <code>//</code> (which browsers read as another site) and not <code>/\</code>. Measured with the check removed: signing in with <code>?next=http://localhost:4000/api</code> left the HQ for the API's page. With the check: <code>/</code>.</p>
+                </div>
+            </section>
+
+            <section id="session" class="lesson-section">
+                <h2>🧭 A Session Outside React</h2>
+                <p>Loaders run before any component renders, outside React. They cannot call <code>useAuth()</code>: Hooks only work while a component renders (oxlint says so too; see Common Mistakes). Since Lesson 5.2 the session has lived in <code>AuthProvider</code>'s state, with <code>sessionStorage</code> as a copy. Now three outsiders need it: the guards read it, the sign-in action writes it, and <code>request()</code> must clear it when the API answers 401.</p>
+                <p>So the session moves to where all of them can reach it: <code>client.ts</code>, as a tiny <strong>store</strong>. A store is a value plus a way to be told when it changes: <code>readSession()</code> gives the current value, <code>saveSession()</code> changes it and calls every listener, <code>onSessionChange(listener)</code> subscribes and returns the function that unsubscribes. React reads an outside store with a Hook made for exactly this, <code>useSyncExternalStore(subscribe, getSnapshot)</code>: React calls <code>subscribe</code> once, re-renders when a listener fires, and reads the value with <code>getSnapshot</code>. The snapshot must be the same object until the value really changes, which is why <code>readSession()</code> returns the saved variable instead of parsing <code>sessionStorage</code> each time.</p>
+                <div class="card card-info">
+                    <h3>💡 Mental model: the harbor board, again</h3>
+                    <p>In Lesson 5.2 the session was something one component remembered and passed around. Now it is a notice pinned on the harbor board: anyone can read it, the harbor office (client.ts) is the only one who changes it, and the people who care (React, the router) asked to be told when a new notice goes up. Lesson 7.3's Zustand is this same idea as a library.</p>
+                </div>
+                <p>Two listeners make the rest automatic. <code>AuthProvider</code> re-renders, so the header, the drafts and <code>useApi</code> (keyed by viewer since Lesson 5.2) all follow. And <code>AppLayout</code> asks the router to run the current page's loaders again with <code>useRevalidator().revalidate()</code>, so a guard notices when its visitor has signed out. Then the <strong>automatic sign-out</strong> is one <code>if</code> in <code>request()</code>: a 401 on a request that carried a token means the API no longer knows this sign-in (shoreline-api keeps sessions in memory, so a restart forgets them all), so the client forgets it too. Measured after restarting the API while Maya was signed in:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Maya was…</th><th>What happened</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>on <code>/events</code> and clicked Weekend Cove Cleanup (a loader)</td><td>The cleanup opened as a guest would see it; the header said <strong>Sign in</strong>; the saved session was gone</td></tr>
+                            <tr><td>on <code>/volunteers</code> and clicked Aisha Rahman</td><td>Sent to <code>/sign-in?next=%2Fvolunteers%2Fv20</code>; after signing in, back on Aisha's card</td></tr>
+                            <tr><td>on <code>/events</code> and typed a search</td><td>The list reloaded as a guest's list; the header said <strong>Sign in</strong></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Before this lesson, all three showed "Your sign-in has ended. Sign out, then sign in again." until she clicked <strong>Sign out</strong> herself. The message now reads "Your sign-in has ended. Sign in again.", for the moment before the HQ catches up.</p>
+            </section>
+
+            <section id="actions" class="lesson-section">
+                <h2>📨 Actions: Forms the Router Handles</h2>
+                <p>Loaders answer "what does this page need to show?"; <strong>actions</strong> answer "someone sent this page a form". A route's <code>action</code> runs when a React Router <code>&lt;Form method="post"&gt;</code> on that route is submitted. It receives <code>ActionFunctionArgs</code> (the same <code>request</code> and <code>params</code>); <code>await request.formData()</code> gives the fields, typed <code>FormDataEntryValue | null</code> as in Lesson 3.5, so you narrow them with <code>typeof</code>. An action can:</p>
+                <ul>
+                    <li><strong>return</strong> a value: the page reads it with <code>useActionData&lt;typeof action&gt;()</code>, which is <code>undefined</code> until the form has been sent once (the sign-in page uses it for "Email or password is incorrect.");</li>
+                    <li><strong>throw a redirect</strong>: on success, sign-in goes to <code>?next=</code>. Throwing (rather than returning) keeps the action's return type to just your result type;</li>
+                    <li>and afterwards the router runs the loaders of the page you end up on, so everything shows data from after the change. This <strong>revalidation</strong> is why actions and loaders belong together.</li>
+                </ul>
+                <p><code>&lt;Form&gt;</code> without an <code>action</code> attribute posts to the current address, search included: measured, a wrong password left the address at <code>/sign-in?next=%2Fvolunteers%3Fskill%3Dfirst-aid</code>, so the next try still knew the way back. While the action runs, <code>useNavigation().state</code> is <code>'submitting'</code>, then <code>'loading'</code> while the next page's loaders run; the button says "Signing in…" for both.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>React 19 form action (Lesson 3.5, 5.2)</th><th>React Router action (today)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Where it lives</td><td>In the component: <code>useActionState(fn, initial)</code></td><td>On the route; the component reads <code>useActionData</code></td></tr>
+                            <tr><td>Can redirect</td><td>Only by calling <code>navigate</code> yourself</td><td><code>throw redirect(…)</code>, before the next page renders</td></tr>
+                            <tr><td>Afterwards</td><td>Nothing else runs</td><td>The router re-runs the loaders</td></tr>
+                            <tr><td>Fields after submitting</td><td>React resets the form</td><td>Fields keep what was typed, unless you clear them (the HQ empties the password itself)</td></tr>
+                            <tr><td>Good for</td><td>Forms that only change what the component shows</td><td>Forms that change where you are or what every page shows (signing in)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The planning form keeps its <code>useActionState</code> for now; Lesson 7.2 sends it to the API with TanStack Query's mutations, and Lesson 8.1 moves it to React Hook Form.</p>
+            </section>
+
+            <section id="next" class="lesson-section">
+                <h2>🔭 What Lesson 7.1 Changes</h2>
+                <p>Loaders decide <em>when</em> data is loaded; they do not keep it. Every visit to a cleanup asks the API again, and a list that changes as you type does not suit a loader at all. Lesson 7.1 adds TanStack Query, a cache, under the same routes. Today's code is written so that step is small:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Today (6.3)</th><th>In Lesson 7.1</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>sitesLoader</code> calls <code>getSites</code></td><td>The loader asks the cache to make sure the sites are there; the page reads them from the cache</td></tr>
+                            <tr><td><code>eventLoader</code> awaits the cleanup, starts the impact report</td><td>Same split: await the cleanup in the cache, start the report without waiting</td></tr>
+                            <tr><td><code>useApi</code> for typed searches, the roster, the volunteer card</td><td>Query Hooks keyed by the same strings; <code>useApi</code> is deleted</td></tr>
+                            <tr><td>Guards, <code>ErrorPage</code>, the sign-in action, the session store</td><td>Unchanged</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Calling a Hook in a loader</h3>
+                    <p>It is tempting to reach for the Hook you already have. It type-checks, but oxlint stops it, with an error rather than a warning:</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  × react-hooks(rules-of-hooks): React Hook "useAuth" is called in function "organizersOnly" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use".
+    ╭─[src/auth/guards.ts:20:23]
+ 18 │ /** For pages with contact details and planning tools: guests sign in first, volunteers are turned away */
+ 19 │ export function organizersOnly({ request }: LoaderFunctionArgs) {
+    ·                 ───────┬──────
+    ·                        ╰── Outer function
+ 20 │   const { session } = useAuth()
+    ·                       ───┬───
+    ·                          ╰── Hook is called here
+ 21 │   if (session === null) {
+    ╰────
+
+Found 0 warnings and 1 error.
+Finished in 14ms on 59 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>A loader is not a component; there is no render for the Hook to belong to. Read the store (<code>readSession()</code>) instead.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A loader in the page's <code>.tsx</code> file</h3>
+                    <p>Keeping a loader next to its page feels tidy, and it compiles, but it costs Fast Refresh for that file (the same rule as Lesson 5.2's context):</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+   ╭─[src/Scratch.tsx:5:17]
+ 4 │ // The loader in the same .tsx file as the page that uses it
+ 5 │ export function sitesLoader({ request }: LoaderFunctionArgs) {
+   ·                 ───────────
+ 6 │   return getSites(request.signal)
+   ╰────
+
+Found 1 warning and 0 errors.
+Finished in 13ms on 60 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>The HQ keeps loaders in <code>pages/loaders.ts</code>, guards in <code>auth/guards.ts</code> and the action in <code>auth/signInAction.ts</code>, and pages use <code>import type</code> for <code>typeof</code>.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A guard that runs on every letter</h3>
+                    <p>By default the router runs a route's loader again whenever the search part of the address changes. The Volunteers search box changes it with every letter, and a navigation with a loader waits for that loader, even one that finishes at once. Lesson 6.2's <code>flushSync</code> cannot help with that wait. Measured without <code>shouldRevalidate</code> on the guard route: typing "mra", moving the cursor two places left and typing "a" gave "mara" with the cursor thrown to position 4 instead of 2. The fix tells the router when the guard may be skipped: when only the search changed. With it: position 2. Both versions type-check and lint cleanly; only the behavior tells you.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ <code>useLoaderData()</code> without its type</h3>
+                    <p>With no type argument it returns <code>any</code>, so this compiles with no error from <code>npx tsc -b</code> and shows nothing on screen:</p>
+                    <pre data-snippet><code class="language-tsx">import { useLoaderData } from 'react-router'
+
+// No type argument: useLoaderData() returns any, so this typo compiles
+export function Scratch() {
+  const sites = useLoaderData()
+  return &lt;p&gt;{sites[0].nmae}&lt;/p&gt;
+}</code></pre>
+                    <p>Write <code>useLoaderData&lt;typeof sitesLoader&gt;()</code> every time; then <code>sites[0]</code> is <code>Site | undefined</code> and the typo is an error.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A guard that only lives in the parent</h3>
+                    <p>Loaders of a route and its children run <em>at the same time</em>, not one after the other. A child route with its own loader under the <code>organizersOnly</code> route still sends its request for a guest, before the guard's redirect wins. Exercise 3 measures it and shows the fix.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Guarded, Preloaded HQ</h2>
+                <p>Steps 1 to 4 write the pieces; Step 5 connects them to the router. In between, the running app is half-wired (a page that expects loader data before its route has a loader will show the error page): that is expected. Keep shoreline-api and <code>npm run dev</code> running.</p>
+
+                <div class="card">
+                    <h3>Step 1: Loaders and one error page <span class="step-time">(14 min)</span></h3>
+                    <p>Create <code>src/pages/loaders.ts</code> with the two data loaders. The event loader awaits the cleanup, turns the API's 404 into a route answer, and starts the impact report without waiting for it (only completed cleanups have one):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/loaders.ts</div>
+                        <pre data-src="shoreline-hq/src/pages/loaders.ts"><code class="language-ts">// Route loaders: the router calls them when an address is opened, and shows the page once they finish (Lesson 6.3)
+import { data, type LoaderFunctionArgs } from 'react-router'
+import { ApiError, getEvent, getImpact, getSites } from '../api/client.ts'
+
+/** /sites: the six beach sites */
+export function sitesLoader({ request }: LoaderFunctionArgs) {
+  // request.signal: leaving the page before the answer arrives cancels the request
+  return getSites(request.signal)
+}
+
+/** /events/:eventId: the cleanup now, its impact report (if it has one) when it arrives */
+export async function eventLoader({ params, request }: LoaderFunctionArgs) {
+  const { eventId } = params
+  if (eventId === undefined) {
+    throw new Error('eventLoader needs a route with an :eventId parameter')
+  }
+  try {
+    const event = await getEvent(eventId, request.signal)
+    // Not awaited: the page shows without it, and the report follows (use() + Suspense)
+    const impact = event.status === 'completed' ? getImpact(eventId) : null
+    return { event, impact }
+  } catch (error: unknown) {
+    if (error instanceof ApiError &amp;&amp; error.status === 404) {
+      const message = 'There is no cleanup at this address. The link may be wrong, or the cleanup is not public.'
+      throw data(message, { status: 404, statusText: 'Cleanup not found' })
+    }
+    throw error
+  }
+}</code></pre>
+                    </div>
+                    <p>TypeScript infers the event loader's return type, <code>Promise&lt;{ event: CleanupEventDetail; impact: Promise&lt;ImpactReport&gt; | null }&gt;</code>, from the <code>return</code>; the <code>throw</code>s do not add to it. That is why the guards and the action <em>throw</em> their redirects and answers.</p>
+                    <p>Next, the error page every route will share. It replaces <code>PageCrashed</code> in <code>App.tsx</code> (you delete that in Step 5). Create <code>src/pages/ErrorPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/ErrorPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/ErrorPage.tsx"><code class="language-tsx">import { isRouteErrorResponse, Link, useLocation, useNavigate, useRouteError } from 'react-router'
+import { describeError } from '../api/client.ts'
+import { Button } from '../components/Button.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './Page.module.css'
+
+// The router shows this instead of a page that could not load or crashed; the header and footer stay
+export function ErrorPage() {
+  const error = useRouteError()
+  const location = useLocation()
+  const navigate = useNavigate()
+  // A loader's answer (thrown with data()) carries a status, a heading and a message
+  const answer = isRouteErrorResponse(error) ? error : null
+  const heading = answer?.statusText || 'Something went wrong on this page'
+  useDocumentTitle(heading)
+
+  if (answer !== null) {
+    return (
+      &lt;&gt;
+        &lt;h1&gt;{heading}&lt;/h1&gt;
+        &lt;p className={styles.lead}&gt;
+          {typeof answer.data === 'string' ? answer.data : 'There is nothing to show at this address.'}
+        &lt;/p&gt;
+        &lt;p&gt;
+          Go to the &lt;Link to="/"&gt;home page&lt;/Link&gt; or the &lt;Link to="/events"&gt;list of cleanups&lt;/Link&gt;.
+        &lt;/p&gt;
+      &lt;/&gt;
+    )
+  }
+  // Anything else: a request that failed, or a bug in a component
+  return (
+    &lt;div role="alert"&gt;
+      &lt;h1&gt;{heading}&lt;/h1&gt;
+      &lt;p&gt;{describeError(error)}&lt;/p&gt;
+      &lt;p&gt;
+        &lt;Button onClick={() =&gt; navigate(location, { replace: true })}&gt;Try again&lt;/Button&gt;{' '}
+        &lt;Link to="/"&gt;Go to the home page&lt;/Link&gt;
+      &lt;/p&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p><code>answer?.statusText || '…'</code> uses <code>||</code> on purpose: a response without a status text has <code>''</code>, which should fall back too (<code>??</code> only falls back for <code>null</code> and <code>undefined</code>). Then the sites page loses its fetching; replace <code>src/pages/SitesPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/SitesPage.tsx"><code class="language-tsx">import { useLoaderData } from 'react-router'
+import { DataList } from '../components/DataList.tsx'
+import { SiteCard } from '../components/SiteCard.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import type { sitesLoader } from './loaders.ts'
+import styles from './Page.module.css'
+
+export function SitesPage() {
+  useDocumentTitle('Beach sites')
+  // The router ran sitesLoader before showing this page: the sites are already here
+  const sites = useLoaderData&lt;typeof sitesLoader&gt;()
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Beach sites&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;Six stretches of coast the crew looks after.&lt;/p&gt;
+      &lt;DataList
+        items={sites}
+        getKey={(site) =&gt; site.id}
+        emptyMessage="No beach sites yet."
+        renderItem={(site) =&gt; &lt;SiteCard site={site} /&gt;}
+      /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>No <code>LoadStatus</code>, no <code>kind === 'ready'</code> check: by the time this component renders, the sites are there or the error page is showing.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The event page reads its loader <span class="step-time">(14 min)</span></h3>
+                    <p>In <code>src/pages/EventPage.tsx</code>, change the imports at the top:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">-import { Suspense, use } from 'react'
+-import { Link, useParams } from 'react-router'
+-import { ApiError, describeError, getRoster } from '../api/client.ts'
+-import { eventPromise, forgetEvent } from '../api/eventPromises.ts'
++import { Suspense } from 'react'
++import { Link, useLoaderData } from 'react-router'
++import { describeError, getRoster } from '../api/client.ts'
+ import type { CleanupEventDetail } from '../api/types.ts'
+ import { useAuth } from '../auth/AuthContext.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { formatDate, toDateString } from '../utils/format.ts'
+ import styles from './EventPage.module.css'
++import type { eventLoader } from './loaders.ts'
+ import pageStyles from './Page.module.css'
+ </code></pre>
+                    </div>
+                    <p>Delete the <code>EventDetailsProps</code> interface:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> interface TodaysDeskProps {
+   eventId: string
+-}
+-
+-interface EventDetailsProps {
+-  eventId: string
+-  viewer: string
+ }
+ </code></pre>
+                    </div>
+                    <p>Keep <code>today</code>, <code>TodaysDesk</code> and <code>AboutCleanup</code> as they are. Replace everything from <code>EventDetails</code> to the end of the file (<code>EventDetails</code>, <code>EventProblem</code> and the old <code>EventPage</code>) with:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="excerpt"><code class="language-tsx">// What the impact tab shows when the report could not be loaded
+function ImpactProblem({ error }: FallbackProps) {
+  return (
+    &lt;LoadStatus state={{ kind: 'failed', message: describeError(error) }} what="the impact report" /&gt;
+  )
+}
+
+// The route is events/:eventId: eventLoader has loaded the cleanup before this page renders
+export function EventPage() {
+  const { event, impact } = useLoaderData&lt;typeof eventLoader&gt;()
+  const { isOrganizer } = useAuth()
+  useDocumentTitle(event.title)
+  const checkInDay = isOrganizer &amp;&amp; event.status === 'scheduled' &amp;&amp; event.date === today
+
+  return (
+    &lt;&gt;
+      &lt;p&gt;
+        &lt;Link to="/events"&gt;← All cleanups&lt;/Link&gt;
+      &lt;/p&gt;
+      &lt;article&gt;
+        &lt;h1&gt;{event.title}&lt;/h1&gt;
+        &lt;p className={styles.badges}&gt;
+          &lt;StatusBadge status={event.status} /&gt;
+        &lt;/p&gt;
+        &lt;p className={pageStyles.lead}&gt;
+          &lt;time dateTime={event.date}&gt;{formatDate(event.date)}&lt;/time&gt;, {event.startTime} to{' '}
+          {event.endTime}
+        &lt;/p&gt;
+        &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
+        {checkInDay || impact !== null ? (
+          // A new key for each cleanup: fresh tabs, nothing selected from the last one
+          &lt;Tabs key={event.id} defaultTab={checkInDay ? 'desk' : 'details'}&gt;
+            &lt;TabList label="About this cleanup"&gt;
+              &lt;Tab id="details"&gt;Details&lt;/Tab&gt;
+              {checkInDay &amp;&amp; &lt;Tab id="desk"&gt;Check-in desk&lt;/Tab&gt;}
+              {impact !== null &amp;&amp; &lt;Tab id="impact"&gt;Impact&lt;/Tab&gt;}
+            &lt;/TabList&gt;
+            &lt;TabPanel id="details"&gt;
+              &lt;AboutCleanup event={event} /&gt;
+            &lt;/TabPanel&gt;
+            {checkInDay &amp;&amp; (
+              &lt;TabPanel id="desk"&gt;
+                &lt;TodaysDesk eventId={event.id} /&gt;
+              &lt;/TabPanel&gt;
+            )}
+            {impact !== null &amp;&amp; (
+              &lt;TabPanel id="impact"&gt;
+                &lt;ErrorBoundary fallback={ImpactProblem}&gt;
+                  &lt;Suspense fallback={&lt;LoadStatus state={{ kind: 'loading' }} what="the impact report" /&gt;}&gt;
+                    &lt;ImpactSummary impact={impact} /&gt;
+                  &lt;/Suspense&gt;
+                &lt;/ErrorBoundary&gt;
+              &lt;/TabPanel&gt;
+            )}
+          &lt;/Tabs&gt;
+        ) : (
+          &lt;AboutCleanup event={event} /&gt;
+        )}
+      &lt;/article&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The page got simpler: no <code>useParams</code>, no viewer, no <code>Suspense</code> around the whole cleanup, no "not found" branch (the error page has it). The <code>key={event.id}</code> moved to <code>Tabs</code>: going from one completed cleanup to another keeps <code>EventPage</code> mounted, and the key gives the tabs (and the impact boundary inside them) a fresh start. The <code>ErrorBoundary</code> from Lesson 4.4 now guards only the impact report, so a missing report costs one tab, not the page.</p>
+                    <p><code>ImpactSummary</code> receives the promise instead of fetching. In <code>src/components/ImpactSummary.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactSummary.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactSummary.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">-import { getImpact } from '../api/client.ts'
+-import type { DebrisCategory } from '../api/types.ts'
+-import { useApi } from '../hooks/useApi.ts'
++import { use } from 'react'
++import type { DebrisCategory, ImpactReport } from '../api/types.ts'
+ import { DataList } from './DataList.tsx'
+-import { LoadStatus } from './LoadStatus.tsx'
+ 
+ // The API's labels for its debris categories (GET /api/meta lists the same ones)</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ImpactSummary.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ImpactSummary.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> 
+ interface ImpactSummaryProps {
+-  eventId: string
++  /** The report on its way: the event page's loader started the request */
++  impact: Promise&lt;ImpactReport&gt;
+ }
+ 
+-// What a completed cleanup took off the beach, from its impact report
+-export function ImpactSummary({ eventId }: ImpactSummaryProps) {
+-  const impact = useApi(`/events/${eventId}/impact`, (signal) =&gt; getImpact(eventId, signal))
+-
+-  if (impact.state.kind !== 'ready') {
+-    return &lt;LoadStatus state={impact.state} what="the impact report" onRetry={impact.reload} /&gt;
+-  }
+-  const report = impact.state.data
++// What a completed cleanup took off the beach. Suspends until the report arrives.
++export function ImpactSummary({ impact }: ImpactSummaryProps) {
++  const report = use(impact)
+   const mostFirst = report.items.toSorted((a, b) =&gt; b.count - a.count)
+ </code></pre>
+                    </div>
+                    <p>Finally, delete <code>src/api/eventPromises.ts</code>: the router keeps the loader's data, which was that file's only job. In VS Code, right-click it in the Explorer and choose <strong>Delete</strong>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: The session moves into a store <span class="step-time">(10 min)</span></h3>
+                    <p>In <code>src/api/client.ts</code>, replace the old <code>readSession</code> and <code>saveSession</code> (the section under "the session", after <code>sessionKey</code>) with the store:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">// What sessionStorage holds, checked: null when nothing (or not a session) is saved
+function loadSession(): Session | null {
+  const saved = sessionStorage.getItem(sessionKey)
+  if (saved === null) return null
+  try {
+    const value: unknown = JSON.parse(saved)
+    return isSignInResponse(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+// The session lives here, outside React, so loaders and actions can read and change it too
+let current = loadSession()
+const listeners = new Set&lt;() =&gt; void&gt;()
+
+/** The current session, or null when nobody is signed in */
+export function readSession(): Session | null {
+  return current
+}
+
+/** Save (or with null, forget) the session, and tell everyone who listens */
+export function saveSession(session: Session | null): void {
+  if (session === null) {
+    sessionStorage.removeItem(sessionKey)
+  } else {
+    sessionStorage.setItem(sessionKey, JSON.stringify(session))
+  }
+  current = session
+  for (const listener of listeners) {
+    listener()
+  }
+}
+
+/** Call listener after every sign-in and sign-out. Returns a function that stops listening. */
+export function onSessionChange(listener: () =&gt; void): () =&gt; void {
+  listeners.add(listener)
+  return () =&gt; {
+    listeners.delete(listener)
+  }
+}</code></pre>
+                    </div>
+                    <p>Inside <code>request()</code>, forget a session the API has ended:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   const response = await fetch(`${apiBaseUrl()}/api${path}`, { ...init, headers })
+   if (!response.ok) {
++    if (response.status === 401 &amp;&amp; session !== null) {
++      // The API no longer knows this sign-in (it restarted, or the session ended): forget it here too
++      saveSession(null)
++    }
+     const body: unknown = await response.json().catch(() =&gt; null)
+     throw new ApiError(</code></pre>
+                    </div>
+                    <p>The <code>session !== null</code> part matters: a wrong password also answers 401, but nobody was signed in to forget. Update the 401 message in <code>describeError</code>, since nobody has to sign out by hand any more:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> export function describeError(error: unknown): string {
+   if (error instanceof ApiError &amp;&amp; error.status === 401) {
+-    return 'Your sign-in has ended. Sign out, then sign in again.'
++    return 'Your sign-in has ended. Sign in again.'
+   }
+   if (error instanceof ApiError &amp;&amp; error.status === 404) {</code></pre>
+                    </div>
+                    <p>Signing in becomes the action's job (Step 4), so <code>signIn</code> leaves the context. In <code>src/auth/AuthContext.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/auth/AuthContext.ts</div>
+                        <pre data-src="shoreline-hq/src/auth/AuthContext.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> import { createContext, useContext } from 'react'
+ import type { Session } from '../api/client.ts'
+-import type { SignInRequest } from '../api/types.ts'
+ 
+ /** What every component can ask about sign-in, wherever it sits in the tree */</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/auth/AuthContext.ts</div>
+                        <pre data-src="shoreline-hq/src/auth/AuthContext.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   /** true when an organizer is signed in */
+   isOrganizer: boolean
+-  /** Throws ApiError (401) when the email or password is wrong */
+-  signIn: (credentials: SignInRequest) =&gt; Promise&lt;void&gt;
+   signOut: () =&gt; void
+ }</code></pre>
+                    </div>
+                    <p>And <code>AuthProvider</code> stops owning state; it subscribes. Replace <code>src/auth/AuthProvider.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/auth/AuthProvider.tsx</div>
+                        <pre data-src="shoreline-hq/src/auth/AuthProvider.tsx"><code class="language-tsx">import { useSyncExternalStore, type ReactNode } from 'react'
+import { onSessionChange, postSignOut, readSession, saveSession } from '../api/client.ts'
+import { AuthContext } from './AuthContext.ts'
+
+interface AuthProviderProps {
+  children: ReactNode
+}
+
+// Hands the session to every component. The session itself lives in client.ts, where the
+// router's loaders and actions can reach it; React re-renders whenever it changes.
+export function AuthProvider({ children }: AuthProviderProps) {
+  const session = useSyncExternalStore(onSessionChange, readSession)
+  const isOrganizer = session?.user.role === 'organizer'
+
+  function signOut() {
+    // The request takes the token with it as it starts; then this tab forgets the session
+    postSignOut().catch((error: unknown) =&gt; console.error(error))
+    saveSession(null)
+  }
+
+  return &lt;AuthContext value={{ session, isOrganizer, signOut }}&gt;{children}&lt;/AuthContext&gt;
+}</code></pre>
+                    </div>
+                    <p>Run <code>npx tsc -b</code> now and TypeScript lists the one place that still signs in the old way, which is the next step's job:</p>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/pages/SignInPage.tsx:50:20 - error TS2339: Property 'signIn' does not exist on type 'AuthValue'.
+
+50   const { session, signIn } = useAuth()
+                      ~~~~~~
+
+
+Found 1 error in src/pages/SignInPage.tsx:50</code></pre>
+                    </div>
+                    <p>A red error after a refactor is good news: it is the compiler's to-do list.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Guards and the sign-in action <span class="step-time">(14 min)</span></h3>
+                    <p>Create <code>src/auth/guards.ts</code>: the safe <code>next</code> reader, the organizers' guard, the rule that lets the router skip it while you type, and a guard for the sign-in page itself (someone already signed in goes straight on):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/auth/guards.ts</div>
+                        <pre data-src="shoreline-hq/src/auth/guards.ts"><code class="language-ts">// Route guards: loaders that decide who may open a page, before the page renders (Lesson 6.3)
+import { data, redirect, type LoaderFunctionArgs, type ShouldRevalidateFunctionArgs } from 'react-router'
+import { readSession } from '../api/client.ts'
+
+/**
+ * Where to go after signing in: the ?next= address, but only if it is a path inside the HQ.
+ * Anything else (https://elsewhere.example, //elsewhere.example) goes to the home page.
+ */
+export function nextPath(url: URL): string {
+  const next = url.searchParams.get('next')
+  if (next === null || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) {
+    return '/'
+  }
+  return next
+}
+
+/** For pages with contact details and planning tools: guests sign in first, volunteers are turned away */
+export function organizersOnly({ request }: LoaderFunctionArgs) {
+  const session = readSession()
+  if (session === null) {
+    // Remember the page (and its ?search) so the sign-in page can send people back to it
+    const { pathname, search } = new URL(request.url)
+    throw redirect(`/sign-in?next=${encodeURIComponent(pathname + search)}`)
+  }
+  if (session.user.role !== 'organizer') {
+    const message = "This page has the crew's contact details and planning tools, so only organizers can open it."
+    throw data(message, { status: 403, statusText: 'Organizers only' })
+  }
+  return null
+}
+
+/**
+ * When the router may skip organizersOnly: a change to the ?search alone (typing in a search box).
+ * A loader makes every navigation wait for it, and a box that waits loses letters.
+ */
+export function onlyWhenThePathChanges({
+  currentUrl,
+  nextUrl,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  const sameAddress = currentUrl.pathname === nextUrl.pathname
+  if (sameAddress &amp;&amp; currentUrl.search !== nextUrl.search) {
+    return false
+  }
+  return defaultShouldRevalidate
+}
+
+/** The sign-in page is for people who are not signed in yet: everyone else goes on to ?next= */
+export function guestsOnly({ request }: LoaderFunctionArgs) {
+  if (readSession() !== null) {
+    throw redirect(nextPath(new URL(request.url)))
+  }
+  return null
+}</code></pre>
+                    </div>
+                    <p><code>ShouldRevalidateFunctionArgs</code> gives you both addresses and <code>defaultShouldRevalidate</code>, the router's own answer. Returning that answer in every other case keeps the default behavior: a new path, an action, or <code>revalidate()</code> after a sign-out (same address, same search) all run the guard again.</p>
+                    <p>Create <code>src/auth/signInAction.ts</code>. The checks inside the <code>try</code> are Lesson 5.2's, moved out of the component:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/auth/signInAction.ts</div>
+                        <pre data-src="shoreline-hq/src/auth/signInAction.ts"><code class="language-ts">// The sign-in form's action: the router calls it when the form is submitted (Lesson 6.3)
+import { redirect, type ActionFunctionArgs } from 'react-router'
+import { ApiError, describeError, postSignIn, saveSession } from '../api/client.ts'
+import { nextPath } from './guards.ts'
+
+/** What the form shows after a try that did not work: the email (never the password) and why */
+export interface SignInResult {
+  email: string
+  fieldErrors: Record&lt;string, string[]&gt;
+  message: string
+}
+
+export async function signInAction({ request }: ActionFunctionArgs): Promise&lt;SignInResult&gt; {
+  const formData = await request.formData()
+  const email = formData.get('email')
+  const password = formData.get('password')
+  if (typeof email !== 'string' || typeof password !== 'string') {
+    return { email: '', fieldErrors: {}, message: 'The form is missing a field.' }
+  }
+  try {
+    saveSession(await postSignIn({ email, password }))
+  } catch (error: unknown) {
+    // The API's answers are written for people: "Enter your password.", "Email or password is incorrect."
+    if (error instanceof ApiError &amp;&amp; error.fieldErrors !== undefined) {
+      return { email, fieldErrors: error.fieldErrors, message: '' }
+    }
+    if (error instanceof ApiError &amp;&amp; error.status === 401) {
+      return { email, fieldErrors: {}, message: error.message }
+    }
+    console.error(error)
+    return { email, fieldErrors: {}, message: describeError(error) }
+  }
+  // Signed in: on to the page that sent them here (or home)
+  throw redirect(nextPath(new URL(request.url)))
+}</code></pre>
+                    </div>
+                    <p>Replace <code>src/pages/SignInPage.tsx</code>. The temporary "Signed in" view from Lesson 5.2 is gone: after a sign-in you are where you wanted to be.</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/SignInPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/SignInPage.tsx"><code class="language-tsx">import { useEffect, useRef } from 'react'
+import { Form, useActionData, useNavigation } from 'react-router'
+import type { signInAction } from '../auth/signInAction.ts'
+import { Button } from '../components/Button.tsx'
+import { FieldError } from '../components/FieldError.tsx'
+import formStyles from '../components/Form.module.css'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './Page.module.css'
+
+export function SignInPage() {
+  useDocumentTitle('Sign in')
+  // undefined until the form has been sent once; after that, why the last try did not work
+  const result = useActionData&lt;typeof signInAction&gt;()
+  const navigation = useNavigation()
+  const isPending = navigation.state !== 'idle'
+  const fieldErrors = result?.fieldErrors ?? {}
+  const passwordRef = useRef&lt;HTMLInputElement&gt;(null)
+
+  // After a try that did not work: empty the password box (never keep a password around), then
+  // put the focus on the first field to fix, or on the password
+  useEffect(() =&gt; {
+    const password = passwordRef.current
+    if (result === undefined || password === null) return
+    password.value = ''
+    const firstInvalid = password.form?.querySelector&lt;HTMLElement&gt;('[aria-invalid="true"]')
+    const target = firstInvalid ?? password
+    target.focus()
+  }, [result])
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Sign in&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;
+        Organizers sign in to see drafts, the crew list and today's check-in desk.
+      &lt;/p&gt;
+      {/* The router's Form: submitting it calls the route's action (signInAction) */}
+      &lt;Form method="post" noValidate className={formStyles.form}&gt;
+        &lt;p role="alert" className={formStyles.status}&gt;
+          {result?.message}
+        &lt;/p&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="email"&gt;Email&lt;/label&gt;
+          &lt;input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="username"
+            defaultValue={result?.email}
+            aria-invalid={fieldErrors.email !== undefined}
+            aria-describedby={fieldErrors.email &amp;&amp; 'email-error'}
+          /&gt;
+          &lt;FieldError id="email-error" messages={fieldErrors.email} /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="password"&gt;Password&lt;/label&gt;
+          &lt;input
+            ref={passwordRef}
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            aria-invalid={fieldErrors.password !== undefined}
+            aria-describedby={fieldErrors.password &amp;&amp; 'password-error'}
+          /&gt;
+          &lt;FieldError id="password-error" messages={fieldErrors.password} /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.actions}&gt;
+          &lt;Button type="submit" variant="primary" disabled={isPending}&gt;
+            {isPending ? 'Signing in…' : 'Sign in'}
+          &lt;/Button&gt;
+        &lt;/div&gt;
+      &lt;/Form&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>One thing the router's <code>&lt;Form&gt;</code> does not do for you: reset the fields. Lesson 5.2's React form action emptied the password after every try; a router form leaves the typed password in its box (measured before the fix). The effect keeps 5.2's promise: each failed try gives a new <code>result</code> object, so the effect runs, empties the password through its ref and moves the focus to the first field marked invalid, or to the password. Measured: after a wrong password the box was empty, the email was still there and the focus was in the password box; after sending an empty form, the focus was on the email field. Writing to <code>.value</code> is fine here because the field is uncontrolled: React never set its value in the first place.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Connect everything to the router <span class="step-time">(10 min)</span></h3>
+                    <p>Replace <code>src/App.tsx</code>. <code>PageCrashed</code> is gone (the new <code>ErrorPage</code> does its job), the two data routes get their loaders, the sign-in route its guard and action, and the organizers' pages move under one pathless guard route:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx"><code class="language-tsx">import { createBrowserRouter } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
+import { guestsOnly, onlyWhenThePathChanges, organizersOnly } from './auth/guards.ts'
+import { AuthProvider } from './auth/AuthProvider.tsx'
+import { signInAction } from './auth/signInAction.ts'
+import { AppLayout } from './components/AppLayout.tsx'
+import { ErrorPage } from './pages/ErrorPage.tsx'
+import { EventPage } from './pages/EventPage.tsx'
+import { EventsPage } from './pages/EventsPage.tsx'
+import { HomePage } from './pages/HomePage.tsx'
+import { eventLoader, sitesLoader } from './pages/loaders.ts'
+import { NewEventPage } from './pages/NewEventPage.tsx'
+import { NotFoundPage } from './pages/NotFoundPage.tsx'
+import { SignInPage } from './pages/SignInPage.tsx'
+import { SitesPage } from './pages/SitesPage.tsx'
+import { VolunteerPage } from './pages/VolunteerPage.tsx'
+import { VolunteersPage } from './pages/VolunteersPage.tsx'
+
+// Every address the HQ knows, and the page it shows there
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: &lt;AppLayout /&gt;,
+    children: [
+      {
+        // A route without a path: it adds the error page and keeps the layout around it
+        errorElement: &lt;ErrorPage /&gt;,
+        children: [
+          { index: true, element: &lt;HomePage /&gt; },
+          { path: 'events', element: &lt;EventsPage /&gt; },
+          { path: 'events/:eventId', element: &lt;EventPage /&gt;, loader: eventLoader },
+          { path: 'sites', element: &lt;SitesPage /&gt;, loader: sitesLoader },
+          { path: 'sign-in', element: &lt;SignInPage /&gt;, loader: guestsOnly, action: signInAction },
+          {
+            // Organizers only: this guard runs before any of these pages appears
+            loader: organizersOnly,
+            shouldRevalidate: onlyWhenThePathChanges,
+            children: [
+              { path: 'events/new', element: &lt;NewEventPage /&gt; },
+              {
+                path: 'volunteers',
+                element: &lt;VolunteersPage /&gt;,
+                // Nested routes: they render inside VolunteersPage, at its &lt;Outlet /&gt;
+                children: [
+                  { index: true, element: &lt;p&gt;Pick a name from the list to see their details.&lt;/p&gt; },
+                  { path: ':volunteerId', element: &lt;VolunteerPage /&gt; },
+                ],
+              },
+            ],
+          },
+          { path: '*', element: &lt;NotFoundPage /&gt; },
+        ],
+      },
+    ],
+  },
+])
+
+export function App() {
+  return (
+    &lt;AuthProvider&gt;
+      &lt;RouterProvider router={router} /&gt;
+    &lt;/AuthProvider&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The layout shows navigations in progress and asks the router to check again whenever the session changes. Replace <code>src/components/AppLayout.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.tsx"><code class="language-tsx">import { useEffect, useRef } from 'react'
+import { Outlet, ScrollRestoration, useLocation, useNavigation, useRevalidator } from 'react-router'
+import { onSessionChange } from '../api/client.ts'
+import styles from './AppLayout.module.css'
+import { Footer } from './Footer.tsx'
+import { Header } from './Header.tsx'
+
+// The frame around every page: the router renders the current page where &lt;Outlet /&gt; is
+export function AppLayout() {
+  const { pathname } = useLocation()
+  const mainRef = useRef&lt;HTMLElement&gt;(null)
+  const shownPath = useRef(pathname)
+  // 'loading' while the next page's loaders run; the current page stays on screen until then
+  const busy = useNavigation().state === 'loading'
+  const { revalidate } = useRevalidator()
+
+  // After a link changes the page, start reading from the new page, not from the old link
+  useEffect(() =&gt; {
+    if (pathname !== shownPath.current) {
+      shownPath.current = pathname
+      mainRef.current?.focus({ preventScroll: true })
+    }
+  }, [pathname])
+
+  // Signing out (or a sign-in the API has ended) changes what loaders may show: run them again
+  useEffect(() =&gt; onSessionChange(() =&gt; void revalidate()), [revalidate])
+
+  return (
+    &lt;&gt;
+      &lt;a className={styles.skipLink} href="#main"&gt;
+        Skip to main content
+      &lt;/a&gt;
+      &lt;Header /&gt;
+      &lt;div role="status" className={styles.pending}&gt;
+        {busy &amp;&amp; 'Loading…'}
+      &lt;/div&gt;
+      &lt;main id="main" ref={mainRef} tabIndex={-1} aria-busy={busy} className={styles.page}&gt;
+        &lt;Outlet /&gt;
+      &lt;/main&gt;
+      &lt;Footer /&gt;
+      &lt;ScrollRestoration /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p><code>onSessionChange</code> returns its own unsubscribe function, so the effect can return it directly as its cleanup. The <code>void</code> says "I start this promise on purpose and do not wait for it". Add the styles at the end of <code>src/components/AppLayout.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.module.css" data-match="diff"><code class="language-diff-css diff-highlight">   outline: none;
+ }
++
++/* "Loading…" at the bottom of the window while the next page's loaders run (empty the rest of the time) */
++.pending {
++  position: fixed;
++  bottom: 1rem;
++  left: 50%;
++  translate: -50% 0;
++  z-index: 1;
++  border-radius: 1rem;
++  background: var(--sunrise);
++  color: var(--ink);
++  font-weight: 600;
++}
++
++.pending:not(:empty) {
++  padding: 0.25rem 1rem;
++}
++
++/* The page that is about to be replaced fades a little */
++.page[aria-busy='true'] {
++  opacity: 0.6;
++}</code></pre>
+                    </div>
+                    <p>Last, the Volunteers page no longer needs to guard itself. In <code>src/pages/VolunteersPage.tsx</code>, <code>CrewList</code> becomes the page, and the old wrapper goes:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import type { ChangeEvent } from 'react'
+-import { Link, NavLink, Outlet, useSearchParams } from 'react-router'
++import { NavLink, Outlet, useSearchParams } from 'react-router'
+ import { getVolunteers, isSkill } from '../api/client.ts'
+ import type { Skill, Volunteer } from '../api/types.ts'
+-import { useAuth } from '../auth/AuthContext.ts'
+ import { DataList } from '../components/DataList.tsx'
+ import { LoadStatus } from '../components/LoadStatus.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> type SkillFilter = Skill | 'all'
+ 
+-// The crew list: search, skill and page all live in the address (?q=&amp;skill=&amp;page=)
+-function CrewList() {
++// Organizers only (the route's organizersOnly guard). Search, skill and page live in the address.
++export function VolunteersPage() {
++  useDocumentTitle('Volunteers')
+   const [searchParams, setSearchParams] = useSearchParams()
+   const query = searchParams.get('q') ?? ''</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   return (
+     &lt;&gt;
++      &lt;h1&gt;Volunteers&lt;/h1&gt;
+       &lt;search className={styles.filters}&gt;
+         &lt;div className={formStyles.field}&gt;</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   )
+ }
+-
+-export function VolunteersPage() {
+-  const { isOrganizer } = useAuth()
+-  useDocumentTitle('Volunteers')
+-
+-  return (
+-    &lt;&gt;
+-      &lt;h1&gt;Volunteers&lt;/h1&gt;
+-      {isOrganizer ? (
+-        &lt;CrewList /&gt;
+-      ) : (
+-        &lt;p&gt;
+-          The crew list has everyone's contact details, so only organizers can see it.{' '}
+-          &lt;Link to="/sign-in"&gt;Sign in&lt;/Link&gt; with an organizer account.
+-        &lt;/p&gt;
+-      )}
+-    &lt;/&gt;
+-  )
+-}</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Try it as three people <span class="step-time">(7 min)</span></h3>
+                    <ul>
+                        <li><strong>As a guest:</strong> open <code>/volunteers?skill=first-aid</code>. You are on the sign-in page, and the address keeps your destination in <code>next</code>. Try a wrong password: the message appears, the email stays, the address is unchanged. Sign in as Maya: you land on the crew list with "First aid" chosen and "Found 4 people.".</li>
+                        <li><strong>As Maya:</strong> type in the crew search, including in the middle of a word: every letter stays where you typed it. Open a draft such as Harbor Kayak Cleanup, then <strong>Sign out</strong>: the page turns into "Cleanup not found", because a guest cannot see drafts. On <code>/events</code>, Sign out keeps you on the list (15 cleanups instead of 17); on <code>/volunteers</code> it sends you to sign in.</li>
+                        <li><strong>As Theo</strong> (<code>theo.nakamura@example.com</code>): open <code>/volunteers</code> or <code>/events/new</code>. "Organizers only".</li>
+                        <li><strong>The API forgets you:</strong> signed in as Maya on <code>/volunteers</code>, stop shoreline-api with <kbd>Ctrl</kbd>+<kbd>C</kbd> (also <kbd>Ctrl</kbd>+<kbd>C</kbd> on a Mac) and start it again with <code>node server.ts</code>. Click a name: you are asked to sign in, and afterwards you are on that person's card.</li>
+                    </ul>
+                    <figure class="screenshot">
+                        <img src="images/lesson_23/23-organizers-only.png" alt="Shoreline Crew HQ signed in as Theo Nakamura (Volunteer), at slash volunteers. The header has only Events and Sites. The page heading says Organizers only, then: This page has the crew&#x27;s contact details and planning tools, so only organizers can open it. Go to the home page or the list of cleanups." width="1100" height="309" loading="lazy">
+                        <figcaption>The guard's 403 answer, drawn by the route's error page: the heading and the sentence came from <code>data(message, { status: 403, statusText: 'Organizers only' })</code> in the loader.</figcaption>
+                    </figure>
+                    <p>Finish with the checks the HQ always passes:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 15ms on 59 files with 150 rules using 20 threads.
+&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 181 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-DTlLK1VW.css                             8.28 kB │ gzip:   2.60 kB
+dist/assets/index-CSxT7tLO.js                            384.04 kB │ gzip: 121.72 kB
+
+✓ built in 1.11s</code></pre>
+                    </div>
+                    <p><code>npx tsc -b</code> prints nothing when all is well. The JavaScript is about the same size as in Lesson 6.2 (383.24 kB): loaders and guards are a little code, and a deleted cache and page gate took some away. Your hashes and timings will differ.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>The sites page and a cleanup's page appear with their data, with a "Loading…" sign at the bottom of the window while a page loads; Back to the sites page returns to where you had scrolled</li>
+                        <li>An unknown cleanup shows "Cleanup not found" from the shared error page; with the API stopped, pages explain it and offer <strong>Try again</strong></li>
+                        <li>Guests who open <code>/volunteers</code> or <code>/events/new</code> sign in and land on the page they asked for; <code>?next=</code> never leads outside the HQ</li>
+                        <li>Volunteers get "Organizers only"; signing out on an organizer page sends you to sign in</li>
+                        <li>A session the API has forgotten ends by itself</li>
+                        <li><code>src/api/eventPromises.ts</code> is gone, and <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass with no errors or warnings</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, list each page with two answers: who may open it (everyone, signed-in people, a role), and what data it must have before it can show anything. Those two columns are your guards and your loaders.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 12 minutes together, included in the lesson time). Exercise 3 is an optional stretch, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Predict the address</h3>
+                    <p>Write down where each of these ends up before you try it (signed out at the start): (a) open <code>/events/new</code>; (b) on that page, sign in as Theo; (c) sign out, open <code>/sign-in?next=//example.com</code> and sign in as Maya; (d) as Maya, open <code>/sign-in?next=/sites</code>; (e) as Maya on <code>/volunteers?page=2</code>, click <strong>Sign out</strong>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Which guard runs for each address, and what does <code>nextPath</code> accept? A 403 does not redirect.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>(a) <code>/sign-in?next=%2Fevents%2Fnew</code>. (b) The action redirects to <code>/events/new</code>, where the guard answers 403: "Organizers only" (Theo is signed in, just not allowed). (c) <code>//example.com</code> starts with <code>//</code>, so <code>nextPath</code> gives <code>/</code>: the home page. (d) <code>guestsOnly</code> sees a session and redirects to <code>/sites</code> at once. (e) Signing out triggers <code>revalidate()</code>; the guard sees no session and redirects to <code>/sign-in?next=%2Fvolunteers%3Fpage%3D2</code>.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Say why they are here</h3>
+                    <p>When a guard sends someone to the sign-in page, its lead paragraph should say so: "That page is for organizers. Sign in, and you will go straight there." Opened directly, the page keeps its usual sentence.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The only difference between the two visits is the <code>next</code> search param. Lesson 6.2's <code>useSearchParams</code> can tell you whether it is there.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">// ?next= means a guard sent them here on the way to another page
+const [searchParams] = useSearchParams()
+const sentHere = searchParams.has('next')
+// ...
+  {sentHere
+    ? 'That page is for organizers. Sign in, and you will go straight there.'
+    : "Organizers sign in to see drafts, the crew list and today's check-in desk."}
+&lt;/p&gt;</code></pre>
+                        <p>Measured: from <code>/volunteers</code> as a guest, the lead read "That page is for organizers. Sign in, and you will go straight there."; at <code>/sign-in</code> it kept "Organizers sign in to see drafts, the crew list and today's check-in desk.". It type-checks and lints cleanly. The course's code continues without this change.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): A loader for the volunteer card</h3>
+                    <p>Optional stretch, not counted in the lesson time. Give the nested <code>:volunteerId</code> route a <code>volunteerLoader</code> (404 as "Volunteer not found"), and make <code>VolunteerPage</code> read it. Then, signed out, open <code>/volunteers/v16</code> with the browser's DevTools Network tab open (<kbd>F12</kbd>, or <kbd>⌥ Option</kbd>+<kbd>⌘ Cmd</kbd>+<kbd>I</kbd> on a Mac) and look for a request to <code>/api/volunteers/v16</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The parent's <code>organizersOnly</code> and your loader start together. Calling the guard yourself at the top of your loader makes it throw first. The child route also needs <code>shouldRevalidate: onlyWhenThePathChanges</code>, or typing in the crew search with a card open runs your loader on every letter.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">/** /volunteers/:volunteerId: one person (organizers only) */
+export async function volunteerLoader(args: LoaderFunctionArgs) {
+  // The parent route's guard runs at the same time as this loader, not before it: check here too
+  organizersOnly(args)
+  const { volunteerId } = args.params
+  if (volunteerId === undefined) {
+    throw new Error('volunteerLoader needs a route with a :volunteerId parameter')
+  }
+  try {
+    return await getVolunteer(volunteerId, args.request.signal)
+  } catch (error: unknown) {
+    if (error instanceof ApiError &amp;&amp; error.status === 404) {
+      throw data('Nobody on the crew has this id. Check the link.', {
+        status: 404,
+        statusText: 'Volunteer not found',
+      })
+    }
+    throw error
+  }
+}</code></pre>
+                        <pre data-snippet><code class="language-tsx">// The child route volunteers/:volunteerId: volunteerLoader has loaded the person already
+export function VolunteerPage() {
+  const volunteer = useLoaderData&lt;typeof volunteerLoader&gt;()
+  return &lt;VolunteerDetails volunteer={volunteer} /&gt;
+}</code></pre>
+                        <p>In <code>App.tsx</code> the child route becomes <code>{ path: ':volunteerId', element: &lt;VolunteerPage /&gt;, loader: volunteerLoader, shouldRevalidate: onlyWhenThePathChanges }</code>. Measured: without the <code>organizersOnly(args)</code> line, a guest opening <code>/volunteers/v16</code> still ended on the sign-in page, but the browser had sent <code>GET /api/volunteers/v16</code> (answered 401). With it: no request. Signed in, Lily's card appeared with no "Loading this volunteer…", <code>/volunteers/v99</code> showed "Volunteer not found", and typing in the search with a card open kept the cursor in place. Not in the course's code (Lesson 7.1 moves this card to a query).</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> Signed out, you open <code>/volunteers?skill=first-aid</code>. Where does the browser end up?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Does the page render before or after its guard has run?">
+                                A) On <code>/volunteers?skill=first-aid</code>, showing "Loading the crew…"
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="How would the sign-in action know where to send you afterwards?">
+                                B) On <code>/sign-in</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A guest is not signed in at all. Which throw is for people who are signed in but not allowed?">
+                                C) On <code>/volunteers?skill=first-aid</code>, showing "Organizers only"
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="organizersOnly finds no session and throws a redirect to the sign-in page, with the path and search you asked for encoded into next. Nothing on the crew page renders and no request for the crew is sent.">
+                                D) On <code>/sign-in?next=%2Fvolunteers%3Fskill%3Dfirst-aid</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> What is the type of <code>sites</code> in <code>const sites = useLoaderData()</code>, with no type argument?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="unknown would force you to check before using it. Did the typo in Common Mistakes get an error?">
+                                A) <code>unknown</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The type parameter defaults to any, so anything you do with the result compiles, typos included. Pass typeof yourLoader and TypeScript works out the real type from the loader's return.">
+                                B) <code>any</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="How would the Hook know which loader belongs to this component? They only meet in the route list.">
+                                C) An array of Site
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="useLoaderData gives you the loader's result, not the loader.">
+                                D) <code>LoaderFunction</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Why does <code>organizersOnly</code> call <code>readSession()</code> instead of <code>useAuth()</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Speed is not the issue. What did oxlint say about the Hook call?">
+                                A) <code>readSession()</code> is faster because it skips React
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="useAuth never returns undefined; it throws outside a provider. But is a loader inside any component?">
+                                B) <code>useAuth()</code> would quietly return <code>undefined</code> in a loader
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The router calls loaders before any component renders, and Hooks only work during a component's render. That is why the session moved into a store in client.ts that plain functions can read, and React subscribes to with useSyncExternalStore.">
+                                C) A loader runs outside React, and Hooks only work while a component renders
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Both read the same session. Who is allowed to call a Hook?">
+                                D) <code>useAuth()</code> cannot tell organizers from volunteers
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> <code>eventLoader</code> awaits the cleanup but not the impact report. On a slow connection, what do you see when you open a completed cleanup?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The router waits only for what the loader awaited. The page appears with the cleanup, and the Impact tab's Suspense boundary shows its fallback until the report's promise resolves, as measured with a slowed API.">
+                                A) The page appears once the cleanup arrives; the Impact tab says "Loading the impact report…" until the report follows
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The loader returns before the report's promise settles. Does the router wait for promises inside the result?">
+                                B) Nothing changes until both have arrived, then the whole page appears
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The promise is started in the loader and handed to the page. Who calls use on it?">
+                                C) The impact report never loads, because nobody awaits it
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A promise in a loader's result is allowed; the type even shows it. What did the terminal card print for the event loader?">
+                                D) TypeScript refuses to compile a loader that returns a promise inside an object
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Maya is on <code>/volunteers</code> when shoreline-api restarts. She clicks Aisha Rahman. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That was the HQ before this lesson. What does request do now when a request with a token gets 401?">
+                                A) The card says "Your sign-in has ended. Sign out, then sign in again."
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The card's request comes back 401, so request forgets the session. The store tells its listeners: the layout revalidates, the guard finds no session and redirects to sign-in with next set to Aisha's address, which is where the sign-in action sends her afterwards.">
+                                B) She is sent to <code>/sign-in?next=%2Fvolunteers%2Fv20</code>, and after signing in she is on Aisha's card
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The API still has the volunteers. What did it lose when it restarted?">
+                                C) Aisha's card appears as usual
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing crashed while rendering. Which part of the HQ notices a 401?">
+                                D) The error page shows "Something went wrong on this page"
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why not a <code>&lt;RequireRole&gt;</code> component around the protected pages?</summary>
+                    <p>That is the other common pattern, and you will see it in many codebases: a component reads the auth context and renders <code>&lt;Navigate to="/sign-in" /&gt;</code> or its children. It works in any router mode. In data mode it has two drawbacks: the protected page's loaders (and the component's own effects, if it renders for a moment) start before the check, and every protected element has to be wrapped. A guard loader decides before anything loads or renders, in one place in the route list. Pick one pattern per app; the HQ uses loaders.</p>
+                </details>
+                <details>
+                    <summary>Should the events list get a loader too?</summary>
+                    <p>Not with a search box that changes the address on every letter. A loader makes each of those navigations wait for a request, and the box would lag (the guard mistake shows the same effect with an instant loader). You could debounce inside the loader or skip revalidation for <code>q</code>, but both fight the tool. Lesson 7.1's cache is the better answer: the page reads cached data at once, and a loader can still warm the cache on the first visit.</p>
+                </details>
+                <details>
+                    <summary>Does React Router have something that runs before all loaders, for checks like this?</summary>
+                    <p>Yes: route <strong>middleware</strong>, a <code>middleware</code> array on a route whose functions run in order before the loaders below them, and can stop or redirect. It solves the "parent and child loaders run at the same time" problem from Exercise 3 in a general way. It is newer than loaders, and the HQ's two protected pages do not need it; check the React Router documentation for data mode before using it.</p>
+                </details>
+                <details>
+                    <summary>Is <code>sessionStorage</code> with a token safe enough?</summary>
+                    <p>For the HQ and the course's API, yes, with the trade-offs from Lesson 5.2: any script on the page could read it, so the app must not load untrusted scripts. Many production apps keep the session in an <code>HttpOnly</code> cookie set by their own server instead, which scripts cannot read. The guards and the 401 handling you wrote today work the same way with either; only <code>readSession</code> and <code>request</code> would change.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>After an automatic sign-out, the HQ goes quiet: public pages simply show what guests see. Tell people what happened. Make <code>request()</code> record why the session ended (a second value in the store, or a reason passed to <code>saveSession</code>), and show "Your sign-in ended, so you are now browsing as a guest." once, in a <code>role="status"</code> message in the layout. Restart shoreline-api while signed in to test it, and make sure an ordinary <strong>Sign out</strong> does not show the message.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Trace one visit from start to finish: a guest opens <code>/events/new</code>, signs in as Maya and lands on the form. Write each function that runs, in order (guard, redirect, action, store, listeners, guard again), and what it hands to the next. Then write one sentence on which piece you would look at first if a guest could suddenly see the form again.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>A loader runs when someone navigates to its route, before the page renders; the old page stays until it finishes, and <code>useNavigation()</code> tells you one is running</li>
+                        <li>Read loader data with <code>useLoaderData&lt;typeof loader&gt;()</code>: without the type argument it is <code>any</code></li>
+                        <li>Await what the page cannot do without; return a promise for what can follow, and <code>use()</code> it inside <code>Suspense</code></li>
+                        <li>Throw <code>data(message, { status, statusText })</code> for expected failures and <code>redirect()</code> to send people elsewhere; one <code>errorElement</code> reads them with <code>useRouteError</code> and <code>isRouteErrorResponse</code></li>
+                        <li>Guards are loaders: redirect guests with a safe <code>?next=</code>, answer 403 to people without the role; the API's 401 and 403 remain the real protection</li>
+                        <li>Actions handle router forms: <code>&lt;Form method="post"&gt;</code>, <code>useActionData</code>, a redirect on success, and loaders run again afterwards</li>
+                        <li>State that code outside React must read lives in a store; React subscribes with <code>useSyncExternalStore</code></li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Check what the API answers with 401 and 403</td><td><a href="api.html">The shoreline-api reference</a></td></tr>
+                            <tr><td>Read about the Hook for outside stores</td><td><a href="https://react.dev/reference/react/useSyncExternalStore" target="_blank" rel="noopener">react.dev: useSyncExternalStore</a></td></tr>
+                            <tr><td>Read React Router's documentation on loaders and actions (choose data mode)</td><td><a href="https://reactrouter.com/" target="_blank" rel="noopener">reactrouter.com</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>Pages in the HQ load their data before they appear, and Back finds your place on the sites page</li>
+                        <li>Every route shares one error page that tells "not found" from "not allowed" from "the server is down"</li>
+                        <li>The organizers' pages are protected routes, with a way back after signing in that cannot be abused</li>
+                        <li>You wrote your first route action and your first external store</li>
+                        <li>The HQ copes when the API forgets a sign-in, without anyone pressing a button</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Module 6 is complete: the HQ has addresses for everything, and its routes decide what they need before they render. What it still lacks is memory. Visit a cleanup twice and it asks the API twice; the events list still flashes on Back. In <a href="lesson_24.html"><strong>Lesson 7.1: TanStack Query</strong></a> a cache moves in under the loaders and replaces <code>useApi</code>, with typed query Hooks keyed by the same addresses you built in this module.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass</li>
+                    <li>With the DevTools Network tab open, open a cleanup, go back to the list and open the same cleanup again: two identical requests. A cache would have remembered the first answer</li>
+                    <li>Keep your two-column list (who may open it, what it needs first) for your Lesson 11.1 plan</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>This was a big lesson: loaders, actions, guards, a store and an automatic sign-out, all touching each other. If it felt like a lot, that is because it is a lot; teams often spread this work over weeks. You did not just copy a pattern, either: you watched a cursor jump, a request slip past a guard and an address try to lead somewhere it should not, and you fixed each one. Trace the flow from your journal prompt once more tomorrow. The second time through, the pieces start to feel like one system, and that is the moment it becomes yours.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_22.html" class="prev-lesson">← Previous: Search Params, Nested Routes and Typed Navigation</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_24.html" class="next-lesson">Next: TanStack Query →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

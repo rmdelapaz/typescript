@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facilitator Guide: Session 22</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Instructor copy —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">contains answers &amp; timing · not for students</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Facilitator Guide</div>
+    <h1>Session 22: Interactions, Async, End-to-End and Accessibility Tests</h1>
+    <p class="sub">How to teach Session 22: tests that click, type and wait with the API's own code answering inside them (user-event, MSW 3, the real routes and guards, the optimistic rollback), then the HQ in a real browser with Playwright against the real server, axe in light and dark, and a rule for what to test where. Both labs have learners write the tests and catch real bugs: a form that sends too early, and two accessibility bugs only a browser can see.</p>
+    <div class="meta-row">
+      <span class="chip"><b>2</b> lessons</span>
+      <span class="chip"><b>3 hrs</b> session</span>
+      <span class="chip">Lessons <b>9.2–9.3</b></span>
+      <span class="chip">Session <b>22</b> of 26 · Part 3</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>How to Use This Guide</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Session 22 finishes Module 9: Lesson 9.2 teaches tests that act like a person and wait for answers (user-event, MSW 3 running shoreline-api's own code, the real routes and guards, Hooks and the optimistic rollback); Lesson 9.3 moves to a real browser (Playwright against the real server, axe in both themes) and settles which test belongs where.</li>
+  <li>Same rhythm for both lessons: frame (one mental model) → live demo (you type, they follow) → guided lab (a kit lab: new practice, never the lesson's own project) → start the lesson's own project. Exercises, quizzes and journals are homework.</li>
+  <li>Lesson 9.2's demo outputs below are real runs on a copy of the course app as a learner has it after Lesson 9.2 (no API and no port needed: the API's code runs inside the tests); where the lesson shows the same run, the kit's output equals the lesson's (asserted). Lesson 9.3's Playwright runs need shoreline-api on :4000 and the preview on :4173; the kit quotes the lesson's own cards for those. Lab 9.3 runs Playwright for real on a small static page with its own server on port 4322.</li>
+  <li>In both labs learners <b>write tests</b> for code that works, then prove them on planted bugs (<code class="inline">labs/module-22/l9_2-interactions-and-async/debug_SignUpForm.tsx</code>) or on two accessibility bugs already in the page (Lab 9.3).</li>
+  <li>Keep shoreline-api running in its own terminal for the 9.3 half (Playwright reuses it); close the dev server.</li>
+</ul>
+<div class="note warn"><div class="t">The #1 risk of Session 22: the Chromium download</div>
+<p>Lesson 9.3 and Lab 9.3 need Playwright's Chromium: about 330 MB per computer. Twenty laptops on venue Wi-Fi is 6 GB, and a filtered network may block <code class="inline">cdn.playwright.dev</code> outright. <b>Before:</b> in Session 21's bring list learners were asked to run <code class="inline">npx playwright install chromium</code> at home (in Lab 9.3's starter after <code class="inline">npm install</code>); check it in the warm-up with a show of hands. <b>In the room:</b> anyone without Chromium pairs with a neighbor for the 9.3 lab and does the 9.2 half normally; never start 20 downloads at once. <b>Fallback:</b> the lesson's cards and Lab 9.3's answer key show every output, and the project's Step 1 can be finished at home. Also tell learners the first Playwright run can sit for a minute or two before "Running…" (the lesson's version note).</p>
+</div>
+
+  <div class="sec"><h2>Before the Session</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ <b>Run the kit check once:</b> <code class="inline">python3 labs/check_labs.py module-22</code> (9 runs, about 30 seconds: both starters fail with their TODOs, both solutions pass their tests and type checks, the sign-up handout turns three tests red, and Lab 9.3's starter page fails axe with <code class="inline">button-name</code> in both themes and <code class="inline">color-contrast</code> in the dark one). It needs Playwright's Chromium on your machine.</li>
+  <li>☐ <b>Files to hand out:</b> the <code class="inline">labs/module-22</code> folder without the <code class="inline">solution/</code> folders; <code class="inline">lesson-30-start.zip</code>, <code class="inline">lesson-31-start.zip</code> and their <code class="inline">-end</code> versions from the course downloads.</li>
+  <li>☐ <b>Projector machine:</b> the HQ at the end of Lesson 9.2 for the first half and at the end of Lesson 9.3 for the second (two copies of the course folder, or <code class="inline">lesson-30-end</code> and <code class="inline">lesson-31-end</code> unzipped side by side); shoreline-api running; Chromium installed; run <code class="inline">npm run test:e2e</code> once in the 9.3 copy before learners arrive so the slow first run is behind you.</li>
+  <li>☐ <b>Board:</b> the request path (user.click → fetch → MSW → API core → findBy); "prefer the real rule over an override"; the Vitest-to-Playwright table (screen.getByRole → page.getByRole, findBy → await expect(...).toBeVisible()); the three-question rule for what to test where.</li>
+</ul>
+
+  <div class="sec"><h2>Session 22 Agenda (3 hours)</h2><span class="rule"></span></div>
+  <table class="timing">
+    <thead><tr><th>Clock</th><th>Minutes</th><th>Segment</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="t">0:00</td><td class="t">10</td><td>Warm-up: Lesson 9.1 retrieval</td><td>Three questions: getBy/queryBy/findBy, why reset module state, test wrong or app wrong. Checkpoint 3 redos collected.</td></tr>
+      <tr><td class="t">0:10</td><td class="t">10</td><td><b>9.2</b> Frame and mental model</td><td>The training beach: the API's own code answers inside the tests; act like a person, wait for answers.</td></tr>
+      <tr><td class="t">0:20</td><td class="t">20</td><td><b>9.2</b> Live demo</td><td>Clicks with user-event, the API's own rules (no override), the guard test that names two requests, the rollback, retries left on.</td></tr>
+      <tr><td class="t">0:40</td><td class="t">25</td><td><b>9.2</b> Guided lab</td><td><code class="inline">labs/module-22/l9_2-interactions-and-async/starter</code>: learners write the tests that type, click and wait; Task 2's "nothing was sent".</td></tr>
+      <tr><td class="t">1:05</td><td class="t">15</td><td><b>9.2</b> Start the lesson project</td><td>Steps 1 and 2: user-event and MSW, src/mocks, server.ts and setup.ts, the first clicks.</td></tr>
+      <tr><td class="t">1:20</td><td class="t">10</td><td>Break</td><td>Leave the request path (click → fetch → MSW → API core → findBy) and the get/query/find grid on the board.</td></tr>
+      <tr><td class="t">1:30</td><td class="t">10</td><td><b>9.3</b> Frame and mental model</td><td>The dress rehearsal on the real beach: few, slow, the only tests that see everything together.</td></tr>
+      <tr><td class="t">1:40</td><td class="t">20</td><td><b>9.3</b> Live demo</td><td>Playwright in five ideas, one real server and a fresh beach for every test, axe in light and dark, what to test where.</td></tr>
+      <tr><td class="t">2:00</td><td class="t">25</td><td><b>9.3</b> Guided lab</td><td><code class="inline">labs/module-22/l9_3-end-to-end-and-accessibility-tests/starter</code>: three journeys and axe in both themes on a small page with two accessibility bugs.</td></tr>
+      <tr><td class="t">2:25</td><td class="t">25</td><td><b>9.3</b> Start the lesson project</td><td>Steps 1 to 3: Playwright and axe, Chromium, the config and helpers, the guest's search.</td></tr>
+      <tr><td class="t">2:50</td><td class="t">10</td><td>Wrap-up</td><td>Exit ticket (3 questions), homework, bring list for Session 23.</td></tr>
+      <tr><td class="t"><b>Total</b></td><td class="t"><b>180</b></td><td></td><td>Ends at 3:00.</td></tr>
+    </tbody>
+  </table>
+<p><b>In the room.</b> The lesson pages estimate 150 + 135 = 285 minutes for a learner working alone; after the warm-up, the break and the wrap-up the room has 150, 70 for each lesson. Both keep their full shape; the project starts are short (15 and 25 minutes) and the rest of both projects goes home.</p>
+<p><b>Goes home (about 2 to 3 hours).</b> Lesson 9.2's project from Step 3 (routes.tsx and renderApp, the edit form, guards and the failing page, uploads with overrides, renderHook and the optimistic check-in: 46 tests) and Exercise 1 (a fake clock for useDebouncedValue; Exercises 2 and 3 are stretches); Lesson 9.3's project from Step 4 (plan, check-in with a reload, the impact report with a real photo, axe on seven pages in both themes: 19 tests) and Exercise 1 (a phone-sized dark page); both Quick Quizzes; both journals; Lab 9.2 Task 3 and Lab 9.3 Task 3.</p>
+<p><b>Protect, in this order:</b> the guard demo (the request log is the idea of Lesson 9.2); the axe-in-the-dark demo (the idea of Lesson 9.3); both guided labs' Task 2 ("nothing was sent", axe in two themes). <b>Cut first:</b> the rollback and retry demo steps (both are in the lesson's text and the homework), then "What to test where" as a demo step (ask Self-check Q10 instead), then the 9.2 project start (Steps 1 and 2 are install and copy work).</p>
+
+  <div class="sec"><h2>Opening Segment</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">0:00</span><h3>Warm-up: Lesson 9.1 retrieval</h3><span class="dur">10 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Timing</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">3m</td><td>Show of hands: 29 tests green at home? Chromium installed? Checkpoint 3 redos handed in</td></tr>
+<tr><td class="t">7m</td><td>Three questions out loud, then the bridge to today: "so far tests looked; today they click, wait and open a real browser"</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Questions (answers in bold)</div>
+<ol class="steps">
+  <li>Here now, not here, soon: which query for each? <b>getBy, queryBy, findBy.</b></li>
+  <li>Why does setup.ts reset the cache, the session and the display store after every test? <b>Every test in a file shares the modules; leftovers make results depend on order.</b></li>
+  <li>A test fails: what is the first question? <b>Is the test wrong, or the app?</b></li>
+</ol>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Lesson Plans</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">9.2</span><h3>Interactions and Async</h3><span class="dur">70 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Click, type, tab and upload in tests with user-event, and explain why each action is awaited</li>
+  <li>Answer the app's requests in tests with MSW 3 running the API's own code, reset it between tests and fail on requests nobody answers</li>
+  <li>Wait for data with findBy and waitFor, and replace one answer for one test with server.use(), typed with the API's own types</li>
+  <li>Test whole pages through the app's real routes, including loaders, redirects and the organizers-only guard</li>
+  <li>Test custom Hooks and TanStack Query mutations with renderHook, including an optimistic update and its rollback</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the training beach; act like a person; something has to answer the requests</td></tr>
+<tr><td class="t">20m</td><td>Live demo: the mock API inside, the first clicks, the API's real rules, the guard test, the rollback, retries</td></tr>
+<tr><td class="t">25m</td><td>Guided lab: <code class="inline">l9_2-interactions-and-async/starter</code>, Tasks 1 and 2</td></tr>
+<tr><td class="t">15m</td><td>Start the lesson project: Steps 1 and 2</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>From the lesson: "New crew leaders practice on a training beach: the same tide tables, the same gear, the same sign-in sheets, but nobody gets hurt when something goes wrong, and the trainer can call 'the tide is coming in early' whenever they like." The mock API is that beach: the real rules and sample data (shoreline-api's own core, through MSW), a reset between drills (<code class="inline">api.reset()</code>), and a surprise for one drill only (<code class="inline">server.use</code>).</p>
+<p>Two new abilities for the tests: <b>act</b> like a person (user-event: every action awaited) and <b>wait</b> for answers (findBy, waitFor). And one new way of seeing: some rules are about what must NOT happen (a request, a save), and a log of requests makes those testable.</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>In the course app at the end of Lesson 9.2 (<code class="inline">lesson-30-end</code>).</p>
+<ol class="steps">
+  <li><b>The mock API inside the tests (3m).</b> Open <code class="inline">src/test/server.ts</code> and <code class="inline">setup.ts</code>: <code class="inline">createHandlers({ baseUrl })</code> runs shoreline-api's own core; <code class="inline">onUnhandledFrame: 'error'</code>, <code class="inline">api.reset()</code> before each test, <code class="inline">resetHandlers()</code> after, <code class="inline">retry: false</code>. Draw the request path on the board.
+<div class="codefile">shoreline-hq/src/test/server.ts</div>
+<pre class="code" data-src="shoreline-hq/src/test/server.ts" data-stage="lesson_30" data-match="excerpt"><span class="k">export</span> <span class="k">const</span> API_URL = <span class="k">import</span>.meta.env.VITE_API_URL
+
+<span class="c">// api = the API's code with its sample data; handlers = MSW's way in to it</span>
+<span class="k">export</span> <span class="k">const</span> { handlers, api } = createHandlers({ baseUrl: API_URL })
+<span class="k">export</span> <span class="k">const</span> server = setupServer(...handlers)</pre></li>
+  <li><b>The first clicks (4m).</b> The two new EventCard tests: <code class="inline">const { user } = renderWithProviders(...)</code>, <code class="inline">await user.click(...)</code>, then Tab Tab Enter.
+<pre class="code">npx vitest run src/components/EventCard.test.tsx</pre>
+<pre class="out"> ✓ src/components/EventCard.test.tsx (8 tests)
+   ✓ EventCard (8)
+     ✓ links the title to the cleanup page
+     ✓ shows the date, the status, the meeting point and the spots left
+     ✓ says when the site is not known yet
+     ✓ has a details button named after the cleanup, closed at first
+     ✓ opens and closes the details with a click
+     ✓ opens the details from the keyboard
+     ✓ leaves out the meeting point and supplies in compact lists
+     ✓ shows supplies in roomy lists (the store was reset after the last test)
+ Test Files  1 passed (1)
+      Tests  8 passed (8)</pre>
+Every action awaited. The keyboard test is an accessibility check for free: focus order and Enter on a real button.</li>
+  <li><b>The API's own rules (4m).</b> EditEventPage's three tests through the real routes (<code class="inline">renderApp</code>): a whole journey, the form's own check that sends nothing, and the API's real 400 on a full cleanup (no override: Weekend Cove really has 18 people).
+<pre class="code">npx vitest run src/pages/EditEventPage.test.tsx</pre>
+<pre class="out"> ✓ src/pages/EditEventPage.test.tsx (3 tests)
+   ✓ EditEventPage (3)
+     ✓ saves new details and shows the cleanup
+     ✓ shows the form's own message and sends nothing
+     ✓ puts the API's message under the field when its rules say no
+ Test Files  1 passed (1)
+      Tests  3 passed (3)</pre>
+"Prefer the real rule over an override." Overrides are for what you cannot cause: failures, rare statuses.</li>
+  <li><b>Break the guard on purpose (5m).</b> Comment out <code class="inline">organizersOnly(args)</code> in <code class="inline">editEventLoader</code> and run the routes tests:
+<pre class="out">AssertionError: expected [ 'GET /api/events/e08', …(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "GET /api/events/e08",
++   "GET /api/sites",</pre>
+Ask: "would a person clicking through notice?" (No: the guest still lands on Sign in.) The request log makes the invisible half of the rule testable. Put the line back.</li>
+  <li><b>Break the rollback (2m).</b> Delete the <code class="inline">onError</code> option of <code class="inline">markMutation</code>:
+<pre class="out">AssertionError: expected 'attended' to be 'confirmed' // Object.is equality
+
+Expected: "confirmed"
+Received: "attended"</pre>
+The desk would keep showing Diego checked in although the API never saved it. Undo.</li>
+  <li><b>Retries left on (2m).</b> Remove the <code class="inline">retry: false</code> lines from <code class="inline">setup.ts</code>:
+<pre class="out">TestingLibraryElementError: Unable to find role="alert"
+
+Tests  1 failed | 4 passed (5)</pre>
+It fails after about a second: findBy's default wait, while the app was still retrying. Put the lines back; the suite is 12 files, 46 tests.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>A missing <code class="inline">await</code> before <code class="inline">user.</code>.</b> "Unable to find an element with the text" for something that does appear. Coach: "Did the test wait for the click to finish?" (Self-check Q1.)</li>
+  <li><b>getBy for data that is still loading.</b> The error's page shows "Loading Shoreline Crew HQ…". Coach: "What was on the screen at that moment?" Then findBy for the first thing that depends on the API (Self-check Q2).</li>
+  <li><b>MSW 2 code from the internet.</b> <code class="inline">onUnhandledRequest</code> is a TS2353 in MSW 3; <code class="inline">rest</code> is MSW 1. Coach: "Which version was that guide for?" The option is <code class="inline">onUnhandledFrame</code>; handlers are <code class="inline">http</code> + <code class="inline">HttpResponse</code>.</li>
+</ul>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>Folder:</b> <code class="inline">labs/module-22/l9_2-interactions-and-async/starter/</code> with <code class="inline">labs/module-22/l9_2-interactions-and-async/TASKS.md</code>; your reference is <code class="inline">labs/module-22/l9_2-interactions-and-async/solution/</code>. A sign-up form (not the HQ) with its own small mock API in <code class="inline">src/test/server.ts</code> (<code class="inline">api.reset()</code>, <code class="inline">api.fill()</code>, <code class="inline">api.signups</code>, <code class="inline">recordRequests()</code>); the life-cycle lines at the top of the test file are given. Learners write the tests. Needs <code class="inline">npm install</code> once in <code class="inline">starter/</code> (the shared React lab install, with user-event and MSW).</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m):</b> two TODO tests fail.</li>
+  <li><b>Task 1 in pairs (10m):</b> <code class="inline">renderForm()</code> with <code class="inline">userEvent.setup()</code> before render; the spots (<code class="inline">findByText('6 spots left')</code>), a sign-up (type, click, the thank-you, 5 spots, <code class="inline">api.signups</code>), the keyboard alone (<code class="inline">user.tab()</code>, <code class="inline">user.keyboard('Ana Lima{Enter}')</code>).</li>
+  <li><b>Task 2 (10m):</b> no name → the message, <code class="inline">aria-invalid</code>, and <code class="inline">recordRequests()</code> started AFTER the spots loaded → <code class="inline">[]</code>; a full cleanup through the API's real rule (<code class="inline">api.fill()</code>, no override); a 500 through <code class="inline">server.use</code> typed <code class="inline">satisfies ApiErrorBody</code>.</li>
+  <li><b>Debrief (3m):</b> "Which of your tests proves something the screen cannot show?" (the request log). Then Task 3 on the projector: the handout sends before it checks, and ignores the API's message:</li>
+</ul>
+<pre class="out">× asks for a name and sends nothing
+× shows the API message when the cleanup is full
+× says what went wrong when the server fails
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)</pre></div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>Tests That Click and Wait</b>, eight steps. In the room: Steps 1 and 2 (15 minutes).</p>
+<ul class="tick">
+  <li>Step 1: <code class="inline">npm install --save-dev @testing-library/user-event msw</code>, copy <code class="inline">shoreline-api/core</code> and <code class="inline">msw</code> into <code class="inline">src/mocks</code> (never edit them there), <code class="inline">test.env</code> in vite.config.ts, the new <code class="inline">server.ts</code> and <code class="inline">setup.ts</code>, the dev tokens in factories.ts. The 29 tests still pass.</li>
+  <li>Step 2: user-event in renderWithProviders, the two EventCard tests; break <code class="inline">/Expect mud/</code> once. <b>Done in the room</b> = 31 tests green. <b>Goes home:</b> Steps 3 to 8 and Exercise 1.</li>
+</ul>
+<figure class="shot"><img src="../../../images/lesson_30/30-guard-caught.png" alt="A terminal in shoreline-hq running npx vitest run on routes.test.tsx with the guard call in editEventLoader commented out. One test has a red cross: send guests to sign in first, without asking the API for anything. The failure shows Expected an empty list in green and Received a list of two requests in red, GET /api/events/e08 and GET /api/sites, with a caret under toEqual on line 17. Summary: 1 failed, 4 passed."><figcaption>The guard test at work: with the guard call commented out, a guest's visit sends two requests before the redirect, and the test names both of them.</figcaption></figure></div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these during the demo and the lab:</p>
+<ul class="tick">
+  <li>Where does a request go in the tests? <b>Answer:</b> MSW catches it inside Node and hands it to shoreline-api's own core: no server.</li>
+  <li>When do you use server.use? <b>Answer:</b> for answers the real rules cannot cause: failures, rare statuses, odd answers.</li>
+  <li>How do you test that something was NOT sent? <b>Answer:</b> record the requests after the page loaded, act, expect the log to be empty.</li>
+  <li>Why renderApp for the guards? <b>Answer:</b> guards and loaders exist only on the real routes.</li>
+</ul>
+<p>Workbook self-check, items Q1 to Q6.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q1</b> <span data-sc="1">C) Each action returns a Promise that resolves once its events have fired and React has updated the page</span>; <b>Q2</b> <span data-sc="2">B) <code class="inline">await screen.findByLabelText('Title (5 to 80 characters)')</code></span>; <b>Q3</b> <span data-sc="3">B) The child loader asked the API for the cleanup and the sites before the guest was sent away</span>; <b>Q4</b> <span data-sc="4">A) The API's own answer again, because server.resetHandlers() runs after every test</span>; <b>Q5</b> <span data-sc="5">The app's cache was still retrying the 500 (with pauses) when findByRole gave up after its 1-second default; tests set retry: false</span>; <b>Q6</b> <span data-sc="6">D) <code class="inline">expect(requests).toEqual([])</code> after <code class="inline">recordRequests()</code></span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners who are lost in async: one rule on a card, "await every user.… ; findBy for anything the API brings". Pair them on Lab 9.2 Task 1 before Task 2.</p>
+<p><b>Stretch:</b> Lab 9.2 Task 3 and the missing-await experiment; the lesson's Exercises 2 (sign-in failure) and 3 (the impact report in jsdom); the Bonus Challenge (Plan a cleanup through renderApp).</p>
+</div>
+    </div>
+  </section>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">9.3</span><h3>End-to-End and Accessibility Tests</h3><span class="dur">80 min</span></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">Objectives (from the lesson page)</div>
+<ul class="tick">
+  <li>Set up Playwright so one command builds the HQ, starts or reuses shoreline-api and the preview server, and runs the tests in Chromium</li>
+  <li>Write end-to-end tests with locators by role and label, auto-waiting actions and web-first assertions, and read their failures</li>
+  <li>Keep tests that share one real server independent: a reset before every test, one test at a time, and a clean API afterwards</li>
+  <li>Run axe accessibility checks on the HQ's key pages in both themes, and explain what automated checks can and cannot find</li>
+  <li>Decide for any behavior whether it needs a unit, component or end-to-end test, and why most of a suite should not be end-to-end</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Timing in the room</div>
+<table class="timing">
+<tbody>
+<tr><td class="t">10m</td><td>Frame: the dress rehearsal on the real beach; what jsdom cannot see</td></tr>
+<tr><td class="t">20m</td><td>Live demo: five ideas, one real server, axe in both themes, what to test where</td></tr>
+<tr><td class="t">25m</td><td>Guided lab: <code class="inline">l9_3-end-to-end-and-accessibility-tests/starter</code>, Tasks 1 and 2</td></tr>
+<tr><td class="t">25m</td><td>Start the lesson project: Steps 1 to 3</td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Mental model to say</div>
+<p>From the lesson: "Lesson 9.2's mock API was the training beach. Before the big Coastal Cleanup Day the crew still walks the real beach once: the real parking lot, the real tide, the real sign-in table. Nobody does that walk for every small decision, because it takes a morning. But it is the only way to find out that the gate is locked on Saturdays." End-to-end tests are that walk: few, slow, and the only tests that see the whole thing.</p>
+<p>Draw the lesson's diagram: the Playwright test in Node remote-controls Chromium; the browser loads the BUILD from vite preview (:4173) and talks to node server.ts (:4000); a dashed line from the test to the API: POST /api/_reset before each test. Then the gaps jsdom left in Lesson 9.2: real file bytes, the &lt;search&gt; element, layout, colors, reloads.</p>
+</div>
+<div class="blk"><div class="h">Live demo (you type, they follow)</div>
+<p>In the course app at the end of Lesson 9.3 (<code class="inline">lesson-31-end</code>), shoreline-api running. The outputs below are the lesson's own cards (your times will differ).</p>
+<ol class="steps">
+  <li><b>Five ideas, one spec (5m).</b> Open <code class="inline">e2e/browse.spec.ts</code> from the lesson (stage after Lesson 9.3): fixtures (<code class="inline">{ page }</code>), locators by role and label, actions that wait, web-first assertions that retry, the config. Put the Vitest-to-Playwright table on the board.
+<div class="codefile">shoreline-hq/e2e/browse.spec.ts</div>
+<pre class="code" data-src="shoreline-hq/e2e/browse.spec.ts" data-stage="lesson_31" data-match="excerpt">test(<span class="s">'a guest finds a cleanup by searching'</span>, <span class="k">async</span> ({ page }) =&gt; {
+  <span class="k">await</span> page.goto(<span class="s">'/'</span>)
+  <span class="k">await</span> page.getByRole(<span class="s">'navigation'</span>, { name: <span class="s">'Main'</span> }).getByRole(<span class="s">'link'</span>, { name: <span class="s">'Events'</span> }).click()
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'heading'</span>, { level: <span class="s">1</span>, name: <span class="s">'Cleanup events'</span> })).toBeVisible()
+
+  <span class="k">await</span> page.getByLabel(<span class="s">'Search cleanups'</span>).fill(<span class="s">'pelican'</span>)
+  <span class="k">await</span> expect(page.getByText(<span class="s">'Found 3 cleanups: 1 coming up, 2 in the log.'</span>)).toBeVisible()
+  <span class="k">await</span> expect(page).toHaveURL(/\?q=pelican$/)
+
+  <span class="k">await</span> page.getByRole(<span class="s">'link'</span>, { name: <span class="s">'Pelican Point Beach Sweep'</span> }).click()
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'heading'</span>, { level: <span class="s">1</span> })).toHaveText(<span class="s">'Pelican Point Beach Sweep'</span>)
+  <span class="k">await</span> expect(page.getByRole(<span class="s">'heading'</span>, { name: <span class="s">'Where to meet'</span> })).toBeVisible()</pre></li>
+  <li><b>Run it (the lesson's output) (4m).</b> With shoreline-api running in its terminal, <code class="inline">npx playwright test e2e/browse.spec.ts</code>. The [WebServer] lines are the build's own output (the 500 kB warning is Lesson 10.1's job). The lesson's card:
+<pre class="out">[WebServer] [plugin builtin:vite-reporter]
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 2 tests using 1 worker
+
+  ✓  1 e2e/browse.spec.ts:8:1 › a guest finds a cleanup by searching (651ms)
+  ✓  2 e2e/browse.spec.ts:22:1 › the beach sites show their real pictures (361ms)
+
+  2 passed (4.4s)
+
+To open last HTML report run:
+
+  npx playwright show-report</pre>
+If the first run sits before "Running…" for a minute or two, let it: the lesson's version note measured that on the course machine. Later runs take seconds.</li>
+  <li><b>One real server, a fresh beach (4m).</b> Open <code class="inline">e2e/helpers.ts</code>: <code class="inline">resetApi(request)</code> (POST /api/_reset) before every test, <code class="inline">workers: 1</code>, <code class="inline">globalTeardown</code>. Warn the room: "the tests reset YOUR running API: the cleanup you planned by hand is gone afterwards."
+<div class="codefile">shoreline-hq/e2e/helpers.ts</div>
+<pre class="code" data-src="shoreline-hq/e2e/helpers.ts" data-stage="lesson_31" data-match="excerpt"><span class="k">export</span> <span class="k">async</span> <span class="k">function</span> resetApi(request: APIRequestContext): Promise&lt;<span class="k">void</span>&gt; {
+  <span class="k">const</span> response = <span class="k">await</span> request.post(<span class="s">`${API_URL}/api/_reset`</span>)
+  expect(response.ok()).toBe(<span class="k">true</span>)</pre></li>
+  <li><b>axe, light and dark (4m).</b> The accessibility spec's two loops (<code class="inline">as const</code> for <code class="inline">colorScheme</code>). Then the lesson's deliberate break: the dark <code class="inline">--text-muted</code> set to the light gray. The lesson's card:
+<pre class="out">  ✘   8 e2e/accessibility.spec.ts:23:7 › dark theme › / has no axe violations (561ms)
+...
+  1) e2e/accessibility.spec.ts:23:7 › dark theme › / has no axe violations ─────────────────────────
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "color-contrast: Elements must meet minimum color contrast ratio thresholds (1)",
+...
+  7 failed
+...
+  7 passed (15.3s)</pre>
+Every light test passes, every dark test fails, each naming the rule. "Nothing else would have caught this: tsc and oxlint do not read colors, jsdom does not compute them."</li>
+  <li><b>What to test where (3m).</b> The lesson's table and the three-question rule of thumb: many cases → unit; one screen, including errors and "nothing sent" → component with MSW; only works when everything is real together → one end-to-end test for the main path. Ask Self-check Q10 out loud.</li>
+</ol>
+</div>
+<div class="blk warn"><div class="h">Three mistakes to expect, and how to coach each</div>
+<ul class="tick">
+  <li><b>A locator that matches several elements.</b> <code class="inline">getByText('Pelican Point')</code> → strict mode violation listing 5 elements. Coach: "The error lists what it found: which one do you mean?" A role with the full name, <code class="inline">{ exact: true }</code>, or a narrower starting point.</li>
+  <li><b>Checking once instead of waiting.</b> <code class="inline">isVisible()</code> or <code class="inline">waitForTimeout(1000)</code>. Coach: "What do you expect to see? Wait for that." (Self-check Q7.)</li>
+  <li><b>Browser types in a Node file.</b> <code class="inline">TS2304: Cannot find name 'HTMLImageElement'</code> in an e2e file: tsconfig.node.json has no DOM. Coach: "Which Playwright assertion reads that property for you?" (<code class="inline">toHaveJSProperty</code>.)</li>
+</ul>
+</div>
+<div class="blk warn"><div class="h">Two more you will see in the lab</div>
+<p>Strict mode, from the lesson's card:</p>
+<pre class="out">    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('Pelican Point')
+    Expected: visible
+    Error: strict mode violation: getByText('Pelican Point') resolved to 5 elements:
+        1) &lt;p&gt;Pelican Point Beach: Lifeguard tower 3&lt;/p&gt; aka getByText('Pelican Point Beach:').first()
+        2) &lt;p&gt;Pelican Point Beach: Lifeguard tower 3&lt;/p&gt; aka getByText('Pelican Point Beach:').nth(1)
+        3) &lt;a href="/events/e04" data-discover="true"&gt;Pelican Point Beach Sweep&lt;/a&gt; aka getByRole('link', { name: 'Pelican Point Beach Sweep' })
+        4) &lt;p&gt;Pelican Point Beach: Lifeguard tower 3&lt;/p&gt; aka getByText('Pelican Point Beach:').nth(2)
+        5) &lt;span class="_hidden_11rrh_2"&gt;for Pelican Point Beach Sweep&lt;/span&gt; aka getByRole('button', { name: 'Show details for Pelican' })</pre><p>And isVisible right after typing:</p>
+<pre class="out">    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false</pre></div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<p><b>Folder:</b> <code class="inline">labs/module-22/l9_3-end-to-end-and-accessibility-tests/starter/</code> with <code class="inline">labs/module-22/l9_3-end-to-end-and-accessibility-tests/TASKS.md</code>; your reference is <code class="inline">labs/module-22/l9_3-end-to-end-and-accessibility-tests/solution/</code>. A static "Beach sites" page (search with a 300 ms pause, <code class="inline">?q=</code> in the address bar, a status line) served by the lab's own tiny server on port 4322 (<code class="inline">e2e/global-setup.ts</code>), Playwright 1.65 and axe. The page has two accessibility bugs: an icon button with no name, and a dark-theme gray that is too faint. Needs <code class="inline">npm install</code> once in <code class="inline">starter/</code> and the Chromium from Lesson 9.3.</p>
+<ul class="tick">
+  <li><b>Run it as shipped (2m):</b> <code class="inline">npm run test:e2e</code>: two TODO tests fail.</li>
+  <li><b>Task 1 in pairs (10m):</b> the search (<code class="inline">Found 2 sites.</code>, the two items, <code class="inline">?q=cove</code>), the reload, Clear. The Clear test cannot find a button named "Clear the search": bug 1. Fix it in <code class="inline">site/index.html</code> (<code class="inline">aria-label</code>).</li>
+  <li><b>Task 2 (10m):</b> <code class="inline">expectNoAxeViolations</code> and the light/dark loop. As shipped the page fails like this (the solution's tests on the starter's page):</li>
+</ul>
+<pre class="out">+   "button-name: Buttons must have discernible text (1)",
++   "button-name: Buttons must have discernible text (1)",
++   "color-contrast: Elements must meet minimum color contrast ratio thresholds (3)",</pre><ul class="tick">
+  <li><code class="inline">button-name</code> fails in both themes, <code class="inline">color-contrast</code> only in the dark one. Fixed, the whole run:</li>
+</ul>
+<pre class="out">Running 5 tests using 1 worker
+  ✓  1 e2e/a11y.spec.ts:8:5 › light theme › the beach sites page has no axe violations
+  ✓  2 e2e/a11y.spec.ts:8:5 › dark theme › the beach sites page has no axe violations
+  ✓  3 e2e/sites.spec.ts:3:1 › a visitor finds a beach by searching
+  ✓  4 e2e/sites.spec.ts:15:1 › the search survives a reload
+  ✓  5 e2e/sites.spec.ts:23:1 › Clear the search shows every site and puts the focus back
+  5 passed</pre><ul class="tick">
+  <li><b>Debrief (3m):</b> "Which of these could Lab 9.2's jsdom tests have found?" (the missing button name, through getByRole; never the contrast).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Start the lesson project</div>
+<p>The lesson project is <b>The HQ in a Real Browser</b>, eight steps. In the room: Steps 1 to 3 (25 minutes).</p>
+<ul class="tick">
+  <li>Step 1: <code class="inline">npm install --save-dev @playwright/test @axe-core/playwright</code>, <code class="inline">npx playwright install chromium</code> (skip if done at home), the <code class="inline">test:e2e</code> script.</li>
+  <li>Step 2: <code class="inline">playwright.config.ts</code> (webServer array: the API from ../shoreline-api and build + preview; workers 1; timezoneId; globalTeardown), <code class="inline">e2e/helpers.ts</code>, <code class="inline">e2e/global-teardown.ts</code>, tsconfig.node.json's include.</li>
+  <li>Step 3: <code class="inline">e2e/browse.spec.ts</code>, then <code class="inline">npx playwright test e2e/browse.spec.ts</code>: 2 passed. <b>Done in the room</b> = that run. <b>Goes home:</b> Steps 4 to 8 (plan, check-in with reload, the impact report with a real photo, axe on seven pages in both themes, the report), Exercise 1.</li>
+</ul>
+<figure class="shot"><img src="../../../images/lesson_31/31-e2e-pass.png" alt="A terminal in shoreline-hq running npm run test:e2e. Playwright prints the build's chunk size warning from its web server, then Running 19 tests using 1 worker and nineteen green check marks: fourteen accessibility scans in the light and dark themes, the guest search and the site pictures, the check-in that survives a reload, the impact report with a photo and the planned cleanup. Summary: 19 passed."><figcaption>Nineteen tests in a real Chromium against the real shoreline-api: four journeys and fourteen accessibility scans.</figcaption></figure></div>
+<div class="blk"><div class="h">Checks for understanding</div>
+<p>Ask these during the demo and the lab:</p>
+<ul class="tick">
+  <li>What does an e2e test see that a jsdom test cannot? <b>Answer:</b> real bytes, pictures, CSS colors and layout, reloads, the build, the real server.</li>
+  <li>Why reset the API before every test? <b>Answer:</b> a real server keeps what tests send; tests must not depend on each other's leftovers.</li>
+  <li>Why both themes in axe? <b>Answer:</b> colors break most often in dark mode, and only a real browser computes them.</li>
+  <li>Is a clean axe run an accessible app? <b>Answer:</b> no: a floor, not a ceiling. Keyboard, focus, a screen reader and 200 % zoom stay manual.</li>
+</ul>
+<p>Workbook self-check, items Q7 to Q12.</p>
+<p style="font-size:.9rem;margin:.2rem 0">Answers: <b>Q7</b> <span data-sc="7">D) isVisible() checks once, during the search's 300 ms pause; a web-first assertion keeps checking</span>; <b>Q8</b> <span data-sc="8">A) All tests share one real API whose data each test resets and changes; two at once would get in each other's way</span>; <b>Q9</b> <span data-sc="9">C) Some text in dark mode really is too faint; only a real browser computing the dark colors could find it</span>; <b>Q10</b> <span data-sc="10">C) A component test with an MSW override that answers 413</span>; <b>Q11</b> <span data-sc="11">The mark came back from the REAL server after the page and its cache were thrown away: the API really saved it</span>; <b>Q12</b> <span data-sc="12"><code class="inline">npx playwright install chromium</code>: the npm package is Playwright's code; the browser is a separate download</span>. Full set with explanations in the Answer Key.</p></div>
+<div class="blk"><div class="h">Differentiation</div>
+<p><b>Support:</b> learners without Chromium pair up for the lab and read the answer key's outputs; their Step 1 waits for home. For anyone overwhelmed by the config, the lesson's diagram on the board is the map: one test runner, one browser, two servers, one reset.</p>
+<p><b>Stretch:</b> Lab 9.3 Task 3; the lesson's Exercises 2 (a fixture for a signed-in page; name the parameter <code class="inline">provide</code>, not <code class="inline">use</code>, because of oxlint's Hooks rule) and 3 (the desk with the keyboard alone); codegen from Going Further.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Closing</h2><span class="rule"></span></div>
+<div class="blk"><div class="h">Exit ticket (3 questions, no notes, 4 minutes)</div>
+<ol class="steps">
+  <li>Why does the HQ's test suite run shoreline-api's own code inside Vitest instead of hand-written fake answers? <b>Answer:</b> the tests then follow the real rules and cannot drift from the API.</li>
+  <li>Give one thing only a real-browser test can check in the HQ. <b>Answer:</b> a real photo upload, CSS colors (dark-mode contrast), layout, a reload against the real server, the build itself (any one).</li>
+  <li>A new rule must hold. Name the three questions that decide where its test goes. <b>Answer:</b> many cases → unit; one screen incl. errors and "nothing sent" → component with MSW; only works when everything is real → one e2e test for the main path.</li>
+</ol>
+</div>
+<div class="blk"><div class="h">Homework (about 2 to 3 hours)</div>
+<ul class="tick">
+  <li><b>Finish Lesson 9.2's project</b> (Steps 3 to 8, 46 tests) and <b>Lesson 9.3's</b> (Steps 4 to 8, 19 e2e tests), each with tsc, lint and build clean.</li>
+  <li><b>Lesson exercises:</b> 9.2 Exercise 1 (a fake clock) and 9.3 Exercise 1 (a phone-sized dark page) are part of the lessons; the others are stretches.</li>
+  <li><b>Both Quick Quizzes</b> and <b>both journal entries.</b></li>
+  <li><b>Labs:</b> Lab 9.2 Task 3 (the planted bugs), Lab 9.3 Task 3.</li>
+  <li><b>Before the Next Lesson (from 9.3):</b> note how long <code class="inline">npm run build</code> takes and the size of the JavaScript file it prints: Lesson 10.1 starts from those numbers.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Bring list for Session 23</div>
+<ul class="tick">
+  <li>The HQ at the end of Lesson 9.3 (46 Vitest and 19 Playwright tests green), or <code class="inline">lesson-32-start</code> from the downloads.</li>
+  <li>shoreline-api in the course folder, and your build numbers from the line above.</li>
+  <li>Session 23 installs one package in the HQ (the bundle visualizer) and uses the React lab install for its lab: <code class="inline">npm install</code> in <code class="inline">labs/module-23/l10_1-performance-and-the-build/starter</code> at home.</li>
+</ul>
+</div>
+
+  <div class="sec"><h2>If You Run Long or Short</h2><span class="rule"></span></div>
+<div class="blk warn"><div class="h">Running long: what to protect and what to cut first</div>
+<ul class="tick">
+  <li><b>Protect:</b> the guard demo; the axe-in-the-dark demo; both labs' Task 2.</li>
+  <li><b>Cut first (saves 4m):</b> the rollback and retry steps of the 9.2 demo.</li>
+  <li><b>Cut second (saves 3m):</b> "What to test where" as a demo step: ask Self-check Q10 out loud instead.</li>
+  <li><b>Cut third (saves 15m):</b> the 9.2 project start (install and copy work); learners start at home from <code class="inline">lesson-30-start</code>.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Running short: what to add</div>
+<ul class="tick">
+  <li>Lab 9.2 Task 3 for everyone: predict which tests the handout breaks, then run it.</li>
+  <li>Open the Playwright HTML report of a failing run (<code class="inline">npx playwright show-report</code>) and step through a trace.</li>
+  <li>The lesson's Bonus Challenge for 9.3: record "cancel a cleanup" with codegen and improve the generated locators together.</li>
+</ul>
+</div>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 22 · Facilitator Guide · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Type Shoreline Crew's functions: parameters and return types, optional, default and rest parameters, function types for callbacks, generic functions and types with constraints, and the overloaded declarations you meet in TypeScript's own library. React + TypeScript: Build a Modern Web App Lesson 2.3.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Functions and Generics - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>🔧 Lesson 2.3: Functions and Generics</h1>
+                <p class="lead">Data sits still; functions do the work. Shoreline Crew HQ will be full of them: one turns a cleanup into a line of text, one finds a volunteer by id, one splits a long list into pages, and every React component you write from Module 3 on is a function too. Today you learn to give each function a clear contract (what goes in, what comes out, what may be left out), to pass functions around as values, and to write one function that works for sites, cleanups, volunteers or anything else without losing a single check. That last trick is called generics, and after today the angle brackets in <code>Array&lt;string&gt;</code> will read like plain English.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Annotate a function's parameters and return type, and decide when an explicit return type is worth writing</li>
+                        <li>Use optional, default and rest parameters and an options object, and read the errors for missing or misplaced arguments</li>
+                        <li>Describe a function as a value with a function type, such as <code>(event: CleanupEvent) =&gt; string</code>, and pass typed callbacks</li>
+                        <li>Write generic functions and types (<code>first&lt;T&gt;</code>, <code>Page&lt;T&gt;</code>) and let TypeScript infer the type arguments</li>
+                        <li>Constrain a type parameter with <code>extends</code> so a generic function can use the properties it needs</li>
+                        <li>Read overloaded and generic declarations in TypeScript's own library, such as <code>querySelector</code> and <code>find</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_04.html">Lesson 2.2: Shaping Data</a> (your <code>ts-lab</code> workbench with <code>shapes.ts</code>)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> <code>functions.ts</code> in <code>ts-lab</code>: Shoreline Crew's helper functions (spots left, plurals, event lines, formatters) and four generic ones (<code>first</code>, <code>findById</code>, <code>groupBy</code>, <code>paginate</code>) that work for cleanups and volunteers alike</li>
+                    <li><span class="meta-label">🧩 Stack</span> TypeScript 7.0, Node.js 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> VS Code with your <code>shoreline</code> folder open and one terminal in <code>ts-lab</code>; the API and the dev server can stay off today</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-05-start.zip">lesson-05-start.zip</a> · Finished code: <a href="downloads/lesson-05-end.zip">lesson-05-end.zip</a>. Each folder has a README with the commands to run it. The finished code adds <code>ts-lab/functions.ts</code>; run <code>npm ci</code> in <code>ts-lab</code> before <code>npm run check</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#typed-functions" class="toc-link">A Function's Contract</a></li>
+                        <li><a href="#parameters" class="toc-link">Optional, Default and Rest Parameters</a></li>
+                        <li><a href="#function-types" class="toc-link">Functions as Values</a></li>
+                        <li><a href="#generics" class="toc-link">Generics: One Function for Any Type</a></li>
+                        <li><a href="#constraints" class="toc-link">Constraints: What T Must Have</a></li>
+                        <li><a href="#overloads" class="toc-link">Reading Overloads and Library Types</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Crew's Helper Functions</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="typed-functions" class="lesson-section">
+                <h2>📜 A Function's Contract</h2>
+                <p>You already typed a few functions in Lesson 2.1 (<code>spotsLeft</code>, <code>totalBags</code>) and many in Lesson 2.2. This lesson looks at functions on purpose. Work as before: in <code>ts-lab</code>, create <code>scratch.ts</code>, put each example in it, save, run <code>npm run check</code>, and <code>node scratch.ts</code> when the example prints something.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the job card</h4>
+                    <p>On cleanup day, each team gets a job card: "Bring: 2 buckets, 1 grabber per person. You will hand in: a bag count." A function's type is that card. The parameters are what the team must bring, the return type is what it promises to hand in, and TypeScript is the organizer at the table who checks both: nobody leaves without buckets, and nobody hands in a shopping list instead of a bag count.</p>
+                </div>
+
+                <h3>Parameters and a return type</h3>
+                <p>A type after each parameter, and one after the parentheses for the value the function returns:</p>
+                <pre data-snippet><code class="language-ts">function spotsLeft(capacity: number, taken: number): number {
+  return capacity - taken
+}
+
+console.log(spotsLeft(18, 11))
+console.log(spotsLeft(18))
+console.log(spotsLeft(18, '11'))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:6:13 - error TS2554: Expected 2 arguments, but got 1.
+
+6 console.log(spotsLeft(18))
+              ~~~~~~~~~
+
+  scratch.ts:1:38 - An argument for 'taken' was not provided.
+    1 function spotsLeft(capacity: number, taken: number): number {
+                                           ~~~~~~~~~~~~~
+
+scratch.ts:7:27 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+
+7 console.log(spotsLeft(18, '11'))
+                            ~~~~
+
+
+Found 2 errors in the same file, starting at: scratch.ts:6</code></pre>
+                </div>
+                <p>Two calls, two questions. <strong>TS2554</strong> counts the arguments ("Expected 2 arguments, but got 1") and the follow-up line points at the parameter that was not provided. TS2345 is Lesson 2.1's old friend: a <code>string</code> where a <code>number</code> belongs. Run <code>node scratch.ts</code> and you get <code>7</code>, <code>NaN</code> and <code>7</code>: JavaScript fills a missing argument with <code>undefined</code> and quietly turns <code>'11'</code> into a number. Unlike JavaScript, TypeScript counts.</p>
+
+                <h3>Why write the return type?</h3>
+                <p>Lesson 2.1 showed that TypeScript infers return types, and for small functions inside one file that is enough. Writing the return type changes <em>where</em> mistakes are reported:</p>
+                <pre data-snippet><code class="language-ts">function spotsLabel(capacity: number, taken: number): string {
+  const left = capacity - taken
+  if (left &lt;= 0) {
+    return 'Full'
+  }
+  return left
+}
+
+function logCleanup(title: string): void {
+  console.log(`Logged: ${title}`)
+}
+
+logCleanup(spotsLabel(18, 18))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:6:3 - error TS2322: Type 'number' is not assignable to type 'string'.
+
+6   return left
+    ~~~~~~
+
+
+Found 1 error in scratch.ts:6</code></pre>
+                </div>
+                <p>The function promised a <code>string</code> and one path returns the number <code>left</code>. Because the promise is written down, the error lands on the line with the bug. Without <code>: string</code>, TypeScript would happily infer <code>number | "Full"</code> for the function, and the mistake would show up later, in some other file, wherever a caller treated the result as text. The course's rule, the same "annotate the edges" from Lesson 2.1: <strong>write the return type for functions other code relies on</strong> (shared helpers, anything exported in Lesson 2.4, the API client), and let inference handle small local ones.</p>
+                <p><code>logCleanup</code> shows the other return type you need today: <strong><code>void</code></strong>, "returns nothing useful". Functions that only print, save or update something are <code>void</code>. You will see it constantly in React, where a click handler's type is <code>() =&gt; void</code>.</p>
+            </section>
+
+            <section id="parameters" class="lesson-section">
+                <h2>🎛️ Optional, Default and Rest Parameters</h2>
+                <p>JavaScript lets callers leave arguments out or pass any number of them. TypeScript keeps that freedom, but makes you say so in the parameter list:</p>
+                <pre data-snippet><code class="language-ts">function eventLine(title: string, town?: string) {
+  if (town === undefined) {
+    return title
+  }
+  return `${title} (${town})`
+}
+
+function spotsText(left: number, unit = 'spots') {
+  return `${left} ${unit} left`
+}
+
+function totalBags(...counts: number[]) {
+  return counts.reduce((sum, count) =&gt; sum + count, 0)
+}
+
+console.log(eventLine('Weekend Cove Cleanup'))
+console.log(eventLine('Weekend Cove Cleanup', 'Port Marisol'))
+console.log(spotsText(4))
+console.log(spotsText(1, 'spot'))
+console.log(totalBags(14, 9, 22))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>Weekend Cove Cleanup
+Weekend Cove Cleanup (Port Marisol)
+4 spots left
+1 spot left
+45</code></pre>
+                </div>
+                <ul>
+                    <li><strong>Optional</strong>, <code>town?: string</code>: callers may leave it out, and inside the function its type is <code>string | undefined</code>, exactly like an optional property in Lesson 2.2. That is why <code>eventLine</code> checks for <code>undefined</code> first.</li>
+                    <li><strong>Default</strong>, <code>unit = 'spots'</code>: callers may leave it out, and then it is <code>'spots'</code>. TypeScript infers the type from the default (<code>string</code>), and inside the function it is never <code>undefined</code>. Hover over <code>spotsText</code>: VS Code shows <code>(left: number, unit?: string) =&gt; string</code>, because from the caller's side a default parameter is simply optional.</li>
+                    <li><strong>Rest</strong>, <code>...counts: number[]</code>: any number of arguments, collected into an array. Its type is always an array type.</li>
+                </ul>
+                <p>Two rules come with them. Optional parameters go after the required ones (otherwise how would TypeScript know which argument you meant?), and a default's type is enforced like any other:</p>
+                <pre data-snippet><code class="language-ts">function eventLine(town?: string, title: string) {
+  return town === undefined ? title : `${title} (${town})`
+}
+
+function spotsText(left: number, unit = 'spots') {
+  return `${left} ${unit} left`
+}
+
+console.log(eventLine('Port Marisol', 'Weekend Cove Cleanup'))
+console.log(spotsText(4, 1))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:1:35 - error TS1016: A required parameter cannot follow an optional parameter.
+
+1 function eventLine(town?: string, title: string) {
+                                    ~~~~~
+
+scratch.ts:10:26 - error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+
+10 console.log(spotsText(4, 1))
+                            ~
+
+
+Found 2 errors in the same file, starting at: scratch.ts:1</code></pre>
+                </div>
+                <p><strong>TS1016</strong> is the order rule. The second error proves that <code>unit</code>, which has no annotation, is still a <code>string</code>: the default said so.</p>
+
+                <h3>Many options? Pass one object</h3>
+                <p>Three or four optional parameters in a row make calls unreadable: what does <code>eventLine(title, town, false, '*')</code> mean? Pass an <strong>options object</strong> instead, and give each option its default as you destructure it:</p>
+                <pre data-snippet><code class="language-ts">interface LineOptions {
+  showTown?: boolean
+  prefix?: string
+}
+
+function eventLine(
+  title: string,
+  town: string,
+  { showTown = true, prefix = '-' }: LineOptions = {},
+) {
+  return showTown ? `${prefix} ${title} (${town})` : `${prefix} ${title}`
+}
+
+console.log(eventLine('Weekend Cove Cleanup', 'Port Marisol'))
+console.log(eventLine('Weekend Cove Cleanup', 'Port Marisol', { showTown: false }))
+console.log(eventLine('Weekend Cove Cleanup', 'Port Marisol', { prefix: '*', showTwon: false }))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:16:78 - error TS2561: Object literal may only specify known properties, but 'showTwon' does not exist in type 'LineOptions'. Did you mean to write 'showTown'?
+
+16 console.log(eventLine('Weekend Cove Cleanup', 'Port Marisol', { prefix: '*', showTwon: false }))
+                                                                                ~~~~~~~~
+
+
+Found 1 error in scratch.ts:16</code></pre>
+                </div>
+                <p>Read the parameter from the inside out: the object has the type <code>LineOptions</code>, both of its properties are optional, the destructuring gives each a default, and <code>= {}</code> lets callers leave the whole object out. Callers name what they change (<code>{ showTown: false }</code>), and a misspelled option is caught by the same TS2561 you met in Lesson 2.2. Fix <code>showTwon</code> and <code>node scratch.ts</code> prints three lines. Remember this shape: a React component receives its props as exactly this kind of object, destructured with defaults, from Lesson 3.2 on.</p>
+            </section>
+
+            <section id="function-types" class="lesson-section">
+                <h2>📨 Functions as Values</h2>
+                <p>In JavaScript you pass functions around all the time: to <code>map</code>, <code>filter</code>, <code>addEventListener</code>. So TypeScript needs a way to describe a function as a type. It looks like an arrow function with types and no body: <code>(event: CleanupEvent) =&gt; string</code> means "a function that takes a cleanup and returns a string".</p>
+                <pre data-snippet><code class="language-ts">interface CleanupEvent {
+  title: string
+  capacity: number
+  spotsTaken: number
+}
+
+// Any function that takes a cleanup and returns a line of text
+type EventFormatter = (event: CleanupEvent) =&gt; string
+
+const titleOnly: EventFormatter = (event) =&gt; event.title
+const withSpots: EventFormatter = (event) =&gt;
+  `${event.title}: ${event.capacity - event.spotsTaken} left`
+
+function printAll(events: CleanupEvent[], format: EventFormatter): void {
+  for (const event of events) {
+    console.log(format(event))
+  }
+}
+
+const upcoming: CleanupEvent[] = [
+  { title: 'Weekend Cove Cleanup', capacity: 18, spotsTaken: 18 },
+  { title: 'Boardwalk and Mudflats', capacity: 16, spotsTaken: 9 },
+]
+printAll(upcoming, titleOnly)
+printAll(upcoming, withSpots)
+printAll(upcoming, (event) =&gt; event.title.toUpperCase())</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>Weekend Cove Cleanup
+Boardwalk and Mudflats
+Weekend Cove Cleanup: 0 left
+Boardwalk and Mudflats: 7 left
+WEEKEND COVE CLEANUP
+BOARDWALK AND MUDFLATS</code></pre>
+                </div>
+                <p>Three things to notice:</p>
+                <ul>
+                    <li>A <code>type</code> alias names the function type, so <code>EventFormatter</code> can be reused. (The course convention from Lesson 2.2 holds: <code>type</code> for everything that is not an object shape.)</li>
+                    <li>None of the arrow functions annotates <code>event</code>, yet each one knows it is a <code>CleanupEvent</code>. This is <strong>contextual typing</strong>, the same thing that typed <code>reduce</code>'s callback in Lesson 2.1: the function type says what the parameter is, so you do not repeat it.</li>
+                    <li><code>printAll</code> takes a function as a parameter, a <strong>callback</strong>. The last call passes one written on the spot, and it is checked just the same.</li>
+                </ul>
+                <p>A callback that does not fit is reported with a helpful extra line:</p>
+                <pre data-snippet><code class="language-ts">printAll(upcoming, (event) =&gt; event.capacity - event.spotsTaken)
+printAll(upcoming, (title: string) =&gt; title)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check, with these two calls at the end of the example above)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:27:31 - error TS2322: Type 'number' is not assignable to type 'string'.
+
+27 printAll(upcoming, (event) =&gt; event.capacity - event.spotsTaken)
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  scratch.ts:8:23 - The expected type comes from the return type of this signature.
+    8 type EventFormatter = (event: CleanupEvent) =&gt; string
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+scratch.ts:28:20 - error TS2345: Argument of type '(title: string) =&gt; string' is not assignable to parameter of type 'EventFormatter'.
+  Types of parameters 'title' and 'event' are incompatible.
+    Type 'CleanupEvent' is not assignable to type 'string'.
+
+28 printAll(upcoming, (title: string) =&gt; title)
+                      ~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Found 2 errors in the same file, starting at: scratch.ts:27</code></pre>
+                </div>
+                <p>The first callback returns a number; the follow-up line says the expectation comes from the function type's return type. The second expects a <code>string</code> where every caller of <code>EventFormatter</code> will hand it a <code>CleanupEvent</code>: the parameters are incompatible, and the indented lines say exactly how. A callback may ignore parameters it does not need, but it cannot ask for something different.</p>
+            </section>
+
+            <section id="generics" class="lesson-section">
+                <h2>🧬 Generics: One Function for Any Type</h2>
+                <p>Here is a problem you will hit within a week of writing real TypeScript. You want "the first item of a list", for sites, for bag counts, later for cleanups and volunteers. Two obvious answers, both bad:</p>
+                <pre data-snippet><code class="language-ts">interface Site {
+  id: string
+  name: string
+}
+
+const sites: Site[] = [{ id: 'driftwood-cove', name: 'Driftwood Cove' }]
+const bagCounts = [14, 9, 22]
+
+// One function per type: the same body twice
+function firstSite(items: Site[]): Site | undefined {
+  return items[0]
+}
+function firstCount(items: number[]): number | undefined {
+  return items[0]
+}
+
+// One function for everything, with any: the types are gone
+function firstAny(items: any[]): any {
+  return items[0]
+}
+
+console.log(firstSite(sites)?.name, firstCount(bagCounts))
+console.log(firstAny(sites).nmae)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts; npm run check is silent)</h4>
+                    <pre><code>Driftwood Cove 14
+undefined</code></pre>
+                </div>
+                <p>Writing one function per type repeats the same body forever. The <code>any</code> version works for everything, and that is the problem: <code>firstAny(sites).nmae</code> has a typo, the check is silent, and the program prints <code>undefined</code>. You traded every check for convenience, the deal Lesson 2.1 warned about.</p>
+
+                <h3>A type parameter</h3>
+                <p>A <strong>generic</strong> function takes a type as a parameter, the way a normal function takes a value. You declare it in angle brackets after the name, and then use it like any type:</p>
+                <pre data-snippet><code class="language-ts">interface Site {
+  id: string
+  name: string
+}
+
+const sites: Site[] = [{ id: 'driftwood-cove', name: 'Driftwood Cove' }]
+const bagCounts = [14, 9, 22]
+
+function first&lt;T&gt;(items: T[]): T | undefined {
+  return items[0]
+}
+
+const site = first(sites)
+const count = first(bagCounts)
+const nobody = first&lt;string&gt;([])
+
+console.log(site?.name ?? 'No sites', count ?? 0, nobody ?? 'Nobody yet')
+console.log(site?.nmae)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:18:19 - error TS2339: Property 'nmae' does not exist on type 'Site'.
+
+18 console.log(site?.nmae)
+                     ~~~~
+
+
+Found 1 error in scratch.ts:18</code></pre>
+                </div>
+                <p>Read <code>function first&lt;T&gt;(items: T[]): T | undefined</code> aloud: "for some type T, <code>first</code> takes an array of T and returns a T, or <code>undefined</code> if the array is empty". <code>T</code> is a placeholder that gets filled in at each call, and you almost never fill it in yourself: TypeScript <strong>infers</strong> it from the argument. <code>first(sites)</code> fills in <code>Site</code>, so <code>site</code> is <code>Site | undefined</code> and the typo is caught. <code>first(bagCounts)</code> fills in <code>number</code>. When there is nothing to infer from, such as an empty array, you can pass the type explicitly: <code>first&lt;string&gt;([])</code>. Fix the typo, and <code>node scratch.ts</code> prints <code>Driftwood Cove 14 Nobody yet</code>.</p>
+
+                <div class="mermaid">
+graph TD
+    F["first⟨T⟩(items: T[])"] --> A["first(sites)"]
+    F --> B["first(bagCounts)"]
+    A --> C["T is Site"]
+    B --> D["T is number"]
+    C --> E["returns Site or undefined"]
+    D --> G["returns number or undefined"]
+                </div>
+
+                <div class="card card-info">
+                    <h4>💡 Mental model: the labeled bin</h4>
+                    <p>The crew's sorting bins have a blank label holder. Slide in "Glass" and it is the glass bin: everything that goes in is glass, everything that comes out is glass. The bin is the same design every time; the label is what changes. A generic is that bin, and <code>T</code> is the blank label. TypeScript reads the label from what you put in first and then holds you to it.</p>
+                </div>
+                <p>Why <code>T | undefined</code> and not just <code>T</code>? Because an array can be empty, and <code>items[0]</code> on an empty array is <code>undefined</code>. With this lesson's settings TypeScript would accept <code>: T</code> without complaint; Lesson 2.4 looks at the setting that makes it insist. Being honest in the return type costs one <code>?.</code> or <code>??</code> at each call, and that is cheap.</p>
+
+                <h3>Generic types</h3>
+                <p>Types can take type parameters too. You have been using one since Lesson 2.1: <code>Array&lt;number&gt;</code> is the long way to write <code>number[]</code>. The API sends long lists in pages, and a page looks the same whether it holds cleanups or volunteers, so it is a generic type:</p>
+                <pre data-snippet><code class="language-ts">interface Volunteer {
+  id: string
+  name: string
+}
+
+// A generic type: a page of anything
+interface Page&lt;T&gt; {
+  items: T[]
+  page: number
+  totalPages: number
+}
+
+const crewPage: Page&lt;Volunteer&gt; = {
+  items: [{ id: 'v02', name: 'Luis Romero' }, { id: 'v03', name: 'Hannah Becker' }],
+  page: 1,
+  totalPages: 12,
+}
+const bagPage: Page&lt;number&gt; = { items: [14, 9, 22], page: 1, totalPages: 1 }
+
+const names: Array&lt;string&gt; = crewPage.items.map((person) =&gt; person.name)
+const sizes = new Map&lt;string, number&gt;([['Luis Romero', 2]])
+
+console.log(`Page ${crewPage.page} of ${crewPage.totalPages}: ${names.join(', ')}`)
+console.log(bagPage.items.length, sizes.get('Luis Romero'))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>Page 1 of 12: Luis Romero, Hannah Becker
+3 2</code></pre>
+                </div>
+                <p>For a type you write the type argument yourself (<code>Page&lt;Volunteer&gt;</code>); there is nothing to infer it from. JavaScript's own <code>Map</code> takes two, the key type and the value type. You will meet many more: <code>Promise&lt;T&gt;</code> for "a T, later" (Module 4), React's <code>useState&lt;T&gt;</code> (Lesson 3.4), and TanStack Query's hooks (Module 7). They all read the same way: the thing, holding T.</p>
+            </section>
+
+            <section id="constraints" class="lesson-section">
+                <h2>🔒 Constraints: What T Must Have</h2>
+                <p>Inside a generic function, TypeScript knows nothing about <code>T</code>: it could be a number, a string or a site. So it lets you do only what works for every type:</p>
+                <pre data-snippet><code class="language-ts">function findById&lt;T&gt;(items: T[], id: string): T | undefined {
+  return items.find((item) =&gt; item.id === id)
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:2:36 - error TS2339: Property 'id' does not exist on type 'T'.
+
+2   return items.find((item) =&gt; item.id === id)
+                                     ~~
+
+
+Found 1 error in scratch.ts:2</code></pre>
+                </div>
+                <p>Fair question: what if <code>T</code> is <code>number</code>? Numbers have no <code>id</code>. The answer is a <strong>constraint</strong>: <code>T extends { id: string }</code> means "T can be any type, as long as it has an <code>id</code> that is a string".</p>
+                <pre data-snippet><code class="language-ts">interface Site {
+  id: string
+  name: string
+}
+interface Volunteer {
+  id: string
+  name: string
+  phone: string | null
+}
+
+const sites: Site[] = [{ id: 'driftwood-cove', name: 'Driftwood Cove' }]
+const crew: Volunteer[] = [{ id: 'v03', name: 'Hannah Becker', phone: null }]
+const bagCounts = [14, 9, 22]
+
+// T can be any type that has at least an id that is a string
+function findById&lt;T extends { id: string }&gt;(items: T[], id: string): T | undefined {
+  return items.find((item) =&gt; item.id === id)
+}
+
+console.log(findById(sites, 'driftwood-cove')?.name)
+console.log(findById(crew, 'v03')?.phone)
+console.log(findById(bagCounts, 'v03'))</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:22:22 - error TS2345: Argument of type 'number[]' is not assignable to parameter of type '{ id: string; }[]'.
+  Type 'number' is not assignable to type '{ id: string; }'.
+
+22 console.log(findById(bagCounts, 'v03'))
+                        ~~~~~~~~~
+
+
+Found 1 error in scratch.ts:22</code></pre>
+                </div>
+                <p>Sites and volunteers both have a string <code>id</code>, so both are welcome, and each call still returns its own type: <code>findById(crew, 'v03')</code> is a <code>Volunteer | undefined</code>, which is why <code>?.phone</code> is allowed. The bag counts are turned away at the door, with a message that names the constraint. Delete the last line and <code>node scratch.ts</code> prints <code>Driftwood Cove</code> and <code>null</code> (Hannah has no phone on file).</p>
+                <p>Notice the word: <code>extends</code> here means "has at least", the same as in <code>interface CleanupEventDetail extends CleanupEvent</code>. A <code>Volunteer</code> has an <code>id</code> plus more, and that is fine.</p>
+            </section>
+
+            <section id="overloads" class="lesson-section">
+                <h2>📖 Reading Overloads and Library Types</h2>
+                <p>You will read far more function types than you write, and many of them come from TypeScript's own description of the browser and of JavaScript. Two features show up there all the time: overloads and generics with constraints. Try this one (only check it: Node has no <code>document</code>, so running it fails with <code>ReferenceError: document is not defined</code>):</p>
+                <pre data-snippet><code class="language-ts">// Check this one only: Node has no document (the browser does)
+const picture = document.querySelector('img')
+const card = document.querySelector('.site-card')
+
+console.log(picture?.alt)
+console.log(card?.alt)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:6:19 - error TS2339: Property 'alt' does not exist on type 'Element'.
+
+6 console.log(card?.alt)
+                    ~~~
+
+
+Found 1 error in scratch.ts:6</code></pre>
+                </div>
+                <p>Same function, two different results. Hover over each variable: <code>picture</code> is an <code>HTMLImageElement | null</code>, which has <code>alt</code>; <code>card</code> is a plain <code>Element | null</code>, which does not. TypeScript can tell because <code>querySelector</code> has several <strong>overloads</strong>: separate signatures for the same function, and TypeScript picks the first one that fits the call. Right-click <code>querySelector</code> and choose <strong>Go to Definition</strong> (<kbd>F12</kbd>), and VS Code opens TypeScript's own declarations. Here are two of the five signatures:</p>
+                <pre data-snippet><code class="language-ts">querySelector&lt;K extends keyof HTMLElementTagNameMap&gt;(selectors: K): HTMLElementTagNameMap[K] | null;
+// ...
+querySelector&lt;E extends Element = Element&gt;(selectors: string): E | null;</code></pre>
+                <p>You can read these now. The first: "for a <code>K</code> that is one of the HTML tag names, return the element type for that tag, or <code>null</code>". <code>'img'</code> is a tag name, so you get an <code>HTMLImageElement</code>. (<code>keyof</code> means "one of the property names of": <code>HTMLElementTagNameMap</code> is a long interface from tag names to element types. Exercise 3 uses <code>keyof</code> itself.) The last signature catches every other string, such as <code>'.site-card'</code>, and returns a general <code>Element</code> (the <code>= Element</code> is a default for the type parameter). In VS Code, a hover that says <code>(+4 overloads)</code> is telling you there are more signatures to read.</p>
+                <p>One more, the <code>find</code> you used in Lesson 2.2 on arrays of sites:</p>
+                <pre data-snippet><code class="language-ts">find&lt;S extends T&gt;(predicate: (value: T, index: number, obj: T[]) =&gt; value is S, thisArg?: any): S | undefined;
+find(predicate: (value: T, index: number, obj: T[]) =&gt; unknown, thisArg?: any): T | undefined;</code></pre>
+                <p>Two overloads, both with a callback parameter described by a function type, and an optional <code>thisArg?</code>. Read the second: "<code>find</code> takes a callback that receives a <code>T</code>, its index and the whole array, and returns a <code>T</code> or <code>undefined</code>". That <code>T | undefined</code> is why <code>sites.find(...)</code> needed <code>?.</code> in Lesson 2.2. The first overload, with <code>value is S</code>, is for a special kind of callback called a type predicate; you write your first one in Lesson 2.4.</p>
+                <div class="card card-info">
+                    <h4>💡 Should you write overloads?</h4>
+                    <p>Rarely. Overloads earn their place in libraries that describe old, flexible JavaScript functions. In your own code, a union parameter, an optional parameter or a generic almost always says the same thing more simply, and every function in Shoreline Crew HQ will be written that way. Reading them is the skill you need.</p>
+                </div>
+                <div class="card card-success">
+                    <h4>✅ Declaration files are documentation you can trust</h4>
+                    <p>Blog posts go out of date; the declaration files that come with TypeScript and with each library describe the exact version you installed. Developers who open them with <kbd>F12</kbd> instead of guessing get unstuck faster, and the <code>/** */</code> comments above each signature often answer the question outright. It feels slow the first few times. Then it becomes the fastest documentation you have.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Reaching for any to make a function reusable</h4>
+                    <p><code>function firstAny(items: any[]): any</code> accepts everything and checks nothing: the misspelled <code>.nmae</code> passed the check and printed <code>undefined</code>. A type parameter gives you the same reuse with every check intact.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Using a property of T without a constraint</h4>
+                    <p><code>error TS2339: Property 'id' does not exist on type 'T'.</code> means the function has not said what <code>T</code> must have. Add a constraint (<code>T extends { id: string }</code>) rather than <code>any</code> or a <code>!</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ An optional parameter before a required one</h4>
+                    <p><code>error TS1016: A required parameter cannot follow an optional parameter.</code> Move the optional one to the end, give it a default, or collect the options in an object.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ A return type and a path that returns nothing</h4>
+                    <p>This <code>statusLabel</code> handles two of the four statuses:</p>
+                    <pre data-snippet><code class="language-ts">type EventStatus = 'draft' | 'scheduled' | 'completed' | 'cancelled'
+
+function statusLabel(status: EventStatus): string {
+  if (status === 'scheduled') {
+    return 'Scheduled'
+  }
+  if (status === 'completed') {
+    return 'Completed'
+  }
+}
+
+console.log(statusLabel('draft'))</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run check)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:3:44 - error TS2366: Function lacks ending return statement and return type does not include 'undefined'.
+
+3 function statusLabel(status: EventStatus): string {
+                                             ~~~~~~
+
+
+Found 1 error in scratch.ts:3</code></pre>
+                    </div>
+                    <p>Without <code>: string</code>, the check would be silent and the function would quietly return <code>undefined</code> for drafts (it does when you run it). With it, <strong>TS2366</strong> says some path falls off the end. This is one answer to Lesson 2.2's bonus question: a return type makes TypeScript insist that every status is handled. Return something on every path, or end with a fallback <code>return</code>.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Crew's Helper Functions</h2>
+                <p>You will write <code>ts-lab/functions.ts</code>: the small functions Shoreline Crew HQ needs again and again, typed properly, plus four generic helpers that work for cleanups and volunteers alike. Several of them come back in the app: <code>pluralize</code> and <code>spotsLeft</code> as the app's format helpers, <code>Page&lt;T&gt;</code> when the HQ reads the API's pages, and function types as the props components use to report clicks.</p>
+
+                <div class="card">
+                    <h3>Step 1: Types and sample data <span class="step-time">(10 min)</span></h3>
+                    <p>Delete <code>scratch.ts</code> if it is still there (keep a copy of anything you want). In <code>ts-lab</code>, create <code>functions.ts</code>. Copy <code>EventStatus</code>, <code>CleanupEvent</code> and <code>Volunteer</code> from your <code>shapes.ts</code>, then add the sample data:</p>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/functions.ts</div>
+                        <pre data-src="ts-lab/functions.ts" data-match="excerpt"><code class="language-ts">// Shoreline Crew functions (Lesson 2.3): typed functions, function types and generics
+
+// Copied from shapes.ts: each ts-lab file has its own types until Lesson 2.4 shares them
+type EventStatus = 'draft' | 'scheduled' | 'completed' | 'cancelled'
+
+interface CleanupEvent {
+  id: string
+  title: string
+  siteId: string
+  status: EventStatus
+  startTime: string
+  capacity: number
+  spotsTaken: number
+}
+
+interface Volunteer {
+  id: string
+  name: string
+  phone: string | null
+}
+
+const events: CleanupEvent[] = [
+  {
+    id: 'e08',
+    title: 'Weekend Cove Cleanup',
+    siteId: 'driftwood-cove',
+    status: 'scheduled',
+    startTime: '09:00',
+    capacity: 18,
+    spotsTaken: 18,
+  },
+  {
+    id: 'e09',
+    title: 'Boardwalk and Mudflats',
+    siteId: 'sandpiper-flats',
+    status: 'scheduled',
+    startTime: '10:00',
+    capacity: 16,
+    spotsTaken: 15,
+  },
+  {
+    id: 'e15',
+    title: 'Harbor Kayak Cleanup',
+    siteId: 'north-jetty',
+    status: 'draft',
+    startTime: '09:00',
+    capacity: 8,
+    spotsTaken: 0,
+  },
+  {
+    id: 'e01',
+    title: 'Storm Debris Sweep',
+    siteId: 'driftwood-cove',
+    status: 'completed',
+    startTime: '09:00',
+    capacity: 20,
+    spotsTaken: 20,
+  },
+]
+
+const crew: Volunteer[] = [
+  { id: 'v01', name: 'Maya Okafor', phone: '(831) 555-0101' },
+  { id: 'v02', name: 'Luis Romero', phone: '(831) 555-0102' },
+  { id: 'v03', name: 'Hannah Becker', phone: null },
+  { id: 'v04', name: 'Theo Nakamura', phone: '(831) 555-0104' },
+  { id: 'v05', name: 'Amara Diallo', phone: null },
+]</code></pre>
+                    </div>
+                    <p>Yes, the types are copied. Each file in <code>ts-lab</code> is its own module (the <code>moduleDetection</code> setting from Lesson 2.1), so the same names in two files do not clash, and neither file can see the other's types yet. Lesson 2.4 shows how files share types with <code>export</code> and <code>import</code>, and the copying ends there. Run <code>npm run check</code>: silent.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Parameters, defaults and return types <span class="step-time">(10 min)</span></h3>
+                    <p>Add three helpers and a few lines that use them at the end of the file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/functions.ts</div>
+                        <pre data-src="ts-lab/functions.ts" data-match="excerpt"><code class="language-ts">// ...
+// Parameters, defaults and return types
+
+function spotsLeft(event: CleanupEvent): number {
+  return Math.max(event.capacity - event.spotsTaken, 0)
+}
+
+function pluralize(count: number, word: string, plural = `${word}s`): string {
+  return count === 1 ? `1 ${word}` : `${count} ${plural}`
+}
+
+interface LineOptions {
+  showStatus?: boolean
+  prefix?: string
+}
+
+function eventLine(
+  event: CleanupEvent,
+  { showStatus = false, prefix = '-' }: LineOptions = {},
+): string {
+  const left = spotsLeft(event)
+  const spots = left === 0 ? 'full' : `${pluralize(left, 'spot')} left`
+  const line = `${prefix} ${event.title}: ${spots}`
+  return showStatus ? `${line} [${event.status}]` : line
+}
+
+console.log('All cleanups:')
+for (const event of events) {
+  console.log(eventLine(event))
+}
+console.log(pluralize(1, 'bag'), '/', pluralize(3, 'bag'), '/', pluralize(2, 'person', 'people'))</code></pre>
+                    </div>
+                    <pre class="terminal"><code class="language-bash">npm run check
+node functions.ts</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (node functions.ts)</h4>
+                        <pre><code>All cleanups:
+- Weekend Cove Cleanup: full
+- Boardwalk and Mudflats: 1 spot left
+- Harbor Kayak Cleanup: 8 spots left
+- Storm Debris Sweep: full
+1 bag / 3 bags / 2 people</code></pre>
+                    </div>
+                    <p>Each helper has a written return type: the crew's whole app will lean on them. <code>pluralize</code>'s default refers to an earlier parameter (<code>`${word}s`</code>), which works because defaults are worked out at the time of the call, left to right; <code>person</code> needs the third argument. <code>eventLine</code> takes an options object with defaults, so <code>eventLine(event)</code> and <code>eventLine(event, { showStatus: true })</code> both read clearly.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Function types and callbacks <span class="step-time">(10 min)</span></h3>
+                    <p>Add a function type, two formatters, a function that takes a formatter, and a test for <code>filter</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/functions.ts</div>
+                        <pre data-src="ts-lab/functions.ts" data-match="excerpt"><code class="language-ts">// ...
+// Function types
+
+// Any function that turns a cleanup into a line of text
+type EventFormatter = (event: CleanupEvent) =&gt; string
+
+const titleOnly: EventFormatter = (event) =&gt; `- ${event.title}`
+const withStatus: EventFormatter = (event) =&gt; eventLine(event, { showStatus: true })
+
+function printAll(list: CleanupEvent[], format: EventFormatter): void {
+  for (const event of list) {
+    console.log(format(event))
+  }
+}
+
+function isOpen(event: CleanupEvent): boolean {
+  return event.status === 'scheduled' &amp;&amp; spotsLeft(event) &gt; 0
+}
+
+console.log('Titles only:')
+printAll(events, titleOnly)
+console.log('Open for sign-ups:')
+printAll(events.filter(isOpen), withStatus)</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (node functions.ts, the new lines)</h4>
+                        <pre><code>...
+Titles only:
+- Weekend Cove Cleanup
+- Boardwalk and Mudflats
+- Harbor Kayak Cleanup
+- Storm Debris Sweep
+Open for sign-ups:
+- Boardwalk and Mudflats: 1 spot left [scheduled]</code></pre>
+                    </div>
+                    <p><code>isOpen</code> is a normal function declaration, yet <code>events.filter(isOpen)</code> accepts it: <code>filter</code> wants a function that takes a <code>CleanupEvent</code> and returns something it can treat as true or false, and <code>isOpen</code> fits. Function types describe the shape of a function, not how it was written. <code>withStatus</code> calls <code>eventLine</code> with options, so the formatters build on Step 2.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Four generic helpers <span class="step-time">(14 min)</span></h3>
+                    <p>Now the reusable ones. Each works for any list, and each call keeps the list's own type:</p>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/functions.ts</div>
+                        <pre data-src="ts-lab/functions.ts" data-match="excerpt"><code class="language-ts">// ...
+// Generics: one function for any type
+
+function first&lt;T&gt;(items: T[]): T | undefined {
+  return items[0]
+}
+
+// T can be any type that has at least an id that is a string
+function findById&lt;T extends { id: string }&gt;(items: T[], id: string): T | undefined {
+  return items.find((item) =&gt; item.id === id)
+}
+
+function groupBy&lt;T, K&gt;(items: T[], keyOf: (item: T) =&gt; K): Map&lt;K, T[]&gt; {
+  const groups = new Map&lt;K, T[]&gt;()
+  for (const item of items) {
+    const key = keyOf(item)
+    const group = groups.get(key)
+    if (group === undefined) {
+      groups.set(key, [item])
+    } else {
+      group.push(item)
+    }
+  }
+  return groups
+}
+
+// The API's paging information, and a page of anything
+interface PageInfo {
+  page: number
+  perPage: number
+  total: number
+  totalPages: number
+}
+
+interface Page&lt;T&gt; {
+  items: T[]
+  page: PageInfo
+}
+
+function paginate&lt;T&gt;(items: T[], page = 1, perPage = 10): Page&lt;T&gt; {
+  const start = (page - 1) * perPage
+  return {
+    items: items.slice(start, start + perPage),
+    page: { page, perPage, total: items.length, totalPages: Math.ceil(items.length / perPage) },
+  }
+}
+
+console.log(`First cleanup: ${first(events)?.title ?? 'none yet'}`)
+console.log(`v03 is ${findById(crew, 'v03')?.name ?? 'nobody'}`)
+console.log(`e99 is ${findById(events, 'e99')?.title ?? 'not a cleanup'}`)
+
+const byStatus = groupBy(events, (event) =&gt; event.status)
+for (const [status, group] of byStatus) {
+  console.log(`${status}: ${pluralize(group.length, 'cleanup')}`)
+}
+
+const crewPage = paginate(crew, 2, 2)
+const names = crewPage.items.map((person) =&gt; person.name).join(', ')
+console.log(`Crew page ${crewPage.page.page} of ${crewPage.page.totalPages}: ${names}`)</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (node functions.ts, the new lines)</h4>
+                        <pre><code>...
+First cleanup: Weekend Cove Cleanup
+v03 is Hannah Becker
+e99 is not a cleanup
+scheduled: 2 cleanups
+draft: 1 cleanup
+completed: 1 cleanup
+Crew page 2 of 3: Hannah Becker, Theo Nakamura</code></pre>
+                    </div>
+                    <p>Hover to see what TypeScript filled in. <code>byStatus</code> is a <code>Map&lt;EventStatus, CleanupEvent[]&gt;</code>: <code>groupBy</code> has two type parameters, and <code>K</code> was inferred from what your callback returns. <code>crewPage</code> is a <code>Page&lt;Volunteer&gt;</code>, so <code>person.name</code> in the <code>map</code> is checked. <code>paginate</code> combines everything from today: a type parameter, two defaults and a generic return type.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_05/05-hover-generic.png" alt="The TypeScript Playground editor showing the groupBy function and the line const byStatus = groupBy(events, (event) =&gt; event.status). A hover pop-up over groupBy reads: function groupBy&lt;CleanupEvent, EventStatus&gt;(items: CleanupEvent[], keyOf: (item: CleanupEvent) =&gt; EventStatus): Map&lt;EventStatus, CleanupEvent[]&gt;." width="900" height="380" loading="lazy">
+                        <figcaption>Hover over a generic call and the editor shows what TypeScript filled in: <code>T</code> is <code>CleanupEvent</code> (from the list), <code>K</code> is <code>EventStatus</code> (from what the callback returns), so the result is a <code>Map&lt;EventStatus, CleanupEvent[]&gt;</code>. VS Code shows the same pop-up.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Break it four ways <span class="step-time">(10 min)</span></h3>
+                    <p>One change at a time: make it, run <code>npm run check</code>, read the whole message, undo it (<kbd>Ctrl</kbd>+<kbd>Z</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>Z</kbd> on a Mac). For each, write down the code and the question TypeScript is asking.</p>
+                    <ol>
+                        <li><strong>A constraint removed:</strong> change <code>function findById&lt;T extends { id: string }&gt;(</code> to <code>function findById&lt;T&gt;(</code>.</li>
+                        <li><strong>A formatter that breaks its type:</strong> change <code>titleOnly</code>'s body to <code>(event) =&gt; event.capacity</code>.</li>
+                        <li><strong>A missing argument:</strong> in the <code>byStatus</code> loop, change <code>pluralize(group.length, 'cleanup')</code> to <code>pluralize(group.length)</code>.</li>
+                        <li><strong>A broken promise:</strong> in <code>paginate</code>, delete the <code>items: items.slice(start, start + perPage),</code> line.</li>
+                    </ol>
+                    <div class="card card-output">
+                        <h4>Expected output (1: a constraint removed)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+functions.ts:131:36 - error TS2339: Property 'id' does not exist on type 'T'.
+
+131   return items.find((item) =&gt; item.id === id)
+                                       ~~
+
+
+Found 1 error in functions.ts:131</code></pre>
+                    </div>
+                    <figure class="screenshot">
+                        <img src="images/lesson_05/05-formatter-error.png" alt="A terminal in ts-lab. npm run check reports error TS2322 at functions.ts line 105: Type number is not assignable to type string, underlining event.capacity in const titleOnly: EventFormatter = (event) =&gt; event.capacity. An indented follow-up at line 103 reads: The expected type comes from the return type of this signature, underlining the EventFormatter function type." width="821" height="391" loading="lazy">
+                        <figcaption>Mistake 2: the error is on the arrow function's body, and the follow-up (in blue) points at the function type it was checked against: <code>EventFormatter</code> promised a <code>string</code>.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (2: a formatter that breaks its type)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+functions.ts:105:46 - error TS2322: Type 'number' is not assignable to type 'string'.
+
+105 const titleOnly: EventFormatter = (event) =&gt; event.capacity
+                                                 ~~~~~~~~~~~~~~
+
+  functions.ts:103:23 - The expected type comes from the return type of this signature.
+    103 type EventFormatter = (event: CleanupEvent) =&gt; string
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Found 1 error in functions.ts:105</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (3: a missing argument)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+functions.ts:175:29 - error TS2554: Expected 2-3 arguments, but got 1.
+
+175   console.log(`${status}: ${pluralize(group.length)}`)
+                                ~~~~~~~~~
+
+  functions.ts:75:35 - An argument for 'word' was not provided.
+    75 function pluralize(count: number, word: string, plural = `${word}s`): string {
+                                         ~~~~~~~~~~~~
+
+
+Found 1 error in functions.ts:175</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (4: a broken promise)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+functions.ts:163:3 - error TS2741: Property 'items' is missing in type '{ page: { page: number; perPage: number; total: number; totalPages: number; }; }' but required in type 'Page&lt;T&gt;'.
+
+163   return {
+      ~~~~~~
+
+  functions.ts:157:3 - 'items' is declared here.
+    157   items: T[]
+          ~~~~~
+
+
+Found 1 error in functions.ts:163</code></pre>
+                    </div>
+                    <p>Mistake 3 says "Expected 2-3 arguments": the count includes the optional <code>plural</code>. Mistake 4 is Lesson 2.2's TS2741 on a generic type: the return type <code>Page&lt;T&gt;</code> promised <code>items</code>, and the object no longer has them. Notice that the error is inside <code>paginate</code>, not at the call: that is the written return type at work. Undo every change until <code>npm run check</code> is silent again.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Meet your groupBy in the language <span class="step-time">(5 min)</span></h3>
+                    <p>Grouping is so common that JavaScript now ships it. Change <code>groupBy(events,</code> to <code>Map.groupBy(events,</code> in the <code>byStatus</code> line, run <code>npm run check</code> and <code>node functions.ts</code>: the check is silent and the output is identical. Now right-click <code>groupBy</code> after <code>Map.</code> and choose <strong>Go to Definition</strong>:</p>
+                    <pre data-snippet><code class="language-ts">interface MapConstructor {
+    /**
+     * Groups members of an iterable according to the return value of the passed callback.
+     * @param items An iterable.
+     * @param keySelector A callback which will be invoked for each item in items.
+     */
+    groupBy&lt;K, T&gt;(
+        items: Iterable&lt;T&gt;,
+        keySelector: (item: T, index: number) =&gt; K,
+    ): Map&lt;K, T[]&gt;;
+}</code></pre>
+                    <p>It is your function, almost line for line: two type parameters, a callback described by a function type, a <code>Map&lt;K, T[]&gt;</code> back. (<code>Iterable&lt;T&gt;</code> accepts arrays and other things you can loop over; the callback also gets an index.) You can read the declarations of the tools you use, because you just wrote one. Change the line back to your own <code>groupBy</code>, so your file matches the finished code. <code>Map.groupBy</code> is a recent addition to JavaScript: it runs in Node 22 and newer and in current browsers.</p>
+                    <p><strong>Your own project:</strong> list three helper functions the app you are planning for Lesson 11.1 will need (a formatter, a lookup, a filter). Write each one's type as a function type, such as <code>(event: CleanupEvent) =&gt; string</code>, and mark which one could be generic.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>functions.ts</code> has <code>spotsLeft</code>, <code>pluralize</code> (with a default) and <code>eventLine</code> (with an options object), each with a written return type</li>
+                        <li>☐ It has the <code>EventFormatter</code> function type, two formatters, <code>printAll</code> and <code>isOpen</code></li>
+                        <li>☐ It has <code>first</code>, <code>findById</code> (with a constraint), <code>groupBy</code> and <code>paginate</code> returning a <code>Page&lt;T&gt;</code></li>
+                        <li>☐ <code>node functions.ts</code> prints the twenty lines above, and <code>npm run check</code> reports no errors</li>
+                        <li>☐ I produced TS2339, TS2322, TS2554 and TS2741 and wrote down the question each one asks</li>
+                        <li>☐ I read <code>Map.groupBy</code>'s declaration and can say what <code>K</code> and <code>T</code> are in my call</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time). Use <code>scratch.ts</code> for each, and delete <code>scratch.ts</code> when you are done, so <code>ts-lab</code> keeps one file per lesson.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Count what matches</h3>
+                    <p>Write a generic <code>countWhere</code> that takes a list and a test function and returns how many items pass the test. Use it twice: to count crew members with no phone on file (<code>phone === null</code>), and to count the cleanups in <code>[14, 9, 22, 6]</code> that filled 10 bags or more. Do not annotate the callbacks' parameters; let the function type do it.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The signature is the whole exercise: <code>countWhere&lt;T&gt;(items: T[], test: (item: T) =&gt; boolean): number</code>. The body is a loop with a counter, or <code>items.filter(test).length</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">interface Volunteer {
+  id: string
+  name: string
+  phone: string | null
+}
+
+const crew: Volunteer[] = [
+  { id: 'v01', name: 'Maya Okafor', phone: '(831) 555-0101' },
+  { id: 'v03', name: 'Hannah Becker', phone: null },
+  { id: 'v05', name: 'Amara Diallo', phone: null },
+]
+const bagCounts = [14, 9, 22, 6]
+
+function countWhere&lt;T&gt;(items: T[], test: (item: T) =&gt; boolean): number {
+  let count = 0
+  for (const item of items) {
+    if (test(item)) {
+      count += 1
+    }
+  }
+  return count
+}
+
+console.log(`${countWhere(crew, (person) =&gt; person.phone === null)} people have no phone on file`)
+console.log(`${countWhere(bagCounts, (bags) =&gt; bags &gt;= 10)} cleanups filled 10 bags or more`)</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>2 people have no phone on file
+2 cleanups filled 10 bags or more</code></pre>
+                        </div>
+                        <p>Hover over <code>person</code> and <code>bags</code>: one is a <code>Volunteer</code>, the other a <code>number</code>, both inferred, because <code>T</code> comes from the list and the callback's type comes from <code>T</code>. Arrays have this built in as <code>items.filter(test).length</code>; writing it yourself is how you learn to read such signatures.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Three questions in one file</h3>
+                    <p>Put this in <code>scratch.ts</code> and run <code>npm run check</code>. Answer each of the three errors in code, without <code>any</code>, <code>!</code> or changing <code>Site</code> or <code>SiteFormatter</code>, so that the check is silent and <code>node scratch.ts</code> prints <code>Driftwood Cove, North Jetty</code>, <code>- Driftwood Cove</code> and <code>NORTH JETTY</code>.</p>
+                    <pre data-snippet><code class="language-ts">interface Site {
+  id: string
+  name: string
+}
+
+const sites: Site[] = [
+  { id: 'driftwood-cove', name: 'Driftwood Cove' },
+  { id: 'north-jetty', name: 'North Jetty' },
+]
+
+function names&lt;T&gt;(items: T[]): string[] {
+  return items.map((item) =&gt; item.name)
+}
+
+function siteLine(site: Site, prefix: string): string {
+  return `${prefix} ${site.name}`
+}
+
+type SiteFormatter = (site: Site) =&gt; string
+const shout: SiteFormatter = (site) =&gt; site.name.length
+
+console.log(names(sites).join(', '))
+console.log(siteLine(sites[0]))
+console.log(shout(sites[1]))</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>One generic function uses a property it never asked for: add a constraint. One parameter should have a default of <code>'-'</code>. One formatter returns a number where its type promised a string: the expected output says what it should return.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card card-output">
+                            <h4>Expected output (npm run check, before the fixes)</h4>
+                            <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:12:35 - error TS2339: Property 'name' does not exist on type 'T'.
+
+12   return items.map((item) =&gt; item.name)
+                                     ~~~~
+
+scratch.ts:20:40 - error TS2322: Type 'number' is not assignable to type 'string'.
+
+20 const shout: SiteFormatter = (site) =&gt; site.name.length
+                                          ~~~~~~~~~~~~~~~~
+
+  scratch.ts:19:22 - The expected type comes from the return type of this signature.
+    19 type SiteFormatter = (site: Site) =&gt; string
+                            ~~~~~~~~~~~~~~~~~~~~~~
+
+scratch.ts:23:13 - error TS2554: Expected 2 arguments, but got 1.
+
+23 console.log(siteLine(sites[0]))
+               ~~~~~~~~
+
+  scratch.ts:15:31 - An argument for 'prefix' was not provided.
+    15 function siteLine(site: Site, prefix: string): string {
+                                     ~~~~~~~~~~~~~~
+
+
+Found 3 errors in the same file, starting at: scratch.ts:12</code></pre>
+                        </div>
+                        <pre data-snippet><code class="language-ts">interface Site {
+  id: string
+  name: string
+}
+
+const sites: Site[] = [
+  { id: 'driftwood-cove', name: 'Driftwood Cove' },
+  { id: 'north-jetty', name: 'North Jetty' },
+]
+
+function names&lt;T extends { name: string }&gt;(items: T[]): string[] {
+  return items.map((item) =&gt; item.name)
+}
+
+function siteLine(site: Site, prefix = '-'): string {
+  return `${prefix} ${site.name}`
+}
+
+type SiteFormatter = (site: Site) =&gt; string
+const shout: SiteFormatter = (site) =&gt; site.name.toUpperCase()
+
+console.log(names(sites).join(', '))
+console.log(siteLine(sites[0]))
+console.log(shout(sites[1]))</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>Driftwood Cove, North Jetty
+- Driftwood Cove
+NORTH JETTY</code></pre>
+                        </div>
+                        <p>If you ran the broken file first, it printed <code>undefined Driftwood Cove</code> and <code>11</code>: two real bugs, and the check found both before anyone saw them. <code>names</code> worked at run time by luck (sites do have a <code>name</code>); the constraint makes that luck a promise.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Pluck one property from every item (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 15 minutes).</em></p>
+                    <p>Write <code>pluck(items, key)</code> that returns an array with that property of every item: <code>pluck(crew, 'name')</code> gives the names, <code>pluck(crew, 'phone')</code> the phones. The type must be exact: the names are a <code>string[]</code>, the phones a <code>(string | null)[]</code>, and <code>pluck(crew, 'email')</code> is an error, because a <code>Volunteer</code> has no <code>email</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Use two type parameters and the <code>keyof</code> from the <code>querySelector</code> declaration: <code>K extends keyof T</code> means "K is one of T's property names". The type of property <code>K</code> of a <code>T</code> is written <code>T[K]</code>, so the return type is <code>T[K][]</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">interface Volunteer {
+  id: string
+  name: string
+  phone: string | null
+}
+
+const crew: Volunteer[] = [
+  { id: 'v02', name: 'Luis Romero', phone: '(831) 555-0102' },
+  { id: 'v03', name: 'Hannah Becker', phone: null },
+]
+
+function pluck&lt;T, K extends keyof T&gt;(items: T[], key: K): T[K][] {
+  return items.map((item) =&gt; item[key])
+}
+
+const names = pluck(crew, 'name')
+const phones = pluck(crew, 'phone')
+
+console.log(names.join(', '))
+console.log(phones)</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>Luis Romero, Hannah Becker
+[ '(831) 555-0102', null ]</code></pre>
+                        </div>
+                        <p>And the call with a property that does not exist:</p>
+                        <div class="card card-output">
+                            <h4>Expected output (npm run check, with console.log(pluck(crew, 'email')) added)</h4>
+                            <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:21:25 - error TS2345: Argument of type '"email"' is not assignable to parameter of type 'keyof Volunteer'.
+
+21 console.log(pluck(crew, 'email'))
+                           ~~~~~~~
+
+
+Found 1 error in scratch.ts:21</code></pre>
+                        </div>
+                        <p>Hover over <code>phones</code>: <code>(string | null)[]</code>. TypeScript looked up the type of <code>phone</code> in <code>Volunteer</code> for you. This <code>T[K]</code> lookup is how library types stay exact, and you will see it in React's own types.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> With <code>function pluralize(count: number, word: string, plural = `${word}s`): string</code>, what does <code>npm run check</code> say about <code>pluralize(3)</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript counts arguments, and word has no default. Would a missing required argument pass the check?">
+                                A) Nothing; it prints <code>3 undefineds</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TS2345 is about an argument of the wrong type. Is any argument here of the wrong type, or is one missing?">
+                                B) TS2345: Argument of type 'number' is not assignable to parameter of type 'string'
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="count and word are required and plural has a default, so a call needs two or three arguments. The follow-up line says an argument for word was not provided.">
+                                C) TS2554: Expected 2-3 arguments, but got 1
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Which type describes "a function that takes a cleanup and returns a line of text"?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A function type looks like an arrow function with types and no body: the parameters in parentheses, then the arrow and the return type. Give it a name with a type alias, such as EventFormatter.">
+                                A) <code>(event: CleanupEvent) =&gt; string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This looks like an old-style function, but it is not TypeScript type syntax. Which notation did EventFormatter use?">
+                                B) <code>function(CleanupEvent): string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A function type needs parentheses around its parameters, and each parameter needs a name. Which option has both?">
+                                C) <code>CleanupEvent =&gt; string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="There is no such built-in generic type. How did the lesson write the type of a callback?">
+                                D) <code>Function&lt;CleanupEvent, string&gt;</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Given <code>function first&lt;T&gt;(items: T[]): T | undefined</code>, what is the type of <code>first(['v02', 'v03'])</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="T is a placeholder that is filled in at each call. What does TypeScript fill in from this argument?">
+                                A) <code>T</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Generics keep the type; nothing here becomes any. What is the type of the array's items?">
+                                B) <code>any</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="TypeScript infers T from the argument: an array of strings, so T is string and the result is string or undefined (the array might have been empty).">
+                                C) <code>string | undefined</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The function returns one item, not the array. Read the return type: T or undefined.">
+                                D) <code>string[]</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> <code>function findById&lt;T&gt;(items: T[], id: string)</code> gives TS2339 "Property 'id' does not exist on type 'T'" on <code>item.id</code>. What is the best fix?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That makes the error go away by switching off every check, including on the results. Is there a way to say what T must have?">
+                                A) Change the parameter to <code>items: any[]</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A constraint tells TypeScript that every T has a string id, so item.id is allowed inside, lists without ids are rejected at the call, and each call still returns its own type.">
+                                B) Add a constraint: <code>findById&lt;T extends { id: string }&gt;</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The non-null assertion removes null and undefined; it does not add properties. What does TypeScript not know about T?">
+                                C) Write <code>item!.id</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> TypeScript infers return types. Why does the course still write them on helpers like <code>eventLine</code> and <code>paginate</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Node strips types without reading them. Does it care whether a return type is written?">
+                                A) Node cannot run a function without a return type
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Inferred types are checked just as strictly as written ones (Lesson 2.1). What changes is where a mistake is reported.">
+                                B) Inferred return types are not checked
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A return type adds no speed when the code runs: types disappear. What does it change for the person fixing a bug?">
+                                C) The function runs faster
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A written return type is a promise the function is checked against, so a mistake is reported on the line inside the function (as with TS2741 in paginate) instead of at callers in other files, and the signature documents what callers can rely on.">
+                                D) Mistakes are reported inside the function, where the bug is, and callers get a clear promise
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why is it called <code>T</code>? Can I use another name?</summary>
+                    <p><code>T</code> for "type" is a convention, and so are <code>K</code> for "key" and <code>V</code> for "value". Any name works: <code>function first&lt;Item&gt;(items: Item[]): Item | undefined</code> is the same function. Single letters are fine for short helpers like today's; a descriptive name helps when a function has several type parameters that mean different things.</p>
+                </details>
+                <details>
+                    <summary>Arrow function or <code>function</code> declaration?</summary>
+                    <p>For TypeScript they are the same: both take parameter and return types. This course uses <code>function</code> declarations for named helpers and components (they read well at the top level and can be used before the line that defines them) and arrow functions for callbacks and formatters stored in variables. In a <code>.tsx</code> file, a generic arrow function needs a small trick (<code>&lt;T,&gt;</code>), one more reason to use declarations for generic helpers.</p>
+                </details>
+                <details>
+                    <summary>Should I write <code>&lt;string&gt;</code> at every call to a generic function?</summary>
+                    <p>No. Let TypeScript infer type arguments from the values you pass, and write them only when there is nothing to infer from (an empty array, <code>new Map&lt;K, T[]&gt;()</code> inside <code>groupBy</code>) or when inference picks something wider than you want. If you find yourself writing them everywhere, the function's parameters probably do not mention the type parameter.</p>
+                </details>
+                <details>
+                    <summary>What is the difference between <code>void</code> and <code>undefined</code> as a return type?</summary>
+                    <p><code>undefined</code> says "returns the value <code>undefined</code>", and callers may use it. <code>void</code> says "do not use what this returns". It matters for callbacks: a function type <code>() =&gt; void</code> accepts a function that happens to return something, such as an arrow function that returns the result of <code>push</code>, and promises callers that the result will be ignored. That is why React types event handlers with <code>void</code>.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Write a generic <code>sortBy&lt;T&gt;(items: T[], keyOf: (item: T) =&gt; number): T[]</code> that returns a <strong>sorted copy</strong> and leaves the original list alone (look up the array method <code>toSorted</code>). Sort the crew's cleanups by spots left, then sort volunteers by name: what has to change in the type of <code>keyOf</code> so that it can return a <code>string</code> too? Copying instead of changing data in place is exactly what React will ask of you from Module 3 on, so this is good practice for more than generics.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Explain generics to a friend who knows JavaScript but not TypeScript, in three or four sentences and without the word "generic". Use <code>first</code> or <code>findById</code> as your example, and say what goes wrong with <code>any</code> instead. If the explanation comes out tangled, note which part, so you can come back to it.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Annotate every parameter; write the <strong>return type</strong> for functions other code relies on, so mistakes are reported inside the function (TS2322, TS2366, TS2741). <code>void</code> means "returns nothing to use"</li>
+                        <li><code>x?: T</code> is optional (<code>T | undefined</code> inside), <code>x = value</code> is a default (type inferred from it), <code>...xs: T[]</code> collects the rest; optional ones go last (TS1016), and TypeScript counts arguments (TS2554)</li>
+                        <li>Several options belong in one <strong>options object</strong>, destructured with defaults: the shape of React props</li>
+                        <li>A <strong>function type</strong> such as <code>(event: CleanupEvent) =&gt; string</code> describes callbacks; contextual typing fills in their parameters</li>
+                        <li>A <strong>generic</strong> takes types as parameters (<code>first&lt;T&gt;</code>, <code>Page&lt;T&gt;</code>); TypeScript infers type arguments at each call, so reuse costs no checks, unlike <code>any</code></li>
+                        <li>A <strong>constraint</strong> (<code>T extends { id: string }</code>) says what T must have; library declarations combine overloads, generics and constraints, and you can read them with <kbd>F12</kbd></li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up a type or pattern quickly</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Read the official chapter on functions</td><td><a href="https://www.typescriptlang.org/docs/handbook/2/functions.html" target="_blank" rel="noopener">TypeScript Handbook: More on Functions</a></td></tr>
+                            <tr><td>Read the official chapter on generics</td><td><a href="https://www.typescriptlang.org/docs/handbook/2/generics.html" target="_blank" rel="noopener">TypeScript Handbook: Generics</a></td></tr>
+                            <tr><td>Look up a new word</td><td><a href="glossary.html">Glossary</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You wrote Shoreline Crew's first helper functions with clear contracts: typed parameters, defaults, an options object and written return types</li>
+                        <li>You described functions as values and passed typed callbacks to your own functions and to <code>filter</code></li>
+                        <li>You replaced "one function per type" and <code>any</code> with generics that keep every check</li>
+                        <li>You constrained a type parameter and saw TypeScript turn away a list without ids</li>
+                        <li>You read real declarations from TypeScript's library (<code>querySelector</code>, <code>find</code>, <code>Map.groupBy</code>) and recognized your own code in one of them</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_06.html"><strong>Lesson 2.4: Typing Real Data</strong></a> your types move into Shoreline Crew HQ itself. You share them between files with <code>export</code> and <code>import</code> (no more copying), read the app's <code>tsconfig</code> line by line, meet utility types that build new types from old ones, and write the function that turns the API's <code>unknown</code> JSON into checked, typed cleanups. Generics and function types are how that function stays reusable.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>node functions.ts</code> prints its twenty lines and <code>npm run check</code> in <code>ts-lab</code> reports no errors</li>
+                    <li>Delete <code>scratch.ts</code>, so <code>ts-lab</code> holds <code>types.ts</code>, <code>shapes.ts</code> and <code>functions.ts</code></li>
+                    <li>Keep your notes from Step 5 (four error codes and their questions) and your list of helper functions for your own project</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Generics are the point where many people decide TypeScript is "too hard", usually after reading a library's declaration that looks like punctuation soup. You just read three of those and found your own <code>groupBy</code> in one. If <code>T</code> still feels abstract, that is normal: it settles each time you hover over a call and see what TypeScript filled in. You will write <code>useState&lt;Site[]&gt;</code> in a few lessons and it will look obvious. That is what learning looks like from the inside: confusing, then ordinary.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_04.html" class="prev-lesson">← Previous: Shaping Data</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_06.html" class="next-lesson">Next: Typing Real Data →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

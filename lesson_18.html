@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Share app-wide values with typed React context: createContext, a provider and a useAuth() Hook that can never return undefined by accident, then sign organizers in to Shoreline Crew HQ with roles, drafts and a live check-in roster. React + TypeScript: Build a Modern Web App Lesson 5.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Typed Context - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🔑 Lesson 5.2: Typed Context</h1>
+                <p class="lead">Until today, everyone who opens Shoreline Crew HQ sees the same thing. That is about to change: organizers sign in, and the app starts to know who is looking. The header greets Maya by name, the events page shows her the two drafts nobody else may see, and the check-in desk on today's cleanup loads the real roster from shoreline-api. Dozens of components, at every depth of the tree, need to ask the same question: "who is signed in?" Passing the answer down as a prop through every layer would be painful. React's answer is context, and TypeScript's job today is to make sure no component can ever read it the wrong way.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain prop drilling, and decide when a value belongs in context and when a plain prop is clearer</li>
+                        <li>Create a typed context with <code>createContext</code>, provide it with React 19's <code>&lt;Context value&gt;</code>, and read it with <code>useContext</code></li>
+                        <li>Avoid the "undefined context" trap: type the context as <code>T | undefined</code> and write a <code>useAuth()</code> Hook that fails loudly outside its provider and never returns <code>undefined</code></li>
+                        <li>Sign in against a real API with roles, keep the session in <code>sessionStorage</code>, and send the token with every request</li>
+                        <li>Make data depend on who is asking: drafts, organizer-only buttons and a live roster that load again when someone signs in or out</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_17.html">Lesson 5.1: useReducer with Discriminated Unions</a> (your <code>shoreline-hq</code> with the check-in desk on <code>/events/e17</code>)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> Sign-in for Shoreline Crew HQ: an <code>AuthContext</code> with a <code>useAuth()</code> Hook, a sign-in page, a header that knows who you are, drafts and Cancel buttons for organizers only, and the check-in desk fed by the real roster</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-18-start.zip">lesson-18-start.zip</a> · Finished code: <a href="downloads/lesson-18-end.zip">lesson-18-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#drilling" class="toc-link">The Prop Drilling Problem</a></li>
+                        <li><a href="#context" class="toc-link">Context in Three Parts</a></li>
+                        <li><a href="#undefined" class="toc-link">The Undefined Context Trap</a></li>
+                        <li><a href="#sessions" class="toc-link">Where a Sign-in Lives</a></li>
+                        <li><a href="#who-asks" class="toc-link">Who Asks Is Part of the Question</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Sign-in for the HQ</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="drilling" class="lesson-section">
+                <h2>🪢 The Prop Drilling Problem</h2>
+                <p>Here is a real question from today's project. On the events page, every scheduled cleanup has a <strong>Cancel cleanup</strong> button. Only organizers should see it. The component that draws the button is <code>EventCard</code>, and it sits three levels below the page:</p>
+                <div class="mermaid">
+graph TD
+    A["EventsPage"] --> B["EventGroups"]
+    B --> C["EventList"]
+    C --> D["EventCard: Cancel?"]
+    E["Header"] --> F["UserMenu: name?"]
+</div>
+                <p>With props alone, the answer has to be carried down by hand: <code>EventsPage</code> passes <code>isOrganizer</code> to <code>EventGroups</code>, which passes it to <code>EventList</code>, which passes it to each <code>EventCard</code>. Two of those three components never use the value; they only hand it on. That is <strong>prop drilling</strong>. It works, but every middle component grows a prop it does not care about, and when the value changes shape, all of them change too. And the header's <code>UserMenu</code>, in a different branch of the tree, needs the same answer through a completely different chain.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the beach radio</h4>
+                    <p>Passing a message along a line of volunteers works for two or three people. For the whole beach, the crew lead uses the radio: one broadcast on a known channel, and anyone carrying a radio tuned to it hears the message, wherever they stand. Nobody in between has to repeat it. A <strong>context</strong> is that channel. The <strong>provider</strong> is the transmitter, and it only reaches the part of the tree inside it. Each component that calls <code>useContext</code> is a radio tuned to the channel, and it hears the nearest transmitter above it.</p>
+                </div>
+                <p>Context is not a reason to stop using props. Props are explicit: you can read a component's interface and see everything it needs. Use context for values that many components at different depths need, and that change rarely. The usual list:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Good fit for context</th><th>Better as props or elsewhere</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Who is signed in, and their role (today's project)</td><td>Data for one component and its child: a prop (today, <code>EventGroups</code> gets <code>showDrafts</code> as a prop)</td></tr>
+                            <tr><td>Theme, language, units chosen by the person</td><td>Server data such as events and rosters: <code>useApi</code> now, TanStack Query in Lesson 7.1</td></tr>
+                            <tr><td>A reducer's <code>dispatch</code> shared by a deep tree</td><td>Values that change many times a second (every keystroke of a search): local state</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Almost every real React app has an "auth context": routers, data libraries and design systems all ship their own contexts too, and <code>useAuth()</code>-style Hooks are what you will call on your first day on a team. Knowing how they are built, and typed, means you can read those libraries' code, debug "it says I am signed out" bugs, and write your own when an app needs one.</p>
+                </div>
+            </section>
+
+            <section id="context" class="lesson-section">
+                <h2>📡 Context in Three Parts</h2>
+                <p>Every context has three parts: <strong>create</strong> it once, <strong>provide</strong> a value high in the tree, and <strong>read</strong> it anywhere below. Try them on something small before sign-in. The crew weighs its bags; some volunteers think in kilograms, visitors from the US in pounds. Create <code>src/Scratch.tsx</code> (this lesson's experiment file) and show it by temporarily making <code>return &lt;UnitsDemo /&gt;</code> the first line of <code>CurrentPage</code> in <code>App.tsx</code>:</p>
+                <pre data-snippet><code class="language-tsx">import { createContext, useContext, useState } from 'react'
+
+type WeightUnit = 'kg' | 'lb'
+
+// The default ('kg') is what components get when no provider is above them
+const WeightUnitContext = createContext&lt;WeightUnit&gt;('kg')
+
+function BagWeight({ kg }: { kg: number }) {
+  const unit = useContext(WeightUnitContext)
+  return &lt;strong&gt;{unit === 'kg' ? `${kg} kg` : `${Math.round(kg * 2.2)} lb`}&lt;/strong&gt;
+}
+
+// Knows nothing about units: no prop passes through it
+function DayTotal() {
+  return &lt;p&gt;Collected today: &lt;BagWeight kg={42} /&gt;&lt;/p&gt;
+}
+
+export function UnitsDemo() {
+  const [unit, setUnit] = useState&lt;WeightUnit&gt;('kg')
+
+  return (
+    &lt;&gt;
+      &lt;WeightUnitContext value={unit}&gt;
+        &lt;button type="button" onClick={() =&gt; setUnit(unit === 'kg' ? 'lb' : 'kg')}&gt;
+          Show {unit === 'kg' ? 'pounds' : 'kilograms'}
+        &lt;/button&gt;
+        &lt;DayTotal /&gt;
+      &lt;/WeightUnitContext&gt;
+      &lt;DayTotal /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <ul>
+                    <li><strong>Create:</strong> <code>createContext&lt;WeightUnit&gt;('kg')</code> makes a context object. The type argument says what the channel carries; the argument is the <strong>default value</strong>, used by any component that has no provider above it.</li>
+                    <li><strong>Provide:</strong> <code>&lt;WeightUnitContext value={unit}&gt;</code> wraps part of the tree. In React 19 the context object itself is the provider component, and TypeScript checks that <code>value</code> is a <code>WeightUnit</code>.</li>
+                    <li><strong>Read:</strong> <code>useContext(WeightUnitContext)</code> returns the value of the nearest provider above the component. Its type is <code>WeightUnit</code>, inferred from the context. <code>DayTotal</code> has no props at all: the unit skips it, like the radio skips the people in between.</li>
+                </ul>
+                <p>Measured on the dev server: at first both lines said "Collected today: 42 kg". After one click on <strong>Show pounds</strong>, the line inside the provider said "Collected today: 92 lb" and the button said "Show kilograms", while the second <code>&lt;DayTotal /&gt;</code>, outside the provider, still said "42 kg": with no transmitter above it, it hears the default. When a provider's value changes, React renders every component that reads that context again, wherever it is. That is how one sign-in will update the header, the event cards and the desk at once.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: <code>.Provider</code> and <code>use(Context)</code></h4>
+                    <p>Code written before React 19 provides a context with <code>.Provider</code>. It still compiles and works in React 19.3 (measured: <code>npx tsc -b</code> and <code>npm run lint</code> were clean), so you will meet it in older projects:</p>
+                    <pre data-snippet data-legacy><code class="language-tsx">export function OldStyle() {
+  return (
+    &lt;WeightUnitContext.Provider value="lb"&gt;
+      &lt;p&gt;Same context, older spelling.&lt;/p&gt;
+    &lt;/WeightUnitContext.Provider&gt;
+  )
+}</code></pre>
+                    <p>New code writes <code>&lt;WeightUnitContext value="lb"&gt;</code>. React 19 also reads a context with <code>use(SomeContext)</code>, the same <code>use</code> that unwrapped promises in Lesson 4.4. Unlike <code>useContext</code>, it may be called inside an <code>if</code>. The HQ sticks with <code>useContext</code>, which reads the same everywhere.</p>
+                </div>
+            </section>
+
+            <section id="undefined" class="lesson-section">
+                <h2>🕳️ The Undefined Context Trap</h2>
+                <p>Units have a sensible default: kilograms. Sign-in does not. What should <code>useContext</code> return for "who is signed in" when nobody remembered to put a provider above the component? Many tutorials paper over the question with a harmless-looking default object:</p>
+                <pre data-snippet><code class="language-tsx">import { createContext, useContext } from 'react'
+import type { AuthValue } from './auth/AuthContext.ts'
+
+// A "harmless" default so that nobody has to deal with undefined...
+const QuietAuthContext = createContext&lt;AuthValue&gt;({
+  session: null,
+  isOrganizer: false,
+  signIn: async () =&gt; {},
+  signOut: () =&gt; {},
+})
+
+// ...used by a component that nobody wrapped in a provider
+export function QuickSignIn() {
+  const { session, signIn } = useContext(QuietAuthContext)
+  return (
+    &lt;button
+      type="button"
+      onClick={() =&gt; signIn({ email: 'maya.okafor@example.com', password: 'shoreline-demo' })}
+    &gt;
+      {session === null ? 'Sign in as Maya' : `Signed in as ${session.user.name}`}
+    &lt;/button&gt;
+  )
+}</code></pre>
+                <p>It type-checks and lints cleanly. Then, measured on the dev server with <code>QuickSignIn</code> rendered outside any provider: clicking <strong>Sign in as Maya</strong> did nothing at all. The button kept its text, no request reached the API, and the console showed no error. The default's <code>signIn</code> is an empty function, so the app is "signed out forever", and nothing tells you why. That is the trap: a fake default turns a setup mistake into a silent bug.</p>
+                <h3>Make "no provider" a type the compiler sees</h3>
+                <p>The HQ's context says the truth instead: outside a provider there is <em>no</em> value. Its type is <code>AuthValue | undefined</code>, and the default is <code>undefined</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/auth/AuthContext.ts</div>
+                    <pre data-src="shoreline-hq/src/auth/AuthContext.ts" data-match="excerpt"><code class="language-ts">// undefined is the value outside an AuthProvider: a mistake that useAuth() reports at once
+export const AuthContext = createContext&lt;AuthValue | undefined&gt;(undefined)</code></pre>
+                </div>
+                <p>Now TypeScript refuses any component that reads it without checking. Try it in <code>src/Scratch.tsx</code> once the project's Step 2 is done:</p>
+                <pre data-snippet><code class="language-tsx">import { useContext } from 'react'
+import { AuthContext } from './auth/AuthContext.ts'
+
+export function OrganizerNote() {
+  const { isOrganizer } = useContext(AuthContext)
+  return isOrganizer ? &lt;p&gt;Drafts are listed below.&lt;/p&gt; : null
+}</code></pre>
+                <figure class="screenshot">
+                    <img src="images/lesson_18/18-plain-usecontext.png" alt="A terminal in shoreline-hq. npx tsc -b reports error TS2339 in src/Scratch.tsx: Property isOrganizer does not exist on type AuthValue or undefined, with isOrganizer underlined in the line that destructures useContext(AuthContext). Found 1 error." width="1002" height="239" loading="lazy">
+                    <figcaption>Reading the context directly: TypeScript knows the value can be <code>undefined</code> outside a provider, and refuses to take <code>isOrganizer</code> out of it.</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:5:11 - error TS2339: Property 'isOrganizer' does not exist on type 'AuthValue | undefined'.
+
+5   const { isOrganizer } = useContext(AuthContext)
+            ~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:5</code></pre>
+                </div>
+                <p>The message is precise: "does not exist on type <code>AuthValue | undefined</code>" means "this might be <code>undefined</code>, and <code>undefined</code> has no <code>isOrganizer</code>". You could write <code>useContext(AuthContext)?.isOrganizer</code> in every component, but then every component decides on its own what "no provider" means. Instead, check once, in a custom Hook:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/auth/AuthContext.ts</div>
+                    <pre data-src="shoreline-hq/src/auth/AuthContext.ts" data-match="excerpt"><code class="language-ts">/** The sign-in state. Only works inside &lt;AuthProvider&gt;. */
+export function useAuth(): AuthValue {
+  const auth = useContext(AuthContext)
+  if (auth === undefined) {
+    throw new Error('useAuth() must be used inside &lt;AuthProvider&gt;')
+  }
+  return auth
+}</code></pre>
+                </div>
+                <ul>
+                    <li><code>useAuth()</code> is a custom Hook (Lesson 4.2): its name starts with <code>use</code> and it calls <code>useContext</code>.</li>
+                    <li>The <code>if</code> narrows. After it, <code>auth</code> is <code>AuthValue</code>, so the declared return type <code>AuthValue</code> holds and every caller gets a value with no <code>undefined</code> in it.</li>
+                    <li>A missing provider is now a loud error with a message that says exactly what to fix. Measured with the provider removed from <code>App.tsx</code> (Common Mistakes): the page went blank and the console showed "useAuth() must be used inside &lt;AuthProvider&gt;".</li>
+                </ul>
+                <div class="card card-success">
+                    <h4>✅ The pattern, in one sentence</h4>
+                    <p>Type the context as <code>Value | undefined</code> with <code>undefined</code> as the default, never export a way to read it without the check, and give callers one Hook that throws outside the provider and returns <code>Value</code>. Errors that point at the cause are a gift: this one turns an afternoon of "why am I always signed out?" into one line in the console.</p>
+                </div>
+            </section>
+
+            <section id="sessions" class="lesson-section">
+                <h2>🗄️ Where a Sign-in Lives</h2>
+                <p>Signing in to shoreline-api is one request: <code>POST /api/auth/sign-in</code> with an email and password. The answer is a <code>SignInResponse</code> from the API's types: a <code>token</code> (an opaque string such as <code>st_…</code>) and the <code>user</code> (id, name, email and <code>role</code>, <code>'organizer' | 'volunteer'</code>). Every later request proves who is asking by sending the token in a header: <code>Authorization: Bearer st_…</code>. The API keeps its sessions in memory, so a restarted API has forgotten every token.</p>
+                <p>The app has to remember that answer somewhere. Until Lesson 6.1, every header link reloads the whole page, so a session kept only in React state would be lost on every click. The choices:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Where</th><th>Survives a reload</th><th>Shared with other tabs</th><th>Readable by the page's JavaScript</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>React state only (memory)</td><td>No</td><td>No</td><td>Yes</td></tr>
+                            <tr><td><code>sessionStorage</code> (the HQ's choice)</td><td>Yes</td><td>No: each tab has its own, gone when the tab closes</td><td>Yes</td></tr>
+                            <tr><td><code>localStorage</code></td><td>Yes</td><td>Yes, and kept for weeks</td><td>Yes</td></tr>
+                            <tr><td>An <code>HttpOnly</code> cookie set by the server</td><td>Yes</td><td>Yes</td><td>No</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The HQ keeps the session in <code>sessionStorage</code> under the key <code>shoreline-hq-session</code>: it survives the reloads this app still has, and it ends when the organizer closes the tab, which suits a shared laptop at a sign-in table. Measured in the project: after signing in, a reload kept Maya signed in, and a second tab opened on the same app showed <strong>Sign in</strong>.</p>
+                <div class="card card-danger">
+                    <h4>🛑 What the token is, and what it is not</h4>
+                    <ul>
+                        <li><strong>Anything a page's JavaScript can read, a malicious script on that page could read too.</strong> That includes React state and both storages. The defense is not hiding the token better; it is not letting foreign scripts run (React escapes text you render, and Lesson 10.2's host settings help). Teams that control their own server often prefer an <code>HttpOnly</code> cookie, which scripts cannot read at all. shoreline-api uses bearer tokens because the React Native course's phone app needs them too.</li>
+                        <li><strong>Never put a token in code, in a URL, or in a log.</strong> URLs end up in browser history and server logs. The HQ never prints the token anywhere, and neither does this page.</li>
+                        <li><strong>Hiding a button is not security.</strong> Today the HQ hides drafts and the Cancel button from volunteers, but the API is what enforces the rules. Measured: with a volunteer's token, <code>GET /api/events/e17/signups</code> answered 403 with "Only organizers can do that." The front end only decides what is <em>convenient</em> to show.</li>
+                    </ul>
+                </div>
+                <p>Data from storage is outside data, so the HQ treats it like an API answer (Lesson 2.4): <code>readSession()</code> parses it as <code>unknown</code> and checks it with a type guard before trusting it. A session someone edited by hand in DevTools, or one saved by an older version of the app, becomes <code>null</code> instead of a crash.</p>
+            </section>
+
+            <section id="who-asks" class="lesson-section">
+                <h2>🙋 Who Asks Is Part of the Question</h2>
+                <p>Here is the part that is easy to miss. <code>GET /api/events</code> answers 15 cleanups to a guest and 17 to an organizer, because drafts are only for organizers. The same URL, a different answer, depending on the token. So the signed-in person is part of what a request means, and anything that remembers answers has to remember them per person:</p>
+                <ul>
+                    <li><strong><code>useApi</code></strong> loads again when its <code>key</code> changes (Lesson 4.2). Today it also reads the context and adds the person to its dependencies: <code>[key, viewer, attempt]</code>. Measured: when Maya signed out on the events page, the page asked for <code>/events?perPage=50</code> and <code>/sites</code> again, without a token, and the drafts disappeared with no reload.</li>
+                    <li><strong><code>eventPromises.ts</code></strong> caches one promise per cleanup (Lesson 4.4). A guest's cached 404 for a draft must not be served to the organizer who signs in next, so the cache key becomes viewer plus id. Measured: on the Harbor Kayak Cleanup page (a draft), signing out turned the page into "Cleanup not found" on the spot.</li>
+                </ul>
+                <p>You will meet the same idea in Lesson 7.1, where TanStack Query's cache keys play the role of <code>useApi</code>'s key.</p>
+                <p>A word on how often things render. When the session changes, every component that calls <code>useAuth()</code> renders again, and so does every component <code>useApi</code> runs in. Sign-in and sign-out happen a few times a day, so that is fine. A context whose value changes on every keystroke would be a different story: Lesson 5.3 measures what context changes cost and when it is worth caring.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Forgetting the provider</h4>
+                    <p>Remove <code>&lt;AuthProvider&gt;</code> from <code>App.tsx</code> and everything still compiles: TypeScript cannot see which components end up inside which provider at run time. Measured on the dev server: the page was blank (the <code>#root</code> element was empty), and the console's error was the one <code>useAuth()</code> throws: "useAuth() must be used inside &lt;AuthProvider&gt;". <code>UserMenu</code> in the header threw while rendering, and the header sits outside the app's error boundary, so React removed the whole app (Lesson 4.4). A blank page plus that message means one thing: put the provider back around everything that reads the context.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ The context, the Hook and the provider in one .tsx file</h4>
+                    <p>Putting all three in <code>AuthProvider.tsx</code> feels tidy, and it type-checks. The linter disagrees:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ╭─[src/auth/AuthProvider.tsx:20:17]
+ 19 │ /** The sign-in state. Only works inside &lt;AuthProvider&gt;. */
+ 20 │ export function useAuth(): AuthValue {
+    ·                 ───────
+ 21 │   const auth = useContext(AuthContext)
+    ╰────
+
+  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Move your React context(s) to a separate file.
+    ╭─[src/auth/AuthProvider.tsx:17:14]
+ 16 │ // undefined is the value outside an AuthProvider: a mistake that useAuth() reports at once
+ 17 │ export const AuthContext = createContext&lt;AuthValue | undefined&gt;(undefined)
+    ·              ───────────
+ 18 │
+    ╰────
+
+Found 2 warnings and 0 errors.
+Finished in 15ms on 46 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>Vite's Fast Refresh (the dev server's update-in-place after you save) can only keep a component's state if its file exports components and nothing else. That is why the project has <code>AuthContext.ts</code> (the context, the type and <code>useAuth</code>, no JSX) and <code>AuthProvider.tsx</code> (the component).</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Context for everything</h4>
+                    <p>Once context works, it is tempting to put every shared value in one. But a component that reads a context depends on whatever provider happens to be above it, which you cannot see in its props. Keep context for values needed far and wide. In today's project, <code>EventGroups</code> sits directly under <code>EventsPage</code>, so it gets <code>showDrafts</code> as a plain prop; <code>EventCard</code>, three levels down, reads <code>useAuth()</code>.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Sign-in for the HQ</h2>
+                <p>At the end of this project, organizers sign in at <code>/sign-in</code> with shoreline-api's sample accounts (password <code>shoreline-demo</code> for all of them; Maya Okafor, <code>maya.okafor@example.com</code>, is an organizer, Theo Nakamura, <code>theo.nakamura@example.com</code>, a volunteer). The header shows who is signed in, with a <strong>Sign out</strong> button. Organizers see drafts, the <strong>Plan a cleanup</strong> link and the <strong>Cancel cleanup</strong> buttons; everyone else does not. And the check-in desk on today's cleanup loads the real roster, so <code>src/data/sampleRoster.ts</code> goes away.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>). Delete <code>src/Scratch.tsx</code> and the line you added to <code>CurrentPage</code> when you are done experimenting.</p>
+                <div class="mermaid">
+graph TD
+    A["SignInPage: signIn()"] --> B["POST /api/auth/sign-in"]
+    B --> C["AuthProvider saves session"]
+    C --> D["Every useAuth() renders"]
+    D --> E["useApi asks again"]
+</div>
+
+                <div class="card">
+                    <h3>Step 1: Teach the API client about sessions <span class="step-time">(16 min)</span></h3>
+                    <p>Everything that talks to shoreline-api lives in <code>src/api/client.ts</code>, so the session and the token header go there too. First the comment and the types it needs from the API's contract:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts">-// Shoreline Crew HQ's API client (Lessons 2.4 and 4.1).
++// Shoreline Crew HQ's API client (Lessons 2.4, 4.1 and 5.2).
+ // Data from the API is unknown until a check proves its shape.
+ import type {
+   ApiErrorBody,
+   CleanupEvent,
+   CleanupEventDetail,
+   ErrorCode,
+   EventStatus,
+   PageInfo,
++  Role,
++  RosterEntry,
++  SignInRequest,
++  SignInResponse,
++  Signup,
++  SignupStatus,
+   Site,
++  Skill,
+   Terrain,
++  User,
+ } from './types.ts'</code></pre>
+                    </div>
+                    <p>Then three new checks, after <code>isListOf</code> and before <code>isApiErrorBody</code>. They follow Lesson 2.4's recipe: a list of allowed values for each union, then one <code>typeof</code> test per property.</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">const roles: Role[] = ['organizer', 'volunteer']
+
+function isUser(value: unknown): value is User {
+  return (
+    isRecord(value) &amp;&amp;
+    typeof value.id === 'string' &amp;&amp;
+    typeof value.name === 'string' &amp;&amp;
+    typeof value.email === 'string' &amp;&amp;
+    roles.some((role) =&gt; role === value.role)
+  )
+}
+
+function isSignInResponse(value: unknown): value is SignInResponse {
+  return isRecord(value) &amp;&amp; typeof value.token === 'string' &amp;&amp; isUser(value.user)
+}
+
+const signupStatuses: SignupStatus[] = ['confirmed', 'waitlisted', 'cancelled', 'attended', 'no-show']
+const signupTextFields: (keyof Signup)[] = ['id', 'eventId', 'volunteerId', 'note', 'createdAt']
+const skills: Skill[] = [
+  'first-aid', 'boat-handling', 'heavy-lifting', 'photography', 'data-recording', 'team-lead',
+]
+
+/** One row of GET /api/events/:id/signups: a sign-up and the volunteer's contact details */
+function isRosterEntry(value: unknown): value is RosterEntry {
+  return (
+    isRecord(value) &amp;&amp;
+    signupTextFields.every((key) =&gt; typeof value[key] === 'string') &amp;&amp;
+    signupStatuses.some((status) =&gt; status === value.status) &amp;&amp;
+    (value.checkedInAt === null || typeof value.checkedInAt === 'string') &amp;&amp;
+    isRecord(value.volunteer) &amp;&amp;
+    typeof value.volunteer.id === 'string' &amp;&amp;
+    typeof value.volunteer.name === 'string' &amp;&amp;
+    typeof value.volunteer.email === 'string' &amp;&amp;
+    (value.volunteer.phone === null || typeof value.volunteer.phone === 'string') &amp;&amp;
+    Array.isArray(value.volunteer.skills) &amp;&amp;
+    value.volunteer.skills.every((skill) =&gt; skills.some((known) =&gt; known === skill))
+  )
+}</code></pre>
+                    </div>
+                    <p><code>isSignInResponse</code> checks the sign-in answer (and, below, what comes back out of storage). <code>isRosterEntry</code> checks one roster row, including the volunteer's contact details, which the HQ will not show but the type promises. After <code>Array.isArray</code>, TypeScript only knows <code>any[]</code> (Lesson 2.4), so the skills are checked one by one against the list.</p>
+                    <p>A 401 now means something specific to people, so <code>describeError</code> says it in words:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts"> export function describeError(error: unknown): string {
++  if (error instanceof ApiError &amp;&amp; error.status === 401) {
++    return 'Your sign-in has ended. Sign out, then sign in again.'
++  }
+   if (error instanceof ApiError) {</code></pre>
+                    </div>
+                    <p>Next, a new section for the session, between the errors and "talking to the API":</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">// ---------------------------------------------------------------- the session
+
+/** A signed-in organizer or volunteer: the API's token, and who it belongs to */
+export type Session = SignInResponse
+
+// sessionStorage: kept when the page reloads, gone when the tab closes, never shared with other tabs
+const sessionKey = 'shoreline-hq-session'
+
+/** The saved session, or null when nobody is signed in (or what is saved is not a session) */
+export function readSession(): Session | null {
+  const saved = sessionStorage.getItem(sessionKey)
+  if (saved === null) return null
+  try {
+    const value: unknown = JSON.parse(saved)
+    return isSignInResponse(value) ? value : null
+  } catch {
+    return null
+  }
+}
+
+export function saveSession(session: Session | null): void {
+  if (session === null) {
+    sessionStorage.removeItem(sessionKey)
+  } else {
+    sessionStorage.setItem(sessionKey, JSON.stringify(session))
+  }
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>Session</code> is a type alias for the API's <code>SignInResponse</code>: a name that says what the app uses it for.</li>
+                        <li><code>readSession()</code> never trusts storage: <code>JSON.parse</code> can throw on garbage, and parsed data is <code>unknown</code> until <code>isSignInResponse</code> says otherwise. <code>catch</code> without a variable is fine when you do not need the error.</li>
+                        <li><code>saveSession(null)</code> removes the key, so "signed out" leaves nothing behind.</li>
+                    </ul>
+                    <p>At the very end of the file, the three new requests:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">/** Today's roster for one cleanup (organizers only: it has contact details) */
+export function getRoster(eventId: string, signal?: AbortSignal): Promise&lt;RosterEntry[]&gt; {
+  return getJSON(`/events/${encodeURIComponent(eventId)}/signups`, isListOf(isRosterEntry), signal)
+}
+
+/** POST /api/auth/sign-in. A wrong email or password is an ApiError with status 401. */
+export async function postSignIn(credentials: SignInRequest): Promise&lt;Session&gt; {
+  const response = await request('/auth/sign-in', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  })
+  const data: unknown = await response.json()
+  if (!isSignInResponse(data)) {
+    throw new Error('Unexpected data from POST /api/auth/sign-in')
+  }
+  return data
+}
+
+/** POST /api/auth/sign-out: the API forgets the token */
+export async function postSignOut(): Promise&lt;void&gt; {
+  await request('/auth/sign-out', { method: 'POST' })
+}</code></pre>
+                    </div>
+                    <p><code>getRoster</code> reuses <code>getJSON</code> and <code>isListOf</code> exactly like <code>getSites</code>. The two sign-in requests are the first in the HQ that are not a plain GET, so <code>request</code> must accept more than a signal. Change it to take a <code>RequestInit</code>, the type of <code>fetch</code>'s own second argument (method, headers, body, signal and more), and to add the token:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts">-/** GET a path under /api. Throws ApiError when the API answers with an error status. */
+-async function request(path: string, signal?: AbortSignal): Promise&lt;Response&gt; {
+-  const response = await fetch(`${apiBaseUrl()}/api${path}`, { signal })
++/** Send a request to a path under /api, signed in if there is a session. Throws ApiError on an error status. */
++async function request(path: string, init: RequestInit = {}): Promise&lt;Response&gt; {
++  const headers = new Headers(init.headers)
++  const session = readSession()
++  if (session !== null) {
++    headers.set('Authorization', `Bearer ${session.token}`)
++  }
++  const response = await fetch(`${apiBaseUrl()}/api${path}`, { ...init, headers })
+   if (!response.ok) {</code></pre>
+                    </div>
+                    <p><code>new Headers(init.headers)</code> copies whatever headers the caller passed (such as <code>Content-Type</code>), so adding <code>Authorization</code> never loses them. Now let the compiler find the callers you broke, as in Lesson 4.1:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>src/api/client.ts:217:40 - error TS2345: Argument of type 'AbortSignal | undefined' is not assignable to parameter of type 'RequestInit | undefined'.
+  Type 'AbortSignal' has no properties in common with type 'RequestInit'.
+
+217   const response = await request(path, signal)
+                                           ~~~~~~
+
+src/api/client.ts:246:40 - error TS2345: Argument of type 'AbortSignal | undefined' is not assignable to parameter of type 'RequestInit | undefined'.
+  Type 'AbortSignal' has no properties in common with type 'RequestInit'.
+
+246   const response = await request(path, signal)
+                                           ~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/api/client.ts:217</code></pre>
+                    </div>
+                    <p>"No properties in common" is TypeScript's check for options objects: every property of <code>RequestInit</code> is optional, but an <code>AbortSignal</code> shares none of them, so it cannot be meant as one. Wrap the signal in an object at both places:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts">-  const response = await request(path, signal)
++  const response = await request(path, { signal })
+   return response.json()</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts">-  const response = await request(path, signal)
++  const response = await request(path, { signal })
+   const items: unknown = await response.json()</code></pre>
+                    </div>
+                    <p><code>npx tsc -b</code> is quiet again. Nothing has changed on screen yet: nobody can sign in so far.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The context and its provider <span class="step-time">(10 min)</span></h3>
+                    <p>Create the folder <code>src/auth/</code> and, in it, <code>AuthContext.ts</code> (a <code>.ts</code> file: it has no JSX):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/auth/AuthContext.ts</div>
+                        <pre data-src="shoreline-hq/src/auth/AuthContext.ts"><code class="language-ts">import { createContext, useContext } from 'react'
+import type { Session } from '../api/client.ts'
+import type { SignInRequest } from '../api/types.ts'
+
+/** What every component can ask about sign-in, wherever it sits in the tree */
+export interface AuthValue {
+  /** null while nobody is signed in */
+  session: Session | null
+  /** true when an organizer is signed in */
+  isOrganizer: boolean
+  /** Throws ApiError (401) when the email or password is wrong */
+  signIn: (credentials: SignInRequest) =&gt; Promise&lt;void&gt;
+  signOut: () =&gt; void
+}
+
+// undefined is the value outside an AuthProvider: a mistake that useAuth() reports at once
+export const AuthContext = createContext&lt;AuthValue | undefined&gt;(undefined)
+
+/** The sign-in state. Only works inside &lt;AuthProvider&gt;. */
+export function useAuth(): AuthValue {
+  const auth = useContext(AuthContext)
+  if (auth === undefined) {
+    throw new Error('useAuth() must be used inside &lt;AuthProvider&gt;')
+  }
+  return auth
+}</code></pre>
+                    </div>
+                    <p><code>AuthValue</code> is the contract every component gets: the session (or <code>null</code>), a ready-made <code>isOrganizer</code> so nobody repeats the role check, and the two actions. <code>signIn</code> returns a <code>Promise&lt;void&gt;</code> that rejects with the API's error, so the form can show it. Then <code>src/auth/AuthProvider.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/auth/AuthProvider.tsx</div>
+                        <pre data-src="shoreline-hq/src/auth/AuthProvider.tsx"><code class="language-tsx">import { useState, type ReactNode } from 'react'
+import { postSignIn, postSignOut, readSession, saveSession, type Session } from '../api/client.ts'
+import type { SignInRequest } from '../api/types.ts'
+import { AuthContext } from './AuthContext.ts'
+
+interface AuthProviderProps {
+  children: ReactNode
+}
+
+// Owns the session: the only place that changes it, for React and for the saved copy
+export function AuthProvider({ children }: AuthProviderProps) {
+  // Start from the saved session, so a page reload keeps you signed in
+  const [session, setSession] = useState&lt;Session | null&gt;(readSession)
+  const isOrganizer = session?.user.role === 'organizer'
+
+  async function signIn(credentials: SignInRequest) {
+    const next = await postSignIn(credentials)
+    saveSession(next)
+    setSession(next)
+  }
+
+  function signOut() {
+    // The request takes the token with it as it starts; then this tab forgets the session
+    postSignOut().catch((error: unknown) =&gt; console.error(error))
+    saveSession(null)
+    setSession(null)
+  }
+
+  return &lt;AuthContext value={{ session, isOrganizer, signIn, signOut }}&gt;{children}&lt;/AuthContext&gt;
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>useState&lt;Session | null&gt;(readSession)</code> passes the function itself, not its result: React calls it once, on the first render, to restore a saved sign-in (the same lazy start you met with <code>useReducer</code>).</li>
+                        <li><strong>One writer.</strong> Only <code>signIn</code> and <code>signOut</code> change the session, and each changes both copies together: <code>sessionStorage</code> (for reloads and for <code>request</code>) and React state (for rendering). Components never touch storage.</li>
+                        <li><strong>Signing out always works here, whatever the API says.</strong> <code>postSignOut()</code> reads the token as it starts, so the request still carries it even though the next line clears the session. If it fails (the API is down, or already forgot the token), the error is logged and the person is signed out anyway.</li>
+                        <li><code>value={{ session, isOrganizer, signIn, signOut }}</code> builds a new object on every render of <code>AuthProvider</code>. It only renders when the session changes, so that is fine here; Lesson 5.3 measures when it is not.</li>
+                    </ul>
+                    <p>Finally, put the provider around the whole app in <code>src/App.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx">+import { AuthProvider } from './auth/AuthProvider.tsx'
+ import { AppLayout } from './components/AppLayout.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx"> export function App() {
+   return (
+-    &lt;AppLayout&gt;
+-      &lt;ErrorBoundary fallback={PageCrashed}&gt;
+-        &lt;CurrentPage /&gt;
+-      &lt;/ErrorBoundary&gt;
+-    &lt;/AppLayout&gt;
++    &lt;AuthProvider&gt;
++      &lt;AppLayout&gt;
++        &lt;ErrorBoundary fallback={PageCrashed}&gt;
++          &lt;CurrentPage /&gt;
++        &lt;/ErrorBoundary&gt;
++      &lt;/AppLayout&gt;
++    &lt;/AuthProvider&gt;
+   )
+ }</code></pre>
+                    </div>
+                    <p>The provider sits outside <code>AppLayout</code> because the header needs it, and outside the error boundary so that a crashed page cannot take the sign-in with it. This is a good moment for the <a href="#undefined">undefined trap experiment</a> with <code>src/Scratch.tsx</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: The sign-in page and the header <span class="step-time">(18 min)</span></h3>
+                    <p>Create <code>src/pages/SignInPage.tsx</code>. It uses Lesson 3.5's form action pattern, with an <code>async</code> action this time:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/SignInPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/SignInPage.tsx"><code class="language-tsx">import { useActionState, useEffect, useRef } from 'react'
+import { ApiError, describeError } from '../api/client.ts'
+import type { User } from '../api/types.ts'
+import { useAuth } from '../auth/AuthContext.ts'
+import buttonStyles from '../components/Button.module.css'
+import { FieldError } from '../components/FieldError.tsx'
+import formStyles from '../components/Form.module.css'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import styles from './Page.module.css'
+
+// What the form keeps between tries: the email (never the password) and what went wrong
+interface SignInState {
+  email: string
+  fieldErrors: Record&lt;string, string[]&gt;
+  message: string
+}
+
+const initialState: SignInState = { email: '', fieldErrors: {}, message: '' }
+
+interface SignedInProps {
+  user: User
+}
+
+// Shown instead of the form once someone is signed in
+function SignedIn({ user }: SignedInProps) {
+  const headingRef = useRef&lt;HTMLHeadingElement&gt;(null)
+
+  // The form (and the button that had the focus) is gone: start reading from the new heading
+  useEffect(() =&gt; {
+    headingRef.current?.focus()
+  }, [])
+
+  return (
+    &lt;&gt;
+      &lt;h1 ref={headingRef} tabIndex={-1}&gt;
+        Signed in
+      &lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;
+        Welcome, {user.name}. You are signed in as {user.email}.
+      &lt;/p&gt;
+      &lt;p&gt;
+        &lt;a href="/events"&gt;Go to the cleanups&lt;/a&gt;
+      &lt;/p&gt;
+    &lt;/&gt;
+  )
+}
+
+export function SignInPage() {
+  const { session, signIn } = useAuth()
+  useDocumentTitle('Sign in')
+
+  async function signInAction(_previous: SignInState, formData: FormData): Promise&lt;SignInState&gt; {
+    const email = formData.get('email')
+    const password = formData.get('password')
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return { ...initialState, message: 'The form is missing a field.' }
+    }
+    try {
+      await signIn({ email, password })
+      return initialState
+    } catch (error: unknown) {
+      // The API's answers are written for people: "Enter your password.", "Email or password is incorrect."
+      if (error instanceof ApiError &amp;&amp; error.fieldErrors !== undefined) {
+        return { email, fieldErrors: error.fieldErrors, message: '' }
+      }
+      if (error instanceof ApiError &amp;&amp; error.status === 401) {
+        return { email, fieldErrors: {}, message: error.message }
+      }
+      console.error(error)
+      return { email, fieldErrors: {}, message: describeError(error) }
+    }
+  }
+
+  const [state, formAction, isPending] = useActionState(signInAction, initialState)
+
+  if (session !== null) {
+    return &lt;SignedIn user={session.user} /&gt;
+  }
+
+  const { fieldErrors } = state
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Sign in&lt;/h1&gt;
+      &lt;p className={styles.lead}&gt;Organizers sign in to see drafts and today's check-in desk.&lt;/p&gt;
+      &lt;form action={formAction} noValidate className={formStyles.form}&gt;
+        &lt;p role="alert" className={formStyles.status}&gt;
+          {state.message}
+        &lt;/p&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="email"&gt;Email&lt;/label&gt;
+          &lt;input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="username"
+            defaultValue={state.email}
+            aria-invalid={fieldErrors.email !== undefined}
+            aria-describedby={fieldErrors.email &amp;&amp; 'email-error'}
+          /&gt;
+          &lt;FieldError id="email-error" messages={fieldErrors.email} /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="password"&gt;Password&lt;/label&gt;
+          &lt;input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            aria-invalid={fieldErrors.password !== undefined}
+            aria-describedby={fieldErrors.password &amp;&amp; 'password-error'}
+          /&gt;
+          &lt;FieldError id="password-error" messages={fieldErrors.password} /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.actions}&gt;
+          &lt;button type="submit" className={buttonStyles.primary} disabled={isPending}&gt;
+            {isPending ? 'Signing in…' : 'Sign in'}
+          &lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/form&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong>The page reads the context twice over:</strong> <code>signIn</code> to send the form, and <code>session</code> to decide what to draw. When <code>signIn</code> succeeds, the provider's state changes, this page renders again with a session, and the early return shows <code>SignedIn</code>. Nothing passes "it worked" back by hand. (Lesson 6.3 replaces this with a redirect to wherever you were going.)</li>
+                        <li><strong>The action keeps the email but never the password.</strong> React resets the form after every action (Lesson 3.5); the email field gets it back through <code>defaultValue</code>, the password field has no <code>defaultValue</code>, so a password is never stored in state.</li>
+                        <li><strong>Errors in the API's words.</strong> An empty field comes back as a 400 with <code>fieldErrors</code> (shown under each field with Lesson 3.5's <code>FieldError</code>); a wrong password is a 401 with "Email or password is incorrect.". Anything else goes through <code>describeError</code>. <code>fieldErrors.email</code> is <code>string[] | undefined</code> thanks to <code>noUncheckedIndexedAccess</code>, which is exactly what <code>FieldError</code> takes.</li>
+                        <li><code>autoComplete="username"</code> and <code>"current-password"</code> let password managers fill the form.</li>
+                        <li><strong>Focus.</strong> After signing in, the form (and the button you pressed) disappears, so <code>SignedIn</code> moves the focus to its heading. <code>tabIndex={-1}</code> makes a heading focusable from code without adding it to the <kbd>Tab</kbd> order (Lesson 4.3).</li>
+                    </ul>
+                    <p>Next, the header's corner. Create <code>src/components/UserMenu.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/UserMenu.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/UserMenu.tsx"><code class="language-tsx">import type { Role } from '../api/types.ts'
+import { useAuth } from '../auth/AuthContext.ts'
+import styles from './UserMenu.module.css'
+
+const roleLabels: Record&lt;Role, string&gt; = {
+  organizer: 'Organizer',
+  volunteer: 'Volunteer',
+}
+
+// The header's corner: who is signed in, or a way to sign in
+export function UserMenu() {
+  const { session, signOut } = useAuth()
+
+  if (session === null) {
+    return (
+      &lt;a className={styles.link} href="/sign-in"&gt;
+        Sign in
+      &lt;/a&gt;
+    )
+  }
+  return (
+    &lt;div className={styles.menu}&gt;
+      &lt;span&gt;
+        {session.user.name} ({roleLabels[session.user.role]})
+      &lt;/span&gt;
+      &lt;button type="button" className={styles.signOut} onClick={signOut}&gt;
+        Sign out
+      &lt;/button&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>After <code>if (session === null) return …</code>, TypeScript has narrowed <code>session</code> to <code>Session</code>, so <code>session.user.name</code> needs no <code>?.</code>. The role labels are a <code>Record&lt;Role, string&gt;</code>, exhaustive like <code>StatusBadge</code>'s table. Its styles, <code>src/components/UserMenu.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/UserMenu.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/UserMenu.module.css"><code class="language-css">/* Light text on the header's Deep Tide */
+.menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.link {
+  color: var(--white);
+  font-weight: 600;
+}
+
+.signOut {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--white);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  cursor: pointer;
+}</code></pre>
+                    </div>
+                    <p>Put the menu in <code>src/components/Header.tsx</code>, after the navigation:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Header.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Header.tsx" data-match="diff"><code class="language-diff-tsx"> import styles from './Header.module.css'
++import { UserMenu } from './UserMenu.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Header.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Header.tsx" data-match="diff"><code class="language-diff-tsx">       &lt;/nav&gt;
++      &lt;UserMenu /&gt;
+     &lt;/header&gt;</code></pre>
+                    </div>
+                    <p><code>Header</code> got no new props: <code>UserMenu</code> reads the context itself. Last, give the page an address in <code>App.tsx</code>'s <code>CurrentPage</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx"> import { NewEventPage } from './pages/NewEventPage.tsx'
++import { SignInPage } from './pages/SignInPage.tsx'
+ import { SitesPage } from './pages/SitesPage.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx">   if (path === '/sites') {
+     return &lt;SitesPage /&gt;
+   }
++  if (path === '/sign-in') {
++    return &lt;SignInPage /&gt;
++  }
+   return &lt;HomePage /&gt;</code></pre>
+                    </div>
+                    <p>Open <code>http://localhost:5173/sign-in</code> and try three things, as measured on the dev server and the build: <strong>Sign in</strong> with both fields empty shows "Enter an email address." and "Enter your password." under the fields; a wrong password shows "Email or password is incorrect." and keeps the email; the right password shows "Signed in", "Welcome, Maya Okafor. You are signed in as maya.okafor@example.com.", moves the focus to that heading, and the header changes to "Maya Okafor (Organizer)" with a <strong>Sign out</strong> button, all without a reload.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_18/18-sign-in-wrong.png" alt="The Sign in page of Shoreline Crew HQ. Under the heading, a message with a blue bar on its left says Email or password is incorrect. The Email field still holds maya.okafor@example.com; the Password field is empty. A Sign in button is below. The header shows a Sign in link at the right." width="1100" height="688" loading="lazy">
+                        <figcaption>A wrong password: the API's own message, the email kept, the password gone. The header's <strong>Sign in</strong> link comes from <code>UserMenu</code>, which reads the context.</figcaption>
+                    </figure>
+                    <p>Want to see what was saved? In the browser's DevTools, the <strong>Application</strong> tab (Chrome and Edge) or <strong>Storage</strong> tab (Firefox) lists Session Storage for <code>http://localhost:5173</code>: one key, <code>shoreline-hq-session</code>, holding <code>{"token":"st_…","user":{…}}</code>. That is your own sign-in in your own browser; do not paste the token anywhere.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Data that depends on who asks <span class="step-time">(10 min)</span></h3>
+                    <p>Sign in and follow <strong>Go to the cleanups</strong>: the two drafts are already there, because the page loaded after you signed in and every request carries the token (Step 1). Now press <strong>Sign out</strong> in the header. Measured: Maya's name went away, but Harbor Kayak Cleanup stayed on the page until a reload. The page has no reason to ask again. Teach <code>useApi</code> that the person is part of every request, in <code>src/hooks/useApi.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/hooks/useApi.ts</div>
+                        <pre data-src="shoreline-hq/src/hooks/useApi.ts" data-match="diff"><code class="language-diff-ts"> import { describeError } from '../api/client.ts'
++import { useAuth } from '../auth/AuthContext.ts'
+ import type { LoadState } from '../utils/loadState.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/hooks/useApi.ts</div>
+                        <pre data-src="shoreline-hq/src/hooks/useApi.ts" data-match="diff"><code class="language-diff-ts"> /**
+- * Loads data when the component appears, and again whenever `key` changes.
++ * Loads data when the component appears, and again whenever `key` or the signed-in person changes.</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/hooks/useApi.ts</div>
+                        <pre data-src="shoreline-hq/src/hooks/useApi.ts" data-match="diff"><code class="language-diff-ts">   const [attempt, setAttempt] = useState(0)
++  // Who asks is part of the question: signing in or out loads the data again
++  const viewer = useAuth().session?.user.id ?? 'guest'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/hooks/useApi.ts</div>
+                        <pre data-src="shoreline-hq/src/hooks/useApi.ts" data-match="diff"><code class="language-diff-ts">-  }, [key, attempt])
++  }, [key, viewer, attempt])</code></pre>
+                    </div>
+                    <p>A custom Hook may call other Hooks, including <code>useAuth()</code>; every page that uses <code>useApi</code> now follows sign-in and sign-out without a single change. The effect does not read <code>viewer</code>; it is listed only so that a new person means a new request, and oxlint accepts that.</p>
+                    <p>The event page's promise cache needs the same idea. Replace <code>src/api/eventPromises.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/eventPromises.ts</div>
+                        <pre data-src="shoreline-hq/src/api/eventPromises.ts"><code class="language-ts">// One promise per cleanup and viewer, kept for as long as the page is open (Lessons 4.4 and 5.2).
+// use() needs the SAME promise on every render; a new one each time would start over.
+// Temporary: TanStack Query keeps a cache like this for every request in Lesson 7.1.
+import { getEvent } from './client.ts'
+import type { CleanupEventDetail } from './types.ts'
+
+const saved = new Map&lt;string, Promise&lt;CleanupEventDetail&gt;&gt;()
+
+// An organizer gets more than a guest (drafts, the check-in code), so each viewer has their own copy
+function cacheKey(id: string, viewer: string): string {
+  return `${viewer}/${id}`
+}
+
+/** The cleanup with this id, as this viewer sees it: the first call starts the request */
+export function eventPromise(id: string, viewer: string): Promise&lt;CleanupEventDetail&gt; {
+  const key = cacheKey(id, viewer)
+  let promise = saved.get(key)
+  if (promise === undefined) {
+    promise = getEvent(id)
+    saved.set(key, promise)
+  }
+  return promise
+}
+
+/** Forget a saved promise (after an error), so the next eventPromise() asks the API again */
+export function forgetEvent(id: string, viewer: string): void {
+  saved.delete(cacheKey(id, viewer))
+}</code></pre>
+                    </div>
+                    <p>Now <code>npx tsc -b</code> points at <code>EventPage.tsx</code>, which calls both functions with one argument; Step 5 rewrites that page. First, the organizer-only parts of the events list. In <code>src/pages/EventsPage.tsx</code>, the page reads the context and hands the answer to its direct child as a prop:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx"> import type { CleanupEvent, Site } from '../api/types.ts'
++import { useAuth } from '../auth/AuthContext.ts'
+ import { EventFilters, type StatusFilter } from '../components/EventFilters.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">   filtering: boolean
++  /** Drafts only reach organizers, so only they get a Drafts list */
++  showDrafts: boolean
+ }</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">-function EventGroups({ events, sites, filtering }: EventGroupsProps) {
++function EventGroups({ events, sites, filtering, showDrafts }: EventGroupsProps) {</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">-      &lt;h2&gt;Drafts&lt;/h2&gt;
+-      &lt;EventList
+-        events={drafts}
+-        sites={sites}
+-        emptyMessage={filtering ? noMatches : 'No drafts waiting to be published.'}
+-      /&gt;
++      {showDrafts &amp;&amp; (
++        &lt;&gt;
++          &lt;h2&gt;Drafts&lt;/h2&gt;
++          &lt;EventList
++            events={drafts}
++            sites={sites}
++            emptyMessage={filtering ? noMatches : 'No drafts waiting to be published.'}
++          /&gt;
++        &lt;/&gt;
++      )}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx"> export function EventsPage() {
++  const { isOrganizer } = useAuth()
+   const [query, setQuery] = useState('')</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">       &lt;h1&gt;Cleanup events&lt;/h1&gt;
+-      &lt;p&gt;
+-        &lt;a href="/events/new"&gt;Plan a cleanup&lt;/a&gt;
+-      &lt;/p&gt;
++      {isOrganizer &amp;&amp; (
++        &lt;p&gt;
++          &lt;a href="/events/new"&gt;Plan a cleanup&lt;/a&gt;
++        &lt;/p&gt;
++      )}</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">           filtering={search !== '' || status !== 'all'}
++          showDrafts={isOrganizer}
+         /&gt;</code></pre>
+                    </div>
+                    <p>And <code>src/components/EventCard.tsx</code>, three levels down, asks the context itself instead of receiving a prop through <code>EventGroups</code> and <code>EventList</code>. The Cancel button and its note go to organizers only, and the note stops naming a lesson:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx"> import type { CleanupEvent, Site } from '../api/types.ts'
++import { useAuth } from '../auth/AuthContext.ts'
+ import { getAvailability } from '../utils/availability.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx"> export function EventCard({ event, site }: EventCardProps) {
++  const { isOrganizer } = useAuth()
++  const canCancel = isOrganizer &amp;&amp; event.status === 'scheduled'
+   const [showDetails, setShowDetails] = useState(false)</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx">-        {event.status === 'scheduled' &amp;&amp; (
++        {canCancel &amp;&amp; (
+           &lt;button</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx">-      {event.status === 'scheduled' &amp;&amp; (
++      {canCancel &amp;&amp; (
+         // Always in the page, so screen readers notice when the text appears
+         &lt;p role="status" className={styles.note}&gt;
+-          {readyToCancel &amp;&amp; 'Ready to cancel. Nothing is sent to shoreline-api yet (Lesson 7.2).'}
++          {readyToCancel &amp;&amp; 'Ready to cancel. Nothing is sent to shoreline-api yet.'}</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The event page and the live roster <span class="step-time">(10 min)</span></h3>
+                    <p>Three changes meet on the cleanup page: it passes the viewer to the promise cache, it shows the check-in desk only when it makes sense, and the desk's rows come from <code>GET /api/events/:id/signups</code> instead of the saved copy. There are enough of them to replace the whole of <code>src/pages/EventPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx"><code class="language-tsx">import { Suspense, use } from 'react'
+import { ApiError, describeError, getRoster } from '../api/client.ts'
+import { eventPromise, forgetEvent } from '../api/eventPromises.ts'
+import { useAuth } from '../auth/AuthContext.ts'
+import { CheckInDesk } from '../components/CheckInDesk.tsx'
+import { ErrorBoundary, type FallbackProps } from '../components/ErrorBoundary.tsx'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { SitePicture } from '../components/SitePicture.tsx'
+import { SpotsLine } from '../components/SpotsLine.tsx'
+import { StatusBadge } from '../components/StatusBadge.tsx'
+import { useApi } from '../hooks/useApi.ts'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import { getAvailability } from '../utils/availability.ts'
+import { formatDate, toDateString } from '../utils/format.ts'
+import styles from './EventPage.module.css'
+import pageStyles from './Page.module.css'
+
+// Read once, when the app starts: the pages reload whenever you follow a link
+const today = toDateString(new Date())
+
+interface EventPageProps {
+  eventId: string
+}
+
+interface EventDetailsProps {
+  eventId: string
+  viewer: string
+}
+
+// Today's roster from the API, loaded on its own, so the cleanup's details never wait for it
+function TodaysDesk({ eventId }: EventPageProps) {
+  const roster = useApi(`/events/${eventId}/signups`, (signal) =&gt; getRoster(eventId, signal))
+
+  if (roster.state.kind !== 'ready') {
+    return &lt;LoadStatus state={roster.state} what="today's roster" onRetry={roster.reload} /&gt;
+  }
+  // The desk is for the people with a spot (not the waiting list or cancellations)
+  const expected = roster.state.data.filter((entry) =&gt; entry.status === 'confirmed')
+  return &lt;CheckInDesk entries={expected} /&gt;
+}
+
+// Rendered only once the cleanup has arrived: until then, use() suspends
+function EventDetails({ eventId, viewer }: EventDetailsProps) {
+  const { isOrganizer } = useAuth()
+  const event = use(eventPromise(eventId, viewer))
+  useDocumentTitle(event.title)
+  const { site } = event
+  const checkInDay = isOrganizer &amp;&amp; event.status === 'scheduled' &amp;&amp; event.date === today
+
+  return (
+    &lt;article&gt;
+      &lt;h1&gt;{event.title}&lt;/h1&gt;
+      &lt;p className={styles.badges}&gt;
+        &lt;StatusBadge status={event.status} /&gt;
+      &lt;/p&gt;
+      &lt;p className={pageStyles.lead}&gt;
+        &lt;time dateTime={event.date}&gt;{formatDate(event.date)}&lt;/time&gt;, {event.startTime} to{' '}
+        {event.endTime}
+      &lt;/p&gt;
+      &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
+      &lt;p&gt;{event.description}&lt;/p&gt;
+      {event.suppliesProvided.length &gt; 0 &amp;&amp; (
+        &lt;p&gt;We bring: {event.suppliesProvided.join(', ')}.&lt;/p&gt;
+      )}
+      {checkInDay &amp;&amp; &lt;TodaysDesk eventId={event.id} /&gt;}
+      &lt;h2&gt;Where to meet&lt;/h2&gt;
+      &lt;p&gt;
+        {event.meetingPoint}, {site.name} ({site.town}).
+      &lt;/p&gt;
+      &lt;p&gt;Parking: {site.parking}&lt;/p&gt;
+      &lt;SitePicture image={site.image} /&gt;
+    &lt;/article&gt;
+  )
+}
+
+// What the error boundary shows instead of EventDetails
+function EventProblem({ error, retry }: FallbackProps) {
+  const notFound = error instanceof ApiError &amp;&amp; error.status === 404
+  useDocumentTitle(notFound ? 'Cleanup not found' : 'Cleanup')
+
+  if (notFound) {
+    return (
+      &lt;&gt;
+        &lt;h1&gt;Cleanup not found&lt;/h1&gt;
+        &lt;p&gt;There is no cleanup at this address. The link may be wrong, or the cleanup is not public.&lt;/p&gt;
+      &lt;/&gt;
+    )
+  }
+  return (
+    &lt;LoadStatus
+      state={{ kind: 'failed', message: describeError(error) }}
+      what="this cleanup"
+      onRetry={retry}
+    /&gt;
+  )
+}
+
+export function EventPage({ eventId }: EventPageProps) {
+  const { session } = useAuth()
+  const viewer = session?.user.id ?? 'guest'
+
+  return (
+    &lt;&gt;
+      &lt;p&gt;
+        &lt;a href="/events"&gt;← All cleanups&lt;/a&gt;
+      &lt;/p&gt;
+      &lt;ErrorBoundary fallback={EventProblem} onRetry={() =&gt; forgetEvent(eventId, viewer)}&gt;
+        &lt;Suspense fallback={&lt;LoadStatus state={{ kind: 'loading' }} what="the cleanup" /&gt;}&gt;
+          &lt;EventDetails eventId={eventId} viewer={viewer} /&gt;
+        &lt;/Suspense&gt;
+      &lt;/ErrorBoundary&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong>Which cleanups show the desk:</strong> <code>checkInDay</code> is true for an organizer, on a scheduled cleanup, on its own day. Check-in only happens on the day (the API's check-in request refuses any other day), and only organizers may read a roster. Today that is Tide Pool Morning Cleanup, as before.</li>
+                        <li><code>today</code> is read once, at module level: reading the clock while rendering is impure (oxlint's <code>react(purity)</code> rule, Lesson 3.1), and the HQ reloads on every link until Lesson 6.1.</li>
+                        <li><strong><code>TodaysDesk</code> loads the roster on its own,</strong> with <code>useApi</code>, below the details. The details appear as soon as the cleanup arrives; the desk shows "Loading today's roster…" (or an error with <strong>Try again</strong>) in its own place. It is only rendered for organizers, so guests never send a request the API would refuse (measured: no <code>/signups</code> request as a guest or as Theo).</li>
+                        <li><strong>The desk takes <code>RosterEntry[]</code> as it is.</strong> In Lesson 5.1, <code>RosterRow</code> picked only what the table reads. A real roster row has more fields, and TypeScript compares shapes, so <code>expected</code> fits <code>entries</code> without a conversion. The filter keeps the people with a spot (<code>'confirmed'</code>), not the waiting list or cancellations.</li>
+                        <li><code>EventPage</code> reads the session to build <code>viewer</code> and passes it down; <code>EventDetails</code> asks the context for <code>isOrganizer</code> itself. Both are fine: one level of props or a context read, whichever reads better.</li>
+                    </ul>
+                    <p>Now delete <code>src/data/sampleRoster.ts</code> and the empty <code>src/data/</code> folder (in VS Code: right-click, <strong>Delete</strong>). The saved copy did its job. Last, the desk's note in <code>src/components/CheckInDesk.tsx</code> no longer talks about a practice copy:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/CheckInDesk.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/CheckInDesk.tsx" data-match="diff"><code class="language-diff-tsx">       &lt;p className={styles.practice}&gt;
+-        Practice copy: these marks stay in this tab. Lesson 5.2 loads the real roster after sign-in, and
+-        Lesson 7.2 saves the marks to shoreline-api.
++        Marks stay in this browser tab for now: nothing is saved to shoreline-api yet.
+       &lt;/p&gt;</code></pre>
+                    </div>
+                    <p>Signed in as Maya, open <strong>Tide Pool Morning Cleanup</strong>. Measured on the dev server and the build: the desk shows "Checked in: 0 of 7. No-shows: 0. Still expected: 7.", with the same seven volunteers as the saved copy, and the roster request carried Maya's token. Lesson 5.1's reducer, table and counts did not change at all.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_18/18-desk-live.png" alt="The Check-in desk on the Tide Pool Morning Cleanup page, now loaded from shoreline-api. The status line says Checked in: 2 of 7. No-shows: 0. Still expected: 5. The table lists seven volunteers; Diego Herrera and Sofia Lindgren show Checked in badges. The note below says marks stay in this browser tab for now." width="936" height="746" loading="lazy">
+                        <figcaption>The same desk as Lesson 5.1, now fed by <code>GET /api/events/e17/signups</code> with the organizer's token. The reducer did not change.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Check it, then try the edges <span class="step-time">(6 min)</span></h3>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 15ms on 46 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>Then walk through what changed, as measured in the project:</p>
+                    <ul>
+                        <li><strong>As a guest</strong>, <code>/events</code> says "Found 15 cleanups: 8 coming up, 7 in the log." with no Drafts heading, no <strong>Plan a cleanup</strong> link and no <strong>Cancel cleanup</strong> buttons, and the header shows <strong>Sign in</strong>.</li>
+                        <li><strong>As Maya</strong>, the same page says "Found 17 cleanups: 8 coming up, 7 in the log.", lists Harbor Kayak Cleanup and Beach Reset Day under Drafts, and shows the link and eight Cancel buttons. Harbor Kayak Cleanup's own page opens (a guest gets "Cleanup not found").</li>
+                        <li><strong>Sign out on the events page:</strong> the drafts, the link and the buttons disappear without a reload, and the count goes back to 15. <strong>Sign out on Harbor Kayak Cleanup's page:</strong> it turns into "Cleanup not found".</li>
+                        <li><strong>Reload</strong> while signed in: still signed in. <strong>Open the app in a new tab</strong>: signed out there.</li>
+                    </ul>
+                    <figure class="screenshot">
+                        <img src="images/lesson_18/18-events-organizer.png" alt="The Cleanup events page while Maya Okafor is signed in. The header shows Maya Okafor (Organizer) and a Sign out button, outlined in red. Below the heading are a Plan a cleanup link, the search filters and the status line Found 17 cleanups: 8 coming up, 7 in the log." width="1100" height="688" loading="lazy">
+                        <figcaption>Signed in as an organizer: the header, the <strong>Plan a cleanup</strong> link and the count of 17 (two drafts included) all come from the same context, read in three different places.</figcaption>
+                    </figure>
+                    <p><strong>Restart the API while signed in</strong> (<kbd>Ctrl</kbd>+<kbd>C</kbd> in its terminal, <code>node server.ts</code> again, same keys on a Mac), then reload <code>/events</code>. The API has forgotten your token, so it answers 401 to every request that carries it. Measured: the page showed "Could not load the cleanups. Your sign-in has ended. Sign out, then sign in again.", and one click on <strong>Sign out</strong> loaded the 15 public cleanups, because <code>useApi</code> asked again without the token. (The console also shows the failed requests and the failed sign-out; signing out still worked, as Step 2 promised.) Lesson 6.3 handles a 401 for you by sending people to the sign-in page.</p>
+                    <p><strong>Your own project:</strong> list the values in your Lesson 11.1 app idea that many screens need: the signed-in person, a chosen language or unit, a theme. For each, write down whether it has a sensible default (like kilograms) or none (like sign-in), and so whether its context type needs <code>| undefined</code>.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>client.ts</code> reads and saves the session in <code>sessionStorage</code>, sends <code>Authorization: Bearer …</code> when there is one, and has <code>getRoster</code>, <code>postSignIn</code> and <code>postSignOut</code></li>
+                        <li>☐ <code>AuthContext.ts</code> has an <code>AuthValue | undefined</code> context and a <code>useAuth()</code> that throws outside <code>&lt;AuthProvider&gt;</code>; <code>App</code> wraps everything in the provider</li>
+                        <li>☐ <code>/sign-in</code> shows the API's messages, keeps the email but not the password, and the header shows who is signed in with a working <strong>Sign out</strong></li>
+                        <li>☐ Drafts, <strong>Plan a cleanup</strong> and <strong>Cancel cleanup</strong> appear for organizers only, and disappear on sign-out without a reload</li>
+                        <li>☐ Today's cleanup shows the desk with the live roster for organizers; <code>src/data/sampleRoster.ts</code> is deleted</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Predict Theo's HQ</h3>
+                    <p>Theo Nakamura (<code>theo.nakamura@example.com</code>, password <code>shoreline-demo</code>) is a volunteer. Before you sign in as Theo, write down what you expect: What does the header say? How many cleanups does <code>/events</code> find, and does Theo see Drafts, <strong>Plan a cleanup</strong> or <strong>Cancel cleanup</strong>? Does <code>/events/e17</code> show the check-in desk, and does the HQ ask the API for the roster? What does <code>/events/e15</code> (a draft) show? Then sign in as Theo and check.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Find every place that reads <code>isOrganizer</code>, and remember that the API decides what a token may see: drafts are for organizers, whoever asks.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Measured: the header said "Theo Nakamura (Volunteer)" with <strong>Sign out</strong>. <code>/events</code> said "Found 15 cleanups: 8 coming up, 7 in the log." with only Coming up and Past cleanups, no link and no Cancel buttons: <code>isOrganizer</code> is false, and the API sends a volunteer no drafts. <code>/events/e17</code> showed the details but no desk, and no <code>/signups</code> request was sent, because <code>TodaysDesk</code> is never rendered. <code>/events/e15</code> said "Cleanup not found". Signed in is not the same as allowed: if the HQ did ask for the roster with Theo's token, the API would answer 403, "Only organizers can do that." (measured). The HQ is the organizers' app; the volunteers' phone app in the React Native course is where Theo will feel at home.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Where does the focus go after Sign out?</h3>
+                    <p>Sign in, press <kbd>Tab</kbd> until <strong>Sign out</strong> has the focus, and press <kbd>Enter</kbd>. The button disappears, and with it the focus (measured: it fell back to the page's <code>&lt;body&gt;</code>). Change <code>UserMenu</code> so that after someone signs out with its button, the focus lands on the <strong>Sign in</strong> link that replaces it, and only then: a page that simply loads signed out must not grab the focus.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Remember in state that the sign-out came from this menu. Lesson 4.3's callback refs run when an element appears: a ref like <code>(link) =&gt; link?.focus()</code> on the <strong>Sign in</strong> link focuses it the moment it is added.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>In <code>UserMenu.tsx</code>, import <code>useState</code> from <code>'react'</code> and change the component's first part:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/UserMenu.tsx</div>
+                            <pre data-snippet><code class="language-tsx">export function UserMenu() {
+  const { session, signOut } = useAuth()
+  // true once someone signs out with this menu's button
+  const [signedOut, setSignedOut] = useState(false)
+
+  function handleSignOut() {
+    setSignedOut(true)
+    signOut()
+  }
+
+  if (session === null) {
+    return (
+      &lt;a
+        className={styles.link}
+        href="/sign-in"
+        ref={signedOut ? (link) =&gt; link?.focus() : undefined}
+      &gt;
+        Sign in
+      &lt;/a&gt;
+    )
+  }</code></pre>
+                        </div>
+                        <p>and use <code>onClick={handleSignOut}</code> on the button. Measured: after <kbd>Enter</kbd> on <strong>Sign out</strong>, the focused element was the <strong>Sign in</strong> link. <code>signedOut</code> starts as <code>false</code> on every page load, so a signed-out page does not move the focus by itself. The course's code keeps the simpler menu.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A Drafts card for organizers (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 20 minutes).</em></p>
+                    <p>On the home page, organizers should see a third card, <strong>Drafts</strong>, saying how many drafts wait to be published, with a link to the events page. Guests see no card, and must not send a request for it either. Use <code>getEvents</code> with <code>status=draft&amp;perPage=1</code> and the total from the response headers, like the Next cleanup card.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Hooks cannot sit behind an <code>if</code>, but components can. Put the request in a small component that only organizers get, exactly like <code>TodaysDesk</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>In <code>HomePage.tsx</code>, import <code>useAuth</code> and add, above <code>NextCleanupProps</code>:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">const draftsQuery = 'status=draft&amp;perPage=1'
+
+// Rendered only for organizers, so guests never send a request they cannot use
+function DraftsWaiting() {
+  const drafts = useApi(`/events?${draftsQuery}`, (signal) =&gt; getEvents(draftsQuery, signal))
+  if (drafts.state.kind !== 'ready') {
+    return &lt;LoadStatus state={drafts.state} what="the drafts" onRetry={drafts.reload} /&gt;
+  }
+  return &lt;p&gt;Drafts waiting to be published: {drafts.state.data.page.total}.&lt;/p&gt;
+}</code></pre>
+                        </div>
+                        <p>Then <code>const { isOrganizer } = useAuth()</code> at the top of <code>HomePage</code>, and the card between the two others:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">{isOrganizer &amp;&amp; (
+  &lt;Card title="Drafts"&gt;
+    &lt;DraftsWaiting /&gt;
+    &lt;a href="/events"&gt;Review them&lt;/a&gt;
+  &lt;/Card&gt;
+)}</code></pre>
+                        </div>
+                        <p>Measured: as a guest, the home page had two cards and sent no <code>status=draft</code> request; signed in as Maya, it had three, and the new one said "Drafts waiting to be published: 2.". The course's code does not keep this card.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>EventCard</code> sits three levels below <code>EventsPage</code> and needs to know whether an organizer is signed in. How does the finished HQ give it that answer?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That is prop drilling. Which components in between would carry a value they never use?">
+                                A) <code>EventsPage</code> passes <code>isOrganizer</code> through <code>EventGroups</code> and <code>EventList</code> as a prop
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Who is the only writer of the session, and how would the card know when storage changes?">
+                                B) <code>EventCard</code> reads <code>sessionStorage</code> itself
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="EventCard calls useAuth(), which reads the nearest AuthContext provider above it. Nothing in between has to carry the value, and when the session changes, React renders the card again.">
+                                C) <code>EventCard</code> calls <code>useAuth()</code> and reads <code>isOrganizer</code> from the nearest <code>AuthProvider</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The HQ knows the role as soon as someone signs in. Where is it kept?">
+                                D) <code>EventCard</code> asks the API for the role before drawing the button
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> The context is <code>createContext&lt;AuthValue | undefined&gt;(undefined)</code>. A component writes <code>const { isOrganizer } = useContext(AuthContext)</code>. What does <code>npx tsc -b</code> say?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="TS2339: outside a provider the value is undefined, and undefined has no isOrganizer. That is why components call useAuth(), which checks once and returns AuthValue.">
+                                A) An error: property <code>isOrganizer</code> does not exist on type <code>AuthValue | undefined</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Look at the type argument of createContext. Can the value be something other than AuthValue?">
+                                B) Nothing: <code>useContext</code> always returns an <code>AuthValue</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript cannot see providers: they are placed at run time. What does it know about the context's type?">
+                                C) An error: the component is not inside <code>AuthProvider</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Someone deletes <code>&lt;AuthProvider&gt;</code> from <code>App.tsx</code>. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript cannot see which components end up inside which provider. Measured: did tsc complain?">
+                                A) <code>npx tsc -b</code> fails with a missing provider error
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is what a fake default value would do. What does useAuth() do when the context is undefined?">
+                                B) The app works, but nobody can ever sign in
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The header is outside the app's error boundary, and UserMenu calls useAuth() while rendering.">
+                                C) Only the sign-in page shows an error message
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Measured: it compiles, then UserMenu's useAuth() throws while rendering, React removes the whole app (the root element was empty) and the console's error says useAuth() must be used inside the AuthProvider component. A loud error that names the fix.">
+                                D) It compiles, then the page goes blank and the console says <code>useAuth()</code> must be used inside <code>&lt;AuthProvider&gt;</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why does the HQ keep the session in <code>sessionStorage</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Any script running on the page can call sessionStorage.getItem. Which option in the table was not readable by scripts?">
+                                A) Because scripts on the page cannot read <code>sessionStorage</code>, so the token is safe there
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The HQ still reloads on every link (until Lesson 6.1), so memory alone would lose the sign-in. sessionStorage survives reloads but belongs to one tab and ends when the tab closes. It is readable by the page's scripts, like every storage, which is why the front end never decides what is secure.">
+                                B) It survives the page reloads the HQ still has, but stays in one tab and ends when the tab closes
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Measured: what did a second tab show after signing in?">
+                                C) So that every tab and window shares one sign-in
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The API keeps its sessions in memory. What happens to a stored token when the API restarts?">
+                                D) Because the token in it never expires
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Maya signs out while the events page is open. Why do the drafts disappear without a reload?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Does the page filter drafts out itself, or does the API leave them out? Who asks for the list again?">
+                                A) <code>EventGroups</code> removes drafts from the list it already has
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing reloads. What changes in useApi's dependencies?">
+                                B) <code>signOut</code> reloads the page
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The API forgets the token, but it does not send anything to the browser on its own.">
+                                C) The API tells the open page that the session ended
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="useApi lists the viewer in its effect's dependencies. A new viewer means the effect runs again, the request goes out without a token, and the API's answer has no drafts. Measured: /events?perPage=50 and /sites were requested again right after Sign out.">
+                                D) <code>useApi</code> has the signed-in person in its dependencies, so it asks again, now without a token, and the API sends no drafts
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Is context a replacement for Redux or Zustand?</summary>
+                    <p>No. Context <em>delivers</em> a value to a tree; it does not store or organize state by itself. The state lives in <code>AuthProvider</code>'s <code>useState</code>, and context carries it. For one rarely changing value like a sign-in, that is all you need. Libraries such as Zustand and Redux Toolkit add things context does not have, such as letting a component listen to only part of the state. Lesson 7.3 compares them. Some are built on context themselves: React Redux, for example, hands its store to components through a provider.</p>
+                </details>
+                <details>
+                    <summary>Can I put a reducer's dispatch in a context?</summary>
+                    <p>Yes, and it is a common pattern: <code>useReducer</code> in a provider, <code>state</code> and <code>dispatch</code> in the value, a Hook like <code>useAuth()</code> to read them. Because <code>dispatch</code> never changes (Lesson 5.1), some teams put it in a second context of its own, so components that only send actions do not render when the state changes. The check-in desk does not need this: its table is one level down, and a prop is clearer.</p>
+                </details>
+                <details>
+                    <summary>Why not log in once and keep the token in localStorage, so people stay signed in?</summary>
+                    <p>You can, and many apps do, for convenience. The trade-off is that a token in <code>localStorage</code> stays on the computer for weeks and is shared by every tab, which is a poor fit for an organizer at a shared laptop on the beach. Both storages are readable by the page's own scripts. If the server is yours, an <code>HttpOnly</code> cookie keeps the token away from scripts entirely. The HQ follows the API it talks to, which uses bearer tokens so the phone app can use them too.</p>
+                </details>
+                <details>
+                    <summary>What about <code>use(AuthContext)</code> instead of <code>useContext</code>?</summary>
+                    <p>It reads the same value. Its extra power is that it may be called inside an <code>if</code> or a loop (checked: <code>npx tsc -b</code> and <code>npm run lint</code> accept it after an early return). <code>useAuth()</code> calls the context unconditionally anyway, so either works there; the HQ uses <code>useContext</code>, which you will find in most codebases.</p>
+                    <pre data-snippet><code class="language-tsx">// use() reads a context too, and (unlike useContext) it may sit inside an if
+export function DraftHint({ showHint }: { showHint: boolean }) {
+  if (!showHint) return null
+  const auth = use(AuthContext)
+  return auth?.isOrganizer ? &lt;p&gt;Drafts are only visible to organizers.&lt;/p&gt; : null
+}</code></pre>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Today a 401 asks people to sign out by hand. Make <code>useApi</code> do it: when a request fails with an <code>ApiError</code> whose status is 401 <em>and</em> someone is signed in, call <code>signOut()</code> so the page loads again as a guest and the header shows <strong>Sign in</strong>. Think about loops before you write it (what if the guest's request also fails?), and where the person should learn what happened. Lesson 6.3 takes the next step: sending them to <code>/sign-in</code> and back.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Draw the HQ's component tree from <code>App</code> down to <code>EventCard</code>, <code>UserMenu</code> and <code>TodaysDesk</code>, and circle every component that calls <code>useAuth()</code> (directly or through <code>useApi</code>). Then answer in two sentences: why is "no provider" an <code>undefined</code> in the type instead of a friendly default, and what would you have lost with the default?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Context sends one value to every component below a provider, wherever it sits; use it for values many distant components need and that change rarely, and keep props for the rest</li>
+                        <li>Three parts: <code>createContext&lt;T&gt;(default)</code>, <code>&lt;SomeContext value={…}&gt;</code> (React 19; <code>.Provider</code> is the older spelling), and <code>useContext</code>, which reads the nearest provider</li>
+                        <li>When no default makes sense, type the context <code>T | undefined</code> and read it only through a Hook that throws outside the provider and returns <code>T</code>; a fake default hides setup mistakes</li>
+                        <li>Keep the context, its type and its Hook in a <code>.ts</code> file and the provider component in a <code>.tsx</code> file, or Fast Refresh (and oxlint) complain</li>
+                        <li>The HQ's session lives in <code>sessionStorage</code>, checked like API data on the way in, written only by the provider, and sent as <code>Authorization: Bearer …</code> on every request</li>
+                        <li>Who asks is part of the question: data and caches that depend on the person must load again when the person changes</li>
+                        <li>Hiding a button is convenience, not security: the API decides who may see and change what</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Look up narrowing and union types</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Check the sign-in and roster endpoints</td><td><a href="api.html">shoreline-api reference</a></td></tr>
+                            <tr><td>Read React's guide to context</td><td><a href="https://react.dev/learn/passing-data-deeply-with-context" target="_blank" rel="noopener">React: Passing Data Deeply with Context</a></td></tr>
+                            <tr><td>Read React's reference for <code>useContext</code></td><td><a href="https://react.dev/reference/react/useContext" target="_blank" rel="noopener">React: useContext</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You built a typed <code>AuthContext</code> whose Hook cannot return <code>undefined</code>, and saw both ways of getting it wrong</li>
+                        <li>You signed organizers in against a real API, with roles, error messages in plain words, and a session that survives reloads</li>
+                        <li>You made the header, the event cards and the events page follow sign-in and sign-out without passing a single extra prop through the middle</li>
+                        <li>You replaced the check-in desk's saved copy with the live roster, without touching Lesson 5.1's reducer</li>
+                        <li>You kept two old promises: drafts appear for organizers, and the Cancel button is theirs alone</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>When Maya signs in, how many components render again, and does it matter? In <a href="lesson_19.html"><strong>Lesson 5.3: Rendering Performance</strong></a> you measure it with the React DevTools Profiler instead of guessing, learn when <code>memo</code>, <code>useMemo</code> and <code>useCallback</code> help (and when they only add noise), and try the React Compiler, which does much of that work for you.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and <code>src/Scratch.tsx</code> and <code>src/data/</code> are gone</li>
+                    <li>Sign in and out once as Maya and once as Theo, and watch what changes</li>
+                    <li>Keep your list of "values many screens need" for your Lesson 11.1 plan</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Sign-in touches almost every part of an app: today you wrote five new files and changed nine others. If it felt like a lot to hold in your head, that is normal: the first auth context anyone builds feels that way. Notice how much of it was things you already knew, though: type guards from Lesson 2.4, form actions from 3.5, <code>useApi</code> from 4.2, focus from 4.3, the reducer from 5.1. The new idea, context, was small; the work was connecting it. That is what real features are like, and you just shipped one. Well done.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_17.html" class="prev-lesson">← Previous: useReducer with Discriminated Unions</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_19.html" class="next-lesson">Next: Rendering Performance →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

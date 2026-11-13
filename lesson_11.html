@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Build forms the React 19 way: controlled and uncontrolled inputs, form actions that receive typed FormData, useActionState for results and pending state, and field messages people understand. Add a Plan a cleanup form to Shoreline Crew HQ. React + TypeScript: Build a Modern Web App Lesson 3.5.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Forms and Actions - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>📝 Lesson 3.5: Forms and Actions</h1>
+                <p class="lead">Organizers do not only read Shoreline Crew HQ; they plan the cleanups in it. Today the app gets its first real form: "Plan a cleanup", with a title, a beach site, a date and times, how many volunteers are needed and where to meet. You will learn the two ways an input can hold its value, React 19's form actions that hand you the whole form at once, <code>useActionState</code> for results and "saving..." states, and how to write error messages that tell people exactly what to fix.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain the difference between controlled and uncontrolled inputs, and choose the right one for a field</li>
+                        <li>Pass a function to a form's <code>action</code> and read the submitted <code>FormData</code> safely, narrowing <code>FormDataEntryValue | null</code> without <code>as</code></li>
+                        <li>Use <code>useActionState</code> to turn each submit into typed state, and <code>isPending</code> to show that a submit is in progress</li>
+                        <li>Keep what people typed when a submit fails, and know why React resets a form after an action</li>
+                        <li>Write field messages that say how to fix the problem, and connect them to their fields with <code>aria-invalid</code> and <code>aria-describedby</code></li>
+                        <li>Build the HQ's "Plan a cleanup" form, with checks that agree with the API's own rules</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 140 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_10.html">Lesson 3.4: State and Events</a> (your <code>shoreline-hq</code> with search and filters on the events page)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A "Plan a cleanup" page with a typed form, field messages in the API's <code>fieldErrors</code> shape, "Save as draft" and "Publish" buttons, and a status line that says what is ready to save</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-11-start.zip">lesson-11-start.zip</a> · Finished code: <a href="downloads/lesson-11-end.zip">lesson-11-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#inputs" class="toc-link">Controlled and Uncontrolled Inputs</a></li>
+                        <li><a href="#actions" class="toc-link">Form Actions and Typed FormData</a></li>
+                        <li><a href="#action-state" class="toc-link">useActionState: Results and Pending</a></li>
+                        <li><a href="#messages" class="toc-link">Messages People Understand</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Plan a Cleanup</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="inputs" class="lesson-section">
+                <h2>🎚️ Controlled and Uncontrolled Inputs</h2>
+                <p>The search box you built in Lesson 3.4 is a <strong>controlled</strong> input: React state holds the text, the input shows that state through <code>value</code>, and every keystroke goes through <code>onChange</code> back into the state. Here it is once more, on its own, with a character count. Create <code>src/Scratch.tsx</code> in <code>shoreline-hq</code> (your experiment file for this lesson) and try it:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+// Controlled: React state holds the text, and the input shows the state
+export function MeetingPointField() {
+  const [meetingPoint, setMeetingPoint] = useState('')
+
+  return (
+    &lt;div className="field"&gt;
+      &lt;label htmlFor="meeting-point"&gt;Meeting point&lt;/label&gt;
+      &lt;input
+        id="meeting-point"
+        value={meetingPoint}
+        onChange={(event) =&gt; setMeetingPoint(event.target.value)}
+      /&gt;
+      &lt;p&gt;{meetingPoint.length} of 120 characters&lt;/p&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+                <p>Type <code>North jetty steps</code> and the line under the field says <strong>17 of 120 characters</strong> as you type. Because React holds the value, your code knows it at every moment, so it can count it, check it or change it.</p>
+                <p>An <strong>uncontrolled</strong> input is the browser's own text box: the browser holds what is typed, and your code reads it when it needs it, usually when the form is sent. You give it a <code>name</code> (the key it is sent under) and, if it should start with something, a <code>defaultValue</code> (the starting text, not a live link):</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+// Uncontrolled: the browser holds the text; you read it when the form is sent
+export function CrewNote() {
+  const [lastNote, setLastNote] = useState('')
+
+  function saveNote(formData: FormData) {
+    const note = formData.get('note')
+    if (typeof note === 'string') {
+      setLastNote(note.trim())
+    }
+  }
+
+  return (
+    &lt;form action={saveNote}&gt;
+      &lt;label htmlFor="note"&gt;Note for the crew&lt;/label&gt;
+      &lt;input id="note" name="note" defaultValue="" /&gt;
+      &lt;button type="submit"&gt;Save note&lt;/button&gt;
+      &lt;p&gt;Last note: {lastNote === '' ? 'none yet' : lastNote}&lt;/p&gt;
+    &lt;/form&gt;
+  )
+}</code></pre>
+                <p>No state for the text, no <code>onChange</code>. Type <code>Bring sunscreen</code> and press <strong>Save note</strong>: the line says <strong>Last note: Bring sunscreen</strong>, and the field is empty again, ready for the next note. The next section explains both what <code>action={saveNote}</code> does and why the field empties itself.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th>Controlled</th><th>Uncontrolled</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Who holds the value</td><td>React state</td><td>The browser (the DOM)</td></tr>
+                            <tr><td>You write</td><td><code>value</code> + <code>onChange</code></td><td><code>name</code> (+ <code>defaultValue</code>)</td></tr>
+                            <tr><td>You read the value</td><td>Any time, from state</td><td>When the form is sent, from <code>FormData</code></td></tr>
+                            <tr><td>Re-renders while typing</td><td>Every keystroke</td><td>None</td></tr>
+                            <tr><td>Good for</td><td>Live search, counters, fields that depend on each other, formatting as you type</td><td>Fill-in-and-submit forms: sign-ups, "plan a cleanup", settings</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Neither one is "the React way" and the other a hack. Controlled inputs are the right tool when you need the value on every keystroke; for the classic "fill it in, send it once" form, where you only care about the values at submit time, uncontrolled inputs read through <code>FormData</code> are less code and let React 19 manage the sending. The "Plan a cleanup" form is that classic kind.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the sign-up sheet and the clipboard</h4>
+                    <p>A controlled input is the organizer's clipboard from Lesson 3.4: every change goes through the organizer, who always knows what it says. An uncontrolled form is a paper sign-up sheet on the welcome table. People write on it by themselves, and the organizer only reads it when the sheet is handed in. Both work; you would not use a clipboard for forty volunteers writing at once, and you would not use a sign-up sheet for a live head count.</p>
+                </div>
+            </section>
+
+            <section id="actions" class="lesson-section">
+                <h2>📮 Form Actions and Typed FormData</h2>
+                <p>In plain HTML, <code>&lt;form action="/signup"&gt;</code> means "send these fields to that address and load a new page". React 19 adds a second kind of <code>action</code>: a <strong>function</strong>. Press a submit button (or <kbd>Enter</kbd> in a text field) and React stops the page load, collects every named field into a <code>FormData</code> object, and calls your function with it. That is the <code>saveNote(formData: FormData)</code> above. When the function has finished, React <strong>resets the form</strong>: every uncontrolled field goes back to its <code>defaultValue</code>. That is why the note field emptied itself.</p>
+                <p>The prop's type in <code>@types/react</code> spells this out: a form's <code>action</code> is a URL string, or <code>(formData: FormData) =&gt; void | Promise&lt;void&gt;</code>. So the function may be <code>async</code>, which matters in Lesson 7.2 when it talks to the API.</p>
+                <h3>What <code>formData.get</code> really returns</h3>
+                <p><code>FormData</code> is the browser's own type, and TypeScript describes it honestly. Try to treat a field as a string:</p>
+                <pre data-snippet><code class="language-tsx">export function readTitle(formData: FormData): string {
+  const title: string = formData.get('title')
+  return title.trim()
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:2:9 - error TS2322: Type 'FormDataEntryValue | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+
+2   const title: string = formData.get('title')
+          ~~~~~
+
+
+Found 1 error in src/Scratch.tsx:2</code></pre>
+                </div>
+                <p><code>get</code> returns <code>FormDataEntryValue | null</code>, and <code>FormDataEntryValue</code> is <code>File | string</code>: a <code>File</code> when the field is a file input (Lesson 8.2 uploads photos), <code>null</code> when the form has no field with that name. This is the "outside data is <code>unknown</code> until checked" lesson from 2.1 and 2.4 again, in a smaller form. Narrow it, exactly as you narrowed API data:</p>
+                <pre data-snippet><code class="language-ts">// formData.get() returns a string, a File (from a file input) or null (no such field)
+function readText(formData: FormData, name: EventField): string {
+  const value = formData.get(name)
+  return typeof value === 'string' ? value.trim() : ''
+}</code></pre>
+                <p>After <code>typeof value === 'string'</code>, TypeScript knows it is a string, and a missing field becomes an empty string your checks will report. Many tutorials write <code>formData.get('title') as string</code> instead. It compiles, and it is a promise TypeScript cannot check. Misspell the field name once:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+export function TitleForm() {
+  const [title, setTitle] = useState('')
+
+  function saveTitle(formData: FormData) {
+    // "as string" silences TypeScript, and the misspelled name returns null
+    const value = formData.get('titel') as string
+    setTitle(value.trim())
+  }
+
+  return (
+    &lt;form action={saveTitle}&gt;
+      &lt;label htmlFor="title"&gt;Title&lt;/label&gt;
+      &lt;input id="title" name="title" /&gt;
+      &lt;button type="submit"&gt;Save&lt;/button&gt;
+      &lt;p&gt;Title: {title}&lt;/p&gt;
+    &lt;/form&gt;
+  )
+}</code></pre>
+                <p><code>npx tsc -b</code> and <code>npm run lint</code> both pass. Type a title, press <strong>Save</strong>, and the action stops in the browser:</p>
+                <div class="card card-output">
+                    <h4>Browser console (dev server)</h4>
+                    <pre><code>Uncaught TypeError: Cannot read properties of null (reading 'trim')</code></pre>
+                </div>
+                <p>There is no field named <code>titel</code>, so <code>get</code> returned <code>null</code>, and <code>as string</code> told TypeScript not to worry about it. The <code>typeof</code> check costs one line and turns this crash into a message the person can act on. Two more <code>FormData</code> facts you will use today:</p>
+                <ul>
+                    <li><code>formData.getAll('name')</code> returns <em>every</em> value sent under a name, as <code>FormDataEntryValue[]</code>: one per ticked checkbox in a group (Exercise 3).</li>
+                    <li>The button that submitted the form is included when it has a <code>name</code>: <code>&lt;button type="submit" name="status" value="scheduled"&gt;</code> sends <code>status=scheduled</code>. Two such buttons give one form two different submits, such as "Save as draft" and "Publish".</li>
+                </ul>
+                <h3>The way you will see in most React code: <code>onSubmit</code></h3>
+                <p>Before React 19, forms were handled with an <code>onSubmit</code> event handler, and you will meet this in nearly every codebase and tutorial. It still works and is still fine:</p>
+                <pre data-snippet><code class="language-tsx">import { useState, type SubmitEvent } from 'react'
+
+// The way most React code handled forms before actions, and still fine to use
+export function CrewNoteClassic() {
+  const [lastNote, setLastNote] = useState('')
+
+  function handleSubmit(event: SubmitEvent&lt;HTMLFormElement&gt;) {
+    event.preventDefault() // stop the browser from sending the form and loading a new page
+    const note = new FormData(event.currentTarget).get('note')
+    if (typeof note === 'string') {
+      setLastNote(note.trim())
+    }
+  }
+
+  return (
+    &lt;form onSubmit={handleSubmit}&gt;
+      &lt;label htmlFor="note"&gt;Note for the crew&lt;/label&gt;
+      &lt;input id="note" name="note" /&gt;
+      &lt;button type="submit"&gt;Save note&lt;/button&gt;
+      &lt;p&gt;Last note: {lastNote === '' ? 'none yet' : lastNote}&lt;/p&gt;
+    &lt;/form&gt;
+  )
+}</code></pre>
+                <p>The handler's type is <code>SubmitEvent&lt;HTMLFormElement&gt;</code>, React's type for submit events (Lesson 3.4's FAQ explained why the older <code>FormEvent</code> is now marked deprecated). <code>event.preventDefault()</code> stops the browser's own page load, and <code>new FormData(event.currentTarget)</code> reads the form. Saved this way, the note stays in the field: nothing resets the form unless your code does. With an action, React does the <code>preventDefault</code>, the <code>FormData</code> and the reset for you, and, with the Hook in the next section, it also tracks the result and whether a submit is still running.</p>
+            </section>
+
+            <section id="action-state" class="lesson-section">
+                <h2>🔄 useActionState: Results and Pending</h2>
+                <p>A form action on its own returns nothing to the screen. To show "you're on the list" or "enter an email address", the action's result has to become state. React 19's <code>useActionState</code> Hook does exactly that:</p>
+                <pre data-snippet><code class="language-tsx">import { useActionState } from 'react'
+
+type JoinState =
+  | { kind: 'idle' }
+  | { kind: 'invalid'; message: string }
+  | { kind: 'joined'; email: string }
+
+// An action for useActionState gets the previous state first, then the FormData
+function joinWaitingList(_previous: JoinState, formData: FormData): JoinState {
+  const email = formData.get('email')
+  if (typeof email !== 'string' || !email.includes('@')) {
+    return { kind: 'invalid', message: 'Enter an email address, such as you@example.com.' }
+  }
+  return { kind: 'joined', email }
+}
+
+export function WaitingList() {
+  const [state, formAction] = useActionState(joinWaitingList, { kind: 'idle' })
+
+  return (
+    &lt;form action={formAction}&gt;
+      &lt;label htmlFor="email"&gt;Email&lt;/label&gt;
+      &lt;input id="email" name="email" /&gt;
+      &lt;button type="submit"&gt;Join the waiting list&lt;/button&gt;
+      {state.kind === 'invalid' &amp;&amp; &lt;p&gt;{state.message}&lt;/p&gt;}
+      {state.kind === 'joined' &amp;&amp; &lt;p&gt;{state.email} is on the waiting list.&lt;/p&gt;}
+    &lt;/form&gt;
+  )
+}</code></pre>
+                <p>Read it from the Hook call:</p>
+                <ul>
+                    <li><code>useActionState(joinWaitingList, { kind: 'idle' })</code> takes your action and the first state. It returns <code>[state, formAction, isPending]</code>; this example uses the first two.</li>
+                    <li>You give the form <code>formAction</code>, not <code>joinWaitingList</code>. React calls your function with <strong>the previous state first</strong>, then the <code>FormData</code>, and whatever it returns becomes the new <code>state</code> and re-renders the component.</li>
+                    <li>The state is a discriminated union on <code>kind</code>, as in Lesson 3.3: the component narrows it to decide what to draw. The underscore in <code>_previous</code> says "required by the signature, not used here".</li>
+                    <li>TypeScript infers the state type from the action's return type. Hover over the three names in VS Code: <code>state</code> is <code>JoinState</code> (shown written out as the union), <code>formAction</code> is <code>(payload: FormData) =&gt; void</code>, and <code>isPending</code> is a <code>boolean</code>.</li>
+                </ul>
+                <p>Type <code>maya</code> and press the button: the page says <strong>Enter an email address, such as you@example.com.</strong>, and the field is <em>empty</em>. React reset the form after the action, as it always does. Retyping one email address is a small annoyance; retyping a whole cleanup because of one mistake would make organizers give up. The project solves it by returning what was typed in the state and showing it again with <code>defaultValue</code>. With <code>maya@example.com</code> the page says <strong>maya@example.com is on the waiting list.</strong></p>
+                <div class="mermaid">
+graph TD
+    A["Press Publish"] --> B["React collects FormData"]
+    B --> C["Your action runs"]
+    C --> D{"Any problems?"}
+    D -->|"yes"| E["editing: values, errors"]
+    D -->|"no"| F["ready: the new cleanup"]
+    E --> G["Re-render, then form reset"]
+    F --> G
+</div>
+                <h3>isPending: while the action runs</h3>
+                <p>An action may be <code>async</code>. Until the API arrives in Lesson 7.2, this one pretends with a one-second wait:</p>
+                <pre data-snippet><code class="language-tsx">import { useActionState } from 'react'
+
+// Pretend the server takes a second to answer (Lesson 7.2 sends real requests)
+function wait(ms: number): Promise&lt;void&gt; {
+  return new Promise((resolve) =&gt; setTimeout(resolve, ms))
+}
+
+async function saveBagCount(_previous: string, formData: FormData): Promise&lt;string&gt; {
+  await wait(1000)
+  const bags = formData.get('bags')
+  return typeof bags === 'string' ? `Saved: ${bags} bags.` : ''
+}
+
+export function BagCountForm() {
+  const [message, formAction, isPending] = useActionState(saveBagCount, '')
+
+  return (
+    &lt;form action={formAction}&gt;
+      &lt;label htmlFor="bags"&gt;Bags collected&lt;/label&gt;
+      &lt;input id="bags" name="bags" type="number" /&gt;
+      &lt;button type="submit" disabled={isPending}&gt;
+        {isPending ? 'Saving…' : 'Save'}
+      &lt;/button&gt;
+      &lt;p role="status"&gt;{message}&lt;/p&gt;
+    &lt;/form&gt;
+  )
+}</code></pre>
+                <p>Enter <code>14</code> and press <strong>Save</strong>: for a second the button says <strong>Saving…</strong> and is disabled, so nobody sends the same count twice; then it says <strong>Save</strong> again and the status line reads <strong>Saved: 14 bags.</strong> You never wrote <code>useState(false)</code> for "is it saving?": <code>isPending</code> is <code>true</code> from the submit until the action's promise settles. Notice the return type: an <code>async</code> function returns <code>Promise&lt;string&gt;</code>, and the state is still a plain <code>string</code>, because React waits for the promise.</p>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Forms are where users hand your app their work, and where most of them give up. A form that loses their typing, double-submits, or says "Invalid input" without saying which input costs real sign-ups and real volunteers. Teams notice developers who get forms right, and the pattern you learn today (typed values in, typed result out, the server checks again) is the same one React Hook Form, Next.js server actions and React Native forms use.</p>
+                </div>
+                <p>One "you'll see this in old code" note: during React 19's beta this Hook was called <code>useFormState</code> and lived in <code>react-dom</code>. Tutorials from that time still import it; today it is <code>useActionState</code>, imported from <code>react</code>.</p>
+            </section>
+
+            <section id="messages" class="lesson-section">
+                <h2>💬 Messages People Understand</h2>
+                <h3>Three places that check</h3>
+                <p>A cleanup's details are checked in up to three places, and each has a different job:</p>
+                <div class="mermaid">
+graph TD
+    A["The browser's built-in checks"] --> B["Your form's checks"]
+    B --> C["The API checks again"]
+    C --> D["Saved, or 400 + fieldErrors"]
+</div>
+                <ul>
+                    <li><strong>The browser</strong> checks attributes such as <code>required</code>, <code>type="email"</code> and <code>max</code> before anything else, and shows its own bubble. Its wording depends on the browser and its language, and the bubble disappears when focus moves.</li>
+                    <li><strong>Your form's checks</strong> run in the action and produce messages you wrote, in the place you choose, worded for this app.</li>
+                    <li><strong>The API</strong> checks everything again, because anyone can send it anything without your form. It is the authority: front-end checks are for people, never for security. shoreline-api answers a bad request with status 400 and a body like <code>{ "error": "validation_failed", "message": "...", "fieldErrors": { "title": ["Add a title."] } }</code>, the <code>ApiErrorBody</code> type in <code>src/api/types.ts</code>.</li>
+                </ul>
+                <p>The project form adds <code>noValidate</code> to the <code>&lt;form&gt;</code>, which turns off the browser's bubbles so every message comes from one place and looks the same. It keeps <code>type="date"</code>, <code>type="time"</code> and <code>type="number"</code>, which still give people date pickers and number keyboards on phones. Without <code>noValidate</code>, a capacity of 500 in a field with <code>max={200}</code> never reaches your action: Chrome blocks the submit and shows "Value must be less than or equal to 200." in a bubble next to the field, and your status line says nothing.</p>
+                <h3>What a good field message does</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Instead of…</th><th>Write…</th><th>Because</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Invalid input</td><td>Use at least 5 characters for the title.</td><td>Say which field and how to fix it</td></tr>
+                            <tr><td>Error: endTime &lt;= startTime</td><td>The end time must be after the start time.</td><td>Plain words, no field names from the code</td></tr>
+                            <tr><td>Enter a date as YYYY-MM-DD.</td><td>Pick a date.</td><td>People use a date picker; the format is the program's business</td></tr>
+                            <tr><td>You entered an invalid capacity!</td><td>Capacity must be a whole number from 1 to 200.</td><td>Describe the rule, do not blame the person</td></tr>
+                            <tr><td>A list of errors at the top only</td><td>Each message right under its field</td><td>People fix fields where they are; Lesson 8.2 adds a summary as well</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Saying the rule <em>before</em> anyone breaks it helps even more: the project's labels read "Title (5 to 80 characters)" and "Volunteers needed (1 to 200)".</p>
+                <h3>Messages that assistive technology can find</h3>
+                <p>A red message under a field is obvious to someone who can see it. For a screen reader user, the field and its message must be connected in the markup:</p>
+                <ul>
+                    <li><code>aria-invalid="true"</code> on the field: screen readers announce that the field is invalid.</li>
+                    <li><code>aria-describedby="title-error"</code> on the field, and <code>id="title-error"</code> on the message: the message is read out with the field's name when the field gets focus.</li>
+                    <li>Not color alone: the message is text, and the field's outline gets thicker as well as red.</li>
+                </ul>
+                <p>The messages use the API's own <code>fieldErrors</code> shape, field name to a list of messages, so in Lesson 7.2 the API's answers can be shown with the same component. When the project is done, run the same bad drafts through the form's checks and through shoreline-api, and they report problems in exactly the same fields. Most messages are word for word the same; a few are reworded for people:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Field</th><th>shoreline-api says</th><th>The form says</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>title</code></td><td>Use at least 5 characters for the title.</td><td>Use at least 5 characters for the title.</td></tr>
+                            <tr><td><code>date</code> (empty)</td><td>Enter a date as YYYY-MM-DD.</td><td>Pick a date.</td></tr>
+                            <tr><td><code>date</code> (in the past)</td><td>Pick today or a later date.</td><td>Pick today or a later date.</td></tr>
+                            <tr><td><code>startTime</code> (empty)</td><td>Enter a time as HH:MM (24-hour clock).</td><td>Pick a start time.</td></tr>
+                            <tr><td><code>endTime</code></td><td>The end time must be after the start time.</td><td>The end time must be after the start time.</td></tr>
+                            <tr><td><code>capacity</code></td><td>Capacity must be a whole number from 1 to 200.</td><td>Capacity must be a whole number from 1 to 200.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ The action's parameters in the wrong order</h4>
+                    <p>A plain form action takes <code>(formData)</code>. An action for <code>useActionState</code> takes <code>(previousState, formData)</code>. Swap them in the waiting-list example, <code>function joinWaitingList(formData: FormData, _previous: JoinState)</code>, and:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b, trimmed)</h4>
+                        <pre><code>src/Scratch.tsx:18:46 - error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '(formData: FormData, _previous: JoinState) =&gt; JoinState' is not assignable to parameter of type '(state: { kind: "idle"; } | { kind: "invalid"; message: string; } | { kind: "joined"; email: string; }, payload: JoinState) =&gt; Promise&lt;{ kind: "idle"; } | { kind: "invalid"; message: string; } | { ...; }&gt; | { ...; } | { ...; } | { ...; }'.
+      Types of parameters 'formData' and 'state' are incompatible.
+        Type '{ kind: "idle"; } | { kind: "invalid"; message: string; } | { kind: "joined"; email: string; }' is not assignable to type 'FormData'.
+          Type '{ kind: "idle"; }' is missing the following properties from type 'FormData': append, delete, get, getAll, and 7 more.
+
+18   const [state, formAction] = useActionState(joinWaitingList, { kind: 'idle' })
+                                                ~~~~~~~~~~~~~~~
+...</code></pre>
+                    </div>
+                    <p>A long message, so read it from the bottom: your <code>formData</code> parameter would receive the state, and a <code>{ kind: "idle" }</code> object is not a <code>FormData</code>. "No overload matches this call" means "none of the Hook's signatures fit what you passed".</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ A field without a <code>name</code></h4>
+                    <p><code>FormData</code> only collects fields that have a <code>name</code>. An <code>id</code> is not enough. Forget it and the field is simply missing: your code reads <code>null</code>, the project's <code>typeof</code> check turns that into an empty string, and the form says "Add a title." for a title you typed (then the reset empties the field, because the action never saw the text). Neither <code>tsc</code> nor oxlint can see this. If a field "is always empty", check its <code>name</code> first.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ <code>as string</code> on form data</h4>
+                    <p>It turns a type error into the run-time "Cannot read properties of null" above. Narrow with <code>typeof value === 'string'</code> instead.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ A button that submits by accident</h4>
+                    <p>Inside a <code>&lt;form&gt;</code>, a <code>&lt;button&gt;</code> without a <code>type</code> is a <em>submit</em> button. A "Clear" or "Show details" button inside a form needs <code>type="button"</code>, as the course's buttons have had since Lesson 3.4.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Plan a Cleanup</h2>
+                <p>Organizers need to plan new cleanups. Today they get a "Plan a cleanup" page at <code>/events/new</code>: a form with typed values, checks that follow the API's rules, a message under every field that needs fixing, and two ways to submit. Saving to the API needs a signed-in organizer (Lesson 5.2) and a POST request (Lesson 7.2), so for now a successful submit shows exactly what <em>would</em> be saved, already shaped as the API's <code>NewEvent</code> type.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>). Delete <code>src/Scratch.tsx</code> if you still have it.</p>
+
+                <div class="card">
+                    <h3>Step 1: Types for the form, and reading it <span class="step-time">(12 min)</span></h3>
+                    <p>The form's logic gets its own file, so the component stays about markup. Create <code>src/utils/eventForm.ts</code> with this first half:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/eventForm.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/eventForm.ts" data-match="excerpt"><code class="language-ts">// Reading and checking the "Plan a cleanup" form (Lesson 3.5).
+// Module 8 replaces these hand-written checks with one Zod schema.
+import type { DateString, NewEvent } from '../api/types.ts'
+import { sites } from '../data/sites.ts'
+
+// The form's fields, named like the API's NewEvent properties
+export type EventField =
+  | 'title'
+  | 'siteId'
+  | 'date'
+  | 'startTime'
+  | 'endTime'
+  | 'capacity'
+  | 'meetingPoint'
+  | 'description'
+
+// What the person typed, as text, so the form can show it again
+export type EventFormValues = Record&lt;EventField, string&gt;
+
+// The API's fieldErrors shape (field name: messages), with names TypeScript can check
+export type FieldErrors = Partial&lt;Record&lt;EventField, string[]&gt;&gt;
+
+export const emptyValues: EventFormValues = {
+  title: '',
+  siteId: '',
+  date: '',
+  startTime: '',
+  endTime: '',
+  capacity: '',
+  meetingPoint: '',
+  description: '',
+}
+
+// formData.get() returns a string, a File (from a file input) or null (no such field)
+function readText(formData: FormData, name: EventField): string {
+  const value = formData.get(name)
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export function readValues(formData: FormData): EventFormValues {
+  return {
+    title: readText(formData, 'title'),
+    siteId: readText(formData, 'siteId'),
+    date: readText(formData, 'date'),
+    startTime: readText(formData, 'startTime'),
+    endTime: readText(formData, 'endTime'),
+    capacity: readText(formData, 'capacity'),
+    meetingPoint: readText(formData, 'meetingPoint'),
+    description: readText(formData, 'description'),
+  }
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>EventField</code> is a union of the field names, spelled like the API's <code>NewEvent</code> properties. Every function below takes an <code>EventField</code>, so a misspelled name is a type error instead of an always-empty field (Step 5 shows the message).</li>
+                        <li><code>EventFormValues</code> is <code>Record&lt;EventField, string&gt;</code>: every field, as the text the person typed. Text on purpose, even for the capacity: if someone types something that is not a number, the form must be able to show it back to them unchanged.</li>
+                        <li><code>FieldErrors</code> is the API's <code>fieldErrors</code> shape with checked keys. <code>Partial</code> makes every field optional: a field with no problem has no entry. Because of <code>noUncheckedIndexedAccess</code> (Lesson 2.4), <code>errors.title</code> is <code>string[] | undefined</code>, so you must check before using it.</li>
+                        <li><code>readText</code> is the narrowing from the teaching section, with <code>trim()</code> so that a title of three spaces counts as empty, as it does for the API.</li>
+                    </ul>
+                    <p>The API's rule "today or a later date" needs today's date as <code>YYYY-MM-DD</code> on the organizer's calendar. Add this function at the end of <code>src/utils/format.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/format.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/format.ts" data-match="excerpt"><code class="language-ts">// Today (or any moment) as a "YYYY-MM-DD" day on this computer's calendar
+export function toDateString(date: Date): DateString {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}</code></pre>
+                    </div>
+                    <p>It reads the local year, month and day, for the same reason <code>formatDate</code> avoids UTC: <code>toISOString()</code> would give the UTC day, which on the US west coast is already tomorrow every evening.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The checks, with messages that help <span class="step-time">(12 min)</span></h3>
+                    <p>Add the rest of <code>src/utils/eventForm.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/eventForm.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/eventForm.ts" data-match="excerpt"><code class="language-ts">// The API's rules for a new cleanup, with messages that say how to fix the problem
+export function validateEvent(values: EventFormValues, today: DateString): FieldErrors {
+  const errors: FieldErrors = {}
+  function add(field: EventField, message: string) {
+    errors[field] = [...(errors[field] ?? []), message]
+  }
+
+  if (values.title === '') add('title', 'Add a title.')
+  else if (values.title.length &lt; 5) add('title', 'Use at least 5 characters for the title.')
+  else if (values.title.length &gt; 80) add('title', 'Keep the title to 80 characters or fewer.')
+
+  if (!sites.some((site) =&gt; site.id === values.siteId)) {
+    add('siteId', 'Choose one of the cleanup sites.')
+  }
+
+  if (values.date === '') add('date', 'Pick a date.')
+  else if (values.date &lt; today) add('date', 'Pick today or a later date.')
+
+  if (values.startTime === '') add('startTime', 'Pick a start time.')
+  if (values.endTime === '') add('endTime', 'Pick an end time.')
+  else if (values.startTime !== '' &amp;&amp; values.endTime &lt;= values.startTime) {
+    add('endTime', 'The end time must be after the start time.')
+  }
+
+  const capacity = Number(values.capacity)
+  if (values.capacity === '' || !Number.isInteger(capacity) || capacity &lt; 1 || capacity &gt; 200) {
+    add('capacity', 'Capacity must be a whole number from 1 to 200.')
+  }
+
+  if (values.meetingPoint.length &lt; 3) {
+    add('meetingPoint', 'Say where volunteers meet (at least 3 characters).')
+  } else if (values.meetingPoint.length &gt; 120) {
+    add('meetingPoint', 'Keep the meeting point to 120 characters or fewer.')
+  }
+
+  if (values.description.length &gt; 2000) {
+    add('description', 'Keep the description to 2000 characters or fewer.')
+  }
+  return errors
+}
+
+// Only called once validateEvent found nothing: the text becomes the API's types
+export function toNewEvent(values: EventFormValues, status: 'draft' | 'scheduled'): NewEvent {
+  return {
+    title: values.title,
+    siteId: values.siteId,
+    date: values.date,
+    startTime: values.startTime,
+    endTime: values.endTime,
+    capacity: Number(values.capacity),
+    meetingPoint: values.meetingPoint,
+    description: values.description,
+    status,
+  }
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>validateEvent</code> returns <code>FieldErrors</code>: an empty object means "nothing to fix". It takes <code>today</code> as a parameter instead of reading the clock itself, so the same values always give the same answer (handy for the tests in Module 9).</li>
+                        <li>The small <code>add</code> helper appends a message to a field's list, with <code>?? []</code> for a field that has none yet.</li>
+                        <li>Dates and times are compared as text. That works because <code>YYYY-MM-DD</code> and 24-hour <code>HH:MM</code> strings sort in time order: <code>'08:00' &lt; '09:00'</code>.</li>
+                        <li><code>Number(values.capacity)</code> turns the text into a number; <code>Number.isInteger</code> rejects <code>2.5</code> and the <code>NaN</code> you get from text that is not a number. The empty field is checked separately, because <code>Number('')</code> is <code>0</code>.</li>
+                        <li><code>toNewEvent</code> builds the API's <code>NewEvent</code>. Its return type means TypeScript checks every property against the API's contract: leave out <code>meetingPoint</code> and you get the TS2741 "missing property" error from Lesson 2.2.</li>
+                    </ul>
+                    <p>These rules repeat the API's, by hand. That duplication is deliberate for now, and it is exactly the problem Module 8 solves: one Zod schema gives the types, the checks and the messages, and React Hook Form handles forms at scale (field arrays, multi-step forms, uploads). Today's version shows you what those libraries do for you.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: The form, with useActionState <span class="step-time">(16 min)</span></h3>
+                    <p>First a small component for the message under a field. Create <code>src/components/FieldError.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/FieldError.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/FieldError.tsx"><code class="language-tsx">interface FieldErrorProps {
+  id: string
+  messages: string[] | undefined
+}
+
+// The message under a field. The field points at it with aria-describedby.
+export function FieldError({ id, messages }: FieldErrorProps) {
+  if (messages === undefined) {
+    return null
+  }
+  return (
+    &lt;p id={id} className="field-error"&gt;
+      {messages.join(' ')}
+    &lt;/p&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p><code>messages: string[] | undefined</code> rather than <code>messages?: string[]</code>: the prop is required, so every field has to say "here are my messages, if any", and you cannot forget one by accident. It accepts <code>errors.title</code> directly. Now the form itself. Create <code>src/components/NewEventForm.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/NewEventForm.tsx"><code class="language-tsx">import { useActionState } from 'react'
+import type { NewEvent } from '../api/types.ts'
+import { sites } from '../data/sites.ts'
+import {
+  emptyValues,
+  readValues,
+  toNewEvent,
+  validateEvent,
+  type EventField,
+  type EventFormValues,
+  type FieldErrors,
+} from '../utils/eventForm.ts'
+import { formatDate, toDateString } from '../utils/format.ts'
+import { FieldError } from './FieldError.tsx'
+
+// What the form shows: what the person typed and what to fix, or a cleanup ready to save
+type FormState =
+  | { kind: 'editing'; values: EventFormValues; errors: FieldErrors }
+  | { kind: 'ready'; event: NewEvent }
+
+const initialState: FormState = { kind: 'editing', values: emptyValues, errors: {} }
+
+// The form's action: React calls it with the previous state and the submitted FormData
+function planCleanup(_previous: FormState, formData: FormData): FormState {
+  const values = readValues(formData)
+  const errors = validateEvent(values, toDateString(new Date()))
+  if (Object.keys(errors).length &gt; 0) {
+    return { kind: 'editing', values, errors }
+  }
+  // The button that submitted the form sends its own name and value
+  const status = formData.get('status') === 'scheduled' ? 'scheduled' : 'draft'
+  return { kind: 'ready', event: toNewEvent(values, status) }
+}
+
+export function NewEventForm() {
+  const [state, formAction, isPending] = useActionState(planCleanup, initialState)
+  const values = state.kind === 'editing' ? state.values : emptyValues
+  const errors = state.kind === 'editing' ? state.errors : {}
+
+  // The props every field needs: its name, what to show, and a link to its message
+  function fieldProps(field: EventField) {
+    const invalid = errors[field] !== undefined
+    return {
+      id: field,
+      name: field,
+      defaultValue: values[field],
+      'aria-invalid': invalid,
+      'aria-describedby': invalid ? `${field}-error` : undefined,
+    }
+  }
+
+  return (
+    &lt;&gt;
+      &lt;p role="status" className="form-status"&gt;
+        {state.kind === 'ready' &amp;&amp; (
+          &lt;&gt;
+            Ready to save: &lt;strong&gt;{state.event.title}&lt;/strong&gt;,{' '}
+            {formatDate(state.event.date)}, {state.event.startTime} to {state.event.endTime}, as{' '}
+            {state.event.status === 'scheduled' ? 'a published cleanup' : 'a draft'}.
+          &lt;/&gt;
+        )}
+      &lt;/p&gt;
+      &lt;form action={formAction} noValidate className="event-form"&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="title"&gt;Title (5 to 80 characters)&lt;/label&gt;
+          &lt;input type="text" {...fieldProps('title')} /&gt;
+          &lt;FieldError id="title-error" messages={errors.title} /&gt;
+        &lt;/div&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="siteId"&gt;Beach site&lt;/label&gt;
+          {/* React reads a select's defaultValue only when it creates the select: a new key */}
+          {/* makes a new select whenever the value to show changes */}
+          &lt;select key={values.siteId} {...fieldProps('siteId')}&gt;
+            &lt;option value=""&gt;Choose a site&lt;/option&gt;
+            {sites.map((site) =&gt; (
+              &lt;option key={site.id} value={site.id}&gt;
+                {site.name}
+              &lt;/option&gt;
+            ))}
+          &lt;/select&gt;
+          &lt;FieldError id="siteId-error" messages={errors.siteId} /&gt;
+        &lt;/div&gt;
+        &lt;div className="form-row"&gt;
+          &lt;div className="field"&gt;
+            &lt;label htmlFor="date"&gt;Date&lt;/label&gt;
+            &lt;input type="date" {...fieldProps('date')} /&gt;
+            &lt;FieldError id="date-error" messages={errors.date} /&gt;
+          &lt;/div&gt;
+          &lt;div className="field"&gt;
+            &lt;label htmlFor="startTime"&gt;Starts&lt;/label&gt;
+            &lt;input type="time" {...fieldProps('startTime')} /&gt;
+            &lt;FieldError id="startTime-error" messages={errors.startTime} /&gt;
+          &lt;/div&gt;
+          &lt;div className="field"&gt;
+            &lt;label htmlFor="endTime"&gt;Ends&lt;/label&gt;
+            &lt;input type="time" {...fieldProps('endTime')} /&gt;
+            &lt;FieldError id="endTime-error" messages={errors.endTime} /&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="capacity"&gt;Volunteers needed (1 to 200)&lt;/label&gt;
+          &lt;input type="number" min={1} max={200} {...fieldProps('capacity')} /&gt;
+          &lt;FieldError id="capacity-error" messages={errors.capacity} /&gt;
+        &lt;/div&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="meetingPoint"&gt;Meeting point&lt;/label&gt;
+          &lt;input type="text" {...fieldProps('meetingPoint')} /&gt;
+          &lt;FieldError id="meetingPoint-error" messages={errors.meetingPoint} /&gt;
+        &lt;/div&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="description"&gt;Description (optional)&lt;/label&gt;
+          &lt;textarea rows={4} {...fieldProps('description')} /&gt;
+          &lt;FieldError id="description-error" messages={errors.description} /&gt;
+        &lt;/div&gt;
+        &lt;div className="form-actions"&gt;
+          &lt;button
+            type="submit"
+            name="status"
+            value="draft"
+            className="button-secondary"
+            disabled={isPending}
+          &gt;
+            Save as draft
+          &lt;/button&gt;
+          &lt;button
+            type="submit"
+            name="status"
+            value="scheduled"
+            className="button-primary"
+            disabled={isPending}
+          &gt;
+            Publish
+          &lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/form&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Work through it top to bottom:</p>
+                    <ul>
+                        <li><strong><code>FormState</code></strong> is a union on <code>kind</code>: <code>editing</code> (what was typed and what to fix) or <code>ready</code> (a checked <code>NewEvent</code>). A state can never have both errors and a finished cleanup.</li>
+                        <li><strong><code>planCleanup</code></strong> lives outside the component: it uses no props and no state of its own, only its parameters, like <code>matchesFilters</code> in Lesson 3.4. It reads, checks, and returns the next state. <code>new Date()</code> here is fine: an action is not rendering, so the purity rule from Lesson 3.1 does not apply.</li>
+                        <li><strong>The submit buttons</strong> both have <code>name="status"</code>, so <code>formData.get('status')</code> says which one was pressed. Anything but <code>'scheduled'</code> counts as a draft, which is also what <kbd>Enter</kbd> in a text field does: it presses the <em>first</em> submit button, "Save as draft", the safe choice.</li>
+                        <li><strong><code>values</code> and <code>defaultValue</code></strong>: React resets the form after every action. Each field's <code>defaultValue</code> is what was submitted (while <code>editing</code>), or empty (when <code>ready</code>), so after a submit with mistakes the reset puts everything back as typed, and after a good one the form is empty for the next cleanup. Hover over <code>errors</code>: TypeScript worked out <code>Partial&lt;Record&lt;EventField, string[]&gt;&gt;</code> from both branches, so <code>errors[field]</code> is allowed.</li>
+                        <li><strong><code>fieldProps</code></strong> returns the five props every field needs, and <code>{...fieldProps('title')}</code> spreads them onto the element: each property becomes a prop. Its return type is inferred, and TypeScript still checks each spread prop's type against what the element accepts: <code>'aria-invalid': 'yes'</code> would be a TS2322 error.</li>
+                        <li><strong>The <code>key</code> on the <code>&lt;select&gt;</code></strong> deals with a quirk, explained in the version note below.</li>
+                        <li><strong>The status line</strong> is always in the page, empty until there is something to say. A <code>role="status"</code> region that appears together with its text may not be announced; one that is already there and gets new text is.</li>
+                        <li><strong><code>isPending</code></strong> disables both buttons while the action runs. With today's instant checks you will never see it; in Lesson 7.2 the action waits for the API, and this line is already in place.</li>
+                    </ul>
+                    <div class="card card-info">
+                        <h4>🧩 Version note: selects and the form reset</h4>
+                        <p>In React 19.3, which this course was checked with, React applies a <code>&lt;select&gt;</code>'s <code>defaultValue</code> only when it creates the select. When the form resets after an action, the select goes back to the value it was <em>created</em> with, not the newest <code>defaultValue</code>: without the <code>key</code>, an organizer who picked North Jetty finds "Choose a site" again after fixing a typo in the title. Text, date, time and number inputs, text areas and checkboxes do follow the newest <code>defaultValue</code> (or <code>defaultChecked</code>). <code>key={values.siteId}</code> uses what Lesson 3.3 taught about keys: when the value to show changes, the key changes, and React makes a new select that starts with it. If a later React version changes this, the <code>key</code> does no harm.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: A page, a way in, and styles <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>src/pages/NewEventPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/NewEventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/NewEventPage.tsx"><code class="language-tsx">import { NewEventForm } from '../components/NewEventForm.tsx'
+
+export function NewEventPage() {
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Plan a cleanup&lt;/h1&gt;
+      &lt;p className="lead"&gt;
+        Fill in the basics. Save it as a draft to finish later, or publish it so volunteers can
+        sign up.
+      &lt;/p&gt;
+      &lt;NewEventForm /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Give it an address in <code>App.tsx</code>'s temporary page switch (React Router replaces this in Lesson 6.1). Change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx"> import { HomePage } from './pages/HomePage.tsx'
++import { NewEventPage } from './pages/NewEventPage.tsx'
+ import { SitesPage } from './pages/SitesPage.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx"> function CurrentPage() {
++  if (path === '/events/new') {
++    return &lt;NewEventPage /&gt;
++  }
+   if (path === '/events') {</code></pre>
+                    </div>
+                    <p>Then a link to it under the events page's heading, in <code>src/pages/EventsPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx">       &lt;h1&gt;Cleanup events&lt;/h1&gt;
++      &lt;p&gt;
++        &lt;a href="/events/new"&gt;Plan a cleanup&lt;/a&gt;
++      &lt;/p&gt;
+       &lt;EventFilters</code></pre>
+                    </div>
+                    <p>Anyone can open the page for now; Lesson 6.3 lets only organizers in, and the API already refuses everyone else. Last, the styles. The error color needs its own dark-mode value (Coral is too dark on the dark page), so add a role token next to the others in <code>src/index.css</code>, in <code>:root</code> and in the dark-mode block:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css">   --border: #e4dccb;
++  --error: var(--coral);</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css">     --border: #2b4257;
++    --error: #ff9b85;</code></pre>
+                    </div>
+                    <p>Let the field styles from Lesson 3.4 cover text areas too:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css"> .field input,
+-.field select {
++.field select,
++.field textarea {</code></pre>
+                    </div>
+                    <p>And add the form's own rules at the end of the file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="excerpt"><code class="language-css">
+/* Forms (Lesson 3.5) */
+.event-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 40rem;
+}
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem 1.5rem;
+}
+
+.form-row .field input {
+  min-width: 10rem;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--error);
+  font-weight: 400;
+}
+
+.field [aria-invalid='true'] {
+  border: 2px solid var(--error);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.button-primary {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--link);
+  border-radius: 0.5rem;
+  background: var(--link);
+  color: var(--page);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-status {
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--link);
+  background: var(--surface);
+}
+
+/* Kept in the page while empty, so screen readers notice when a message arrives */
+.form-status:empty {
+  padding: 0;
+  border: 0;
+}</code></pre>
+                    </div>
+                    <p>The red outline uses an attribute selector, <code>[aria-invalid='true']</code>: the style follows the same fact the screen reader announces, so the two cannot disagree. The primary button uses the page color on the link color, which keeps its contrast in both modes.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Try it, check it, break it <span class="step-time">(8 min)</span></h3>
+                    <p>Open <code>http://localhost:5173/events</code> and follow <strong>Plan a cleanup</strong>. Type <code>Dune</code> as the title, pick North Jetty, enter a start of 09:00 and an end of 08:00, 12 volunteers, and press <strong>Publish</strong>:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_11/11-form-errors.png" alt="The Plan a cleanup page after pressing Publish. The title field still says Dune and is outlined in red, with the message Use at least 5 characters for the title. under it. Beach site keeps North Jetty. Date is empty with Pick a date. The start time says 09:00, the end time 08:00 with The end time must be after the start time. Volunteers needed keeps 12. The empty meeting point says Say where volunteers meet (at least 3 characters)." width="672" height="897" loading="lazy">
+                        <figcaption>After a submit with mistakes, every field keeps what was typed, and each problem has a message right under its field that says how to fix it.</figcaption>
+                    </figure>
+                    <p>Four messages, each under its field, and everything you typed is still there, including the site. Now fix them: a longer title such as <code>Dune Grass Cleanup</code>, a date in the coming weeks, an end time of 11:30, a meeting point. Press <strong>Publish</strong> again:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_11/11-form-ready.png" alt="The top of the Plan a cleanup page after a successful Publish. A status box under the introduction reads Ready to save: Dune Grass Cleanup, then the date with its weekday, 09:00 to 11:30, as a published cleanup. Below it the form is empty again, ready for the next cleanup." width="976" height="744" loading="lazy">
+                        <figcaption>When every check passes, the action returns the <code>ready</code> state, React clears the form, and the status line says what would be saved.</figcaption>
+                    </figure>
+                    <p>Fill it in once more and press <kbd>Enter</kbd> in the meeting point field: the status line ends "as a draft." Check the page at phone size and in dark mode, and try it with the keyboard only: <kbd>Tab</kbd> through the fields and the two buttons.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_11/11-form-phone-dark.png" alt="The Plan a cleanup form on a phone-sized screen in dark mode. The fields stack in one column; the date, start and end fields each sit on their own line. Messages such as Pick a date. and The end time must be after the start time. appear in light coral under the fields, which have coral outlines." width="390" height="900" loading="lazy">
+                        <figcaption>The same messages at 390 pixels in dark mode: the error color has its own dark-mode value, so it stays readable on the dark page.</figcaption>
+                    </figure>
+                    <p>Then break it twice, undoing each change:</p>
+                    <ol>
+                        <li>In <code>NewEventForm.tsx</code>, change <code>{...fieldProps('title')}</code> to <code>{...fieldProps('titel')}</code> and run <code>npx tsc -b</code>.</li>
+                        <li>Remove <code>key={values.siteId}</code> from the <code>&lt;select&gt;</code>, then repeat the first submit with mistakes in the browser.</li>
+                    </ol>
+                    <figure class="screenshot">
+                        <img src="images/lesson_11/11-field-typo.png" alt="A terminal in shoreline-hq. npx tsc -b reports one error in src/components/NewEventForm.tsx: TS2345, Argument of type titel is not assignable to parameter of type EventField, with fieldProps(&#x27;titel&#x27;) underlined." width="1100" height="258" loading="lazy">
+                        <figcaption>Field names are a union type, <code>EventField</code>, so a misspelled name is an error in the editor instead of a field that is always empty.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (1: a misspelled field name)</h4>
+                        <pre><code>src/components/NewEventForm.tsx:66:45 - error TS2345: Argument of type '"titel"' is not assignable to parameter of type 'EventField'.
+
+66           &lt;input type="text" {...fieldProps('titel')} /&gt;
+                                               ~~~~~~~
+
+
+Found 1 error in src/components/NewEventForm.tsx:66</code></pre>
+                    </div>
+                    <p>The second change passes <code>npx tsc -b</code> without a word, and the browser shows the problem: after the submit, every field keeps its text but Beach site is back to "Choose a site". Put the <code>key</code> back. Then run the full check:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run build)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 41 modules transformed.
+computing gzip size...
+dist/index.html                   0.46 kB │ gzip:  0.30 kB
+dist/assets/index-DW_7JB8R.css    3.91 kB │ gzip:  1.32 kB
+dist/assets/index-Cu4CzZZ5.js   244.03 kB │ gzip: 75.45 kB
+
+✓ built in 103ms</code></pre>
+                    </div>
+                    <p>41 modules instead of 37: <code>eventForm.ts</code>, <code>FieldError</code>, <code>NewEventForm</code> and <code>NewEventPage</code>. (Times, sizes and hashes will differ.)</p>
+                    <p><strong>Your own project:</strong> pick the most important form in your Lesson 11.1 app. Write its <code>Values</code> type (every field as text), its result type as a union on <code>kind</code>, and three field messages that say how to fix the problem without blaming anyone.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>src/utils/eventForm.ts</code> has the <code>EventField</code>, <code>EventFormValues</code> and <code>FieldErrors</code> types, reads the form with <code>typeof</code> narrowing, and checks it with the API's rules</li>
+                        <li>☐ <code>NewEventForm</code> uses <code>useActionState</code> with a <code>FormState</code> union, keeps what was typed after a submit with mistakes, and clears itself after a good one</li>
+                        <li>☐ Every field has a label, a <code>name</code>, and, when it needs fixing, <code>aria-invalid</code> and <code>aria-describedby</code> pointing at its message</li>
+                        <li>☐ "Save as draft" and "Publish" both work, and the status line says what is ready to save</li>
+                        <li>☐ <code>/events/new</code> is reachable from the events page, and looks right on a phone and in dark mode</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> all pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Quick notes</h3>
+                    <p>In <code>src/Scratch.tsx</code>, write a <code>QuickNotes</code> component: a form with one uncontrolled text field and an <strong>Add note</strong> button, whose action adds the note to a list in state (skip empty notes). Under the form, show "N notes. Latest: ..." ("1 note" for one). Render it by temporarily returning it from <code>CurrentPage</code> in <code>App.tsx</code>. You do not need <code>useActionState</code>: which Hook do you need instead, and why?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The list is state that grows: <code>useState&lt;string[]&gt;([])</code> (Lesson 3.4's empty-array rule) and an updater that copies, <code>[...current, note]</code>. The action is a plain <code>(formData: FormData) =&gt; void</code>. <code>notes.at(-1)</code> is the last item, or <code>undefined</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+export function QuickNotes() {
+  const [notes, setNotes] = useState&lt;string[]&gt;([])
+
+  function addNote(formData: FormData) {
+    const note = formData.get('note')
+    if (typeof note === 'string' &amp;&amp; note.trim() !== '') {
+      setNotes((current) =&gt; [...current, note.trim()])
+    }
+  }
+
+  return (
+    &lt;section&gt;
+      &lt;h2&gt;Notes for the crew&lt;/h2&gt;
+      &lt;form action={addNote}&gt;
+        &lt;label htmlFor="quick-note"&gt;New note&lt;/label&gt;
+        &lt;input id="quick-note" name="note" /&gt;
+        &lt;button type="submit"&gt;Add note&lt;/button&gt;
+      &lt;/form&gt;
+      &lt;p&gt;
+        {notes.length} {notes.length === 1 ? 'note' : 'notes'}. Latest: {notes.at(-1) ?? 'none yet'}
+      &lt;/p&gt;
+    &lt;/section&gt;
+  )
+}</code></pre>
+                        <p>After two notes the line says <strong>2 notes. Latest: Meet at the stairs</strong>, and the field is empty after each one: React reset the form. <code>useState</code> is enough because the action does not need the previous result to work out the next one; it only adds to a list, and the updater function gives it the current list. <code>useActionState</code> is for when the action's <em>return value</em> is what you show. Put <code>App.tsx</code> back and delete <code>Scratch.tsx</code> when you are done.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Why defaultValue matters</h3>
+                    <p>In <code>NewEventForm.tsx</code>, delete the line <code>defaultValue: values[field],</code> from <code>fieldProps</code>. Run <code>npx tsc -b</code> and <code>npm run lint</code> (both pass). Then in the browser, repeat Step 5's first submit with mistakes. What happens to the fields, and to the messages? Explain it, then put the line back.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>What does React do to a form after every action? And what does a field go back to when it has no <code>defaultValue</code>?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>The same four messages appear, but every field is empty, the site menu included: the organizer has to type everything again to fix one short title. The action ran and returned the typed values in the state, but nothing put them back into the fields. React reset the form, as it does after every action, and a field without a <code>defaultValue</code> resets to empty. The state remembered; the fields did not. The two tools cannot catch this: it is behavior, not types.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: What the crew brings (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 20 minutes).</em></p>
+                    <p>The API's <code>NewEvent</code> has an optional <code>suppliesProvided: string[]</code>. Add a group of checkboxes, "We bring", for Gloves, Bags, Grabbers and Water, all named <code>suppliesProvided</code>, and send the ticked ones with the new cleanup. Ticked boxes must stay ticked after a submit with mistakes, and clear after a good one.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>formData.getAll('suppliesProvided')</code> gives every ticked box's value; keep the strings with <code>filter((value) =&gt; typeof value === 'string')</code> (TypeScript infers that this callback narrows, so the result is <code>string[]</code>). Group checkboxes in a <code>&lt;fieldset&gt;</code> with a <code>&lt;legend&gt;</code>. The <code>editing</code> state needs the ticked supplies too, and each checkbox gets <code>defaultChecked</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/utils/eventForm.ts</div>
+                            <pre data-snippet><code class="language-ts">// Reading and checking the "Plan a cleanup" form (Lesson 3.5).
+// Module 8 replaces these hand-written checks with one Zod schema.
+import type { DateString, NewEvent } from '../api/types.ts'
+import { sites } from '../data/sites.ts'
+
+// The form's fields, named like the API's NewEvent properties
+export type EventField =
+  | 'title'
+  | 'siteId'
+  | 'date'
+  | 'startTime'
+  | 'endTime'
+  | 'capacity'
+  | 'meetingPoint'
+  | 'description'
+
+// What the person typed, as text, so the form can show it again
+export type EventFormValues = Record&lt;EventField, string&gt;
+
+// The API's fieldErrors shape (field name: messages), with names TypeScript can check
+export type FieldErrors = Partial&lt;Record&lt;EventField, string[]&gt;&gt;
+
+export const emptyValues: EventFormValues = {
+  title: '',
+  siteId: '',
+  date: '',
+  startTime: '',
+  endTime: '',
+  capacity: '',
+  meetingPoint: '',
+  description: '',
+}
+
+// formData.get() returns a string, a File (from a file input) or null (no such field)
+function readText(formData: FormData, name: EventField): string {
+  const value = formData.get(name)
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+export function readValues(formData: FormData): EventFormValues {
+  return {
+    title: readText(formData, 'title'),
+    siteId: readText(formData, 'siteId'),
+    date: readText(formData, 'date'),
+    startTime: readText(formData, 'startTime'),
+    endTime: readText(formData, 'endTime'),
+    capacity: readText(formData, 'capacity'),
+    meetingPoint: readText(formData, 'meetingPoint'),
+    description: readText(formData, 'description'),
+  }
+}
+
+// The API's rules for a new cleanup, with messages that say how to fix the problem
+export function validateEvent(values: EventFormValues, today: DateString): FieldErrors {
+  const errors: FieldErrors = {}
+  function add(field: EventField, message: string) {
+    errors[field] = [...(errors[field] ?? []), message]
+  }
+
+  if (values.title === '') add('title', 'Add a title.')
+  else if (values.title.length &lt; 5) add('title', 'Use at least 5 characters for the title.')
+  else if (values.title.length &gt; 80) add('title', 'Keep the title to 80 characters or fewer.')
+
+  if (!sites.some((site) =&gt; site.id === values.siteId)) {
+    add('siteId', 'Choose one of the cleanup sites.')
+  }
+
+  if (values.date === '') add('date', 'Pick a date.')
+  else if (values.date &lt; today) add('date', 'Pick today or a later date.')
+
+  if (values.startTime === '') add('startTime', 'Pick a start time.')
+  if (values.endTime === '') add('endTime', 'Pick an end time.')
+  else if (values.startTime !== '' &amp;&amp; values.endTime &lt;= values.startTime) {
+    add('endTime', 'The end time must be after the start time.')
+  }
+
+  const capacity = Number(values.capacity)
+  if (values.capacity === '' || !Number.isInteger(capacity) || capacity &lt; 1 || capacity &gt; 200) {
+    add('capacity', 'Capacity must be a whole number from 1 to 200.')
+  }
+
+  if (values.meetingPoint.length &lt; 3) {
+    add('meetingPoint', 'Say where volunteers meet (at least 3 characters).')
+  } else if (values.meetingPoint.length &gt; 120) {
+    add('meetingPoint', 'Keep the meeting point to 120 characters or fewer.')
+  }
+
+  if (values.description.length &gt; 2000) {
+    add('description', 'Keep the description to 2000 characters or fewer.')
+  }
+  return errors
+}
+
+// The supplies the crew can bring: one checkbox each, all named suppliesProvided
+export const supplyChoices = ['Gloves', 'Bags', 'Grabbers', 'Water']
+
+// getAll() returns every checked box's value (FormDataEntryValue[]): keep the strings
+export function readSupplies(formData: FormData): string[] {
+  return formData.getAll('suppliesProvided').filter((value) =&gt; typeof value === 'string')
+}
+
+// Only called once validateEvent found nothing: the text becomes the API's types
+export function toNewEvent(
+  values: EventFormValues,
+  status: 'draft' | 'scheduled',
+  supplies: string[],
+): NewEvent {
+  return {
+    title: values.title,
+    siteId: values.siteId,
+    date: values.date,
+    startTime: values.startTime,
+    endTime: values.endTime,
+    capacity: Number(values.capacity),
+    meetingPoint: values.meetingPoint,
+    description: values.description,
+    suppliesProvided: supplies,
+    status,
+  }
+}</code></pre>
+                        </div>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/NewEventForm.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import { useActionState } from 'react'
+import type { NewEvent } from '../api/types.ts'
+import { sites } from '../data/sites.ts'
+import {
+  emptyValues,
+  readSupplies,
+  readValues,
+  supplyChoices,
+  toNewEvent,
+  validateEvent,
+  type EventField,
+  type EventFormValues,
+  type FieldErrors,
+} from '../utils/eventForm.ts'
+import { formatDate, toDateString } from '../utils/format.ts'
+import { FieldError } from './FieldError.tsx'
+
+// What the form shows: what the person typed and what to fix, or a cleanup ready to save
+type FormState =
+  | { kind: 'editing'; values: EventFormValues; supplies: string[]; errors: FieldErrors }
+  | { kind: 'ready'; event: NewEvent }
+
+const initialState: FormState = {
+  kind: 'editing',
+  values: emptyValues,
+  supplies: [],
+  errors: {},
+}
+
+// The form's action: React calls it with the previous state and the submitted FormData
+function planCleanup(_previous: FormState, formData: FormData): FormState {
+  const values = readValues(formData)
+  const supplies = readSupplies(formData)
+  const errors = validateEvent(values, toDateString(new Date()))
+  if (Object.keys(errors).length &gt; 0) {
+    return { kind: 'editing', values, supplies, errors }
+  }
+  // The button that submitted the form sends its own name and value
+  const status = formData.get('status') === 'scheduled' ? 'scheduled' : 'draft'
+  return { kind: 'ready', event: toNewEvent(values, status, supplies) }
+}
+
+export function NewEventForm() {
+  const [state, formAction, isPending] = useActionState(planCleanup, initialState)
+  const values = state.kind === 'editing' ? state.values : emptyValues
+  const supplies = state.kind === 'editing' ? state.supplies : []
+  const errors = state.kind === 'editing' ? state.errors : {}
+
+  // The props every field needs: its name, what to show, and a link to its message
+  function fieldProps(field: EventField) {
+    const invalid = errors[field] !== undefined
+    return {
+      id: field,
+      name: field,
+      defaultValue: values[field],
+      'aria-invalid': invalid,
+      'aria-describedby': invalid ? `${field}-error` : undefined,
+    }
+  }
+
+  return (
+    &lt;&gt;
+      &lt;p role="status" className="form-status"&gt;
+        {state.kind === 'ready' &amp;&amp; (
+          &lt;&gt;
+            Ready to save: &lt;strong&gt;{state.event.title}&lt;/strong&gt;,{' '}
+            {formatDate(state.event.date)}, {state.event.startTime} to {state.event.endTime}, as{' '}
+            {state.event.status === 'scheduled' ? 'a published cleanup' : 'a draft'}.
+          &lt;/&gt;
+        )}
+      &lt;/p&gt;
+      &lt;form action={formAction} noValidate className="event-form"&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="title"&gt;Title (5 to 80 characters)&lt;/label&gt;
+          &lt;input type="text" {...fieldProps('title')} /&gt;
+          &lt;FieldError id="title-error" messages={errors.title} /&gt;
+        &lt;/div&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="siteId"&gt;Beach site&lt;/label&gt;
+          {/* React reads a select's defaultValue only when it creates the select: a new key */}
+          {/* makes a new select whenever the value to show changes */}
+          &lt;select key={values.siteId} {...fieldProps('siteId')}&gt;
+            &lt;option value=""&gt;Choose a site&lt;/option&gt;
+            {sites.map((site) =&gt; (
+              &lt;option key={site.id} value={site.id}&gt;
+                {site.name}
+              &lt;/option&gt;
+            ))}
+          &lt;/select&gt;
+          &lt;FieldError id="siteId-error" messages={errors.siteId} /&gt;
+        &lt;/div&gt;
+        &lt;div className="form-row"&gt;
+          &lt;div className="field"&gt;
+            &lt;label htmlFor="date"&gt;Date&lt;/label&gt;
+            &lt;input type="date" {...fieldProps('date')} /&gt;
+            &lt;FieldError id="date-error" messages={errors.date} /&gt;
+          &lt;/div&gt;
+          &lt;div className="field"&gt;
+            &lt;label htmlFor="startTime"&gt;Starts&lt;/label&gt;
+            &lt;input type="time" {...fieldProps('startTime')} /&gt;
+            &lt;FieldError id="startTime-error" messages={errors.startTime} /&gt;
+          &lt;/div&gt;
+          &lt;div className="field"&gt;
+            &lt;label htmlFor="endTime"&gt;Ends&lt;/label&gt;
+            &lt;input type="time" {...fieldProps('endTime')} /&gt;
+            &lt;FieldError id="endTime-error" messages={errors.endTime} /&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="capacity"&gt;Volunteers needed (1 to 200)&lt;/label&gt;
+          &lt;input type="number" min={1} max={200} {...fieldProps('capacity')} /&gt;
+          &lt;FieldError id="capacity-error" messages={errors.capacity} /&gt;
+        &lt;/div&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="meetingPoint"&gt;Meeting point&lt;/label&gt;
+          &lt;input type="text" {...fieldProps('meetingPoint')} /&gt;
+          &lt;FieldError id="meetingPoint-error" messages={errors.meetingPoint} /&gt;
+        &lt;/div&gt;
+        &lt;fieldset className="supplies"&gt;
+          &lt;legend&gt;We bring&lt;/legend&gt;
+          {supplyChoices.map((choice) =&gt; (
+            &lt;label key={choice}&gt;
+              &lt;input
+                type="checkbox"
+                name="suppliesProvided"
+                value={choice}
+                defaultChecked={supplies.includes(choice)}
+              /&gt;{' '}
+              {choice}
+            &lt;/label&gt;
+          ))}
+        &lt;/fieldset&gt;
+        &lt;div className="field"&gt;
+          &lt;label htmlFor="description"&gt;Description (optional)&lt;/label&gt;
+          &lt;textarea rows={4} {...fieldProps('description')} /&gt;
+          &lt;FieldError id="description-error" messages={errors.description} /&gt;
+        &lt;/div&gt;
+        &lt;div className="form-actions"&gt;
+          &lt;button
+            type="submit"
+            name="status"
+            value="draft"
+            className="button-secondary"
+            disabled={isPending}
+          &gt;
+            Save as draft
+          &lt;/button&gt;
+          &lt;button
+            type="submit"
+            name="status"
+            value="scheduled"
+            className="button-primary"
+            disabled={isPending}
+          &gt;
+            Publish
+          &lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/form&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                        </div>
+                        <p>Tick Gloves and Water and submit with mistakes: both stay ticked, because checkboxes follow the newest <code>defaultChecked</code> when the form resets (only the select needed a key). The course's own code continues without this group; Lesson 8.2 builds lists of fields with React Hook Form's field arrays.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> A form has <code>action={saveNote}</code> and one uncontrolled input with <code>defaultValue=""</code>. Someone types a note and presses the submit button. What is in the input after <code>saveNote</code> has finished?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing in your code changed the field, but something else touches the form after an action. What?">
+                                A) The note, because uncontrolled inputs keep their text
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="React resets the form after an action, and an uncontrolled field goes back to its defaultValue, here an empty string. That is why the project passes the submitted values back as defaultValue.">
+                                B) Nothing: React reset the form to its default values
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="A function action stops the browser's page load. What does React do instead when the action is done?">
+                                C) The page reloads, so the whole app starts over
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> What is the type of <code>formData.get('title')</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="What if the form has no field with that name? What did tsc say when this was assigned to a string?">
+                                A) <code>string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Strict TypeScript describes FormData precisely. Which two kinds of value can a form send, and what if the field is missing?">
+                                B) <code>any</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Close, but a missing field does not give undefined. What does the browser return?">
+                                C) <code>string | undefined</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="FormDataEntryValue is File or string, and get returns null when there is no such field. Narrow it with typeof value === string before using it.">
+                                D) <code>FormDataEntryValue | null</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> In which order does React pass arguments to an action used with <code>useActionState</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The previous state comes first, then the FormData. Swapping them gives TS2769, No overload matches this call, because the state is not a FormData.">
+                                A) The previous state, then the <code>FormData</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is the order you might guess. What did tsc report when the waiting-list example used it?">
+                                B) The <code>FormData</code>, then the previous state
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Then the action could not build on the last result. What is its first parameter called in planCleanup?">
+                                C) Only the <code>FormData</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why does the project's <code>&lt;select&gt;</code> have <code>key={values.siteId}</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Keys are needed on items made by map. Is the select made by map?">
+                                A) Every element in a form needs a key
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="FormData uses the name attribute, not the key. What happened to the menu when the key was removed?">
+                                B) So that <code>FormData</code> sends the site under the right name
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="In React 19.3 a select's defaultValue is applied only when the select is created, so after the reset it went back to Choose a site. A new key makes a new select with the newest defaultValue.">
+                                C) So that the chosen site survives the form reset: a new key makes a new select that starts with the newest value
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The select is still uncontrolled: there is no value prop and no onChange. What does the key change?">
+                                D) It turns the select into a controlled input
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> The form already checks every rule the API has. Why does shoreline-api check the same data again?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Both use the same rules. What could reach the API without going through your form at all?">
+                                A) Because the form's checks might be slower
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Anyone can send the API a request without your form, with curl or a script. Front-end checks are for people; the server is the authority and must check everything it receives.">
+                                B) Because anyone can send it a request without the form, so the server must never trust what arrives
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript types are erased before the code runs. Do they check anything in the browser or on the server at run time?">
+                                C) Because TypeScript's types are not available in the API
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should every form be uncontrolled now?</summary>
+                    <p>No. Use controlled inputs when the screen needs the value while someone types: the events page's search, a character counter, a field that changes another one. Use uncontrolled fields with an action for fill-in-and-submit forms. Mixing is fine too: one controlled field in an otherwise uncontrolled form works, as long as you decide what it should show after the reset.</p>
+                </details>
+                <details>
+                    <summary>What is <code>useFormStatus</code>? I saw it next to <code>useActionState</code>.</summary>
+                    <p>A Hook from <code>react-dom</code> that a component <em>inside</em> a form can call to ask "is my form submitting?". It is handy for a reusable <code>SubmitButton</code> component that disables itself without receiving <code>isPending</code> as a prop. The HQ's buttons sit in the same component as <code>useActionState</code>, so <code>isPending</code> is simpler here.</p>
+                </details>
+                <details>
+                    <summary>Why not use <code>required</code> and let the browser do the checking?</summary>
+                    <p>You can, and for a tiny form it is reasonable. The browser's bubbles cannot show the API's rules (a date that must not be in the past, an end after the start), their wording changes between browsers, and they vanish when focus moves. With <code>noValidate</code>, one set of messages covers everything and stays on the page. The input types (<code>date</code>, <code>time</code>, <code>number</code>) still help on every device.</p>
+                </details>
+                <details>
+                    <summary>Can anyone open <code>/events/new</code> right now?</summary>
+                    <p>Yes, and nothing is saved yet, so no harm is done. When saving arrives, the API itself refuses anyone who is not a signed-in organizer (401 or 403), whatever the front end shows. Lesson 6.3 also hides the page from non-organizers, which is about a friendly experience, not security.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add a live character count under the description, "N of 2000 characters", like the meeting point example in the first section. That makes the textarea controlled, inside a form that resets after every action. Decide what the count (and the text) should show after a submit with mistakes and after a good one, make it happen, and write down why you chose that. Hint: the <code>key</code> idea from this lesson is one way; lifting the description into the action's state is another.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Follow one press of <strong>Publish</strong> with mistakes from start to finish, in your own words: what React collects, what <code>planCleanup</code> returns, what the component draws, what the reset does, and how the typed title gets back into its field. Then rewrite the worst error message you have seen in an app you use, the way this lesson's table suggests.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Controlled inputs keep their value in React state (<code>value</code> + <code>onChange</code>); uncontrolled inputs keep it in the browser and are read through <code>FormData</code> when the form is sent</li>
+                        <li>A function in a form's <code>action</code> receives the form's <code>FormData</code>; React resets the form afterwards, so fields show their <code>defaultValue</code> again</li>
+                        <li><code>formData.get</code> returns <code>FormDataEntryValue | null</code>: narrow it with <code>typeof</code>, never with <code>as string</code>, and give every field a <code>name</code></li>
+                        <li><code>useActionState(action, initialState)</code> returns <code>[state, formAction, isPending]</code>; the action gets the previous state first, then the <code>FormData</code>, and its return value is the new state</li>
+                        <li>Good field messages say how to fix the problem, sit under their field, and are linked with <code>aria-invalid</code> and <code>aria-describedby</code>; the server always checks again</li>
+                        <li>Module 8 replaces the hand-written types and checks with one Zod schema and React Hook Form</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up form and Hook patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>See the API's rules and error shapes</td><td><a href="api.html">Shoreline API reference</a></td></tr>
+                            <tr><td>Read React's reference for forms and actions</td><td><a href="https://react.dev/reference/react-dom/components/form" target="_blank" rel="noopener">React: &lt;form&gt;</a></td></tr>
+                            <tr><td>Read React's reference for the Hook</td><td><a href="https://react.dev/reference/react/useActionState" target="_blank" rel="noopener">React: useActionState</a></td></tr>
+                            <tr><td>Read about accessible form errors</td><td><a href="https://www.w3.org/WAI/tutorials/forms/notifications/" target="_blank" rel="noopener">W3C WAI: User Notifications</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You can tell controlled and uncontrolled inputs apart and pick the right one</li>
+                        <li>You read form data the safe way and saw what <code>as string</code> hides</li>
+                        <li>You turned submits into typed state with <code>useActionState</code>, including a pending state</li>
+                        <li>You wrote field messages that help, and connected them for screen readers</li>
+                        <li>Organizers can plan a cleanup in Shoreline Crew HQ, with checks that agree with the API</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The HQ now has an events page, a sites page and a form, all styled from one global stylesheet that is getting long. In <a href="lesson_12.html"><strong>Lesson 3.6: Styling and Accessible Components</strong></a> every component gets its own CSS Module, the headings get the crew's font, focus styles become visible for keyboard users, and you run your first accessibility check on the pages you have built.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass in <code>shoreline-hq</code>, and that <code>src/Scratch.tsx</code> is gone</li>
+                    <li>Use the form once with the keyboard only, and once at phone size</li>
+                    <li>Keep your own app's form types from the project for Lesson 11.1</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Forms look simple and are not: today you met the browser's rules, React's rules, TypeScript's rules and the API's rules, all on one page. If the reset and the select key felt like a lot, that is normal. You did not just copy a form, you watched each piece fail on purpose and saw why it is there, which is exactly what makes the form libraries in Module 8 feel obvious instead of magic. Every good form you ever fill in was built by someone who once found all of this confusing.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_10.html" class="prev-lesson">← Previous: State and Events</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_12.html" class="next-lesson">Next: Styling and Accessible Components →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

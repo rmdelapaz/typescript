@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Set up ts-lab, a TypeScript workbench next to Shoreline Crew HQ, and learn how TypeScript infers types, when to write annotations, the basic types and arrays, why unknown is safer than any, and how to read the errors you will meet most often. React + TypeScript: Build a Modern Web App Lesson 2.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Types and Inference - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>🔮 Lesson 2.1: Types and Inference</h1>
+                <p class="lead">Here is a secret that makes TypeScript much less work than it looks: most of the time, you do not write types at all. TypeScript watches the values you write and works out their types on its own, then holds the rest of your code to them. Your job is to know the few places where it cannot guess and to read what it tells you when something does not fit. Today you set up a small workbench for TypeScript experiments next to Shoreline Crew HQ, learn which types to write and which to leave to the compiler, meet the one type that switches checking off (and its safe twin), and practice reading the errors you will see for the rest of your career.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Set up a TypeScript workbench (<code>ts-lab</code>) with its own <code>package.json</code>, <code>tsconfig.json</code> and a check script</li>
+                        <li>Predict the type TypeScript infers for a value, including the difference between <code>let</code> and <code>const</code></li>
+                        <li>Decide when to write a type annotation: parameters, values that arrive later, and empty arrays</li>
+                        <li>Use the basic types (<code>string</code>, <code>number</code>, <code>boolean</code>, <code>null</code>, <code>undefined</code>) and typed arrays</li>
+                        <li>Explain why <code>unknown</code> is safer than <code>any</code> for data from outside your program, and check an <code>unknown</code> value with <code>typeof</code></li>
+                        <li>Read the errors TS2322, TS2345, TS7006, TS18046 and TS18047 and know what each one is asking you to fix</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_02.html">Lesson 1.2: Your Workspace</a> (Node.js 24 or newer, VS Code and your <code>shoreline</code> folder)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> the <code>ts-lab</code> workbench and <code>types.ts</code>, a typed script of Shoreline Crew's numbers, and you let inference do its work in Shoreline Crew HQ's <code>App.tsx</code></li>
+                    <li><span class="meta-label">🧩 Stack</span> TypeScript 7.0, Node.js 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> VS Code with your <code>shoreline</code> folder open and one terminal; the API and the dev server can stay off today</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-03-start.zip">lesson-03-start.zip</a> · Finished code: <a href="downloads/lesson-03-end.zip">lesson-03-end.zip</a>. Each folder has a README with the commands to run it. The finished code adds the <code>ts-lab</code> folder; run <code>npm ci</code> in it before <code>npm run check</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#workbench" class="toc-link">Your TypeScript Workbench</a></li>
+                        <li><a href="#inference" class="toc-link">Inference: TypeScript Works It Out</a></li>
+                        <li><a href="#annotations" class="toc-link">When to Write a Type</a></li>
+                        <li><a href="#basic-types" class="toc-link">The Basic Types and Arrays</a></li>
+                        <li><a href="#any-unknown" class="toc-link">any and unknown</a></li>
+                        <li><a href="#reading-errors" class="toc-link">Reading TypeScript's Errors</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Type the Crew's Numbers</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="workbench" class="lesson-section">
+                <h2>🧪 Your TypeScript Workbench</h2>
+                <p>For the four lessons of Module 2 you learn TypeScript on its own, before React joins in. Trying ideas inside Shoreline Crew HQ would mix two new things at once, so you get a second folder next to the app: <code>ts-lab</code>, a tiny Node project whose only job is to hold TypeScript files you run with <code>node</code> and check with <code>tsc</code>. Every lesson in this module adds a file to it.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the workbench in the supply shed</h4>
+                    <p>Before a new volunteer ties a knot on the boat, an organizer shows it on the workbench in the supply shed, where a wrong knot costs nothing. <code>ts-lab</code> is that bench: small, safe and made for trying things. What you learn on it goes into Shoreline Crew HQ (the boat) from Lesson 2.4 on.</p>
+                </div>
+
+                <h3>Create it</h3>
+                <p>Open your <code>shoreline</code> folder in VS Code and open a terminal (<kbd>Ctrl</kbd>+<kbd>`</kbd>). It starts in <code>shoreline</code>; if the prompt shows <code>shoreline-api</code> or <code>shoreline-hq</code>, type <code>cd ..</code> first. Then run these commands one at a time (they are the same in PowerShell, Command Prompt and macOS or Linux terminals):</p>
+                <pre class="terminal"><code class="language-bash">mkdir ts-lab
+cd ts-lab
+npm init -y
+npm install --save-dev --save-exact typescript@7.0.2
+npx tsc --init</code></pre>
+                <p><code>mkdir</code> makes the folder and <code>cd</code> moves into it. <code>npm init -y</code> writes a <code>package.json</code> with default answers (<code>-y</code> means "yes to every question"):</p>
+                <div class="card card-output">
+                    <h4>Expected output (npm init -y)</h4>
+                    <pre><code>Wrote to /Users/you/shoreline/ts-lab/package.json:
+
+{
+  "name": "ts-lab",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" &amp;&amp; exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}</code></pre>
+                </div>
+                <p>The path in the first line will be your own. <code>npm install --save-dev --save-exact typescript@7.0.2</code> installs the TypeScript compiler into this folder only. <code>--save-dev</code> records it as a <strong>development dependency</strong>, a tool you use while working rather than code that ships, and <code>--save-exact</code> records exactly <code>7.0.2</code>, the version the course was checked with, instead of "7.0.2 or a newer 7.x":</p>
+                <div class="card card-output">
+                    <h4>Expected output (npm install)</h4>
+                    <pre><code>added 2 packages, and audited 3 packages in 550ms
+
+found 0 vulnerabilities</code></pre>
+                </div>
+                <p>Finally, <code>npx tsc --init</code> runs the compiler you just installed and asks it to write a starter <code>tsconfig.json</code>. Your terminal also shows a small blue TypeScript logo next to the message:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc --init)</h4>
+                    <pre><code>Created a new tsconfig.json
+You can learn more at https://aka.ms/tsconfig</code></pre>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Run npx tsc inside ts-lab</h4>
+                    <p><code>npx tsc</code> uses the TypeScript installed in the current folder. Run it somewhere without TypeScript (such as <code>shoreline</code> itself) and npm offers to download an unrelated, long-abandoned package that happens to be called <code>tsc</code>. If you see <code>Need to install the following packages: tsc@2.0.4</code>, answer <kbd>n</kbd> and <code>cd ts-lab</code>. The <a href="troubleshooting.html#npx-tsc">troubleshooting page</a> has the details.</p>
+                </div>
+
+                <h3>Two small edits</h3>
+                <p>Open <code>ts-lab/package.json</code> in VS Code. Replace the <code>"test"</code> script (npm's placeholder) with a <code>"check"</code> script, and change <code>"type"</code> from <code>"commonjs"</code> to <code>"module"</code>. The file should then read:</p>
+                <div class="code-file">
+                    <div class="code-filename">ts-lab/package.json</div>
+                    <pre data-src="ts-lab/package.json"><code class="language-json">{
+  "name": "ts-lab",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}</code></pre>
+                </div>
+                <p><code>npm run check</code> now runs <code>tsc --noEmit</code>: check every <code>.ts</code> file in the folder and write nothing (you met <code>--noEmit</code> in Lesson 1.1). <code>"type": "module"</code> makes Node treat your files as modern JavaScript modules, the same kind of files as in Shoreline Crew HQ.</p>
+                <p>Now open <code>ts-lab/tsconfig.json</code>. Its lines starting with <code>//</code> are comments (tsconfig files allow them). Find the section headed <code>// Stricter Typechecking Options</code> and delete it: the comment line and the two settings under it, <code>noUncheckedIndexedAccess</code> and <code>exactOptionalPropertyTypes</code>. Shoreline Crew HQ does not turn those two on, and the lab should check your code exactly the way the app does (Lesson 2.4 looks at both). Save. The file now reads:</p>
+                <div class="code-file">
+                    <div class="code-filename">ts-lab/tsconfig.json</div>
+                    <pre data-src="ts-lab/tsconfig.json"><code class="language-json">{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    // File Layout
+    // "rootDir": "./src",
+    // "outDir": "./dist",
+
+    // Environment Settings
+    // See also https://aka.ms/tsconfig/module
+    "module": "nodenext",
+    "target": "esnext",
+    "types": [],
+    // For nodejs:
+    // "lib": ["esnext"],
+    // "types": ["node"],
+    // and npm install -D @types/node
+
+    // Other Outputs
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    // Style Options
+    // "noImplicitReturns": true,
+    // "noImplicitOverride": true,
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    // "noFallthroughCasesInSwitch": true,
+    // "noPropertyAccessFromIndexSignature": true,
+
+    // Recommended Options
+    "strict": true,
+    "jsx": "react-jsx",
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+  }
+}</code></pre>
+                </div>
+                <p>You do not need most of these lines yet. Three matter today:</p>
+                <ul>
+                    <li><code>"strict": true</code>: the full set of strict checks. TypeScript 7 turns them on even without this line (the app's <code>tsconfig.app.json</code> does not list it), but <code>tsc --init</code> writes it out so you can see it.</li>
+                    <li><code>"moduleDetection": "force"</code>: every file is its own module, so a <code>crewName</code> in one file never clashes with a <code>crewName</code> in another.</li>
+                    <li><code>"target": "esnext"</code> and <code>"module": "nodenext"</code>: write for the newest JavaScript, the way current Node.js runs it.</li>
+                </ul>
+
+                <h3>First run</h3>
+                <p>Create a new file in <code>ts-lab</code> called <code>scratch.ts</code> (in the Explorer, right-click <code>ts-lab</code> → <strong>New File…</strong>). This is your scratch file for the whole lesson: each time a section shows an example, replace everything in <code>scratch.ts</code> with it, save, and run the two commands. Start with this:</p>
+                <pre data-snippet><code class="language-ts">const crewName = 'Shoreline Crew'
+console.log(`${crewName}: the lab is ready`)</code></pre>
+                <pre class="terminal"><code class="language-bash">node scratch.ts
+npm run check</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>Shoreline Crew: the lab is ready</code></pre>
+                </div>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit</code></pre>
+                </div>
+                <p><code>node</code> <strong>runs</strong> the file (after removing the types, as in Lesson 1.1), and <code>npm run check</code> <strong>checks</strong> it. The two lines starting with <code>&gt;</code> are npm saying which script it runs; after them, silence means "no errors". That is the rhythm of this module: run it, check it, read what the checker says.</p>
+            </section>
+
+            <section id="inference" class="lesson-section">
+                <h2>🔮 Inference: TypeScript Works It Out</h2>
+                <p>Put this in <code>scratch.ts</code>. It has no types written anywhere:</p>
+                <pre data-snippet><code class="language-ts">let volunteers = 21
+const crewName = 'Shoreline Crew'
+const capacity = 18
+let spotsTaken = 12
+const isFull = spotsTaken &gt;= capacity</code></pre>
+                <p>Now hover your mouse over each name in VS Code. The pop-ups show what TypeScript worked out, a process called <strong>type inference</strong>:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You wrote</th><th>The hover shows</th><th>Why</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>let volunteers = 21</code></td><td><code>let volunteers: number</code></td><td>the first value is a number, and <code>let</code> may change to any other number</td></tr>
+                            <tr><td><code>const crewName = 'Shoreline Crew'</code></td><td><code>const crewName: "Shoreline Crew"</code></td><td>a <code>const</code> can never change, so its type is that exact text</td></tr>
+                            <tr><td><code>const capacity = 18</code></td><td><code>const capacity: 18</code></td><td>the same for an exact number</td></tr>
+                            <tr><td><code>let spotsTaken = 12</code></td><td><code>let spotsTaken: number</code></td><td><code>let</code> again: any number</td></tr>
+                            <tr><td><code>const isFull = spotsTaken &gt;= capacity</code></td><td><code>const isFull: boolean</code></td><td>a comparison always gives <code>true</code> or <code>false</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Two things to notice. First, TypeScript reads the <em>value</em>, including expressions like <code>spotsTaken &gt;= capacity</code>, so most variables never need a type written next to them. Second, <code>const</code> gets a narrower type than <code>let</code>. A type that is one exact value, like <code>"Shoreline Crew"</code> or <code>18</code>, is a <strong>literal type</strong>. It looks like a curiosity now; in Lesson 2.2 it is how you describe a cleanup's status as exactly one of four words.</p>
+                <p>An inferred type is not a weaker type. Add the last line of the example and check:</p>
+                <pre data-snippet><code class="language-ts">volunteers = 'twenty-two'</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:7:1 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+7 volunteers = 'twenty-two'
+  ~~~~~~~~~~
+
+
+Found 1 error in scratch.ts:7</code></pre>
+                </div>
+                <p>TypeScript decided on line 1 that <code>volunteers</code> is a number and holds the rest of the file to it. <strong>TS2322</strong> is the error you will see most often in your career: "this value does not fit where you are putting it". Read it as "Type <em>what you gave</em> is not assignable to type <em>what was expected</em>".</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the first entry in the logbook</h4>
+                    <p>When the crew starts a new logbook column, the first entry decides what the column is for: write "21" at the top and everyone knows it is a count of people. TypeScript reads your first value the same way. After that, writing a word in the count column gets flagged, whether or not anyone printed a heading on it.</p>
+                </div>
+            </section>
+
+            <section id="annotations" class="lesson-section">
+                <h2>✍️ When to Write a Type</h2>
+                <p>A <strong>type annotation</strong> is the <code>: type</code> you write after a name. If inference covers so much, when do you need one? Mostly in three places, and the reason is always the same: at that moment, there is no value for TypeScript to look at.</p>
+
+                <div class="mermaid">
+graph TD
+    A["A new name in your code"] --> B{"A function parameter?"}
+    B -->|"yes"| C["Annotate it"]
+    B -->|"no"| D{"Has its value already?"}
+    D -->|"yes"| E["Let TypeScript infer"]
+    D -->|"no, or empty array"| C
+                </div>
+
+                <h3>1. Function parameters</h3>
+                <p>TypeScript does not guess a parameter's type from the places that call the function. Try this in <code>scratch.ts</code>:</p>
+                <pre data-snippet><code class="language-ts">function spotsLeft(capacity, taken) {
+  return capacity - taken
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:1:20 - error TS7006: Parameter 'capacity' implicitly has an 'any' type.
+
+1 function spotsLeft(capacity, taken) {
+                     ~~~~~~~~
+
+scratch.ts:1:30 - error TS7006: Parameter 'taken' implicitly has an 'any' type.
+
+1 function spotsLeft(capacity, taken) {
+                               ~~~~~
+
+
+Found 2 errors in the same file, starting at: scratch.ts:1</code></pre>
+                </div>
+                <p><strong>TS7006</strong> means "I would have to treat this as <code>any</code>, the type that checks nothing, and strict mode does not allow that silently". The fix is an annotation on each parameter. The return type is a different story: TypeScript can see what the function returns, so it infers that too. Hover over the function name after you add the annotations:</p>
+
+                <figure class="screenshot">
+                    <img src="images/lesson_03/03-hover-return.png" alt="The TypeScript Playground editor: const left = spotsLeft(18, 12) on line 1, and on line 4 a function spotsLeft with two parameters annotated as number. A hover pop-up over spotsLeft reads: function spotsLeft(capacity: number, taken: number): number." width="640" height="150" loading="lazy">
+                    <figcaption>Hovering over <code>spotsLeft</code>: the parameters have annotations, and TypeScript worked out the return type, <code>: number</code>, on its own. VS Code shows the same pop-up.</figcaption>
+                </figure>
+
+                <h3>2. Values that arrive later, and 3. empty arrays</h3>
+                <p>A variable declared without a value, and an array that starts empty, give inference nothing to read. Write the type you mean:</p>
+                <pre data-snippet><code class="language-ts">// 1. Parameters: always annotate (TypeScript cannot guess what callers will pass)
+function spotsLeft(capacity: number, taken: number) {
+  return capacity - taken
+}
+
+// 2. A variable that gets its value later
+let meetingPoint: string
+meetingPoint = 'Top of the Cove Lane stairs'
+
+// 3. An empty array you fill later
+const bagCounts: number[] = []
+bagCounts.push(14, 9, 22)
+
+console.log(spotsLeft(18, 12), meetingPoint, bagCounts)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>6 Top of the Cove Lane stairs [ 14, 9, 22 ]</code></pre>
+                </div>
+                <p>And <code>npm run check</code> is silent. <code>number[]</code> reads "an array of numbers"; the next section has more on arrays.</p>
+                <div class="card card-success">
+                    <h4>✅ The rule of thumb professionals use</h4>
+                    <p>Annotate the edges (parameters, values that arrive later, data from outside) and let inference fill in the middle. Some teams also write return types on functions that other files use, as documentation that the compiler checks; you will see that in Lesson 2.3. Writing <code>: string</code> next to <code>= 'Shoreline Crew'</code> is not wrong, just noise, and it can even throw information away: the annotation replaces the literal type <code>"Shoreline Crew"</code> with plain <code>string</code>. In Lesson 1.2 you wrote exactly that in <code>App.tsx</code>; the project removes it.</p>
+                </div>
+            </section>
+
+            <section id="basic-types" class="lesson-section">
+                <h2>🧱 The Basic Types and Arrays</h2>
+                <p>JavaScript has a handful of <strong>primitive</strong> values, and TypeScript has a type for each, always written in lowercase:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Type</th><th>Values</th><th>In Shoreline Crew</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>string</code></td><td>any text, in <code>'…'</code>, <code>"…"</code> or <code>`…`</code></td><td>a site's name, a start time like <code>'09:00'</code></td></tr>
+                            <tr><td><code>number</code></td><td>whole numbers and decimals alike (JavaScript has one number type), also <code>NaN</code></td><td>a capacity, a weight in kilograms, a latitude</td></tr>
+                            <tr><td><code>boolean</code></td><td><code>true</code> or <code>false</code></td><td>whether a site is wheelchair accessible</td></tr>
+                            <tr><td><code>null</code></td><td>only <code>null</code>: "deliberately nothing"</td><td>no saved session yet</td></tr>
+                            <tr><td><code>undefined</code></td><td>only <code>undefined</code>: "not there"</td><td>a search that found nothing</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>JavaScript also has <code>bigint</code> (huge whole numbers) and <code>symbol</code> (unique keys); you will rarely need either in a React app. The capitalized <code>String</code>, <code>Number</code> and <code>Boolean</code> exist too, but they name JavaScript's wrapper objects: always use the lowercase types.</p>
+
+                <h3>null is its own type</h3>
+                <p>With strict checks on, <code>null</code> and <code>undefined</code> are not quietly allowed everywhere: a <code>string</code> must really be a string. Try it:</p>
+                <pre data-snippet><code class="language-ts">const siteName: string = 'Driftwood Cove'
+const capacity: number = 18
+const accessible: boolean = false
+let leadName: string = 'Luis Romero'
+
+leadName = null</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:6:1 - error TS2322: Type 'null' is not assignable to type 'string'.
+
+6 leadName = null
+  ~~~~~~~~
+
+
+Found 1 error in scratch.ts:6</code></pre>
+                </div>
+                <p>The same TS2322 as before, now with <code>null</code> as the value that does not fit. This one check prevents a whole family of JavaScript's most common crashes, "Cannot read properties of null". When a value really may be missing, its type says so (for example "a string or <code>null</code>"); the section on reading errors shows one, and Lesson 2.2 teaches you to write such types yourself.</p>
+
+                <h3>Arrays</h3>
+                <p>An array type is the type of its items followed by <code>[]</code>. TypeScript infers it from the items, or you write it when the array starts empty:</p>
+                <pre data-snippet><code class="language-ts">const siteIds = ['pelican-point', 'driftwood-cove', 'north-jetty']
+const capacities: number[] = [18, 12, 40]
+const supplies: Array&lt;string&gt; = ['Gloves', 'Bags']
+
+siteIds.push(42)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:5:14 - error TS2345: Argument of type 'number' is not assignable to parameter of type 'string'.
+
+5 siteIds.push(42)
+               ~~
+
+
+Found 1 error in scratch.ts:5</code></pre>
+                </div>
+                <p><code>siteIds</code> was inferred as <code>string[]</code>, so <code>push</code> takes strings. The code is new: <strong>TS2345</strong> is TS2322's sibling for function calls, "Argument of type <em>what you passed</em> is not assignable to parameter of type <em>what the function expects</em>". <code>Array&lt;string&gt;</code> means exactly the same as <code>string[]</code>; the angle brackets are generics (Lesson 2.3), and this course uses the shorter <code>string[]</code> style. If an array mixes values, such as <code>[18, 'full']</code>, TypeScript infers <code>(string | number)[]</code>: "each item is a string or a number". That <code>|</code> is a union type, the star of Lesson 2.2.</p>
+            </section>
+
+            <section id="any-unknown" class="lesson-section">
+                <h2>🚧 any and unknown</h2>
+                <p>Every value you have typed so far was written in your own code, so TypeScript could see it. Real apps also handle values from outside: text the user typed, data the API sends, something saved in the browser. TypeScript cannot see those while it checks your code. JavaScript's own <code>JSON.parse</code>, which turns JSON text into a value, is the classic example. Put this in <code>scratch.ts</code> (look closely at the last line):</p>
+                <pre data-snippet><code class="language-ts">const text = '{"name": "Shoreline Crew", "tagline": "Many hands, cleaner sands."}'
+const meta = JSON.parse(text)
+
+console.log(meta.tagLine.toUpperCase())</code></pre>
+                <pre class="terminal"><code class="language-bash">npm run check
+node scratch.ts</code></pre>
+
+                <figure class="screenshot">
+                    <img src="images/lesson_03/03-any-crash.png" alt="A terminal in ts-lab. npm run check runs tsc --noEmit and reports nothing. Then node scratch.ts crashes: TypeError: Cannot read properties of undefined (reading toUpperCase), pointing at meta.tagLine.toUpperCase() on line 4 of scratch.ts." width="785" height="413" loading="lazy">
+                    <figcaption>With <code>any</code>, the check has nothing to say and the program crashes when it runs. The misspelled <code>tagLine</code> went straight through.</figcaption>
+                </figure>
+
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>file:&#47;&#47;/Users/you/shoreline/ts-lab/scratch.ts:4
+console.log(meta.tagLine.toUpperCase())
+                         ^
+
+TypeError: Cannot read properties of undefined (reading 'toUpperCase')
+    at file:&#47;&#47;/Users/you/shoreline/ts-lab/scratch.ts:4:26
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.22.2</code></pre>
+                </div>
+                <p>The JSON says <code>tagline</code>; the code says <code>tagLine</code>. The check passed anyway, because <code>JSON.parse</code> returns <strong><code>any</code></strong>, the type that means "stop checking". Anything you read from an <code>any</code> is <code>any</code> too, so <code>meta.tagLine</code> and <code>meta.tagLine.toUpperCase</code> were waved through, and the mistake surfaced as a crash. On a web page that crash is a blank screen.</p>
+                <p>Now give <code>meta</code> the type <strong><code>unknown</code></strong> instead, by changing one line:</p>
+                <pre data-snippet><code class="language-ts">const meta: unknown = JSON.parse(text)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:4:13 - error TS18046: 'meta' is of type 'unknown'.
+
+4 console.log(meta.tagLine.toUpperCase())
+              ~~~~
+
+
+Found 1 error in scratch.ts:4</code></pre>
+                </div>
+                <p><strong>TS18046</strong>: "you cannot use this value until you have checked what it is". <code>unknown</code> accepts any value, exactly like <code>any</code>, but it lets you do nothing with it until you prove what it is. The simplest proof is JavaScript's own <code>typeof</code>:</p>
+                <pre data-snippet><code class="language-ts">const saved: unknown = JSON.parse('"Many hands, cleaner sands."')
+
+if (typeof saved === 'string') {
+  console.log(saved.toUpperCase())
+} else {
+  console.log('Expected a tagline, got something else')
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (node scratch.ts)</h4>
+                    <pre><code>MANY HANDS, CLEANER SANDS.</code></pre>
+                </div>
+                <p>The check is silent. Inside <code>if (typeof saved === 'string')</code>, TypeScript knows <code>saved</code> is a string, so <code>toUpperCase</code> is allowed; outside the <code>if</code>, it is still <code>unknown</code>. Using a check to make a type more precise is called <strong>narrowing</strong>. <code>typeof</code> works for strings, numbers and booleans; Lesson 2.2 adds the checks for objects, and in Lesson 2.4 you write the function that checks every cleanup the API sends.</p>
+
+                <div class="mermaid">
+graph TD
+    A["Data from outside"] --> B["unknown"]
+    B --> C{"typeof check"}
+    C -->|"passes"| D["A real type: string"]
+    C -->|"fails"| E["Handle the surprise"]
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th></th><th><code>any</code></th><th><code>unknown</code></th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Accepts any value?</td><td>yes</td><td>yes</td></tr>
+                            <tr><td>Lets you use it without checking?</td><td>yes, and so does everything you read from it</td><td>no: TS18046 until you narrow it</td></tr>
+                            <tr><td>Mistakes found</td><td>when the program crashes</td><td>when you check your code</td></tr>
+                            <tr><td>In this course</td><td>avoided</td><td>for every value from outside</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-danger">
+                    <h4>🛑 Data from outside is untrusted</h4>
+                    <p>What the API sends, what users type and what is stored in the browser can be wrong, out of date or deliberately malicious. Typing it as <code>any</code> does not make it safe; it only stops TypeScript from warning you. The habit you start today, "outside data is <code>unknown</code> until checked", is the same habit that keeps apps from crashing on bad data and from trusting input they should not.</p>
+                </div>
+            </section>
+
+            <section id="reading-errors" class="lesson-section">
+                <h2>🔎 Reading TypeScript's Errors</h2>
+                <p>You already read errors the way Lesson 1.1 taught: location (<code>scratch.ts:4:13</code>), code, message, the line with the problem underlined, and sometimes a follow-up line saying where TypeScript's knowledge came from. One more error belongs in your toolkit before you move on. Browsers keep small pieces of text in <code>sessionStorage</code> (Shoreline Crew HQ keeps your sign-in there from Lesson 5.2), and <code>getItem</code> returns <code>null</code> when nothing is saved under that name. Node has no <code>sessionStorage</code>, so only check this one, do not run it:</p>
+                <pre data-snippet><code class="language-ts">const session = sessionStorage.getItem('shoreline-hq-session')
+
+console.log(session.length)</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run check)</h4>
+                    <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:3:13 - error TS18047: 'session' is possibly 'null'.
+
+3 console.log(session.length)
+              ~~~~~~~
+
+
+Found 1 error in scratch.ts:3</code></pre>
+                </div>
+                <p><strong>TS18047</strong>: hover over <code>session</code> and the pop-up says <code>const session: string | null</code>, "a string, or <code>null</code>". On a first visit, nothing is saved and <code>session.length</code> would crash. The fix is the same kind of check as with <code>unknown</code>:</p>
+                <pre data-snippet><code class="language-ts">const session = sessionStorage.getItem('shoreline-hq-session')
+
+if (session !== null) {
+  console.log(session.length)
+}</code></pre>
+                <p>Inside the <code>if</code>, <code>session</code> is a <code>string</code>, and the check is silent. You met this "maybe nothing" idea in Lesson 1.2, where <code>getElementById</code> returned <code>HTMLElement | null</code> and the template used <code>!</code> to promise it was there; an <code>if</code> like this one is the honest way to handle it, and Lesson 2.2 shows the others.</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Code</th><th>The message starts</th><th>It is asking you to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>TS2322</code></td><td>Type 'X' is not assignable to type 'Y'</td><td>give a value of the expected type Y (or fix the type, if Y was wrong)</td></tr>
+                            <tr><td><code>TS2345</code></td><td>Argument of type 'X' is not assignable to parameter of type 'Y'</td><td>pass the function what its parameter expects</td></tr>
+                            <tr><td><code>TS7006</code></td><td>Parameter 'p' implicitly has an 'any' type</td><td>annotate the parameter</td></tr>
+                            <tr><td><code>TS18046</code></td><td>'v' is of type 'unknown'</td><td>check what the value is before using it</td></tr>
+                            <tr><td><code>TS18047</code> / <code>TS18048</code></td><td>'v' is possibly 'null' / 'undefined'</td><td>handle the "nothing there" case first</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card card-success">
+                    <h4>✅ An error is a question, not a verdict</h4>
+                    <p>Every message above is TypeScript describing a situation it cannot rule out: "what if this is <code>null</code>?", "what if this is not a number?". You are not being graded; you are being asked. Answer the question in code, and the error goes away because the bug it described is gone. The first weeks with TypeScript feel like a lot of red. It gets quieter, not because TypeScript gives up, but because you start writing the answers before it asks.</p>
+                </div>
+                <p>When you are done with this section, keep <code>scratch.ts</code>: the exercises use it again.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Naming a file after tsc in a project</h4>
+                    <p>Old tutorials say <code>npx tsc scratch.ts</code>. In a folder with a <code>tsconfig.json</code>, TypeScript 7 refuses, because naming a file would silently ignore your settings:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc scratch.ts)</h4>
+                        <pre><code>error TS5112: tsconfig.json is present but will not be loaded if files are specified on commandline. Use '--ignoreConfig' to skip this error.</code></pre>
+                    </div>
+                    <p>Run <code>npm run check</code> (or <code>npx tsc --noEmit</code>) with no file name: it checks every file with the project's settings. More on the <a href="troubleshooting.html#ts5112">troubleshooting page</a>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Silencing an error with any</h4>
+                    <p>Changing a type to <code>any</code> makes a red underline disappear the way taking the batteries out silences a smoke alarm. The question the error asked is still there; you just stopped hearing it, and everything that touches the value stops being checked too. Use <code>unknown</code> and a check, or fix the type.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Annotating everything</h4>
+                    <p><code>const capacity: number = 18</code> works, but it is noise, and it trades the precise inferred type <code>18</code> for plain <code>number</code>. Annotate parameters, late values, empty arrays and outside data. When you wonder what TypeScript inferred, hover instead of writing it out.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Running instead of checking</h4>
+                    <p><code>node scratch.ts</code> ran the <code>any</code> example and the <code>tagLine</code> typo without a word until it crashed, and it would run every type error in this lesson the same way. Running is not checking: <code>npm run check</code> (and your editor's red underlines) is what checks.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Type the Crew's Numbers</h2>
+                <p>You will write <code>ts-lab/types.ts</code>, a small script that reports Shoreline Crew's numbers using inference wherever it can and annotations exactly where it must, break it four ways and read each error, and then let inference do its work in Shoreline Crew HQ itself.</p>
+
+                <div class="card">
+                    <h3>Step 1: The crew's numbers <span class="step-time">(10 min)</span></h3>
+                    <ol>
+                        <li>In <code>ts-lab</code>, create <code>types.ts</code> (leave <code>scratch.ts</code> as it is) and type these lines:</li>
+                    </ol>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/types.ts</div>
+                        <pre data-src="ts-lab/types.ts" data-match="excerpt"><code class="language-ts">// Shoreline Crew numbers (Lesson 2.1): inference where it can, annotations where it must
+
+const crewName = 'Shoreline Crew'
+const siteIds = [
+  'pelican-point', 'driftwood-cove', 'sandpiper-flats',
+  'north-jetty', 'otter-creek', 'long-strand',
+]
+const organizers = 3
+let volunteers = 21
+
+// Bags collected at the last three cleanups: empty at first, so it needs an annotation
+const bagCounts: number[] = []
+bagCounts.push(14, 9, 22)</code></pre>
+                    </div>
+                    <ol start="2">
+                        <li>Before you hover, predict the type of each name, then hover to check: <code>crewName</code>, <code>siteIds</code>, <code>organizers</code>, <code>volunteers</code>, <code>bagCounts</code>. Which one has an annotation, and why does it need one?</li>
+                    </ol>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Two functions <span class="step-time">(5 min)</span></h3>
+                    <p>Add the functions and the line that counts a new volunteer:</p>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/types.ts</div>
+                        <pre data-src="ts-lab/types.ts" data-match="excerpt"><code class="language-ts">// ...
+function spotsLeft(capacity: number, taken: number) {
+  return capacity - taken
+}
+
+function totalBags(counts: number[]) {
+  return counts.reduce((sum, count) =&gt; sum + count, 0)
+}
+
+volunteers += 1 // a new volunteer joined today</code></pre>
+                    </div>
+                    <p>Both functions annotate their parameters and let TypeScript infer what they return (hover to confirm: <code>number</code> for both). Look at the arrow function inside <code>reduce</code>: its parameters <code>sum</code> and <code>count</code> have no annotations and get no TS7006. TypeScript already knows what <code>reduce</code> passes to its callback on a <code>number[]</code>, so it infers them from that context. Hover over <code>count</code> to see <code>number</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: A value from outside, and the report <span class="step-time">(5 min)</span></h3>
+                    <p>Finish the file. <code>JSON.parse('12')</code> stands in for a capacity read from somewhere TypeScript cannot see, such as a saved form; the whole file now reads:</p>
+                    <div class="code-file">
+                        <div class="code-filename">ts-lab/types.ts</div>
+                        <pre data-src="ts-lab/types.ts"><code class="language-ts">// Shoreline Crew numbers (Lesson 2.1): inference where it can, annotations where it must
+
+const crewName = 'Shoreline Crew'
+const siteIds = [
+  'pelican-point', 'driftwood-cove', 'sandpiper-flats',
+  'north-jetty', 'otter-creek', 'long-strand',
+]
+const organizers = 3
+let volunteers = 21
+
+// Bags collected at the last three cleanups: empty at first, so it needs an annotation
+const bagCounts: number[] = []
+bagCounts.push(14, 9, 22)
+
+function spotsLeft(capacity: number, taken: number) {
+  return capacity - taken
+}
+
+function totalBags(counts: number[]) {
+  return counts.reduce((sum, count) =&gt; sum + count, 0)
+}
+
+volunteers += 1 // a new volunteer joined today
+
+// A value from outside the program: unknown until it has been checked
+const savedCapacity: unknown = JSON.parse('12')
+
+console.log(`${crewName}: ${organizers + volunteers} people, ${siteIds.length} sites`)
+console.log(`Bags at the last three cleanups: ${totalBags(bagCounts)}`)
+
+if (typeof savedCapacity === 'number') {
+  console.log(`Tide Pool Morning Cleanup: ${spotsLeft(savedCapacity, 9)} spots left`)
+} else {
+  console.log('The saved capacity is not a number')
+}</code></pre>
+                    </div>
+                    <pre class="terminal"><code class="language-bash">node types.ts
+npm run check</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (node types.ts)</h4>
+                        <pre><code>Shoreline Crew: 25 people, 6 sites
+Bags at the last three cleanups: 45
+Tide Pool Morning Cleanup: 3 spots left</code></pre>
+                    </div>
+                    <p><code>npm run check</code> prints only its two <code>&gt;</code> lines. It checks every file in <code>ts-lab</code>, so if it reports an error in <code>scratch.ts</code>, that is your last experiment talking: fix it or empty the file.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Break it four ways <span class="step-time">(12 min)</span></h3>
+                    <p>Make one change at a time in <code>types.ts</code>, run <code>npm run check</code>, read the whole message, and undo the change (<kbd>Ctrl</kbd>+<kbd>Z</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>Z</kbd> on a Mac) before the next. For each, write down in your notes the code and, in your own words, the question TypeScript is asking.</p>
+                    <ol>
+                        <li><strong>The wrong kind of value:</strong> change <code>volunteers += 1</code> to <code>volunteers = '22'</code>.</li>
+                        <li><strong>The wrong argument:</strong> in the <code>if</code>, change <code>spotsLeft(savedCapacity, 9)</code> to <code>spotsLeft('12', 9)</code>.</li>
+                        <li><strong>A parameter without a type:</strong> delete <code>: number</code> after <code>taken</code> in <code>spotsLeft</code>.</li>
+                        <li><strong>Skipping the check:</strong> replace the whole <code>if</code>/<code>else</code> with just the line inside the <code>if</code>, so <code>spotsLeft(savedCapacity, 9)</code> runs without the <code>typeof</code> test.</li>
+                    </ol>
+                    <div class="card card-output">
+                        <h4>Expected output (1: the wrong kind of value)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+types.ts:23:1 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+23 volunteers = '22' // a new volunteer joined today
+   ~~~~~~~~~~
+
+
+Found 1 error in types.ts:23</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (2: the wrong argument)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+types.ts:32:55 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+
+32   console.log(`Tide Pool Morning Cleanup: ${spotsLeft('12', 9)} spots left`)
+                                                         ~~~~
+
+
+Found 1 error in types.ts:32</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (3: a parameter without a type)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+types.ts:15:38 - error TS7006: Parameter 'taken' implicitly has an 'any' type.
+
+15 function spotsLeft(capacity: number, taken) {
+                                        ~~~~~
+
+
+Found 1 error in types.ts:15</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (4: skipping the check)</h4>
+                        <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+types.ts:31:53 - error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'number'.
+
+31 console.log(`Tide Pool Morning Cleanup: ${spotsLeft(savedCapacity, 9)} spots left`)
+                                                       ~~~~~~~~~~~~~
+
+
+Found 1 error in types.ts:31</code></pre>
+                    </div>
+                    <p>Mistake 4 is TS2345 with <code>unknown</code> as the argument: <code>spotsLeft</code> needs a number, and an unchecked value is not one. Now, with mistake 4 still in place, also delete <code>: unknown</code> from <code>savedCapacity</code>, so it is <code>any</code> again. <code>npm run check</code> goes silent. Change <code>JSON.parse('12')</code> to <code>JSON.parse('"twelve"')</code> and run <code>node types.ts</code>:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (node types.ts, with any and "twelve")</h4>
+                        <pre><code>Shoreline Crew: 25 people, 6 sites
+Bags at the last three cleanups: 45
+Tide Pool Morning Cleanup: NaN spots left</code></pre>
+                    </div>
+                    <p>The <code>NaN</code> from Lesson 1.1 is back, and nothing warned you. That is the whole case for <code>unknown</code> in one screen. Undo every change until <code>types.ts</code> matches Step 3 and <code>npm run check</code> is silent again.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Inference in Shoreline Crew HQ <span class="step-time">(8 min)</span></h3>
+                    <p>In Lesson 1.2 you wrote <code>: string</code> on the two constants in <code>App.tsx</code> to have something to break. Now you know TypeScript does not need them. Open <code>shoreline-hq/src/App.tsx</code> and change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">-const crewName: string = 'Shoreline Crew'
+-const tagline: string = 'Many hands, cleaner sands.'
++const crewName = 'Shoreline Crew'
++const tagline = 'Many hands, cleaner sands.'</code></pre>
+                    </div>
+                    <ol>
+                        <li>Hover over <code>crewName</code>: <code>const crewName: "Shoreline Crew"</code>, more precise than the <code>string</code> you had written.</li>
+                        <li>Hover over <code>App</code>: TypeScript inferred that the component returns a JSX element, with no annotation from you. Components are functions, and the rules of this lesson apply to them unchanged (Module 3 builds on that).</li>
+                        <li>In the terminal, go to the app and check it the way the build does:</li>
+                    </ol>
+                    <pre class="terminal"><code class="language-bash">cd ../shoreline-hq
+npx tsc -b
+npm run build</code></pre>
+                    <p><code>npx tsc -b</code> prints nothing, and <code>npm run build</code> ends with a <code>built in</code> line as in Lesson 1.2. If you want to see the page, start the API and <code>npm run dev</code> as usual: it looks exactly the same, because types never reach the browser.</p>
+                    <p><strong>Your own project:</strong> on paper, list five values your own app (the one you are planning for Lesson 11.1) would handle. Mark each one "inferred" (written in your code), "annotate" (a parameter or a value that arrives later) or "unknown" (from outside: a user, an API, storage).</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>ts-lab</code> has <code>package.json</code> with a <code>check</code> script and <code>"type": "module"</code>, and a <code>tsconfig.json</code> without the two "stricter" options</li>
+                        <li>☐ <code>node types.ts</code> prints the three lines of the crew's numbers, and <code>npm run check</code> reports no errors</li>
+                        <li>☐ I can say why <code>bagCounts</code> and the parameters of <code>spotsLeft</code> need annotations and the other names do not</li>
+                        <li>☐ I produced TS2322, TS2345, TS7006 and the <code>unknown</code> version of TS2345, and wrote down the question each one asks</li>
+                        <li>☐ I watched <code>any</code> turn an error into a silent <code>NaN</code></li>
+                        <li>☐ <code>App.tsx</code> uses inference, and <code>npx tsc -b</code> and <code>npm run build</code> in <code>shoreline-hq</code> pass</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time). Use <code>scratch.ts</code> for both, then delete <code>scratch.ts</code>: from now on <code>ts-lab</code> keeps one file per lesson, and Lesson 2.2 adds the next.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Predict the hover</h3>
+                    <p>Without hovering, write down the type TypeScript infers for each of these five names. Then paste them into <code>scratch.ts</code> and hover to check yourself:</p>
+                    <pre data-snippet><code class="language-ts">const meetTime = '09:00'
+let startTime = '09:00'
+const bags = [14, 9, 22]
+const mixed = [18, 'full']
+const enoughBags = bags.length &gt; 2</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Ask two questions for each: can it change later (<code>let</code> or <code>const</code>)? And for arrays: what is the type of each item?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr><th>Name</th><th>Inferred type</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td><code>meetTime</code></td><td><code>"09:00"</code> (a <code>const</code>: the exact text)</td></tr>
+                                    <tr><td><code>startTime</code></td><td><code>string</code> (a <code>let</code>: any text)</td></tr>
+                                    <tr><td><code>bags</code></td><td><code>number[]</code></td></tr>
+                                    <tr><td><code>mixed</code></td><td><code>(string | number)[]</code>: each item is one or the other</td></tr>
+                                    <tr><td><code>enoughBags</code></td><td><code>boolean</code></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p>Notice that the array of a <code>const</code> is <code>number[]</code>, not "exactly 14, 9 and 22": <code>const</code> stops you from replacing the array, but you can still push to it, so its items can be any number.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Find the jetty</h3>
+                    <p>Put this in <code>scratch.ts</code> and run <code>npm run check</code>. Read the error, then fix it so the program prints the jetty's id in capitals, or a friendly message if there is none. Run it with <code>node scratch.ts</code>.</p>
+                    <pre data-snippet><code class="language-ts">const siteIds = ['pelican-point', 'driftwood-cove', 'north-jetty', 'otter-creek']
+const jetty = siteIds.find((id) =&gt; id.startsWith('north'))
+
+console.log(jetty.toUpperCase())</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Hover over <code>jetty</code>. What does <code>find</code> return when no item matches? Handle that case the way you handled <code>null</code> from <code>getItem</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="card card-output">
+                            <h4>Expected output (npm run check, before the fix)</h4>
+                            <pre><code>&gt; ts-lab@1.0.0 check
+&gt; tsc --noEmit
+
+scratch.ts:4:13 - error TS18048: 'jetty' is possibly 'undefined'.
+
+4 console.log(jetty.toUpperCase())
+              ~~~~~
+
+
+Found 1 error in scratch.ts:4</code></pre>
+                        </div>
+                        <pre data-snippet><code class="language-ts">const siteIds = ['pelican-point', 'driftwood-cove', 'north-jetty', 'otter-creek']
+const jetty = siteIds.find((id) =&gt; id.startsWith('north'))
+
+if (jetty !== undefined) {
+  console.log(jetty.toUpperCase())
+} else {
+  console.log('No jetty in the list')
+}</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>NORTH-JETTY</code></pre>
+                        </div>
+                        <p><code>find</code> returns the first matching item or <code>undefined</code>, so <code>jetty</code> is <code>string | undefined</code> and TS18048 asks you to handle "not found". This list does contain a jetty, but TypeScript checks every possibility, not just today's data: tomorrow the list comes from the API.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Describe anything (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 15 minutes).</em></p>
+                    <p>Write a function <code>describe(value: unknown)</code> that returns <code>text (N characters)</code> for a string, <code>a number (N)</code> with one decimal place for a number, <code>yes</code> or <code>no</code> for a boolean, and <code>something else</code> for anything else. Test it with <code>JSON.parse('"North Jetty"')</code>, <code>JSON.parse('18')</code>, <code>JSON.parse('true')</code> and <code>JSON.parse('null')</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Use one <code>if (typeof value === '…')</code> per type, each with its own <code>return</code>. After each <code>if</code>, hover over <code>value</code> to see it narrowed. <code>toFixed(1)</code> gives one decimal place.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">function describe(value: unknown) {
+  if (typeof value === 'string') {
+    return `text (${value.length} characters)`
+  }
+  if (typeof value === 'number') {
+    return `a number (${value.toFixed(1)})`
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'yes' : 'no'
+  }
+  return 'something else'
+}
+
+console.log(describe(JSON.parse('"North Jetty"')))
+console.log(describe(JSON.parse('18')))
+console.log(describe(JSON.parse('true')))
+console.log(describe(JSON.parse('null')))</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (node scratch.ts)</h4>
+                            <pre><code>text (11 characters)
+a number (18.0)
+yes
+something else</code></pre>
+                        </div>
+                        <p>Inside each <code>if</code>, <code>value</code> has the narrowed type, so <code>value.length</code> and <code>value.toFixed(1)</code> are allowed. <code>typeof null</code> is <code>'object'</code> in JavaScript (a famous old quirk), so <code>null</code> falls through to "something else". Lesson 2.2 shows how to check objects safely, quirk included.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> You write <code>const meetTime = '09:00'</code>. What does VS Code show when you hover over <code>meetTime</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That is what a let would get. Can a const ever hold a different text?">
+                                A) <code>const meetTime: string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="A const can never change, so TypeScript infers the literal type, the exact text 09:00. A let with the same value would be inferred as string.">
+                                B) <code>const meetTime: "09:00"</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript only falls back to any when it has nothing to go on. Here it can read the value.">
+                                C) <code>const meetTime: any</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> Which of these needs a type annotation to pass <code>npm run check</code> in <code>ts-lab</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The value 18 is right there for TypeScript to read.">
+                                A) <code>const capacity = 18</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript infers number[] from the three numbers.">
+                                B) <code>const bags = [14, 9, 22]</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="TypeScript does not guess parameter types from the calls, so both parameters would implicitly be any, which strict mode reports as TS7006. Annotate them, for example capacity: number.">
+                                C) The parameters in <code>function spotsLeft(capacity, taken)</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="21 is a number, so volunteers is inferred as number.">
+                                D) <code>let volunteers = 21</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> <code>const meta = JSON.parse(text)</code> is followed by <code>meta.tagLine.toUpperCase()</code>, but the JSON's property is <code>tagline</code>. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="JSON.parse returns any, and everything read from an any is unchecked too. The check passes, and the program crashes when it runs because meta.tagLine is undefined. Typing meta as unknown would have turned this into TS18046.">
+                                A) <code>npm run check</code> passes, and the program crashes when it runs
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript can only suggest a name it knows about. What type does JSON.parse return?">
+                                B) <code>npm run check</code> reports TS2551 and suggests <code>tagline</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Node removes the types and runs whatever is left. Does it check anything?">
+                                C) Node refuses to run the file until the typo is fixed
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> <code>siteIds</code> is a <code>string[]</code> and you write <code>siteIds.push(42)</code>. Which error does TypeScript report?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="TS2322 is about assigning a value. Here the number is passed to a function.">
+                                A) TS2322: Type 'number' is not assignable to type 'string'
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TS7006 is about a parameter you declared without a type. push is already typed.">
+                                B) TS7006: Parameter implicitly has an 'any' type
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing here may be null. What kind of mistake is passing the wrong value to a function?">
+                                C) TS18047: 'siteIds' is possibly 'null'
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="push is a function call, so the message is about an argument: Argument of type number is not assignable to parameter of type string. TS2345 is the call version of TS2322.">
+                                D) TS2345: Argument of type 'number' is not assignable to parameter of type 'string'
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> <code>const session = sessionStorage.getItem('shoreline-hq-session')</code>, then <code>session.length</code> gives TS18047, 'session' is possibly 'null'. What is the best fix?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That silences the question instead of answering it. What happens on a first visit, when nothing is saved?">
+                                A) Write <code>const session: any = …</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Strict checks are on by default in TypeScript 7, and they are what caught a real crash here. Keep them.">
+                                B) Turn off strict mode in tsconfig.json
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="getItem returns string or null. Checking session !== null handles the nothing-saved case, and inside the if TypeScript knows session is a string.">
+                                C) Use it inside <code>if (session !== null) { … }</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Should I annotate return types or not?</summary>
+                    <p>Both styles are common. Inferred return types are less to type and always match the code. Written return types document the function for its callers and catch a body that returns the wrong thing (TypeScript then checks the body against your promise). A popular middle ground, and the one this course uses: let small, local functions infer, and annotate functions other files rely on. Lesson 2.3 comes back to it.</p>
+                </details>
+                <details>
+                    <summary>Is there ever a good reason to use any?</summary>
+                    <p>Rarely, and almost never in new code. You meet it when a library has no types or when moving a large JavaScript project to TypeScript step by step. In both cases, teams treat each <code>any</code> as a debt to pay back. For data from outside your program, <code>unknown</code> does everything <code>any</code> does, safely.</p>
+                </details>
+                <details>
+                    <summary>Why does ts-lab have its own TypeScript? Isn't it already installed in shoreline-hq?</summary>
+                    <p>Each Node project gets its own <code>node_modules</code>, and <code>npx tsc</code> uses the one installed in the project you are in. Installing TypeScript in <code>ts-lab</code> keeps the workbench independent of the app, which is also how real projects work: every project pins its own tool versions.</p>
+                </details>
+                <details>
+                    <summary>What is the difference between null and undefined? Do I need both?</summary>
+                    <p>In everyday code both mean "no value". JavaScript's own features tend to produce <code>undefined</code> (a missing property, <code>find</code> with no match, a parameter nobody passed), while many APIs use <code>null</code> on purpose to say "deliberately empty" (<code>getItem</code>, <code>getElementById</code>). You do not choose which ones you receive, so you learn to handle both; Lesson 2.2 shows tools that handle both at once.</p>
+                </details>
+                <details>
+                    <summary>My editor and npm run check disagree. Which one is right?</summary>
+                    <p>Usually they agree within a second or two of saving. If they still differ, first save the file (the checker reads what is on disk), and check that you opened the <code>shoreline</code> folder rather than a single file. In VS Code, the Command Palette command <strong>TypeScript: Restart TS Server</strong> clears a confused editor. When in doubt, the terminal's <code>npm run check</code> is the referee.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Use an error as a question. Declare <code>const probe: null = siteIds</code> at the end of <code>types.ts</code> and run <code>npm run check</code>: the TS2322 message prints the inferred type of <code>siteIds</code> in full. Try the same trick on <code>totalBags</code> and on <code>spotsLeft</code>. Why do the messages show function types like <code>(counts: number[]) =&gt; number</code>? Write down what you think that notation means (Lesson 2.3 confirms it), then delete the probe line.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Explain to a friend who knows JavaScript, in three or four sentences, the difference between <code>any</code> and <code>unknown</code>, using the <code>"twelve"</code> experiment from the project as your example. Then pick the error code from today that felt most confusing at first and rewrite its message as a plain question in your own words.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>TypeScript <strong>infers</strong> types from values: <code>let</code> gets a general type (<code>number</code>), <code>const</code> a <strong>literal type</strong> (<code>18</code>, <code>"Shoreline Crew"</code>); inferred types are checked just as strictly as written ones</li>
+                        <li><strong>Annotate</strong> function parameters, values that arrive later and empty arrays; let inference handle the rest, including most return types and callback parameters</li>
+                        <li>The basic types are lowercase: <code>string</code>, <code>number</code>, <code>boolean</code>, <code>null</code>, <code>undefined</code>; arrays are <code>string[]</code> (same as <code>Array&lt;string&gt;</code>)</li>
+                        <li>With strict checks, <code>null</code> and <code>undefined</code> are their own types: a value that may be missing says so, and you check before using it</li>
+                        <li><code>any</code> switches checking off and spreads; <code>unknown</code> accepts anything but must be checked (for example with <code>typeof</code>) before use. Data from outside is <code>unknown</code></li>
+                        <li>Read errors as questions: TS2322 (value does not fit), TS2345 (argument does not fit), TS7006 (parameter needs a type), TS18046 (check the unknown), TS18047/18048 (handle "nothing")</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up a type or pattern quickly</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Fix TS5112 or the npx tsc surprise</td><td><a href="troubleshooting.html">Troubleshooting</a></td></tr>
+                            <tr><td>Read the official chapter on everyday types</td><td><a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html" target="_blank" rel="noopener">TypeScript Handbook: Everyday Types</a></td></tr>
+                            <tr><td>Look up a new word</td><td><a href="glossary.html">Glossary</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You set up <code>ts-lab</code>, a TypeScript workbench with its own compiler, settings and check script</li>
+                        <li>You can predict what TypeScript infers and know where it needs your help</li>
+                        <li>You watched <code>any</code> let a crash and a <code>NaN</code> through, and <code>unknown</code> stop both</li>
+                        <li>You read five kinds of TypeScript errors and fixed each one by answering its question</li>
+                        <li>You simplified Shoreline Crew HQ's first component with inference and kept its build green</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>In <a href="lesson_04.html"><strong>Lesson 2.2: Shaping Data</strong></a> you describe whole objects: a site, a cleanup, its status. You will compare interfaces and type aliases, mark properties optional or read-only, combine types with unions (the <code>|</code> you saw today), use literal types for the four statuses, and narrow values safely, including the many ways to handle "maybe <code>null</code>". It all happens in a new file in <code>ts-lab</code>.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npm run check</code> in <code>ts-lab</code> reports no errors and you deleted <code>scratch.ts</code></li>
+                    <li>Make sure <code>npm run build</code> in <code>shoreline-hq</code> ends with "built in"</li>
+                    <li>Keep your notes from Step 4 of the project: the four error codes and the questions they ask</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today you saw more red than in any lesson so far, and you read every message to the end. That is the skill. Most people who give up on TypeScript do it in the first week, when the errors still feel like criticism; you are learning to hear them as a colleague asking good questions. Each one you answer now is one fewer blank screen a volunteer will ever see.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_02.html" class="prev-lesson">← Previous: Your Workspace</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_04.html" class="next-lesson">Next: Shaping Data →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

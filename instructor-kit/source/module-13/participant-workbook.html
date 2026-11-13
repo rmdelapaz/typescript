@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 13</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 13: Typed Context</h1>
+    <p class="sub">Your workbook for Session 13: a warm-up on Suspense and reducers, the key ideas of Lesson 5.2 with a worked example, the guided lab, predict-then-check practice, the sign-in project checklist, Checkpoint 2, the self-check and the exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lesson <b>5.2</b> + Checkpoint 2</span>
+      <span class="chip">Session <b>13</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Decide when a value belongs in a context and when a prop is clearer.</li>
+  <li>Create, provide and read a typed context, React 19 style.</li>
+  <li>Avoid the undefined trap: type the context <code class="inline">T | undefined</code> and read it through one Hook that throws outside its provider.</li>
+  <li>Start sign-in for Shoreline Crew HQ: the session and the token in the API client, the context and its provider, the sign-in page.</li>
+  <li>Show what you can do with Modules 4 and 5 so far: Checkpoint 2.</li>
+</ul>
+
+  <div class="sec"><h2>Warm-up: Session 12 Retrieval</h2><span class="rule"></span></div>
+<div class="q"><div class="qn">W1</div><div class="qt">EventDetails reads the cleanup with use(). Why does it go through eventPromises.ts instead of calling getEvent(id) itself?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W2</div><div class="qt">On the event page, what does the ErrorBoundary catch that the Suspense boundary does not?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W3</div><div class="qt">The desk dispatches { type: 'checkIn', signupId } for a row that is already marked attended. What should the reducer return, and why?</div><div class="write"></div></div>
+<div class="q"><div class="qn">W4</div><div class="qt">What does assertNever(value: never) in a switch's default give you?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Lesson</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">5.2</span><h3>Typed Context</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain prop drilling, and decide when a value belongs in context and when a plain prop is clearer</li>
+  <li>Create a typed context with createContext, provide it with React 19's &lt;Context value&gt;, and read it with useContext</li>
+  <li>Avoid the "undefined context" trap: type the context as T | undefined and write a useAuth() Hook that fails loudly outside its provider and never returns undefined</li>
+  <li>Sign in against a real API with roles, keep the session in sessionStorage, and send the token with every request</li>
+  <li>Make data depend on who is asking: drafts, organizer-only buttons and a live roster that load again when someone signs in or out</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Prop drilling</b> = passing a value through components that only hand it on. <b>Context</b> sends one value to every component below a provider, wherever it sits: for values many distant components need and that change rarely. A direct child still gets a prop.</li>
+  <li><b>Three parts:</b> <code class="inline">createContext&lt;T&gt;(default)</code>; <code class="inline">&lt;SomeContext value={…}&gt;</code> (React 19; <code class="inline">.Provider</code> is the older spelling); <code class="inline">useContext(SomeContext)</code> reads the NEAREST provider above, or the default when there is none. When the value changes, every reader renders again.</li>
+  <li><b>The undefined trap:</b> a fake default compiles and fails silently. When no default makes sense, type the context <code class="inline">T | undefined</code> with <code class="inline">undefined</code> as the default, and read it only through a Hook (<code class="inline">useAuth()</code>) that throws outside the provider and returns <code class="inline">T</code>.</li>
+  <li><b>Two files:</b> the context, its type and its Hook in a <code class="inline">.ts</code>; the provider component in a <code class="inline">.tsx</code> (Fast Refresh and oxlint's only-export-components).</li>
+  <li><b>The session:</b> sign-in = <code class="inline">POST /api/auth/sign-in</code> → a token and the user (role organizer or volunteer); <code class="inline">sessionStorage</code> (survives reloads, one tab), checked like API data on the way in, written only by the provider, sent as <code class="inline">Authorization: Bearer …</code> with every request.</li>
+  <li><b>Who asks is part of the question:</b> the same URL answers 15 cleanups to a guest and 17 to an organizer, so useApi and caches key their data by the viewer. Hiding a button is convenience; the API decides (403).</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: the type that tells the truth</div>
+<p>The HQ's context says the truth: outside a provider there is no sign-in, so its type is <code class="inline">AuthValue | undefined</code>. A component in <code class="inline">src/Scratch.tsx</code> that reads it directly:</p>
+<pre class="code"><span class="k">import</span> { useContext } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> { AuthContext } <span class="k">from</span> <span class="s">'./auth/AuthContext.ts'</span>
+
+<span class="k">export</span> <span class="k">function</span> OrganizerNote() {
+  <span class="k">const</span> { isOrganizer } = useContext(AuthContext)
+  <span class="k">return</span> isOrganizer ? &lt;p&gt;Drafts are listed below.&lt;/p&gt; : <span class="k">null</span>
+}</pre><pre class="code">npx tsc -b</pre>
+<pre class="out">src/Scratch.tsx:5:11 - error TS2339: Property 'isOrganizer' does not exist on type 'AuthValue | undefined'.
+
+5   const { isOrganizer } = useContext(AuthContext)
+            ~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:5</pre><p>"Does not exist on type AuthValue | undefined" means: this might be undefined, and undefined has no isOrganizer. Instead of <code class="inline">?.</code> in every component, the project checks once, in a Hook:</p>
+<div class="codefile">shoreline-hq/src/auth/AuthContext.ts</div>
+<pre class="code" data-src="shoreline-hq/src/auth/AuthContext.ts" data-stage="lesson_18" data-match="excerpt"><span class="c">// undefined is the value outside an AuthProvider: a mistake that useAuth() reports at once</span>
+<span class="k">export</span> <span class="k">const</span> AuthContext = createContext&lt;AuthValue | <span class="k">undefined</span>&gt;(<span class="k">undefined</span>)
+
+<span class="c">/** The sign-in state. Only works inside &lt;AuthProvider&gt;. */</span>
+<span class="k">export</span> <span class="k">function</span> useAuth(): AuthValue {
+  <span class="k">const</span> auth = useContext(AuthContext)
+  <span class="k">if</span> (auth === <span class="k">undefined</span>) {
+    <span class="k">throw</span> <span class="k">new</span> Error(<span class="s">'useAuth() must be used inside &lt;AuthProvider&gt;'</span>)
+  }
+  <span class="k">return</span> auth
+}</pre><p>After the <code class="inline">if</code>, <code class="inline">auth</code> is an <code class="inline">AuthValue</code>, so every caller of <code class="inline">useAuth()</code> gets one. A missing provider is now a blank page with a console message that says exactly what to fix, instead of a sign-in button that silently does nothing.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-13/l5_2-typed-context/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once, then <code class="inline">npm test</code> (five failures), <code class="inline">npm run typecheck</code> (one TS2578) and <code class="inline">npm run lint</code> (one warning).</li>
+  <li>Task 1: read the unit in <code class="inline">TideHeight</code>, provide it in <code class="inline">TideBoard</code>. <code class="inline">TideRow</code> does not change.</li>
+  <li>Task 2: <code class="inline">ShiftValue | undefined</code> and a <code class="inline">useShift()</code> that throws. Predict what the Task 3 tests say afterward.</li>
+  <li>Task 3 (home): the provider owns the state; move <code class="inline">leadLabel</code> out of the .tsx.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Why did the type check fail BEFORE Task 2, and on a line in the test file?</td><td></td></tr>
+<tr><td>After Task 2, the Task 3 tests fail with a new message. Which one, and why is that good news?</td><td></td></tr>
+<tr><td>Which unit does a TideHeight show with no provider above it?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write your prediction (the status code and what the message says) first, then compare with the answer your instructor shows. Never paste a real token anywhere.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict the status code and what the answer says. (Maya's email with the wrong password.)</div><pre class="code">POST http://localhost:4000/api/auth/sign-in
+{"email": "maya.okafor@example.com", "password": "low-tide"}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict the status code and what the answer says. (Today's roster, asked for by a volunteer.)</div><pre class="code">GET http://localhost:4000/api/events/e17/signups
+Authorization: Bearer &lt;Theo's token: a volunteer&gt;</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict the status code and what the answer says. (A token the API has forgotten, on a public list.)</div><pre class="code">GET http://localhost:4000/api/events?perPage=1
+Authorization: Bearer &lt;a token from before the API restarted&gt;</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Sign-in for the HQ</b> (lesson page, "Project: Sign-in for the HQ"). In class: Steps 1 and 2 before the break, Step 3 after the checkpoint. At home: Steps 4 to 6.</p>
+<ul class="tick">
+  <li>☐ Step 1: client.ts keeps the session in sessionStorage, sends <code class="inline">Authorization: Bearer …</code>, has getRoster, postSignIn and postSignOut; the two TS2345 errors fixed with <code class="inline">{ signal }</code></li>
+  <li>☐ Step 2: AuthContext.ts (<code class="inline">AuthValue | undefined</code> + <code class="inline">useAuth()</code>), AuthProvider.tsx, the provider around everything in App.tsx</li>
+  <li>☐ Step 3: /sign-in shows the API's messages, keeps the email but not the password; the header shows who is signed in with Sign out</li>
+  <li>☐ Step 4: useApi and eventPromises know the viewer; drafts, Plan a cleanup and Cancel for organizers only, gone on sign-out without a reload</li>
+  <li>☐ Step 5: today's cleanup shows the desk with the live roster for organizers; <code class="inline">src/data/</code> deleted</li>
+  <li>☐ Step 6: <code class="inline">npx tsc -b</code>, <code class="inline">npm run lint</code>, <code class="inline">npm run build</code> pass; <code class="inline">src/Scratch.tsx</code> deleted; the edges tried</li>
+</ul>
+<div class="write tall"></div>
+</div>
+<div class="blk"><div class="h">Self-check (Lesson 5.2)</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which of these values belongs in a context rather than a prop?</div><div class="opts"><div class="opt">A) The <code class="inline">showDrafts</code> flag EventsPage hands to EventGroups, its direct child</div><div class="opt">B) The text in the events search box, which changes on every keystroke</div><div class="opt">C) Who is signed in, which the header, the event cards and the desk all need</div><div class="opt">D) The list of cleanups the events page loaded from the API</div></div></div>
+<div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">A component in <code class="inline">src/Scratch.tsx</code> reads the HQ's context directly and tsc prints this. What does the HQ do instead?</div><pre class="code">src/Scratch.tsx:5:11 - error TS2339: Property 'isOrganizer' does not exist on type 'AuthValue | undefined'.
+
+5   const { isOrganizer } = useContext(AuthContext)
+            ~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:5</pre><div class="opts"><div class="opt">A) Write <code class="inline">useContext(AuthContext) as AuthValue</code> so the error goes away</div><div class="opt">B) Call <code class="inline">useAuth()</code>, which checks for <code class="inline">undefined</code> once, throws outside the provider and returns an <code class="inline">AuthValue</code></div><div class="opt">C) Give <code class="inline">createContext</code> a default object, so the value is never undefined</div><div class="opt">D) Turn off <code class="inline">strict</code> in tsconfig.app.json for this file</div></div></div>
+<div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">The lesson's "harmless" default: what do <code class="inline">npx tsc -b</code> and <code class="inline">npm run lint</code> say about this file, and what happens when the button is clicked outside any provider?</div><pre class="code"><span class="k">import</span> { createContext, useContext } <span class="k">from</span> <span class="s">'react'</span>
+<span class="k">import</span> <span class="k">type</span> { AuthValue } <span class="k">from</span> <span class="s">'./auth/AuthContext.ts'</span>
+
+<span class="c">// A "harmless" default so that nobody has to deal with undefined...</span>
+<span class="k">const</span> QuietAuthContext = createContext&lt;AuthValue&gt;({
+  session: <span class="k">null</span>,
+  isOrganizer: <span class="k">false</span>,
+  signIn: <span class="k">async</span> () =&gt; {},
+  signOut: () =&gt; {},
+})
+
+<span class="c">// ...used by a component that nobody wrapped in a provider</span>
+<span class="k">export</span> <span class="k">function</span> QuickSignIn() {
+  <span class="k">const</span> { session, signIn } = useContext(QuietAuthContext)
+  <span class="k">return</span> (
+    &lt;button
+      <span class="k">type</span>=<span class="s">"button"</span>
+      onClick={() =&gt; signIn({ email: <span class="s">'maya.okafor@example.com'</span>, password: <span class="s">'shoreline-demo'</span> })}
+    &gt;
+      {session === <span class="k">null</span> ? <span class="s">'Sign in as Maya'</span> : <span class="s">`Signed in as ${session.user.name}`</span>}
+    &lt;/button&gt;
+  )
+}</pre><div class="write"></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">Someone puts the context, its Hook and the provider in one AuthProvider.tsx. <code class="inline">npm run lint</code> prints this. What is the fix?</div><pre class="code">  ⚠ react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ╭─[src/auth/AuthProvider.tsx:20:17]
+ 19 │ /** The sign-in state. Only works inside &lt;AuthProvider&gt;. */
+ 20 │ export function useAuth(): AuthValue {
+    ·                 ───────
+ 21 │   const auth = useContext(AuthContext)
+    ╰────</pre><div class="opts"><div class="opt">A) Turn off react(only-export-components) in .oxlintrc.json</div><div class="opt">B) Rename AuthProvider.tsx to AuthProvider.ts</div><div class="opt">C) Stop exporting <code class="inline">useAuth</code> and copy it into every component</div><div class="opt">D) Keep the context, its type and <code class="inline">useAuth</code> in AuthContext.ts and only the provider component in AuthProvider.tsx</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">Step 1 changed <code class="inline">request(path, signal?)</code> to <code class="inline">request(path, init: RequestInit = {})</code>. Then <code class="inline">npx tsc -b</code> prints this. What does it mean?</div><pre class="code">src/api/client.ts:217:40 - error TS2345: Argument of type 'AbortSignal | undefined' is not assignable to parameter of type 'RequestInit | undefined'.
+  Type 'AbortSignal' has no properties in common with type 'RequestInit'.
+src/api/client.ts:246:40 - error TS2345: Argument of type 'AbortSignal | undefined' is not assignable to parameter of type 'RequestInit | undefined'.
+  Type 'AbortSignal' has no properties in common with type 'RequestInit'.
+Found 2 errors in the same file, starting at: src/api/client.ts:217</pre><div class="opts"><div class="opt">A) An AbortSignal shares no property with RequestInit, so it cannot be the options object: pass <code class="inline">{ signal }</code></div><div class="opt">B) fetch no longer accepts a signal: remove it from both calls</div><div class="opt">C) RequestInit needs every property: add method, headers and body</div><div class="opt">D) The callers must cast it: <code class="inline">signal as RequestInit</code></div></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">The same request to <code class="inline">/api/events?perPage=1</code>, first as a guest, then with an organizer's token. Why does <code class="inline">useApi</code> now list the viewer in its dependencies?</div><pre class="code">HTTP/1.1 200 OK
+x-total-count: 15
+
+HTTP/1.1 200 OK
+x-total-count: 17</pre><div class="opts"><div class="opt">A) To send the token with the request</div><div class="opt">B) Because the API answers differently per person, so a new person must mean a new request</div><div class="opt">C) So that guests cannot see drafts</div><div class="opt">D) Because React requires every Hook to read the context</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: draw the HQ's component tree from App down to EventCard, UserMenu and TodaysDesk, and circle every component that calls useAuth() (directly or through useApi). Then answer in two sentences: why is "no provider" an undefined in the type instead of a friendly default, and what would you have lost with the default?</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Checkpoint 2: Modules 4 and 5 So Far</h2><span class="rule"></span></div>
+<div class="blk lab"><div class="h">Your task (30 minutes, alone)</div>
+<p>Three small pieces in <code class="inline">labs/module-13/checkpoint-2/starter/</code>, with the task sheet <code class="inline">labs/module-13/checkpoint-2/TASKS.md</code>. A terminal in <code class="inline">starter</code>: <code class="inline">npm install</code> once (start it at the break), then <code class="inline">npm test</code> after every change and <code class="inline">npm run typecheck</code> at the end. As shipped, all eight tests fail and the type check reports two errors; you are done when Vitest says <code class="inline">Tests  8 passed (8)</code> and the type check prints nothing. Lesson pages and your own <code class="inline">shoreline-hq</code> are allowed; a neighbor's code is not.</p>
+<ul class="tick">
+  <li>☐ <b>Task 1</b> <code class="inline">useSite(apiUrl, siteId)</code> in <code class="inline">src/useSite.ts</code> (Lessons 4.1 and 4.2, about 12 minutes): loading, failed with the status, ready after <code class="inline">isSite</code>; abort in the cleanup; again when the id changes</li>
+  <li>☐ <b>Task 2</b> <code class="inline">TallyAction</code> and <code class="inline">tallyReducer</code> in <code class="inline">src/tally.ts</code> (Lesson 5.1, about 10 minutes): a discriminated union, one case per action, the same state when there is nothing to undo, <code class="inline">assertNever</code></li>
+  <li>☐ <b>Task 3</b> <code class="inline">useTally()</code> and <code class="inline">TallyProvider</code> (Lessons 5.1 and 5.2, about 8 minutes): the reducer shared through a context that is undefined outside its provider</li>
+</ul>
+<p>My last <code class="inline">npm test</code> summary line: ______________________________ <code class="inline">npm run typecheck</code>: ______________</p>
+</div>
+<div class="blk"><div class="h">How it is looked at</div>
+<p>Five rows, each 0 to 2: Effects and fetching (Task 1) · A typed custom Hook (Task 1) · A reducer on a discriminated union (Task 2) · Typed context (Task 3) · Process (running the tests after each change and the type check at the end, reading the first failure, explaining one decision). It is not a grade: it tells you which lesson's exercises to revisit before Session 14.</p>
+<div class="write"></div>
+</div>
+<div class="blk"><div class="h">Self-check (Modules 4 and 5 review)</div>
+<div class="q" data-sc="7"><div class="qn">Q7</div><div class="qt">In development, the events page's request shows twice in the Network tab, the first one canceled. Why?</div><div class="opts"><div class="opt">A) The effect has no dependency array, so it runs after every render</div><div class="opt">B) fetch retries a request once when the API is slow</div><div class="opt">C) Strict Mode runs effect, cleanup, effect in development; the cleanup's abort() cancels the first request</div><div class="opt">D) useApi's reload() runs once when the page appears</div></div></div>
+<div class="q" data-sc="8" data-kind="short"><div class="qn">Q8</div><div class="qt"><code class="inline">useApi(key, load)</code> keeps <code class="inline">load</code> in <code class="inline">useEffectEvent</code> and lists only <code class="inline">[key, viewer, attempt]</code>. Name the three things that make it load again.</div><div class="write"></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">After Sign out, the button that had the focus is gone. Which of these moves the focus to the Sign in link that replaces it, and only after a sign-out?</div><div class="opts"><div class="opt">A) <code class="inline">document.querySelector('a').focus()</code> in the component body</div><div class="opt">B) A state flag set by the sign-out button, and a callback ref on the link that focuses it when the flag is true</div><div class="opt">C) <code class="inline">autoFocus</code> on the Sign in link</div><div class="opt">D) <code class="inline">useRef</code> on the link and <code class="inline">.focus()</code> during render</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">EventDetails calls <code class="inline">use(eventPromise(id, viewer))</code>. Why not <code class="inline">use(getEvent(id))</code>?</div><div class="opts"><div class="opt">A) getEvent returns a Response, not a promise</div><div class="opt">B) use() only accepts promises from the cache API</div><div class="opt">C) Hooks cannot call functions that fetch</div><div class="opt">D) A new promise on every render suspends again and starts over: use() needs the SAME promise each time</div></div></div>
+<div class="q" data-sc="11"><div class="qn">Q11</div><div class="qt">In the checkpoint's model answer, someone deletes the <code class="inline">case 'reset':</code> lines. What happened, and what is the fix?</div><pre class="code">src/tally.ts:34:26 - error TS2345: Argument of type '{ type: "reset"; }' is not assignable to parameter of type 'never'.
+
+34       return assertNever(action)
+                            ~~~~~~
+
+
+Found 1 error in src/tally.ts:34</pre><div class="opts"><div class="opt">A) A reset action can now reach the default case, so <code class="inline">action</code> is not <code class="inline">never</code> there: put the case back</div><div class="opt">B) <code class="inline">assertNever</code> is broken: change its parameter to <code class="inline">unknown</code></div><div class="opt">C) Reducers may not have a default case</div><div class="opt">D) <code class="inline">reset</code> must return a new object, not initialTally</div></div></div>
+<div class="q" data-sc="12" data-kind="short"><div class="qn">Q12</div><div class="qt">As shipped, the checkpoint's <code class="inline">npm run typecheck</code> prints this. What does it tell you, and what makes it go away?</div><pre class="code">src/checkpoint.test.tsx:81:3 - error TS2578: Unused '@ts-expect-error' directive.
+src/checkpoint.test.tsx:83:3 - error TS2578: Unused '@ts-expect-error' directive.
+Found 2 errors in the same file, starting at: src/checkpoint.test.tsx:81</pre><div class="write"></div></div>
+</div>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Why is the HQ's context typed <code class="inline">AuthValue | undefined</code> instead of having a default object?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Why are the context and the provider in two files?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Hiding drafts and the Cancel button from volunteers: who really protects them?</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish Sign-in for the HQ (Steps 3 to 6) and tick the Project Completion Checklist</li>
+  <li>☐ Lesson 5.2 Hands-on Exercises 1 and 2 (Exercise 3 is a stretch)</li>
+  <li>☐ The Quick Quiz on the lesson page</li>
+  <li>☐ Lab 5.2: Task 3 (and the rest); the stretch if you like</li>
+  <li>☐ Checkpoint 2: every test passing and a quiet type check; reread my lowest rubric row's lesson section</li>
+  <li>☐ The journal entry</li>
+  <li>☐ Bring to Session 14: the finished Lesson 5.2 code, React DevTools installed in my browser, internet for <code class="inline">npm install</code>, this workbook</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>prop drilling</td><td>Passing a value down through components that do not use it, only to reach one that does</td></tr>
+<tr><td>context</td><td>A value React sends to every component below a provider, whatever sits in between</td></tr>
+<tr><td><code class="inline">createContext&lt;T&gt;(default)</code></td><td>Makes a context object; the default is what a component gets with no provider above it</td></tr>
+<tr><td>provider</td><td><code class="inline">&lt;SomeContext value={…}&gt;</code> (React 19): gives the value to the part of the tree inside it</td></tr>
+<tr><td><code class="inline">useContext</code></td><td>Reads the value of the NEAREST provider above the component</td></tr>
+<tr><td>the undefined trap</td><td>A fake default that compiles and turns a missing provider into a silent bug</td></tr>
+<tr><td><code class="inline">useAuth()</code></td><td>The HQ's custom Hook: reads AuthContext, throws outside AuthProvider, returns AuthValue</td></tr>
+<tr><td>Fast Refresh</td><td>Vite's update-in-place on save; keeps state only for files that export components only</td></tr>
+<tr><td>session, token</td><td>Who is signed in (the API's answer) / the opaque string that proves it on every request</td></tr>
+<tr><td><code class="inline">Authorization: Bearer …</code></td><td>The request header that carries the token</td></tr>
+<tr><td><code class="inline">sessionStorage</code></td><td>Browser storage that survives reloads, belongs to one tab and ends when the tab closes</td></tr>
+<tr><td>401 / 403</td><td>Not signed in (or the sign-in ended) / signed in, but not allowed</td></tr>
+<tr><td><code class="inline">RequestInit</code></td><td>The type of fetch's options object (method, headers, body, signal…)</td></tr>
+<tr><td>weak type</td><td>A type whose properties are all optional; TypeScript wants at least one property in common</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 13 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

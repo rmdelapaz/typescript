@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Use Suspense, use() and error boundaries in React and TypeScript: read a promise while rendering with a stable cached promise, place loading boundaries, write a typed error boundary class with a working retry, and give every Shoreline Crew HQ cleanup its own page. React + TypeScript: Build a Modern Web App Lesson 4.4.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Suspense, use() and Error Boundaries - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>⏳ Lesson 4.4: Suspense, use() and Error Boundaries</h1>
+                <p class="lead">Every page in Shoreline Crew HQ carries the same bookkeeping: is it loading, did it fail, is it ready? Each component asks those questions itself, with a <code>LoadState</code> and a ternary. React has a second way to handle waiting and failing, where a component simply reads its data as if it were already there, and boundaries further up the tree decide what people see in the meantime or when something breaks. Today you learn that way and use it where it fits: a page of its own for every cleanup, a loading boundary, and error boundaries that tell people what happened and give them a way forward, including one that keeps a crashing page from taking the whole app down with it.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain what Suspense does and where a <code>&lt;Suspense&gt;</code> boundary belongs in a component tree</li>
+                        <li>Read a promise while rendering with <code>use()</code>, typed, and keep the promise stable so it is not requested again on every render</li>
+                        <li>Write a typed error boundary as a class component, and say which errors it catches and which it does not</li>
+                        <li>Design fallbacks that help people: a clear message, "not found" told apart from "could not load", and a <strong>Try again</strong> that really tries again</li>
+                        <li>Judge where Suspense belongs in a single-page app today, and what React Router (Module 6) and TanStack Query (Module 7) take over later</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_15.html">Lesson 4.3: Refs and the DOM</a> (your <code>shoreline-hq</code> with <code>useApi</code>, <code>LoadStatus</code> and the <code>Dialog</code>)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A page for each cleanup at <code>/events/e08</code> that reads its data with <code>use()</code> inside <code>Suspense</code>, a reusable <code>ErrorBoundary</code>, and an app-wide safety net for pages that crash</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-16-start.zip">lesson-16-start.zip</a> · Finished code: <a href="downloads/lesson-16-end.zip">lesson-16-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#waiting" class="toc-link">Waiting Without the Bookkeeping</a></li>
+                        <li><a href="#use" class="toc-link">use(): Reading a Promise While Rendering</a></li>
+                        <li><a href="#suspense" class="toc-link">Suspense Boundaries</a></li>
+                        <li><a href="#error-boundaries" class="toc-link">Error Boundaries</a></li>
+                        <li><a href="#where" class="toc-link">Where Suspense Fits in This App</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: A Page for Every Cleanup</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="waiting" class="lesson-section">
+                <h2>⏳ Waiting Without the Bookkeeping</h2>
+                <p>Look at how the HQ's sites page decides what to show (Lesson 4.2):</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/SitesPage.tsx" data-match="excerpt"><code class="language-tsx">{sites.state.kind === 'ready' ? (
+  &lt;div className={styles.grid}&gt;
+    {sites.state.data.map((site) =&gt; (
+      &lt;SiteCard key={site.id} site={site} /&gt;
+    ))}
+  &lt;/div&gt;
+) : (
+  &lt;LoadStatus state={sites.state} what="the beach sites" onRetry={sites.reload} /&gt;
+)}</code></pre>
+                </div>
+                <p>It works, and it is honest: the type <code>LoadState&lt;Site[]&gt;</code> forces the page to think about all three cases. But every page repeats the same question, and every page answers it slightly differently. The component that wants to show sites has to know about loading and failing too.</p>
+                <p><strong>Suspense</strong> splits those jobs. A component reads its data as if it were already there. If the data has not arrived, the component <em>suspends</em>: React stops rendering it and shows the <strong>fallback</strong> of the nearest <code>&lt;Suspense&gt;</code> boundary above it instead. If loading fails, the error travels up to the nearest <strong>error boundary</strong>, which shows its own fallback. The component in the middle only ever handles the happy path.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the sign-in table</h4>
+                    <p>On cleanup morning, volunteers do not each work out what to do while the crew lead unloads the van. They wait at the sign-in table, where one person says "we start in ten minutes, grab a coffee". That table is a Suspense boundary: one place that handles waiting for everyone behind it. And when the tide is too high to start, the lead does not let each volunteer find out alone; one announcement at the table says what happened and what comes next. That is the error boundary. The volunteers (your components) just do the cleanup when it starts.</p>
+                </div>
+                <p>Here is the tree you will build for a cleanup's own page. Read it from the bottom: <code>EventDetails</code> reads the cleanup; the <code>Suspense</code> above it covers the wait; the <code>ErrorBoundary</code> above that covers failure; and one more boundary at the top of the app catches pages that crash.</p>
+                <div class="mermaid">
+graph TD
+    A["App: ErrorBoundary"] --> B["EventPage"]
+    B --> C["ErrorBoundary"]
+    C --> D["Suspense"]
+    D --> E["EventDetails: use()"]
+    C -. "it failed" .-> F["EventProblem"]
+    D -. "still waiting" .-> G["Loading the cleanup…"]
+</div>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Loading and error states are where apps feel broken. A blank screen, a spinner that never stops, or a raw "TypeError" tells people nothing. Teams that use React today meet Suspense and error boundaries in every data library and router they pick, and code reviews ask "what does the user see while this loads, and when it fails?" Knowing how the boundaries work underneath lets you answer that, whichever library the team uses.</p>
+                </div>
+            </section>
+
+            <section id="use" class="lesson-section">
+                <h2>📬 use(): Reading a Promise While Rendering</h2>
+                <p>React 19's <code>use</code> reads the value of a promise during rendering. Pass it a promise; it gives you what the promise resolves to. Try it as <code>src/Scratch.tsx</code> (this lesson's experiment file), shown by temporarily making <code>return &lt;SiteCountDemo /&gt;</code> the first line of <code>CurrentPage</code> in <code>App.tsx</code>:</p>
+                <pre data-snippet><code class="language-tsx">import { Suspense, use } from 'react'
+import { getSites } from './api/client.ts'
+
+// Started once, when this file is first imported: every render gets the same promise
+const sitesPromise = getSites()
+
+function SiteCount() {
+  const sites = use(sitesPromise) // Site[]: the promise's value, once it has arrived
+  return &lt;p&gt;The crew looks after {sites.length} beach sites.&lt;/p&gt;
+}
+
+export function SiteCountDemo() {
+  return (
+    &lt;Suspense fallback={&lt;p&gt;Counting the beach sites…&lt;/p&gt;}&gt;
+      &lt;SiteCount /&gt;
+    &lt;/Suspense&gt;
+  )
+}</code></pre>
+                <p>Measured on the dev server: the page first said "Counting the beach sites…", then "The crew looks after 6 beach sites.", with one request to <code>/api/sites</code>. Three things happened:</p>
+                <ol>
+                    <li><code>SiteCount</code> rendered and called <code>use(sitesPromise)</code>. The promise was still pending, so <code>use</code> suspended the component: React put it aside and showed the boundary's fallback.</li>
+                    <li>React waited for the promise. When it resolved, React rendered <code>SiteCount</code> again.</li>
+                    <li>This time <code>use(sitesPromise)</code> returned the sites at once, and the paragraph appeared.</li>
+                </ol>
+                <h3>The types</h3>
+                <p><code>use</code> is generic: its declaration in React's types is <code>use&lt;T&gt;(usable: Usable&lt;T&gt;): T</code>, where a "usable" is a promise (or a context, Lesson 5.2). TypeScript infers <code>T</code> from the promise, so nothing needs annotating. Measured with this course's setup (making tsc print each type):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You write</th><th>The value's type</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>use(getSites())</code></td><td><code>Site[]</code></td></tr>
+                            <tr><td><code>eventPromise('e08')</code> (this lesson's project)</td><td><code>Promise&lt;CleanupEventDetail&gt;</code></td></tr>
+                            <tr><td><code>use(eventPromise('e08'))</code></td><td><code>CleanupEventDetail</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Notice what is missing: no <code>| undefined</code>, no <code>LoadState</code>. Inside the component the data is simply there, because the component never runs to the end without it. That is the trade: the waiting and failing move out of the component and into the boundaries above.</p>
+                <h3>Two rules that come with it</h3>
+                <ul>
+                    <li><strong>The promise must be the same promise on every render.</strong> A component that suspends is rendered again later, from the top. If it creates a new promise each time (<code>use(getEvent(id))</code>), the new promise is pending again, so it suspends again, forever. The demo above starts its promise once, outside the component. The project keeps one promise per cleanup in a small cache. Common Mistakes shows what happens otherwise (it is dramatic).</li>
+                    <li><strong><code>use</code> is not called inside <code>try</code>/<code>catch</code>.</strong> Unlike other Hooks it may sit inside an <code>if</code> or a loop, but errors from it belong to an error boundary. The linter enforces this rule.</li>
+                </ul>
+                <div class="card card-info">
+                    <h4>🧩 Version note: use() is new in React 19</h4>
+                    <p>Before React 19, the only way for a component to "wait" for data with Suspense was to use a library that threw promises in a special way. <code>use()</code> made it a public React API. Older articles about "Suspense for data fetching" describe experimental APIs that never shipped; when you read about Suspense, check that the article covers React 19.</p>
+                </div>
+            </section>
+
+            <section id="suspense" class="lesson-section">
+                <h2>🧱 Suspense Boundaries</h2>
+                <p><code>&lt;Suspense fallback={…}&gt;</code> is a component that wraps part of the tree. While anything inside it is suspended, React shows the fallback in its place; when everything inside is ready, React shows the children. A few things follow from that:</p>
+                <ul>
+                    <li><strong>Everything outside the boundary stays on the screen.</strong> In the project, the header and the "← All cleanups" link sit above the boundary, so they appear at once and only the cleanup's part waits (the screenshot in Step 6 shows it).</li>
+                    <li><strong>The nearest boundary wins.</strong> Put a boundary around each part of the page that can load on its own, and each part shows its own fallback. One boundary around several components waits for all of them and then shows them together.</li>
+                    <li><strong>No boundary at all means the whole app waits.</strong> Measured: with the project's <code>Suspense</code> removed and the API slowed down, the page's <code>#root</code> stayed completely empty (no header, nothing) until the cleanup arrived. The app's root acts as the last boundary, and its "fallback" is nothing.</li>
+                </ul>
+                <p>The fallback is an ordinary React element, so it can be the same message the rest of the HQ uses. The project passes <code>LoadStatus</code> a loading state, which gives the familiar "Loading the cleanup…" box with <code>role="status"</code> for screen readers.</p>
+                <p>What can make a component suspend?</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Suspends</th><th>Where you meet it</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>use(promise)</code> on a pending promise</td><td>today</td></tr>
+                            <tr><td>A component loaded with <code>lazy(() =&gt; import(…))</code> whose code has not arrived yet</td><td>Lesson 10.1 (code splitting)</td></tr>
+                            <tr><td>Data libraries' Suspense Hooks, such as TanStack Query's <code>useSuspenseQuery</code></td><td>Lesson 7.1</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>A plain <code>useEffect</code> + <code>useState</code> fetch, like <code>useApi</code>, does <em>not</em> suspend: the component renders with a loading state instead. That is why the HQ's other pages keep working exactly as before.</p>
+            </section>
+
+            <section id="error-boundaries" class="lesson-section">
+                <h2>🛟 Error Boundaries</h2>
+                <p>When a component throws an error while rendering, React has nothing to show for that part of the tree. Without help, React 19 removes the <em>whole</em> app from the page. Measured: a test crash in one site card left <code>#root</code> empty, header and footer included, with only "Test crash" in the console. One broken card, and people see a blank page.</p>
+                <p>An <strong>error boundary</strong> is a component that catches errors thrown while rendering the components inside it, and shows a fallback instead. Rejected promises read with <code>use()</code> count: <code>use</code> throws the rejection's error, so a failed request lands in the nearest error boundary, just like a bug.</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>The error is thrown…</th><th>Caught by an error boundary?</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>while a component inside renders (a bug, bad data)</td><td>yes</td></tr>
+                            <tr><td>by <code>use(promise)</code>, because the promise rejected</td><td>yes</td></tr>
+                            <tr><td>in an event handler such as <code>onClick</code></td><td>no: the screen does not depend on it, so React leaves the page as it is</td></tr>
+                            <tr><td>in async code: <code>setTimeout</code>, a <code>.then</code> in an effect</td><td>no: handle it there (<code>useApi</code> catches its own errors)</td></tr>
+                            <tr><td>in the error boundary itself</td><td>no: the next boundary up catches it</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The first and third rows were measured with this demo (it uses the <code>ErrorBoundary</code> you build in the project, so try it after Step 3):</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+import { ErrorBoundary, type FallbackProps } from './components/ErrorBoundary.tsx'
+
+function Caught({ retry }: FallbackProps) {
+  return (
+    &lt;p&gt;
+      The boundary caught it.{' '}
+      &lt;button type="button" onClick={retry}&gt;
+        Try again
+      &lt;/button&gt;
+    &lt;/p&gt;
+  )
+}
+
+function CrashButtons() {
+  const [broken, setBroken] = useState(false)
+  if (broken) {
+    throw new Error('Thrown while rendering')
+  }
+  return (
+    &lt;&gt;
+      &lt;button
+        type="button"
+        onClick={() =&gt; {
+          throw new Error('Thrown in a click handler')
+        }}
+      &gt;
+        Throw in a click handler
+      &lt;/button&gt;
+      &lt;button type="button" onClick={() =&gt; setBroken(true)}&gt;
+        Throw while rendering
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}
+
+export function CrashDemo() {
+  return (
+    &lt;ErrorBoundary fallback={Caught}&gt;
+      &lt;CrashButtons /&gt;
+    &lt;/ErrorBoundary&gt;
+  )
+}</code></pre>
+                <p>Clicking <strong>Throw in a click handler</strong> printed "Uncaught Error: Thrown in a click handler" in the console and changed nothing on the page: both buttons stayed. Clicking <strong>Throw while rendering</strong> made the next render throw, and the boundary replaced the buttons with "The boundary caught it." Its <strong>Try again</strong> rendered the children again, and the buttons were back (the state that broke them was thrown away with the old components).</p>
+                <h3>Why a class component?</h3>
+                <p>Every component in this course so far has been a function. Error boundaries are the exception: React 19.3 still has no Hook for catching errors (measured: the <code>react</code> package exports nothing of the kind), so a boundary is written as a <strong>class component</strong>, the older style of React component. You only need a small part of it. Here is the shape, which Step 3 builds line by line:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Class piece</th><th>What it does</th><th>Function-component cousin</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>class X extends Component&lt;Props, State&gt;</code></td><td>a component with typed props and state</td><td><code>function X(props: Props)</code></td></tr>
+                            <tr><td><code>state: State = { … }</code></td><td>the starting state</td><td><code>useState(…)</code></td></tr>
+                            <tr><td><code>static getDerivedStateFromError(error)</code></td><td>React calls it when a child throws; it returns the new state</td><td>none: this is why classes are needed</td></tr>
+                            <tr><td><code>this.setState({ … })</code></td><td>changes state and renders again</td><td>the setter from <code>useState</code></td></tr>
+                            <tr><td><code>render()</code></td><td>returns the JSX, reading <code>this.props</code> and <code>this.state</code></td><td>the function body</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <h3>Write it, or install it?</h3>
+                <p>Many teams install <code>react-error-boundary</code> (version 6.1.6 when this lesson was checked) instead of writing the class. It is small and well made. Measured on the HQ's build: swapping this lesson's class for the library added 1.16 kB to the JavaScript (0.40 kB gzipped). Size does not decide it either way. This course writes its own boundary, for three reasons: it is about 40 lines you can read completely; writing it once teaches you what any boundary does; and the HQ needs only the basics (a fallback and a retry). If you later need its extras, such as resetting when a value changes (<code>resetKeys</code>) or sending an event handler's error to the boundary (<code>useErrorBoundary</code>), the library is a good choice, and your fallbacks will move over almost unchanged.</p>
+                <div class="card card-info">
+                    <h4>💡 React still reports what it caught</h4>
+                    <p>A caught error is not a hidden error. Measured on the dev server and on the build: when the boundary showed its fallback, React also logged the error in the browser console. In a real app, <code>createRoot</code>'s <code>onCaughtError</code> and <code>onUncaughtError</code> options (both in React 19's types) are where you would send errors to a monitoring service instead. The HQ keeps React's default.</p>
+                </div>
+            </section>
+
+            <section id="where" class="lesson-section">
+                <h2>🗺️ Where Suspense Fits in This App</h2>
+                <p>Suspense and <code>use()</code> are powerful, but the HQ will not rewrite every page around them today, and it is worth being clear about why. The hard part of <code>use()</code> is not the Hook; it is where the promise comes from. Someone has to start the request, keep the promise so every render gets the same one, decide when it is stale, and forget it after an error. That "someone" is a cache, and caches are exactly what the next modules bring:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Lesson</th><th>What changes for the event page</th><th>What stays</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>4.4 (today)</td><td>a ten-line cache, <code>eventPromises.ts</code>, keeps one promise per cleanup while the page is open</td><td></td></tr>
+                            <tr><td>6.1 React Router</td><td>the router picks the page and reads <code>eventId</code> from the URL; routes get their own error elements</td><td><code>Suspense</code>, <code>ErrorBoundary</code>, <code>EventDetails</code></td></tr>
+                            <tr><td>6.3 Loaders</td><td>a route's loader can start the request when the link is followed, before the page even renders</td><td>the same</td></tr>
+                            <tr><td>7.1 TanStack Query</td><td><code>eventPromises.ts</code> goes: Query's cache keeps, refreshes and forgets data for every request in the app</td><td>the boundaries and the fallbacks</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>So today's cache is deliberately small and temporary, and today's boundaries are the part that lasts. The other pages stay on <code>useApi</code> until Lesson 7.1, for a concrete reason too: the events page keeps the old results on screen while a new search loads (Lesson 4.2). A page that suspended on every new search would swap the whole list for "Loading…" at each keystroke, unless you also brought in transitions, a topic for Lesson 7.1.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ A new promise on every render</h4>
+                    <p>The most natural first try:</p>
+                    <pre data-snippet><code class="language-tsx">import { Suspense, use } from 'react'
+import { getEvent } from './api/client.ts'
+
+function EventTitle({ id }: { id: string }) {
+  const event = use(getEvent(id)) // a NEW promise every time this component renders
+  return &lt;h2&gt;{event.title}&lt;/h2&gt;
+}
+
+export function UncachedDemo() {
+  return (
+    &lt;Suspense fallback={&lt;p&gt;Loading the cleanup…&lt;/p&gt;}&gt;
+      &lt;EventTitle id="e08" /&gt;
+    &lt;/Suspense&gt;
+  )
+}</code></pre>
+                    <p><code>npx tsc -b</code> and <code>npm run lint</code> are both clean. In the browser, the page says "Loading the cleanup…" forever. Measured on the dev server: in three seconds the browser sent <strong>well over a thousand requests</strong> for <code>/api/events/e08</code> and never showed the title. Every render made a new pending promise, so every render suspended, and every resolved promise triggered a render that made another one. Keep promises outside rendering: start them once (the <code>SiteCount</code> demo), or ask a cache for them (<code>eventPromise(id)</code> in the project).</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Catching use() with try/catch</h4>
+                    <p>It looks like ordinary error handling:</p>
+                    <pre data-snippet><code class="language-tsx">function EventTitle({ id }: { id: string }) {
+  try {
+    const event = use(eventPromise(id))
+    return &lt;h2&gt;{event.title}&lt;/h2&gt;
+  } catch {
+    return &lt;p&gt;Could not load the cleanup.&lt;/p&gt;
+  }
+}</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_16/16-try-catch.png" alt="A terminal in shoreline-hq. npm run lint reports a warning, Avoid constructing JSX within try/catch, and an error from react-hooks rules-of-hooks: React Hook use cannot be called in a try/catch block, with the use call underlined. The summary says Found 1 warning and 1 error." width="1100" height="550" loading="lazy">
+                        <figcaption>tsc has nothing to say about this component; the linter knows the rule for <code>use()</code>.</figcaption>
+                    </figure>
+                    <p>The linter stops it with an error, and the browser shows why it is wrong. Measured: the page jumped straight to "Could not load the cleanup." while the request was still on its way, and React logged "`use` was called from inside a try/catch block. This is not allowed and can lead to unexpected behavior." <code>use</code> suspends by throwing, so the <code>catch</code> caught the waiting, not a failure. Remove the <code>try</code>; put an error boundary around the component instead.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Forgetting static on getDerivedStateFromError</h4>
+                    <p>Write <code>getDerivedStateFromError(error: unknown)</code> without <code>static</code> and <code>npx tsc -b</code> and <code>npm run lint</code> both pass. But React only looks for it on the class itself, so the boundary never catches anything. Measured with the click demo: <strong>Throw while rendering</strong> emptied <code>#root</code> completely, and React's console said "getDerivedStateFromError() is defined as an instance method and will be ignored. Instead, declare it as a static method." When a boundary does nothing, check for that console message first.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ A Try again that tries nothing</h4>
+                    <p>A rejected promise stays rejected. If the boundary's retry renders the children again but the cache still holds the failed promise, <code>use</code> throws the same error at once. Measured: with <code>onRetry</code> removed from the project's <code>EventPage</code>, starting the API and pressing <strong>Try again</strong> sent no request at all and showed "Could not load this cleanup" again. The project's boundary calls <code>forgetEvent(id)</code> before retrying, so the next render asks the API.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: A Page for Every Cleanup</h2>
+                <p>At the end of this project, every cleanup's title on <code>/events</code> links to its own page (<code>/events/e08</code> for Weekend Cove Cleanup). The page reads the cleanup with <code>use()</code> inside <code>Suspense</code>; an error boundary tells "not found" apart from "could not load" and offers <strong>Try again</strong>; and a second boundary around every page keeps a crash from blanking the app.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>) and delete <code>src/Scratch.tsx</code> (and the line you added to <code>CurrentPage</code>) if you still have them.</p>
+
+                <div class="card">
+                    <h3>Step 1: Fetch one cleanup <span class="step-time">(8 min)</span></h3>
+                    <p><code>GET /api/events/e08</code> returns a <code>CleanupEventDetail</code>: a <code>CleanupEvent</code> plus its whole <code>site</code> (see <code>src/api/types.ts</code>). In <code>src/api/client.ts</code>, import the type:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts">   CleanupEvent,
++  CleanupEventDetail,
+   ErrorCode,</code></pre>
+                    </div>
+                    <p>add a check under <code>isSite</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">/** A cleanup as GET /api/events/:id sends it: a CleanupEvent plus its whole site */
+export function isCleanupEventDetail(value: unknown): value is CleanupEventDetail {
+  return isCleanupEvent(value) &amp;&amp; 'site' in value &amp;&amp; isSite(value.site)
+}</code></pre>
+                    </div>
+                    <p>and a function at the end of the file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="excerpt"><code class="language-ts">/** One cleanup with its site. An unknown id (or a draft) is an ApiError with status 404. */
+export function getEvent(id: string, signal?: AbortSignal): Promise&lt;CleanupEventDetail&gt; {
+  return getJSON(`/events/${encodeURIComponent(id)}`, isCleanupEventDetail, signal)
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li>The check reuses what you have: <code>isCleanupEvent</code> for the event's fields and <code>isSite</code> for the site.</li>
+                        <li>Why <code>'site' in value</code>? After <code>isCleanupEvent(value)</code>, TypeScript knows <code>value</code> is a <code>CleanupEvent</code>, which has no <code>site</code>. Leave the <code>in</code> check out and tsc says so:</li>
+                    </ul>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/api/client.ts:69:48 - error TS2339: Property 'site' does not exist on type 'CleanupEvent'.
+
+69   return isCleanupEvent(value) &amp;&amp; isSite(value.site)
+                                                  ~~~~
+
+
+Found 1 error in src/api/client.ts:69</code></pre>
+                    </div>
+                    <p>The <code>in</code> operator narrowing from Lesson 2.2 adds "and it has a <code>site</code> property" to the type, so <code>value.site</code> can be read (as <code>unknown</code>) and handed to <code>isSite</code>.</p>
+                    <ul>
+                        <li><code>encodeURIComponent(id)</code> keeps an id from the address bar from changing the path: the id ends up in the URL exactly as one path segment.</li>
+                        <li>An unknown id, and a draft (drafts are only for signed-in organizers), come back as 404. <code>request()</code> already turns that into an <code>ApiError</code> with <code>status</code> 404 (Lesson 4.1), which the page will recognize.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: Keep one promise per cleanup <span class="step-time">(6 min)</span></h3>
+                    <p>Create <code>src/api/eventPromises.ts</code>, the small cache <code>use()</code> needs:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/eventPromises.ts</div>
+                        <pre data-src="shoreline-hq/src/api/eventPromises.ts"><code class="language-ts">// One promise per cleanup, kept for as long as the page is open (Lesson 4.4).
+// use() needs the SAME promise on every render; a new one each time would start over.
+// Temporary: TanStack Query keeps a cache like this for every request in Lesson 7.1.
+import { getEvent } from './client.ts'
+import type { CleanupEventDetail } from './types.ts'
+
+const saved = new Map&lt;string, Promise&lt;CleanupEventDetail&gt;&gt;()
+
+/** The cleanup with this id: the first call starts the request, later calls get the same promise */
+export function eventPromise(id: string): Promise&lt;CleanupEventDetail&gt; {
+  let promise = saved.get(id)
+  if (promise === undefined) {
+    promise = getEvent(id)
+    saved.set(id, promise)
+  }
+  return promise
+}
+
+/** Forget a saved promise (after an error), so the next eventPromise(id) asks the API again */
+export function forgetEvent(id: string): void {
+  saved.delete(id)
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li>A <code>Map&lt;string, Promise&lt;CleanupEventDetail&gt;&gt;</code> at module level lives as long as the page is open, outside any component, so every render (and Strict Mode's second render) gets the same promise. Measured on the dev server: one request for <code>/api/events/e08</code>, not two.</li>
+                        <li><code>let promise = saved.get(id)</code> is <code>Promise&lt;CleanupEventDetail&gt; | undefined</code>; after the <code>if</code> TypeScript knows it is a promise, so the return type checks.</li>
+                        <li>The cache never notices that data changed on the server. Today that is fine: every link in the HQ still loads a whole new page (until Lesson 6.1), and nothing edits cleanups yet (Lesson 7.2). Lesson 7.1 replaces this file with TanStack Query, which handles exactly that.</li>
+                        <li>No <code>AbortSignal</code> this time: the promise is shared, so no single component may cancel it.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: A typed ErrorBoundary <span class="step-time">(12 min)</span></h3>
+                    <p>Create <code>src/components/ErrorBoundary.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/ErrorBoundary.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/ErrorBoundary.tsx"><code class="language-tsx">import { Component, type ComponentType, type ReactNode } from 'react'
+
+/** What a fallback gets: the error that was thrown, and a way to try the children again */
+export interface FallbackProps {
+  error: unknown
+  retry: () =&gt; void
+}
+
+interface ErrorBoundaryProps {
+  /** The component shown instead of the children after one of them throws while rendering */
+  fallback: ComponentType&lt;FallbackProps&gt;
+  /** Runs before a retry: undo whatever made it fail (a saved promise, for example) */
+  onRetry?: () =&gt; void
+  children: ReactNode
+}
+
+type ErrorBoundaryState = { failed: false } | { failed: true; error: unknown }
+
+// React has no Hook for catching errors yet, so an error boundary is a class component.
+export class ErrorBoundary extends Component&lt;ErrorBoundaryProps, ErrorBoundaryState&gt; {
+  state: ErrorBoundaryState = { failed: false }
+
+  // React calls this when a child throws while rendering; the result becomes the new state
+  static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
+    return { failed: true, error }
+  }
+
+  // An arrow function keeps `this` pointing at the boundary when a button calls it
+  retry = () =&gt; {
+    this.props.onRetry?.()
+    this.setState({ failed: false })
+  }
+
+  render() {
+    if (this.state.failed) {
+      const Fallback = this.props.fallback
+      return &lt;Fallback error={this.state.error} retry={this.retry} /&gt;
+    }
+    return this.props.children
+  }
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong>Props.</strong> <code>fallback</code> is a component (<code>ComponentType&lt;FallbackProps&gt;</code>): the boundary renders it with the error and a <code>retry</code> function. Passing a component rather than ready-made JSX means the fallback can read the error and use Hooks of its own. <code>onRetry</code> lets the parent undo whatever made it fail before the children render again.</li>
+                        <li><strong>State as a discriminated union</strong> (Lesson 2.2). Only the <code>failed: true</code> case has an <code>error</code>, so <code>this.state.error</code> can only be read after checking <code>this.state.failed</code>, as <code>render</code> does. The error is <code>unknown</code>: JavaScript can throw anything, not only <code>Error</code> objects.</li>
+                        <li><strong>The state field needs its type.</strong> Write <code>state = { failed: false }</code> and TypeScript infers the narrower <code>{ failed: boolean }</code> for the field, which no longer fits the class's declared state:</li>
+                    </ul>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b, first lines)</h4>
+                        <pre><code>src/components/ErrorBoundary.tsx:21:3 - error TS2416: Property 'state' in type 'ErrorBoundary' is not assignable to the same property in base type 'Component&lt;ErrorBoundaryProps, ErrorBoundaryState, any&gt;'.
+  Type '{ failed: boolean; }' is not assignable to type 'Readonly&lt;ErrorBoundaryState&gt;'.
+    Property 'error' is missing in type '{ failed: boolean; }' but required in type 'Readonly&lt;{ failed: true; error: unknown; }&gt;'.
+
+21   state = { failed: false }
+     ~~~~~
+
+  src/components/ErrorBoundary.tsx:17:63 - 'error' is declared here.
+    17 type ErrorBoundaryState = { failed: false } | { failed: true; error: unknown }</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong><code>static getDerivedStateFromError</code></strong> is the piece only classes have. React calls it on the class when a child throws during rendering; its return value becomes the boundary's state, and the next render shows the fallback. The <code>: ErrorBoundaryState</code> return type matters: React's types do not check a static method for you (measured: without the annotation, returning <code>{ failed: 'yes' }</code> passed <code>npx tsc -b</code>).</li>
+                        <li><strong><code>retry</code> is an arrow function stored on the instance.</strong> A normal method passed to a button as <code>onClick</code> would lose its <code>this</code>; an arrow keeps it. It runs <code>onRetry</code> (if any) and sets the state back to <code>{ failed: false }</code>, so the children render again.</li>
+                        <li><code>const Fallback = this.props.fallback</code>: JSX needs a capitalized name to render a component held in a variable.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: The cleanup's page <span class="step-time">(14 min)</span></h3>
+                    <p>Create <code>src/pages/EventPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx"><code class="language-tsx">import { Suspense, use } from 'react'
+import { ApiError, describeError } from '../api/client.ts'
+import { eventPromise, forgetEvent } from '../api/eventPromises.ts'
+import { ErrorBoundary, type FallbackProps } from '../components/ErrorBoundary.tsx'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { SitePicture } from '../components/SitePicture.tsx'
+import { SpotsLine } from '../components/SpotsLine.tsx'
+import { StatusBadge } from '../components/StatusBadge.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import { getAvailability } from '../utils/availability.ts'
+import { formatDate } from '../utils/format.ts'
+import styles from './EventPage.module.css'
+import pageStyles from './Page.module.css'
+
+interface EventPageProps {
+  eventId: string
+}
+
+// Rendered only once the cleanup has arrived: until then, use() suspends
+function EventDetails({ eventId }: EventPageProps) {
+  const event = use(eventPromise(eventId))
+  useDocumentTitle(event.title)
+  const { site } = event
+
+  return (
+    &lt;article&gt;
+      &lt;h1&gt;{event.title}&lt;/h1&gt;
+      &lt;p className={styles.badges}&gt;
+        &lt;StatusBadge status={event.status} /&gt;
+      &lt;/p&gt;
+      &lt;p className={pageStyles.lead}&gt;
+        &lt;time dateTime={event.date}&gt;{formatDate(event.date)}&lt;/time&gt;, {event.startTime} to{' '}
+        {event.endTime}
+      &lt;/p&gt;
+      &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
+      &lt;p&gt;{event.description}&lt;/p&gt;
+      {event.suppliesProvided.length &gt; 0 &amp;&amp; (
+        &lt;p&gt;We bring: {event.suppliesProvided.join(', ')}.&lt;/p&gt;
+      )}
+      &lt;h2&gt;Where to meet&lt;/h2&gt;
+      &lt;p&gt;
+        {event.meetingPoint}, {site.name} ({site.town}).
+      &lt;/p&gt;
+      &lt;p&gt;Parking: {site.parking}&lt;/p&gt;
+      &lt;SitePicture image={site.image} /&gt;
+    &lt;/article&gt;
+  )
+}
+
+// What the error boundary shows instead of EventDetails
+function EventProblem({ error, retry }: FallbackProps) {
+  const notFound = error instanceof ApiError &amp;&amp; error.status === 404
+  useDocumentTitle(notFound ? 'Cleanup not found' : 'Cleanup')
+
+  if (notFound) {
+    return (
+      &lt;&gt;
+        &lt;h1&gt;Cleanup not found&lt;/h1&gt;
+        &lt;p&gt;There is no cleanup at this address. The link may be wrong, or the cleanup is not public.&lt;/p&gt;
+      &lt;/&gt;
+    )
+  }
+  return (
+    &lt;LoadStatus
+      state={{ kind: 'failed', message: describeError(error) }}
+      what="this cleanup"
+      onRetry={retry}
+    /&gt;
+  )
+}
+
+export function EventPage({ eventId }: EventPageProps) {
+  return (
+    &lt;&gt;
+      &lt;p&gt;
+        &lt;a href="/events"&gt;← All cleanups&lt;/a&gt;
+      &lt;/p&gt;
+      &lt;ErrorBoundary fallback={EventProblem} onRetry={() =&gt; forgetEvent(eventId)}&gt;
+        &lt;Suspense fallback={&lt;LoadStatus state={{ kind: 'loading' }} what="the cleanup" /&gt;}&gt;
+          &lt;EventDetails eventId={eventId} /&gt;
+        &lt;/Suspense&gt;
+      &lt;/ErrorBoundary&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>and <code>src/pages/EventPage.module.css</code> for the badge row:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.module.css</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.module.css"><code class="language-css">.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}</code></pre>
+                    </div>
+                    <p>Read it from the bottom, the way the data flows:</p>
+                    <ul>
+                        <li><strong><code>EventPage</code></strong> owns the boundaries. The back link sits outside both, so it is always there. <code>onRetry</code> forgets the failed promise, so <strong>Try again</strong> really asks the API again.</li>
+                        <li><strong><code>EventDetails</code></strong> is pure happy path: <code>use(eventPromise(eventId))</code> gives a <code>CleanupEventDetail</code>, and the rest reuses the HQ's components (<code>StatusBadge</code>, <code>SpotsLine</code>, <code>SitePicture</code>). <code>useDocumentTitle</code> comes after <code>use</code>: while the component is suspended, nothing after <code>use</code> runs, and when it renders for real the title is known.</li>
+                        <li><strong><code>EventProblem</code></strong> is the fallback. A 404 is not something to retry, so it gets its own heading and words; anything else gets <code>LoadStatus</code>'s familiar "Could not load…" box with <strong>Try again</strong>. <code>instanceof ApiError</code> narrows the <code>unknown</code> error, as in <code>describeError</code>.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Link to it, and protect every page <span class="step-time">(12 min)</span></h3>
+                    <p>Replace <code>src/App.tsx</code>. It learns the new address and wraps every page in an error boundary:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx"><code class="language-tsx">import { AppLayout } from './components/AppLayout.tsx'
+import buttonStyles from './components/Button.module.css'
+import { ErrorBoundary, type FallbackProps } from './components/ErrorBoundary.tsx'
+import { EventPage } from './pages/EventPage.tsx'
+import { EventsPage } from './pages/EventsPage.tsx'
+import { HomePage } from './pages/HomePage.tsx'
+import { NewEventPage } from './pages/NewEventPage.tsx'
+import { SitesPage } from './pages/SitesPage.tsx'
+
+// Temporary, until React Router arrives in Lesson 6.1: the header's links load the whole
+// page again, so reading the address once, when the app starts, is enough to pick a page.
+const path = window.location.pathname
+
+// /events/e08 is the cleanup with the id e08
+const eventPath = /^\/events\/([^/]+)$/
+
+function CurrentPage() {
+  if (path === '/events/new') {
+    return &lt;NewEventPage /&gt;
+  }
+  const eventId = eventPath.exec(path)?.[1]
+  if (eventId !== undefined) {
+    return &lt;EventPage eventId={eventId} /&gt;
+  }
+  if (path === '/events') {
+    return &lt;EventsPage /&gt;
+  }
+  if (path === '/sites') {
+    return &lt;SitesPage /&gt;
+  }
+  return &lt;HomePage /&gt;
+}
+
+// Shown instead of a page that crashed while rendering; the header and footer keep working
+function PageCrashed({ retry }: FallbackProps) {
+  return (
+    &lt;div role="alert"&gt;
+      &lt;h1&gt;Something went wrong on this page&lt;/h1&gt;
+      &lt;p&gt;It is not something you did. Try again, or start over from the home page.&lt;/p&gt;
+      &lt;p&gt;
+        &lt;button type="button" className={buttonStyles.secondary} onClick={retry}&gt;
+          Try again
+        &lt;/button&gt;{' '}
+        &lt;a href="/"&gt;Go to the home page&lt;/a&gt;
+      &lt;/p&gt;
+    &lt;/div&gt;
+  )
+}
+
+export function App() {
+  return (
+    &lt;AppLayout&gt;
+      &lt;ErrorBoundary fallback={PageCrashed}&gt;
+        &lt;CurrentPage /&gt;
+      &lt;/ErrorBoundary&gt;
+    &lt;/AppLayout&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>eventPath.exec(path)?.[1]</code> is the text after <code>/events/</code>. With <code>noUncheckedIndexedAccess</code> (Lesson 2.4) a match's <code>[1]</code> is <code>string | undefined</code>, and <code>?.</code> covers "no match", so one <code>!== undefined</code> check handles both. <code>/events/new</code> is checked first, so it is never read as a cleanup with the id "new". Lesson 6.1's router replaces all of this.</li>
+                        <li><code>PageCrashed</code> is the app-wide fallback. It sits inside <code>AppLayout</code>, so the header and footer keep working, and it says plainly that it is not the person's fault. It does not show the error's text: messages from a crash are for developers (Exercise 1).</li>
+                    </ul>
+                    <p>Now make each title on the events page a link. In <code>src/components/EventCard.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx">     &lt;article className={cardStyles.card}&gt;
+-      &lt;h3&gt;{event.title}&lt;/h3&gt;
++      &lt;h3&gt;
++        &lt;a href={`/events/${event.id}`}&gt;{event.title}&lt;/a&gt;
++      &lt;/h3&gt;</code></pre>
+                    </div>
+                    <p>Open <code>/events</code> and click <strong>Weekend Cove Cleanup</strong>:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_16/16-event-page.png" alt="The Weekend Cove Cleanup page in Shoreline Crew HQ: a link back to all cleanups, the title, a Scheduled badge, the date and time, Full: new sign-ups join the waiting list, the description, We bring: Gloves, Bags, and the Where to meet section with the meeting point and parking." width="1100" height="688" loading="lazy">
+                        <figcaption>A cleanup's own page. <code>EventDetails</code> reads the cleanup with <code>use()</code> and never checks for loading or errors itself.</figcaption>
+                    </figure>
+                    <p><strong>Test the safety net.</strong> In <code>src/pages/SitesPage.tsx</code>, temporarily make the map throw for one site:</p>
+                    <pre data-snippet><code class="language-tsx">{sites.state.data.map((site) =&gt; {
+  if (site.id === 'otter-creek') throw new Error('Test crash')
+  return &lt;SiteCard key={site.id} site={site} /&gt;
+})}</code></pre>
+                    <p>Open <code>/sites</code>: the header and footer are still there, and the page says "Something went wrong on this page". Measured: <strong>Try again</strong> renders the sites again, hits the same bug, and shows the same message. A retry helps when the world changes (the network is back); it cannot fix a bug. Without the boundary (Lesson 4.3's <code>App.tsx</code>), the same crash left the whole page blank. <strong>Remove the test line.</strong></p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: Check the waiting and the failing <span class="step-time">(8 min)</span></h3>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 15ms on 38 files with 150 rules using 20 threads.</code></pre>
+                    </div>
+                    <p>Then make the API slow and break it on purpose (Lesson 4.1's switches). Stop shoreline-api with <kbd>Ctrl</kbd>+<kbd>C</kbd> (also <kbd>Ctrl</kbd>+<kbd>C</kbd> on a Mac) and start it slow:</p>
+                    <pre class="terminal"><code class="language-bash">node server.ts --latency=4000</code></pre>
+                    <p>Reload <code>/events/e08</code>:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_16/16-loading.png" alt="The cleanup page while the API is slow: the app&#x27;s header, the link back to all cleanups and, below it, a dashed box saying Loading the cleanup…" width="1100" height="215" loading="lazy">
+                        <figcaption>The <code>Suspense</code> fallback, with the API started as <code>node server.ts --latency=4000</code>. Everything outside the boundary, like the back link, is already there.</figcaption>
+                    </figure>
+                    <p>Now stop the API completely and reload the page:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_16/16-failed.png" alt="The cleanup page with the API stopped: under the header and the back link, a box with a red border says Could not load this cleanup. Could not reach the server. Check that shoreline-api is running, then try again. Below it is a Try again button, outlined in red." width="1100" height="248" loading="lazy">
+                        <figcaption>The error boundary's fallback reuses <code>LoadStatus</code>: the same message and <strong>Try again</strong> button as the other pages.</figcaption>
+                    </figure>
+                    <p>Start the API again (<code>node server.ts</code>) and press <strong>Try again</strong>: the cleanup appears (measured: a second request for <code>/api/events/e08</code>, and the tab title changed to "Weekend Cove Cleanup · Shoreline Crew HQ"). Finally, open <code>/events/no-such-cleanup</code>: "Cleanup not found", with no Try again, because trying again would not help.</p>
+                    <p><strong>Your own project:</strong> for each screen of your Lesson 11.1 app that loads data, write down three things: what people see while it loads, what they see if it fails (and whether a retry makes sense), and which part of the screen should still work when another part breaks. That is where your boundaries go.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>getEvent(id)</code> returns a checked <code>CleanupEventDetail</code>, and <code>eventPromise(id)</code> returns the same promise for the same id</li>
+                        <li>☐ Every title on <code>/events</code> links to <code>/events/&lt;id&gt;</code>, which shows the cleanup, its site and a back link</li>
+                        <li>☐ With a slow API, "Loading the cleanup…" shows below the back link; with the API stopped, "Could not load this cleanup" and a <strong>Try again</strong> that works once the API is back</li>
+                        <li>☐ An unknown id or a draft shows "Cleanup not found"</li>
+                        <li>☐ A crash in any page shows "Something went wrong on this page" with the header still working (and the test crash is removed)</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Details for developers</h3>
+                    <p>While you build the app, "Something went wrong on this page" hides the one thing you want to know: what went wrong. Show the error's message in <code>PageCrashed</code>, inside a <code>&lt;details&gt;</code> element, but only on the dev server, never in the build people use.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Vite sets <code>import.meta.env.DEV</code> to <code>true</code> on the dev server and <code>false</code> in a build. The error is <code>unknown</code>: which narrowing gives you a <code>.message</code>?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>Take <code>error</code> from the props too, and add the details after the buttons:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                            <pre data-snippet><code class="language-tsx">function PageCrashed({ error, retry }: FallbackProps) {
+  return (
+    &lt;div role="alert"&gt;
+      &lt;h1&gt;Something went wrong on this page&lt;/h1&gt;
+      &lt;p&gt;It is not something you did. Try again, or start over from the home page.&lt;/p&gt;
+      &lt;p&gt;
+        &lt;button type="button" className={buttonStyles.secondary} onClick={retry}&gt;
+          Try again
+        &lt;/button&gt;{' '}
+        &lt;a href="/"&gt;Go to the home page&lt;/a&gt;
+      &lt;/p&gt;
+      {import.meta.env.DEV &amp;&amp; (
+        &lt;details&gt;
+          &lt;summary&gt;Details for developers&lt;/summary&gt;
+          &lt;pre&gt;{error instanceof Error ? error.message : String(error)}&lt;/pre&gt;
+        &lt;/details&gt;
+      )}
+    &lt;/div&gt;
+  )
+}</code></pre>
+                        </div>
+                        <p><code>error instanceof Error</code> narrows <code>unknown</code> to <code>Error</code>; anything else thrown is turned into text with <code>String</code>. Measured on the dev server with the test crash: the fallback ended with "Details for developers", which opens to "Test crash". In a build, <code>import.meta.env.DEV</code> is <code>false</code>, so the block is not rendered. The course's code keeps <code>PageCrashed</code> without it.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Predict, then check</h3>
+                    <p>Before opening each address, write down what you expect to see: the cleanup, "Loading the cleanup…", "Cleanup not found", "Could not load this cleanup", or something else. Then check.</p>
+                    <ol>
+                        <li><code>/events/e17</code></li>
+                        <li><code>/events/e15</code></li>
+                        <li><code>/events/e08/</code> (with a slash at the end)</li>
+                        <li><code>/events/e08</code> with the API started as <code>node server.ts --latency=3000</code>, after 1 second, then after 4</li>
+                    </ol>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Which ids exist, and which of them are drafts (Lesson 1.2's tour of the API, or <code>GET /api/events</code>)? And read <code>eventPath</code> in <code>App.tsx</code> character by character.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <ol>
+                            <li>Tide Pool Morning Cleanup, today's cleanup: a public, scheduled event.</li>
+                            <li>"Cleanup not found" (measured). e15, Harbor Kayak Cleanup, is a draft, and the API hides drafts from anyone who is not a signed-in organizer, so it answers 404. Lesson 5.2 adds sign-in.</li>
+                            <li>The <strong>home page</strong> (measured). <code>/^\/events\/([^/]+)$/</code> allows no slash after the id, so the path matches nothing in <code>CurrentPage</code> and falls through to <code>HomePage</code>. Surprised? That is the kind of corner a real router handles for you, one reason Lesson 6.1 replaces this code.</li>
+                            <li>After 1 second, the back link and "Loading the cleanup…"; after 4, the cleanup (measured with 1.5 seconds of latency: the fallback first, the header and back link already on screen, then the title).</li>
+                        </ol>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: What came off the beach (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 25 minutes).</em></p>
+                    <p>Completed cleanups have an impact report at <code>GET /api/events/:id/impact</code>. On a completed cleanup's page, add a section "What came off the beach" with one sentence such as "10 volunteers filled 5 bags: 18.5 kg in all." It loads with its own <code>Suspense</code> and <code>ErrorBoundary</code>, so the rest of the page never waits for it. Make the cache generic instead of copying it.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A generic function <code>keepPromises&lt;T&gt;(load: (key: string) =&gt; Promise&lt;T&gt;)</code> can return an object with <code>read</code> and <code>forget</code>. For the report's type, <code>Pick&lt;ImpactReport, …&gt;</code> (Lesson 2.4) with only the fields you show, and a check for just those.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>In <code>client.ts</code>, import <code>ImpactReport</code>, then add the type and check under <code>isCleanupEventDetail</code>:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                            <pre data-snippet><code class="language-ts">/** The three numbers the event page shows from an impact report */
+export type ImpactSummary = Pick&lt;ImpactReport, 'volunteersAttended' | 'bags' | 'weightKg'&gt;
+
+function isImpactSummary(value: unknown): value is ImpactSummary {
+  return (
+    isRecord(value) &amp;&amp;
+    typeof value.volunteersAttended === 'number' &amp;&amp;
+    typeof value.bags === 'number' &amp;&amp;
+    typeof value.weightKg === 'number'
+  )
+}</code></pre>
+                        </div>
+                        <p>and at the end of the file:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                            <pre data-snippet><code class="language-ts">/** What came off the beach at a completed cleanup (404 until the organizers write the report) */
+export function getImpact(id: string, signal?: AbortSignal): Promise&lt;ImpactSummary&gt; {
+  return getJSON(`/events/${encodeURIComponent(id)}/impact`, isImpactSummary, signal)
+}</code></pre>
+                        </div>
+                        <p>Replace <code>eventPromises.ts</code> with a generic version (the exported names stay, so <code>EventPage</code>'s imports keep working):</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/api/eventPromises.ts</div>
+                            <pre data-snippet><code class="language-ts">// One promise per key, kept for as long as the page is open (Lesson 4.4, Exercise 3).
+import { getEvent, getImpact } from './client.ts'
+
+/** The first read(key) starts load(key); later reads get the same promise until forget(key) */
+function keepPromises&lt;T&gt;(load: (key: string) =&gt; Promise&lt;T&gt;) {
+  const saved = new Map&lt;string, Promise&lt;T&gt;&gt;()
+  return {
+    read(key: string): Promise&lt;T&gt; {
+      let promise = saved.get(key)
+      if (promise === undefined) {
+        promise = load(key)
+        saved.set(key, promise)
+      }
+      return promise
+    },
+    forget(key: string): void {
+      saved.delete(key)
+    },
+  }
+}
+
+const events = keepPromises((id) =&gt; getEvent(id))
+const impacts = keepPromises((id) =&gt; getImpact(id))
+
+export const eventPromise = events.read
+export const forgetEvent = events.forget
+export const impactPromise = impacts.read
+export const forgetImpact = impacts.forget</code></pre>
+                        </div>
+                        <p>In <code>EventPage.tsx</code>, import <code>forgetImpact</code> and <code>impactPromise</code> as well, add two components above <code>EventDetails</code>:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">// Its own boundaries: the rest of the page does not wait for the report
+function ImpactNumbers({ eventId }: EventPageProps) {
+  const impact = use(impactPromise(eventId))
+  return (
+    &lt;p&gt;
+      {impact.volunteersAttended} volunteers filled {impact.bags} bags: {impact.weightKg} kg in all.
+    &lt;/p&gt;
+  )
+}
+
+function ImpactProblem({ error, retry }: FallbackProps) {
+  return (
+    &lt;LoadStatus
+      state={{ kind: 'failed', message: describeError(error) }}
+      what="the impact report"
+      onRetry={retry}
+    /&gt;
+  )
+}</code></pre>
+                        </div>
+                        <p>and the section after <code>SitePicture</code>:</p>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">{event.status === 'completed' &amp;&amp; (
+  &lt;section&gt;
+    &lt;h2&gt;What came off the beach&lt;/h2&gt;
+    &lt;ErrorBoundary fallback={ImpactProblem} onRetry={() =&gt; forgetImpact(eventId)}&gt;
+      &lt;Suspense fallback={&lt;LoadStatus state={{ kind: 'loading' }} what="the impact report" /&gt;}&gt;
+        &lt;ImpactNumbers eventId={eventId} /&gt;
+      &lt;/Suspense&gt;
+    &lt;/ErrorBoundary&gt;
+  &lt;/section&gt;
+)}</code></pre>
+                        </div>
+                        <p>Measured: <code>/events/e01</code> (Storm Debris Sweep) ends with "What came off the beach" and "10 volunteers filled 5 bags: 18.5 kg in all."; <code>/events/e08</code>, still to come, shows no section. <code>keepPromises((id) =&gt; getEvent(id))</code> wraps <code>getEvent</code> in an arrow so its optional <code>signal</code> parameter is not part of the cache's <code>load</code> type. The course's code keeps the simpler cache; Lesson 7.1 replaces it anyway.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>EventDetails</code> calls <code>use(eventPromise('e08'))</code> and the promise is still pending. What happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="use() never hands back an empty value: what did TypeScript say its type is?">
+                                A) <code>use</code> returns <code>undefined</code> and the component renders without data
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The component suspends: React stops rendering it and shows the fallback of the nearest Suspense boundary above. When the promise resolves, React renders the component again and use returns the cleanup.">
+                                B) The component suspends and the nearest <code>Suspense</code> boundary shows its fallback
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Waiting is not failing. Which boundary handles waiting?">
+                                C) The nearest error boundary shows its fallback
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A teammate writes <code>const event = use(getEvent(eventId))</code> directly in a component. tsc and the linter pass. What do people see?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Count how many promises that line makes. How many renders are there?">
+                                A) The cleanup, after one request
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing failed: every request succeeded. What did the measured demo show?">
+                                B) The error boundary's message
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Strict Mode renders twice in development, but this problem never stops.">
+                                C) The cleanup, after exactly two requests in development
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Every render creates a new pending promise, so every render suspends, and each resolved promise starts another render with yet another promise. The measured demo sent well over a thousand requests in three seconds and never showed the title. The promise has to come from a cache or be started outside rendering.">
+                                D) The loading fallback forever, while requests keep going out
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> Which error does the HQ's <code>ErrorBoundary</code> catch?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="use throws the rejection's error while the component renders, and errors thrown during rendering are what error boundaries catch. Errors in event handlers and in async code such as timers are not caught; handle those where they happen.">
+                                A) A rejected promise read with <code>use()</code> inside it
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="In the demo, clicking that button changed nothing on the page. Does the screen depend on a click handler?">
+                                B) An error thrown in an <code>onClick</code> handler inside it
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That code runs later, outside rendering. Where does useApi handle its errors?">
+                                C) An error thrown in a <code>setTimeout</code> callback inside it
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why is <code>ErrorBoundary</code> a class component in a React 19 app?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Classes still work, but most React code today is functions. What can only a class do here?">
+                                A) Class components are faster than function components
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Does the boundary need to share anything between components?">
+                                B) Function components cannot have state
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Catching a child's rendering error needs the static getDerivedStateFromError method (or componentDidCatch), and React 19.3 has no Hook that does the same. So boundaries are classes, written by you or by a library such as react-error-boundary.">
+                                C) Catching rendering errors needs <code>getDerivedStateFromError</code>, and there is no Hook for it yet
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Suspense is a separate feature with its own component. What does the class provide?">
+                                D) Suspense only works inside class components
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> The API was down, the event page shows "Could not load this cleanup", and the API is now back. Why does <code>EventPage</code> pass <code>onRetry={() =&gt; forgetEvent(eventId)}</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The retry function already does that. What would use read on the next render?">
+                                A) To make the boundary render its children again
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The cache still holds the rejected promise, and a rejected promise stays rejected: use would throw the same error at once. Forgetting it makes eventPromise start a new request on the next render. Measured: without onRetry, Try again sent no request and showed the error again.">
+                                B) So the next render gets a new request instead of the same rejected promise
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Did the cache ever hold a successful answer for this cleanup?">
+                                C) To clear old data so people never see stale cleanups
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Isn't React's <code>cache()</code> made for this?</summary>
+                    <p>Not in a browser app. <code>cache</code> is exported by React 19.3, but it is meant for Server Components, which run in frameworks such as Next.js (Lesson 11.2). Measured in the HQ: <code>cache(getEvent)</code> called twice with <code>'e08'</code> returned two different promises. In client code you keep the promises yourself (today) or let a library do it (Lesson 7.1).</p>
+                </details>
+                <details>
+                    <summary>Should I convert the other pages to Suspense now?</summary>
+                    <p>No. <code>useApi</code> pages work, and the events page relies on keeping old results on screen while a search loads, which plain Suspense would replace with a fallback. Lesson 7.1 moves every page onto TanStack Query and decides page by page; the boundaries you built today come along.</p>
+                </details>
+                <details>
+                    <summary>Why does the console still show an error when the boundary handled it?</summary>
+                    <p>React logs every error a boundary catches (measured in development and in the build), so problems are never silent. A 404 from the API also shows as a failed request in the browser's Network tab and console: that is the browser reporting the response, not a bug in your page. In a real app, <code>createRoot</code>'s <code>onCaughtError</code> option is where you would send errors to a monitoring service.</p>
+                </details>
+                <details>
+                    <summary>Where else should error boundaries go?</summary>
+                    <p>Around anything that can fail on its own without the rest of the screen being useless: a chart, a side panel, a widget fed by another API. One boundary at the top catches everything, but replaces everything; smaller boundaries keep more of the app working. Lesson 6.1's router gives every route an error element, so "one per page" becomes automatic.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>After <strong>Try again</strong> succeeds, the button disappears and, measured, the focus falls to the page's <code>body</code>: the same problem Lesson 4.3 fixed for Clear filters. Give the cleanup's <code>h1</code> a ref and <code>tabIndex={-1}</code>, and move the focus to it when the details appear after a retry (but not on a normal first load: moving the focus without a reason disorients people). Which component knows that a retry happened, and how could it tell <code>EventDetails</code>?</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Draw the event page's component tree from memory, with the two boundaries, and mark what people see when the cleanup is loading, when the API is down, and when the id does not exist. Then compare the sites page (<code>useApi</code>) with the event page (<code>use</code> + boundaries): which one would you rather read in six months, and which one would you rather change? There is no single right answer; write down your reasons.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Suspense moves "is it loading?" out of components: a component that reads unready data suspends, and the nearest <code>&lt;Suspense&gt;</code> shows its fallback while everything outside it stays on screen</li>
+                        <li><code>use(promise)</code> returns the promise's value, typed (<code>use&lt;T&gt;</code> infers <code>T</code>); the promise must be the same on every render, so it comes from a cache or is started outside rendering</li>
+                        <li><code>use</code> is never wrapped in <code>try</code>/<code>catch</code>: a rejected promise is thrown to the nearest error boundary</li>
+                        <li>Error boundaries catch errors thrown while rendering (including rejected <code>use</code> promises), not errors in event handlers or async code; without one, React 19 removes the whole app</li>
+                        <li>A boundary is a class with <code>static getDerivedStateFromError</code>, typed with <code>Component&lt;Props, State&gt;</code>; <code>react-error-boundary</code> is a small, fine alternative</li>
+                        <li>Good fallbacks say what happened in plain words, tell "not found" from "could not load", and make <strong>Try again</strong> really retry (forget the failed promise)</li>
+                        <li>The boundaries last; the promise cache is temporary: routers and TanStack Query take over starting, keeping and refreshing requests</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Look up narrowing and generics</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Read React's reference for <code>use</code></td><td><a href="https://react.dev/reference/react/use" target="_blank" rel="noopener">React: use</a></td></tr>
+                            <tr><td>Read React's reference for Suspense</td><td><a href="https://react.dev/reference/react/Suspense" target="_blank" rel="noopener">React: Suspense</a></td></tr>
+                            <tr><td>Read about error boundaries</td><td><a href="https://react.dev/reference/react/Component#catching-rendering-errors-with-an-error-boundary" target="_blank" rel="noopener">React: Catching rendering errors with an error boundary</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You gave every cleanup its own page, reading checked API data with <code>use()</code></li>
+                        <li>You built a small promise cache and saw what happens without one</li>
+                        <li>You wrote your first class component, a typed error boundary with a working retry</li>
+                        <li>You designed fallbacks for waiting, for "not found" and for "could not load", and tested each one by slowing and stopping the API</li>
+                        <li>You made the whole HQ safer: a crash in one page no longer blanks the app</li>
+                        <li>You finished Module 4: effects, custom Hooks, refs and now Suspense and boundaries</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Module 4 taught the HQ to talk to the API and to the browser. Module 5 turns to how state and components are organized as the app grows. In <a href="lesson_17.html"><strong>Lesson 5.1: useReducer with Discriminated Unions</strong></a> a cleanup's volunteer roster gets check-ins, no-shows and undo, with every change described as a typed action and TypeScript checking that you handled them all.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass, the test crash in <code>SitesPage</code> is gone, and <code>src/Scratch.tsx</code> is deleted</li>
+                    <li>Click through three cleanups' pages from <code>/events</code>, including a past one</li>
+                    <li>Keep your "while it loads / if it fails" notes with your Lesson 11.1 plan</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>You just met two ideas that feel backwards at first: a component that stops in the middle of rendering, and errors that travel up the tree instead of being caught where they happen. If it still feels slippery, that is normal; it takes most developers a few projects before boundaries feel natural. Keep the sign-in table in mind: components do their work, and the boundaries above them handle the waiting and the bad news. You also wrote your first class component today and survived it. That is the end of Module 4. Look back at the app you had at the start of it: it talks to a real API, handles slow networks and failures, manages focus and now degrades gracefully. That is real progress.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_15.html" class="prev-lesson">← Previous: Refs and the DOM</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_17.html" class="next-lesson">Next: useReducer with Discriminated Unions →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

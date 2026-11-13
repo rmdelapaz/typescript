@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Participant Workbook: Session 7</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="../../kit.css">
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="lbl">Student workbook —</span>
+  <button type="button" onclick="window.print()">🖨 Print / Save as PDF</button>
+  <span class="hint">write in it · bring it to every session</span>
+</div>
+
+<div class="sheet">
+
+  <header class="mast">
+    <div class="kit-eyebrow">Instructor Kit · Participant Workbook</div>
+    <h1>Session 7: Forms and Actions</h1>
+    <p class="sub">Your workbook for Session 7: the key ideas of Lesson 3.5, a worked example of the three places that check, the guided lab, predict-then-check practice, the project's checklist, a self-check and your exit ticket.</p>
+    <div class="meta-row">
+      <span class="chip">Lesson <b>3.5</b></span>
+      <span class="chip">Session <b>7</b> · 3 hours</span>
+      <span class="chip">Name: ____________________</span>
+    </div>
+  </header>
+
+  <div class="sec"><h2>Session Goals</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>Choose controlled or uncontrolled inputs for a field, and explain the difference.</li>
+  <li>Pass a function to a form's action and read FormData safely: <code class="inline">FormDataEntryValue | null</code> narrowed with <code class="inline">typeof</code>, never <code class="inline">as</code>.</li>
+  <li>Turn each submit into typed state with <code class="inline">useActionState</code>, and use <code class="inline">isPending</code> while it runs.</li>
+  <li>Keep what people typed after a failed submit (defaultValue, the select's key), and write messages that say how to fix the problem, connected with <code class="inline">aria-invalid</code> and <code class="inline">aria-describedby</code>.</li>
+  <li>Build the HQ's Plan a cleanup form with checks that agree with the API.</li>
+</ul>
+
+  <div class="sec"><h2>Lesson</h2><span class="rule"></span></div>
+
+  <section class="lesson">
+    <div class="lesson-head"><span class="lcode">3.5</span><h3>Forms and Actions</h3></div>
+    <div class="lesson-body">
+<div class="blk"><div class="h">By the end you can</div>
+<ul class="tick">
+  <li>Explain the difference between controlled and uncontrolled inputs, and choose the right one for a field</li>
+  <li>Pass a function to a form's action and read the submitted FormData safely, narrowing FormDataEntryValue | null without as</li>
+  <li>Use useActionState to turn each submit into typed state, and isPending to show that a submit is in progress</li>
+  <li>Keep what people typed when a submit fails, and know why React resets a form after an action</li>
+  <li>Write field messages that say how to fix the problem, and connect them to their fields with aria-invalid and aria-describedby</li>
+  <li>Build the HQ's "Plan a cleanup" form, with checks that agree with the API's own rules</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Key ideas</div>
+<ul class="tick">
+  <li><b>Controlled</b> inputs keep their value in React state (<code class="inline">value</code> + <code class="inline">onChange</code>): for values the screen needs while typing. <b>Uncontrolled</b> inputs keep it in the browser (<code class="inline">name</code>, <code class="inline">defaultValue</code>) and are read through FormData when the form is sent.</li>
+  <li><b>A function in a form's <code class="inline">action</code></b> receives the FormData; React prevents the page load and RESETS the form afterwards (fields go back to their defaultValue).</li>
+  <li><b><code class="inline">formData.get()</code> returns <code class="inline">FormDataEntryValue | null</code></b> (string, File or null): narrow with <code class="inline">typeof value === 'string'</code>. Every field needs a <code class="inline">name</code>; the submitting button's name and value are sent too.</li>
+  <li><b><code class="inline">useActionState(action, initialState)</code></b> returns <code class="inline">[state, formAction, isPending]</code>; the action gets the previous state first, then the FormData, and returns the new state (a union on <code class="inline">kind</code> works well).</li>
+  <li><b>Messages that help</b> say how to fix the problem, sit under their field, and are linked with <code class="inline">aria-invalid</code> and <code class="inline">aria-describedby</code>. <code class="inline">noValidate</code> keeps every message in one place. The API checks everything again.</li>
+  <li><b>The select quirk (React 19.3):</b> a select reads its defaultValue only when it is created; <code class="inline">key={values.siteId}</code> makes a new one after the reset.</li>
+</ul>
+</div>
+<div class="blk"><div class="h">Worked example: three places that check</div>
+<p>The project's mistakes ("Dune", North Jetty, 09:00 to 08:00, 12 volunteers, no date, no meeting point) checked by the form's own <code class="inline">validateEvent</code> (run with Node in the finished app):</p>
+<pre class="out">{
+  "title": [
+    "Use at least 5 characters for the title."
+  ],
+  "date": [
+    "Pick a date."
+  ],
+  "endTime": [
+    "The end time must be after the start time."
+  ],
+  "meetingPoint": [
+    "Say where volunteers meet (at least 3 characters)."
+  ]
+}</pre><p>and by shoreline-api, which answers a POST from an organizer with status 400:</p>
+<pre class="out">HTTP/1.1 400 Bad Request
+content-type: application/json; charset=utf-8
+
+{
+  "error": "validation_failed",
+  "message": "Some fields need attention.",
+  "fieldErrors": {
+    "title": [
+      "Use at least 5 characters for the title."
+    ],
+    "date": [
+      "Enter a date as YYYY-MM-DD."
+    ],
+    "endTime": [
+      "The end time must be after the start time."
+    ],
+    "meetingPoint": [
+      "Say where volunteers meet (at least 3 characters)."
+    ]
+  }
+}</pre><p>The same four fields in the same shape (field name: a list of messages), so in Lesson 7.2 the API's answer can be shown with the same FieldError component. Three messages are word for word the same; the empty date is reworded for people, who use a date picker. The API checks everything again because anyone can send it anything: it is the authority.</p>
+</div>
+<div class="blk lab"><div class="h">Guided lab</div>
+<ul class="tick">
+  <li>Open <code class="inline">labs/module-07/l3_5-forms-and-actions/TASKS.md</code>. <code class="inline">npm install</code> once in <code class="inline">starter</code>, then <code class="inline">npm test</code> (three failures, one crash) and <code class="inline">npm run typecheck</code> (silent: why?).</li>
+  <li>Task 1: <code class="inline">readSignup</code> with <code class="inline">typeof</code>, no <code class="inline">as</code>. Task 2: <code class="inline">validateSignup</code> in the fieldErrors shape. Task 3 (after the project): <code class="inline">SignupForm</code> keeps what was typed and points each field at its message.</li>
+  <li>Done when <code class="inline">npm test</code> says <code class="inline">Tests  6 passed (6)</code> and the type check stays silent.</li>
+</ul>
+<table class="timing">
+<thead><tr><th>Question</th><th>Your answer</th></tr></thead>
+<tbody>
+<tr><td>Why did the starter's type check pass even though a test crashed?</td><td></td></tr>
+<tr><td>What does a missing field read as after your fix?</td><td></td></tr>
+<tr><td>After a submit with mistakes, what put the typed email back into its field?</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<div class="blk"><div class="h">Predict, then check</div>
+<p>Write your prediction first, then run it. Delete <code class="inline">src/Scratch.tsx</code> afterwards.</p>
+<div class="q"><div class="qn">P1</div><div class="qt">Predict what <code class="inline">npx tsc -b</code> says, then put it in <code class="inline">src/Scratch.tsx</code> and run it. (get, then a string method.)</div><pre class="code"><span class="k">export</span> <span class="k">function</span> readNote(formData: FormData): <span class="k">string</span> {
+  <span class="k">return</span> formData.get(<span class="s">'note'</span>).trim()
+}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P2</div><div class="qt">Predict what <code class="inline">npx tsc -b</code> says, then put it in <code class="inline">src/Scratch.tsx</code> and run it. (useActionState with one argument.)</div><pre class="code"><span class="k">import</span> { useActionState } <span class="k">from</span> <span class="s">'react'</span>
+
+<span class="k">function</span> addBags(previous: <span class="k">number</span>, formData: FormData): <span class="k">number</span> {
+  <span class="k">const</span> bags = formData.get(<span class="s">'bags'</span>)
+  <span class="k">return</span> <span class="k">typeof</span> bags === <span class="s">'string'</span> ? previous + Number(bags) : previous
+}
+
+<span class="k">export</span> <span class="k">function</span> BagCount() {
+  <span class="k">const</span> [total, formAction] = useActionState(addBags)
+  <span class="k">return</span> (
+    &lt;form action={formAction}&gt;
+      &lt;input aria-label=<span class="s">"Bags"</span> name=<span class="s">"bags"</span> <span class="k">type</span>=<span class="s">"number"</span> /&gt;
+      &lt;button <span class="k">type</span>=<span class="s">"submit"</span>&gt;Add&lt;/button&gt;
+      &lt;p&gt;{total} bags so far&lt;/p&gt;
+    &lt;/form&gt;
+  )
+}</pre><div class="write"></div></div>
+<div class="q"><div class="qn">P3</div><div class="qt">Predict what <code class="inline">npx tsc -b</code> says, then put it in <code class="inline">src/Scratch.tsx</code> and run it. (The errors map, with a misspelled field name.)</div><pre class="code"><span class="k">import</span> <span class="k">type</span> { FieldErrors } <span class="k">from</span> <span class="s">'./utils/eventForm.ts'</span>
+
+<span class="k">export</span> <span class="k">function</span> titleMessage(errors: FieldErrors): <span class="k">string</span> {
+  <span class="k">return</span> errors.titel?.join(<span class="s">' '</span>) ?? <span class="s">''</span>
+}</pre><div class="write"></div></div>
+</div>
+<div class="blk"><div class="h">Lesson project: start in class, finish at home</div>
+<p><b>Plan a Cleanup</b> (lesson page, "Project: Plan a Cleanup"). In class: Steps 1 to 5. At home: the checks and the checklist.</p>
+<ul class="tick">
+  <li>☐ Step 1: <code class="inline">EventField</code>, <code class="inline">EventFormValues</code>, <code class="inline">FieldErrors</code>, <code class="inline">readValues</code> with typeof narrowing; <code class="inline">toDateString</code></li>
+  <li>☐ Step 2: <code class="inline">validateEvent</code> with the API's rules and helpful messages; <code class="inline">toNewEvent</code> returns a NewEvent</li>
+  <li>☐ Step 3: FieldError; NewEventForm with useActionState, a FormState union, fieldProps, the select's key, two submit buttons</li>
+  <li>☐ Step 4: NewEventPage at /events/new, the link on the events page, the styles (with <code class="inline">--error</code> in dark mode)</li>
+  <li>☐ Step 5: mistakes kept with messages; Ready to save; Enter = draft; phone, dark mode, keyboard; two breaks; tsc, lint and build pass</li>
+</ul>
+<div class="write tall"></div>
+</div>
+<div class="blk"><div class="h">Self-check</div>
+<div class="q" data-sc="1"><div class="qn">Q1</div><div class="qt">Which field should be a CONTROLLED input (value + onChange)?</div><div class="opts"><div class="opt">A) The email on a one-time sign-up form</div><div class="opt">B) A note field that is only read when the form is sent</div><div class="opt">C) The description, when a live "N of 2000 characters" count sits under it</div><div class="opt">D) Every field in every form: it is the React way</div></div></div>
+<div class="q" data-sc="2"><div class="qn">Q2</div><div class="qt">readTitle declares const title: string = formData.get('title'), and tsc prints this. Which fix is safe?</div><pre class="code">src/Scratch.tsx:2:9 - error TS2322: Type 'FormDataEntryValue | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.</pre><div class="opts"><div class="opt">A) typeof value === 'string' ? value.trim() : '' (narrow it)</div><div class="opt">B) formData.get('title') as string</div><div class="opt">C) formData.get('title')!</div><div class="opt">D) String(formData.get('title'))</div></div></div>
+<div class="q" data-sc="3" data-kind="short"><div class="qn">Q3</div><div class="qt">A teammate writes const value = formData.get('titel') as string and then value.trim() in an action. What do npx tsc -b and npm run lint say, and what happens when someone presses Save?</div><div class="write"></div></div>
+<div class="q" data-sc="4"><div class="qn">Q4</div><div class="qt">The waiting-list action was written as joinWaitingList(formData: FormData, _previous: JoinState) and tsc prints this first line. What is wrong?</div><pre class="code">src/Scratch.tsx:18:46 - error TS2769: No overload matches this call.</pre><div class="opts"><div class="opt">A) useActionState needs a type argument</div><div class="opt">B) The action's parameters are in the wrong order: previous state first, then the FormData</div><div class="opt">C) JoinState must be an interface, not a union</div><div class="opt">D) The form needs onSubmit as well as action</div></div></div>
+<div class="q" data-sc="5"><div class="qn">Q5</div><div class="qt">NewEventForm's fieldProps sets defaultValue: values[field]. What would happen without it, after a Publish with mistakes?</div><div class="opts"><div class="opt">A) Nothing: React keeps what was typed in uncontrolled fields</div><div class="opt">B) tsc reports that defaultValue is missing</div><div class="opt">C) The messages would not appear</div><div class="opt">D) The messages appear, and every field is empty again: React resets the form after every action</div></div></div>
+<div class="q" data-sc="6"><div class="qn">Q6</div><div class="qt">Both submit buttons have name="status" (value draft and value scheduled). How does planCleanup know which was pressed?</div><div class="opts"><div class="opt">A) formData.get('status') holds the value of the button that submitted the form</div><div class="opt">B) React passes the button as a third argument</div><div class="opt">C) It cannot: two buttons need two forms</div><div class="opt">D) From event.submitter in an onSubmit handler</div></div></div>
+<div class="q" data-sc="7" data-kind="short"><div class="qn">Q7</div><div class="qt">Someone changes fieldProps to return 'aria-invalid': 'yes'. tsc reports 8 errors; this is the end of the first. What does it tell you about spread props?</div><pre class="code">Types of property '"aria-invalid"' are incompatible.
+Type 'string' is not assignable to type '"false" | "grammar" | "spelling" | "true" | boolean | undefined'.</pre><div class="write"></div></div>
+<div class="q" data-sc="8"><div class="qn">Q8</div><div class="qt">The form has NO noValidate, the capacity input has max={200}, and an organizer types 500 and presses Publish. What happens?</div><div class="opts"><div class="opt">A) The action runs and shows the form's capacity message</div><div class="opt">B) Chrome blocks the submit and shows its own bubble; the action never runs</div><div class="opt">C) React throws a validation error</div><div class="opt">D) The API rejects it</div></div></div>
+<div class="q" data-sc="9"><div class="qn">Q9</div><div class="qt">shoreline-api answers a draft with these mistakes like this. Why does the form keep its errors in exactly this shape?</div><pre class="code">{
+  "fieldErrors": {
+    "title": [
+      "Use at least 5 characters for the title."
+    ],
+    "date": [
+      "Enter a date as YYYY-MM-DD."
+    ],
+    "endTime": [
+      "The end time must be after the start time."
+    ],
+    "meetingPoint": [
+      "Say where volunteers meet (at least 3 characters)."
+    ]
+  }
+}</pre><div class="opts"><div class="opt">A) JSON requires arrays</div><div class="opt">B) So that in Lesson 7.2 the API's answer can be shown with the same FieldError component, field by field</div><div class="opt">C) TypeScript cannot type objects of strings</div><div class="opt">D) So the browser can show the messages in its bubbles</div></div></div>
+<div class="q" data-sc="10"><div class="qn">Q10</div><div class="qt">What connects the capacity field to its message for a screen reader?</div><div class="opts"><div class="opt">A) The message's red color</div><div class="opt">B) Putting the message right under the field</div><div class="opt">C) A title attribute on the field</div><div class="opt">D) aria-invalid="true" on the field and aria-describedby pointing at the message's id</div></div></div>
+<div class="q" data-sc="11" data-kind="short"><div class="qn">Q11</div><div class="qt">In NewEventForm, {...fieldProps('title')} became {...fieldProps('titel')}. Why is this a compile error instead of a field that is always empty?</div><pre class="code">src/components/NewEventForm.tsx:66:45 - error TS2345: Argument of type '"titel"' is not assignable to parameter of type 'EventField'.</pre><div class="write"></div></div>
+<div class="q" data-sc="12"><div class="qn">Q12</div><div class="qt">What disables Save as draft and Publish while an async action is still running?</div><div class="opts"><div class="opt">A) A useState(false) you set to true in the action</div><div class="opt">B) The browser, automatically</div><div class="opt">C) isPending, the third value of useActionState: true until the action's promise settles</div><div class="opt">D) noValidate</div></div></div>
+</div>
+<div class="blk"><div class="h">Journal</div>
+<p>The lesson's prompt: follow one press of Publish with mistakes from start to finish, in your own words: what React collects, what planCleanup returns, what the component draws, what the reset does, and how the typed title gets back into its field. Then rewrite the worst error message you have seen in an app you use, the way this lesson's table suggests.</p>
+</div>
+    </div>
+  </section>
+
+  <div class="sec"><h2>Exit Ticket</h2><span class="rule"></span></div>
+<p>Three questions, no notes.</p>
+<div class="q"><div class="qn">E1</div><div class="qt">Why does a field lose its text after a submit with mistakes, and what puts it back?</div><div class="write"></div></div>
+<div class="q"><div class="qn">E2</div><div class="qt">Write the safe way to read a text field from FormData.</div><div class="write"></div></div>
+<div class="q"><div class="qn">E3</div><div class="qt">Name the two attributes that connect a field to its message.</div><div class="write"></div></div>
+
+  <div class="sec"><h2>Notes</h2><span class="rule"></span></div>
+<div class="notes-lines"></div>
+
+  <div class="sec"><h2>Homework Checklist</h2><span class="rule"></span></div>
+<ul class="tick">
+  <li>☐ Finish Plan a Cleanup (Step 5's checks and the checklist); write my own app's form types and three messages</li>
+  <li>☐ Lesson 3.5 Exercises 1 and 2 (Exercise 3 is a stretch)</li>
+  <li>☐ The Quick Quiz; self-check Q1 to Q12; predict P1 to P3</li>
+  <li>☐ Lab 3.5: Task 3, then the stretch</li>
+  <li>☐ The journal entry</li>
+  <li>☐ Bring to Session 8: the form working (or <code class="inline">lesson-12-start</code>), my own-project notes from Lessons 3.2 to 3.5</li>
+</ul>
+
+  <div class="sec"><h2>Glossary</h2><span class="rule"></span></div>
+<table class="timing">
+<thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>controlled input</td><td>React state holds the value (<code class="inline">value</code> + <code class="inline">onChange</code>)</td></tr>
+<tr><td>uncontrolled input</td><td>The browser holds the value; you read it from FormData (<code class="inline">name</code>, <code class="inline">defaultValue</code>)</td></tr>
+<tr><td><code class="inline">defaultValue</code></td><td>The starting text of an uncontrolled field (what the reset goes back to)</td></tr>
+<tr><td>form action</td><td>A function in <code class="inline">&lt;form action={...}&gt;</code>: React calls it with the FormData and resets the form after it</td></tr>
+<tr><td><code class="inline">FormData</code>, <code class="inline">FormDataEntryValue</code></td><td>The browser's collection of named fields; one value is <code class="inline">File | string</code></td></tr>
+<tr><td>submitter</td><td>The button that submitted the form; its name and value are sent too</td></tr>
+<tr><td><code class="inline">useActionState</code></td><td>Turns each submit into state: <code class="inline">[state, formAction, isPending]</code></td></tr>
+<tr><td><code class="inline">isPending</code></td><td>True from the submit until the action's promise settles</td></tr>
+<tr><td><code class="inline">noValidate</code></td><td>Turns off the browser's own check bubbles so your messages are the only ones</td></tr>
+<tr><td><code class="inline">aria-invalid</code>, <code class="inline">aria-describedby</code></td><td>Tell assistive technology that a field is wrong and where its message is</td></tr>
+<tr><td>fieldErrors</td><td>The API's error shape: field name to a list of messages</td></tr>
+<tr><td><code class="inline">SubmitEvent</code></td><td>React's type for submit events in an <code class="inline">onSubmit</code> handler (FormEvent is deprecated)</td></tr>
+</tbody>
+</table>
+
+  <div class="foot">
+    <div class="who">
+      <span class="bio">© 2026 Ray de la Paz · React + TypeScript: Build a Modern Web App</span>
+    </div>
+    <div class="ver">Instructor Kit · Session 7 · Participant Workbook · v1.0</div>
+  </div>
+
+</div>
+</body>
+</html>

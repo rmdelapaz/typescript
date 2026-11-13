@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Give React components inputs the TypeScript way: type props with interfaces, make props optional with defaults, accept children with ReactNode, reuse the API's own types with Site['image'], and build Shoreline Crew HQ's first data-driven screen, the beach sites page. React + TypeScript: Build a Modern Web App Lesson 3.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Props, Children and Composition - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>📦 Lesson 3.2: Props, Children and Composition</h1>
+                <p class="lead">Yesterday's components always drew the same thing. Today they take inputs. You will hand data to components through props, describe those props with TypeScript so every use is checked, let a component wrap whatever you put inside it, and build bigger pieces out of small ones. By the end, Shoreline Crew HQ has its first screen made from real data: the six beach sites the crew looks after, each on its own card with a picture, badges and directions.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain props as the single object React passes to a component, and destructure it in the parameter list</li>
+                        <li>Type props with an interface, and read the errors TypeScript gives for missing, misspelled and mistyped props</li>
+                        <li>Make props optional with <code>?</code> and give them defaults, the same way you did for options objects in Lesson 2.3</li>
+                        <li>Accept content between a component's tags with <code>children: ReactNode</code>, and choose composition over a long list of props</li>
+                        <li>Reuse the API's domain types in props, including a part of a type such as <code>Site['image']</code></li>
+                        <li>Build the HQ's sites page from a typed <code>Site[]</code> with <code>Card</code>, <code>Badge</code>, <code>SitePicture</code> and <code>SiteCard</code>, and give <code>AppLayout</code> its <code>children</code></li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_07.html">Lesson 3.1: Components and TSX</a> (your <code>shoreline-hq</code> with the HQ shell)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A layout that holds any page, reusable <code>Card</code> and <code>Badge</code> components, and the Beach sites page with six picture cards made from a typed <code>Site[]</code></li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-08-start.zip">lesson-08-start.zip</a> · Finished code: <a href="downloads/lesson-08-end.zip">lesson-08-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#props" class="toc-link">Props: a Component's Options Object</a></li>
+                        <li><a href="#typing-props" class="toc-link">Typing Props</a></li>
+                        <li><a href="#optional-props" class="toc-link">Optional Props and Defaults</a></li>
+                        <li><a href="#children" class="toc-link">Children and Composition</a></li>
+                        <li><a href="#component-apis" class="toc-link">Designing a Component's Props</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: The Beach Sites Page</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="props" class="lesson-section">
+                <h2>📦 Props: a Component's Options Object</h2>
+                <p>A component that can only say one thing is a sign, not a tool. The HQ needs one card component that can show Pelican Point Beach, Driftwood Cove or any other site, depending on what it is given. If a component is a function, <strong>props</strong> (short for properties) are its arguments: the values a parent hands to a child so the child can draw something different each time.</p>
+                <p>You already know the shape props take. In Lesson 2.3 you wrote <code>eventLine</code> with an options object, destructured right in the parameter list:</p>
+                <pre data-snippet><code class="language-ts">interface LineOptions {
+  showStatus?: boolean
+  prefix?: string
+}
+
+function eventLine(
+  event: CleanupEvent,
+  { showStatus = false, prefix = '-' }: LineOptions = {},
+): string {</code></pre>
+                <p>A component's props are exactly that: one object, destructured in the parameter list, described by an interface. Create <code>src/Scratch.tsx</code> in <code>shoreline-hq</code> again (your experiment file for this lesson, deleted at the end) and try this:</p>
+                <pre data-snippet><code class="language-tsx">interface SiteNameProps {
+  name: string
+  town: string
+}
+
+function SiteName({ name, town }: SiteNameProps) {
+  return (
+    &lt;strong&gt;
+      {name}, {town}
+    &lt;/strong&gt;
+  )
+}
+
+export function NextCleanup() {
+  return (
+    &lt;p&gt;
+      Next cleanup: &lt;SiteName name="Driftwood Cove" town="Port Marisol" /&gt;
+    &lt;/p&gt;
+  )
+}</code></pre>
+                <p><code>npx tsc -b</code> is silent. Read it from the bottom up: <code>&lt;SiteName name="Driftwood Cove" town="Port Marisol" /&gt;</code> passes two attributes. React collects every attribute into one object, <code>{ name: 'Driftwood Cove', town: 'Port Marisol' }</code>, and calls <code>SiteName</code> with it. The parameter <code>{ name, town }: SiteNameProps</code> unpacks the object and says what it must contain. Here is what the compiler makes of a component with props (the same <code>tsc</code> emit you looked at in Lesson 3.1):</p>
+                <pre data-snippet><code class="language-js">import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+export function NextCleanup() {
+    return _jsx(SiteName, { name: "Driftwood Cove", town: "Port Marisol" });
+}
+function SiteName({ name, town }) {
+    return _jsxs("strong", { children: [name, ", ", town] });
+}</code></pre>
+                <p>The attributes became a plain object, <code>{ name: "Driftwood Cove", town: "Port Marisol" }</code>, the second argument to <code>_jsx</code>. React later calls <code>SiteName</code> with that object. Nothing magic: a function, called with an options object.</p>
+                <div class="mermaid">
+graph TD
+    A["NextCleanup"] -->|"props: name, town"| B["SiteName"]
+    B --> C["strong: Driftwood Cove, Port Marisol"]
+</div>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the meeting point</h4>
+                    <p>Every cleanup has a meeting point, where the organizer hands each team its kit: a bag, gloves, a map of their stretch of beach. The team does not go back to the van to get more; it works with what it was handed. Props are that handoff. The parent decides what each child gets, the child uses it and never changes it, and the data always travels the same way: down, from parent to child.</p>
+                </div>
+                <h3>Strings in quotes, everything else in braces</h3>
+                <p>An attribute's value in quotes is a string: <code>town="Port Marisol"</code>. Any other value goes in braces, as in Lesson 3.1: a number <code>capacity={18}</code>, a boolean <code>accessible={true}</code>, an object <code>site={site}</code>, even other TSX <code>icon={&lt;span&gt;⭐&lt;/span&gt;}</code>. Braces around a string also work (<code>town={'Port Marisol'}</code>), and you need them when the string is computed (<code>label={`${count} spots`}</code>).</p>
+            </section>
+
+            <section id="typing-props" class="lesson-section">
+                <h2>🔷 Typing Props</h2>
+                <p>The interface is a contract between the component and every place that uses it. TypeScript checks each use the way it checks each call to a function. Add three wrong uses under the right one:</p>
+                <pre data-snippet><code class="language-tsx">export function NextCleanup() {
+  return (
+    &lt;p&gt;
+      Next cleanup: &lt;SiteName name="Driftwood Cove" town="Port Marisol" /&gt;
+      &lt;SiteName name="North Jetty" /&gt;
+      &lt;SiteName name="Otter Creek Mouth" twon="Seal Rock" /&gt;
+      &lt;SiteName name={42} town="Calder Bay" /&gt;
+    &lt;/p&gt;
+  )
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:18:8 - error TS2741: Property 'town' is missing in type '{ name: string; }' but required in type 'SiteNameProps'.
+
+18       &lt;SiteName name="North Jetty" /&gt;
+          ~~~~~~~~
+
+  src/Scratch.tsx:3:3 - 'town' is declared here.
+    3   town: string
+        ~~~~
+
+src/Scratch.tsx:19:42 - error TS2322: Type '{ name: string; twon: string; }' is not assignable to type 'IntrinsicAttributes &amp; SiteNameProps'.
+  Property 'twon' does not exist on type 'IntrinsicAttributes &amp; SiteNameProps'.
+
+19       &lt;SiteName name="Otter Creek Mouth" twon="Seal Rock" /&gt;
+                                            ~~~~
+
+src/Scratch.tsx:20:17 - error TS2322: Type 'number' is not assignable to type 'string'.
+
+20       &lt;SiteName name={42} town="Calder Bay" /&gt;
+                   ~~~~
+
+  src/Scratch.tsx:2:3 - The expected type comes from property 'name' which is declared here on type 'IntrinsicAttributes &amp; SiteNameProps'
+    2   name: string
+        ~~~~
+
+
+Found 3 errors in the same file, starting at: src/Scratch.tsx:18</code></pre>
+                </div>
+                <p>Three errors, three kinds of mistake, and you know two of them from Module 2:</p>
+                <ul>
+                    <li><strong>TS2741, a missing prop.</strong> The props object you wrote, <code>{ name: string; }</code>, lacks <code>town</code>, which <code>SiteNameProps</code> requires. The follow-up line points at the interface, so you can see the rule you broke.</li>
+                    <li><strong>TS2322 with "does not exist", an unknown prop.</strong> <code>twon</code> is not in the interface. The type it checks against, <code>IntrinsicAttributes &amp; SiteNameProps</code>, is "React's own props (like <code>key</code>) plus yours", the <code>IntrinsicAttributes</code> you met in Lesson 3.1.</li>
+                    <li><strong>TS2322 with "the expected type comes from", a wrong type.</strong> <code>{42}</code> is a number; <code>name</code> must be a string.</li>
+                </ul>
+                <p>In plain JavaScript, all three would reach the browser as an empty town, a missing town and a "42" where a name should be, with no error at all. Here they are red underlines while you type, and VS Code's completions list the props a component accepts as soon as you type a space after its name.</p>
+
+                <h3>Reuse the domain types</h3>
+                <p>Most HQ components show something the API already describes. Lesson 2.4 copied those descriptions into <code>src/api/types.ts</code>, so a component that shows a site does not invent its own shape; it asks for a <code>Site</code>:</p>
+                <pre data-snippet><code class="language-tsx">import type { Site } from '../api/types.ts'
+
+interface SiteCardProps {
+  site: Site
+}</code></pre>
+                <p>Sometimes a component needs only <em>part</em> of a type. The picture on a site card needs the image object, not the whole site. TypeScript can name the type of one property with an <strong>indexed access type</strong>: <code>Site['image']</code> reads "the type of the <code>image</code> property of <code>Site</code>". It looks like reading a property, but it happens at the type level, with the property name in quotes:</p>
+                <pre data-snippet><code class="language-tsx">import type { Site } from './api/types.ts'
+
+type SiteImage = Site['image']
+type SiteTerrain = Site['terrain']
+
+export const cover: SiteImage = {
+  url: 'http://localhost:4000/images/sites/north-jetty.jpg',
+  alt: 'A long jetty of gray boulders reaching into the sea.',
+  width: 1200,
+  height: 675,
+}
+export const ground: SiteTerrain = 'rocky'</code></pre>
+                <p>Hover over <code>SiteImage</code> in VS Code and you see <code>{ url: string; alt: string; width: number; height: number; }</code>, the object written inside <code>Site</code>. When the API's type changes, every component using <code>Site['image']</code> changes with it. Name a property that does not exist and TypeScript says so:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b, with <code>Site['picture']</code>)</h4>
+                    <pre><code>src/Scratch.tsx:3:23 - error TS2339: Property 'picture' does not exist on type 'Site'.
+
+3 type SiteImage = Site['picture']
+                        ~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:3</code></pre>
+                </div>
+                <p>Lesson 2.4's utility types work in props too: <code>Pick&lt;Volunteer, 'name' | 'phone'&gt;</code> asks for just those two properties, which lets you use a component with a small object made by hand as well as with a full <code>Volunteer</code> (Exercise 1 does exactly that).</p>
+            </section>
+
+            <section id="optional-props" class="lesson-section">
+                <h2>🎚️ Optional Props and Defaults</h2>
+                <p>Some props have a sensible value most of the time. Mark them optional with <code>?</code> and give them a default in the destructuring, the same two tools as Lesson 2.3's <code>LineOptions</code>:</p>
+                <pre data-snippet><code class="language-tsx">interface TideTimeProps {
+  time: string
+  label?: string
+  highlight?: boolean
+}
+
+function TideTime({ time, label = 'Low tide', highlight = false }: TideTimeProps) {
+  return (
+    &lt;p className={highlight ? 'tide tide-highlight' : 'tide'}&gt;
+      {label.toUpperCase()}: {time}
+    &lt;/p&gt;
+  )
+}
+
+export function TideBoard() {
+  return (
+    &lt;&gt;
+      &lt;TideTime time="06:40" /&gt;
+      &lt;TideTime time="12:55" label="High tide" /&gt;
+      &lt;TideTime time="19:10" highlight /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <ul>
+                    <li><code>label?: string</code> means callers may leave it out. <code>label = 'Low tide'</code> fills it in when they do, so <em>inside</em> the component <code>label</code> is a plain <code>string</code>: hover over it and see.</li>
+                    <li>A boolean prop written without a value is <code>true</code>: <code>&lt;TideTime time="19:10" highlight /&gt;</code> is short for <code>highlight={true}</code>. Leaving it out gives the default, <code>false</code>.</li>
+                    <li>Unlike <code>eventLine</code>, there is no <code>= {}</code> after the props type. React always passes an object, even an empty one, so the props themselves can never be missing.</li>
+                </ul>
+                <p>Take the default away (<code>{ time, label, highlight = false }</code>) and TypeScript reminds you what "optional" means:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:10:8 - error TS18048: 'label' is possibly 'undefined'.
+
+10       {label.toUpperCase()}: {time}
+          ~~~~~
+
+
+Found 1 error in src/Scratch.tsx:10</code></pre>
+                </div>
+                <p>An optional prop is <code>string | undefined</code> inside the component (Lesson 2.2), so calling a string method on it needs a default, a <code>??</code> or a check first. A default is usually the clearest.</p>
+
+                <h3>Props are read-only</h3>
+                <p>A team at the meeting point does not repaint the map it was handed. A component must not change its props either: they belong to the parent, and changing them breaks the "same inputs, same output" purity rule from Lesson 3.1. TypeScript does not stop you here (the props object is not marked <code>readonly</code>), but the linter does:</p>
+                <pre data-snippet><code class="language-tsx">import type { Site } from './api/types.ts'
+
+export function SiteTitle({ site }: { site: Site }) {
+  site.name = site.name.toUpperCase()
+  return &lt;h2&gt;{site.name}&lt;/h2&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npm run lint)</h4>
+                    <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+
+  ⚠ react(immutability): This value cannot be modified
+   ╭─[src/Scratch.tsx:4:3]
+ 3 │ export function SiteTitle({ site }: { site: Site }) {
+ 4 │   site.name = site.name.toUpperCase()
+   ·   ──┬─
+   ·     ╰── value cannot be modified
+ 5 │   return &lt;h2&gt;{site.name}&lt;/h2&gt;
+   ╰────
+  help: Do not mutate component props or hook arguments. If the value should change, update it where it is owned and pass an update callback, or use local state
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/immutability
+
+Found 1 warning and 0 errors.
+Finished in 9ms on 17 files with 116 rules using 20 threads.</code></pre>
+                </div>
+                <p>The help line says what to do instead: work out a new value (<code>&lt;h2&gt;{site.name.toUpperCase()}&lt;/h2&gt;</code>) rather than changing the old one, or, when the value really must change over time, keep it in state where it is owned. State arrives in Lesson 3.4.</p>
+            </section>
+
+            <section id="children" class="lesson-section">
+                <h2>🪣 Children and Composition</h2>
+                <p>HTML elements can hold content: <code>&lt;section&gt;</code> holds whatever you put between its tags. Your components can too. Whatever sits between <code>&lt;Panel&gt;</code> and <code>&lt;/Panel&gt;</code> arrives as a prop called <strong><code>children</code></strong>:</p>
+                <pre data-snippet><code class="language-tsx">import type { ReactNode } from 'react'
+
+interface PanelProps {
+  title: string
+  children: ReactNode
+}
+
+function Panel({ title, children }: PanelProps) {
+  return (
+    &lt;section&gt;
+      &lt;h2&gt;{title}&lt;/h2&gt;
+      {children}
+    &lt;/section&gt;
+  )
+}
+
+export function BeforeYouCome() {
+  return (
+    &lt;Panel title="Before you come"&gt;
+      &lt;p&gt;Bring water, a hat and closed shoes.&lt;/p&gt;
+      &lt;p&gt;
+        Gloves and bags are on us. Questions? Ask &lt;strong&gt;Maya&lt;/strong&gt;.
+      &lt;/p&gt;
+    &lt;/Panel&gt;
+  )
+}</code></pre>
+                <p><code>Panel</code> draws the frame (a section with a heading) and puts <code>{children}</code> where the content belongs. It does not know or care that the content is two paragraphs with a <code>&lt;strong&gt;</code> inside; it could be a picture, a list or another component. The type that says "anything React can draw" is <code>ReactNode</code>, imported with <code>import type</code> from <code>react</code>. Here is its declaration in React's types (<code>node_modules/@types/react/index.d.ts</code>):</p>
+                <pre data-snippet><code class="language-ts">type ReactNode =
+    | ReactElement
+    | string
+    | number
+    | bigint
+    | Iterable&lt;ReactNode&gt;
+    | ReactPortal
+    | boolean
+    | null
+    | undefined
+    | DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_REACT_NODES[
+        keyof DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_REACT_NODES
+    ]
+    | Promise&lt;AwaitedReactNode&gt;;</code></pre>
+                <p>Elements, strings, numbers, iterables (so arrays) of nodes, and the values that draw nothing (<code>boolean</code>, <code>null</code>, <code>undefined</code>), plus two entries for newer React features you can ignore for now. That is the list from Lesson 3.1's "what can React draw?", written as a union type.</p>
+                <p>A component that does not declare <code>children</code> does not accept any. Put content inside one, and TypeScript tells you it has nowhere to go:</p>
+                <pre data-snippet><code class="language-tsx">interface NoteProps {
+  title: string
+}
+
+function Note({ title }: NoteProps) {
+  return &lt;h2&gt;{title}&lt;/h2&gt;
+}
+
+export function BeforeYouCome() {
+  return (
+    &lt;Note title="Before you come"&gt;
+      &lt;p&gt;Bring water, a hat and closed shoes.&lt;/p&gt;
+    &lt;/Note&gt;
+  )
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:11:6 - error TS2322: Type '{ title: string; children: Element; }' is not assignable to type 'IntrinsicAttributes &amp; NoteProps'.
+  Property 'children' does not exist on type 'IntrinsicAttributes &amp; NoteProps'.
+
+11     &lt;Note title="Before you come"&gt;
+        ~~~~
+
+
+Found 1 error in src/Scratch.tsx:11</code></pre>
+                </div>
+                <p>Read the first line: the props TypeScript received were <code>{ title: string; children: Element; }</code>. The content between the tags became a <code>children</code> prop, and <code>NoteProps</code> has no such property. Without TypeScript, React would simply ignore the paragraph, and you would wonder where it went.</p>
+
+                <h3>Composition over configuration</h3>
+                <p>Imagine the site card designed the other way, with a prop for every possible piece:</p>
+                <pre data-snippet><code class="language-tsx">// One component that tries to cover every case with a prop of its own
+export interface EverythingCardProps {
+  title: string
+  imageUrl?: string
+  imageAlt?: string
+  badgeLabels?: string[]
+  showParking?: boolean
+  parkingText?: string
+  footerLinkText?: string
+  footerLinkHref?: string
+}</code></pre>
+                <p>Every new need adds a prop: a badge color, a second link, a picture caption. Soon the component has twenty props and a tangle of <code>if</code>s, and it still cannot show the one thing a new page needs. <strong>Composition</strong> turns this around: small components with one job each, combined by putting one inside another. A <code>Card</code> supplies the frame; a page decides what goes in it. The site card becomes a <code>Card</code> holding a <code>SitePicture</code>, some <code>Badge</code>s and two paragraphs, and the home page can use the same <code>Card</code> for a sentence and a link. It is how React itself is meant to be used, and the libraries you will meet later (React Router's layouts, TanStack Query's providers) are built the same way.</p>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>On a team, components are the API other developers use every day. A component whose props are typed, few and well named is one that teammates can use correctly from the editor's completions alone, without reading its code. A component that takes <code>children</code> is one they can use in places you never imagined. That is the difference between a component library people love and one they work around.</p>
+                </div>
+            </section>
+
+            <section id="component-apis" class="lesson-section">
+                <h2>🧭 Designing a Component's Props</h2>
+                <p>A component's props are its public face. A few habits keep them easy to use:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Habit</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A component that shows one thing from the API takes that thing, typed with the API's type</td><td><code>SiteCard</code> takes <code>site: Site</code></td></tr>
+                            <tr><td>A general-purpose component takes plain values, so any page can use it</td><td><code>Badge</code> takes <code>label: string</code>, not a site</td></tr>
+                            <tr><td>A component that only needs part of a type asks for that part</td><td><code>SitePicture</code> takes <code>image: Site['image']</code></td></tr>
+                            <tr><td>Content goes in <code>children</code>, not in a growing list of props</td><td><code>Card</code> takes <code>title</code> and <code>children</code></td></tr>
+                            <tr><td>Variants are a union of words with a default, not several booleans</td><td><code>tone?: 'info' | 'success'</code>, default <code>'info'</code></td></tr>
+                            <tr><td>Required stays required: only make a prop optional when there is a sensible default</td><td><code>title</code> is required on <code>Card</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Props can also be functions, the way a parent hears back from a child (a button that reports a click). Their types are the function types from Lesson 2.3, such as <code>onSelect: (siteId: string) =&gt; void</code>. You will write them in Lesson 3.4, together with state.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Forgetting the braces around the props</h4>
+                    <p>Props are one object. Writing the parameter as if each prop were its own argument compiles inside the component, and fails where it is used:</p>
+                    <pre data-snippet><code class="language-tsx">function SiteName(name: string) {
+  return &lt;strong&gt;{name}&lt;/strong&gt;
+}
+
+export function NextCleanup() {
+  return &lt;SiteName name="Driftwood Cove" /&gt;
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/Scratch.tsx:6:11 - error TS2322: Type '{ name: string; }' is not assignable to type 'string'.
+
+6   return &lt;SiteName name="Driftwood Cove" /&gt;
+            ~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:6</code></pre>
+                    </div>
+                    <p>The message says it plainly: React will pass <code>{ name: string; }</code>, an object, but the function expects a <code>string</code>. Destructure: <code>function SiteName({ name }: { name: string })</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Declaring <code>children</code> and not drawing it</h4>
+                    <p>A layout that takes <code>children</code> but never puts <code>{children}</code> in its TSX shows an empty space where the page should be. In the HQ, <code>noUnusedParameters</code> catches it (you will see it in Step 7), but only because the destructured <code>children</code> goes unused; if you also used it somewhere else, nothing would warn you. Check the page in the browser, not only the terminal.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Changing a prop to "fix it up"</h4>
+                    <p><code>site.name = ...</code> or <code>props.items.push(...)</code> inside a component changes the parent's data behind its back. oxlint flags it as <code>react(immutability)</code>; work out a new value instead.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Making every prop optional "to be flexible"</h4>
+                    <p>A component with all-optional props accepts <code>&lt;SiteCard /&gt;</code> and then draws nothing useful, and TypeScript can no longer tell you that a caller forgot something important. Required props are free documentation and free checks; keep them required.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: The Beach Sites Page</h2>
+                <p>Organizers plan every cleanup around a site: where to park, whether there is a step-free route for volunteers who need one, what kind of debris to expect. Today the HQ gets its first screen made from data: <strong>Beach sites</strong>, six cards built from the same <code>Site</code> type the API uses. On the way, <code>AppLayout</code> learns to hold any page. When you are done, the tree for the sites page looks like this:</p>
+                <div class="mermaid">
+graph TD
+    App["App"] --> L["AppLayout"]
+    L -->|"children"| S["SitesPage"]
+    S -->|"site, 6 times"| SC["SiteCard"]
+    SC -->|"title, children"| C["Card"]
+    SC -->|"image"| SP["SitePicture"]
+</div>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>) and keep <code>http://localhost:5173</code> open. Delete <code>src/Scratch.tsx</code> if you still have it. The API needs to stay running today: the site pictures are served by it.</p>
+
+                <div class="card">
+                    <h3>Step 1: AppLayout holds any page <span class="step-time">(8 min)</span></h3>
+                    <p>In Lesson 3.1, <code>AppLayout</code> always drew <code>HomePage</code>. Give it a <code>children</code> prop instead. Replace <code>src/components/AppLayout.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/AppLayout.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/AppLayout.tsx"><code class="language-tsx">import type { ReactNode } from 'react'
+import { Footer } from './Footer.tsx'
+import { Header } from './Header.tsx'
+
+interface AppLayoutProps {
+  children: ReactNode
+}
+
+export function AppLayout({ children }: AppLayoutProps) {
+  return (
+    &lt;&gt;
+      &lt;a className="skip-link" href="#main"&gt;
+        Skip to main content
+      &lt;/a&gt;
+      &lt;Header /&gt;
+      &lt;main id="main" className="page"&gt;
+        {children}
+      &lt;/main&gt;
+      &lt;Footer /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The <code>HomePage</code> import is gone; <code>&lt;main&gt;</code> now draws <code>{children}</code>, whatever that turns out to be. Save, and the page loses its content: TypeScript and VS Code underline <code>&lt;AppLayout /&gt;</code> in <code>App.tsx</code>, because a required prop is missing. The layout no longer decides the page; its parent does. Change <code>src/App.tsx</code> to pass the page between the tags:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-snippet><code class="language-tsx">import { AppLayout } from './components/AppLayout.tsx'
+import { HomePage } from './pages/HomePage.tsx'
+
+export function App() {
+  return (
+    &lt;AppLayout&gt;
+      &lt;HomePage /&gt;
+    &lt;/AppLayout&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>The home page is back, and <code>AppLayout</code> is ready for every page the HQ will have. (You will change <code>App.tsx</code> once more in Step 6.)</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The sites as typed data <span class="step-time">(10 min)</span></h3>
+                    <p>Until Lesson 4.1 fetches data from the API while the app runs, the sites page uses a copy of the API's answer. Open <code>http://localhost:4000/api/sites</code> in your browser: six sites as JSON. Make a <code>data</code> folder in <code>src</code> (<code>mkdir src/data</code>, the same in PowerShell) and create <code>src/data/sites.ts</code> with the two lines of header below, then <code>export const sites: Site[] = </code> followed by the JSON: select all of it in the browser (<kbd>Ctrl</kbd>+<kbd>A</kbd>, or <kbd>⌘ Cmd</kbd>+<kbd>A</kbd> on a Mac), copy, and paste it after the <code>=</code>. Whether your copy arrives on one long line or spread over many does not matter to TypeScript. (Firefox shows JSON in a viewer: open its <strong>Raw Data</strong> tab and use <strong>Copy</strong>. If anything other than the JSON comes along, such as a "Pretty-print" label, delete it.) The start and end of the file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/data/sites.ts</div>
+                        <pre data-src="shoreline-hq/src/data/sites.ts" data-match="excerpt"><code class="language-ts">import type { Site } from '../api/types.ts'
+
+// The six beach sites, copied from GET /api/sites (Lesson 3.2).
+// Lesson 4.1 fetches them from the API instead, and this file goes away.
+export const sites: Site[] = [
+  {
+    "id": "pelican-point",
+    "name": "Pelican Point Beach",
+    "town": "Port Marisol",
+    "terrain": "sand",
+    "accessible": true,
+    "latitude": 36.9512,
+    "longitude": -122.0461,
+    "parking": "Free lot at the end of Pelican Point Road (40 spaces).",
+    "description": "A long sandy beach below the bluffs. Busy in summer, so food wrappers and bottle caps pile up near the stairs.",
+    "image": {
+      "url": "http://localhost:4000/images/sites/pelican-point.jpg",
+      "alt": "A wide sandy beach below tall bluffs, with a wooden staircase down the cliff and calm blue water.",
+      "width": 1200,
+      "height": 675
+    }
+  },
+  // ...
+]</code></pre>
+                    </div>
+                    <ul>
+                        <li>JSON is valid TypeScript: an array of objects with quoted property names. The annotation <code>: Site[]</code> makes TypeScript check every one of the six objects against the API's type, all 10 properties each, including the nested <code>image</code>. No <code>Pick</code> needed: the data is complete.</li>
+                        <li>The picture URLs point at <code>http://localhost:4000</code>, because that is what the API answered. They work while shoreline-api runs, which is how you will work all course.</li>
+                        <li>The comment tells the next reader (and you, in a month) that this file is temporary. In Lesson 4.1 the data comes from the API while the app runs, and the file is deleted.</li>
+                    </ul>
+                    <p>See the check at work: change the first site's <code>"terrain": "sand"</code> to <code>"terrain": "beach"</code> and run <code>npx tsc -b</code>.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_08/08-terrain-error.png" alt="A terminal in shoreline-hq. npx tsc -b reports src/data/sites.ts line 10 error TS2322: Type beach is not assignable to type Terrain, with the line underlined, and a second location in src/api/types.ts line 44 where the terrain property is declared on type Site. Found 1 error." width="1038" height="326" loading="lazy">
+                        <figcaption>The pasted JSON is checked like any other code: <code>"beach"</code> is not one of the four <code>Terrain</code> words, and the second location shows where the rule comes from, the API's own <code>types.ts</code>.</figcaption>
+                    </figure>
+                    <p>Pasted data gets no special treatment: <code>"beach"</code> is not one of the four <code>Terrain</code> words from Lesson 2.2, and the second location shows where the rule comes from. Put <code>"sand"</code> back.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Card, and today's styles <span class="step-time">(12 min)</span></h3>
+                    <p>The frame that every card in the HQ will share. Create <code>src/components/Card.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Card.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Card.tsx"><code class="language-tsx">import type { ReactNode } from 'react'
+
+interface CardProps {
+  title: string
+  children: ReactNode
+}
+
+export function Card({ title, children }: CardProps) {
+  return (
+    &lt;section className="card"&gt;
+      &lt;h2&gt;{title}&lt;/h2&gt;
+      {children}
+    &lt;/section&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Each card is a <code>&lt;section&gt;</code> that starts with a heading, so screen-reader users can jump from card to card by heading. Both props are required: a card without a title or without content is a mistake TypeScript should catch.</p>
+                    <p>Now the styles for everything today builds. In <code>src/index.css</code>, add two brand colors and two role colors for cards to the <code>:root</code> block (change these lines):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css">   --sand: #fbf6ec;
++  --seafoam: #bfe3df;
++  --kelp: #2d6a4f;
+   --ink: #1f2a37;
+   --muted: #5b6573;
+   --white: #ffffff;
+
+   /* What the page uses: these change in dark mode */
+   --page: var(--sand);
+   --text: var(--ink);
+   --text-muted: var(--muted);
+   --link: var(--sea-teal);
++  --surface: var(--white);
++  --border: #e4dccb;</code></pre>
+                    </div>
+                    <p>and give the card colors their dark-mode values (change these lines):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="diff"><code class="language-diff-css">     --link: #7cc6d6;
++    --surface: #16283a;
++    --border: #2b4257;
+   }</code></pre>
+                    </div>
+                    <p>Then add these rules at the end of the file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="excerpt"><code class="language-css">/* Cards, badges and the sites grid (Lesson 3.2) */
+.card {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 1.5rem;
+}
+
+.site-picture {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.badge {
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.badge-info {
+  background: var(--seafoam);
+  color: var(--ink);
+}
+
+.badge-success {
+  background: var(--kelp);
+  color: var(--white);
+}
+
+.muted {
+  color: var(--text-muted);
+}</code></pre>
+                    </div>
+                    <p>Seafoam and Kelp are the brand's badge colors: Ink text on Seafoam and white text on Kelp both pass the 4.5 to 1 contrast check, in light and dark mode, because the badges set both their background and their text color. <code>.card-grid</code> fits as many 16rem columns as the screen allows: three on a laptop, one on a phone. In Lesson 3.6 these rules move into CSS Modules next to each component.</p>
+                    <p>Finally, use the card on the home page. Replace <code>src/pages/HomePage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx"><code class="language-tsx">import { Card } from '../components/Card.tsx'
+
+const crewName = 'Shoreline Crew'
+const tagline = 'Many hands, cleaner sands.'
+const towns = ['Port Marisol', 'Calder Bay', 'Seal Rock']
+
+export function HomePage() {
+  return (
+    &lt;&gt;
+      &lt;h1&gt;{crewName} HQ&lt;/h1&gt;
+      &lt;p className="lead"&gt;{tagline}&lt;/p&gt;
+      &lt;p&gt;
+        Plan cleanups, sign up volunteers and count what comes off the beaches of{' '}
+        {towns.join(', ')}. The first real screens arrive over the next lessons.
+      &lt;/p&gt;
+      &lt;Card title="Our beach sites"&gt;
+        &lt;p&gt;Six stretches of coast, from sandy beaches to a tidal marsh.&lt;/p&gt;
+        &lt;a href="/sites"&gt;See all six sites&lt;/a&gt;
+      &lt;/Card&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>A sentence and a link as the card's children. The link goes to <code>/sites</code>, the page you are about to build.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_08/08-home-card.png" alt="The Shoreline Crew HQ home page: the heading, the tagline and the sentence about the three towns, followed by a white card titled Our beach sites with the line Six stretches of coast, from sandy beaches to a tidal marsh, and a link See all six sites." width="1100" height="688" loading="lazy">
+                        <figcaption>The same <code>Card</code> on the home page, holding a sentence and a link instead of a site. That is composition: the card supplies the frame, the page supplies what goes in it.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Badge, with an optional tone <span class="step-time">(6 min)</span></h3>
+                    <p>Small rounded labels for the town, the terrain and the step-free route. Create <code>src/components/Badge.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Badge.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Badge.tsx"><code class="language-tsx">interface BadgeProps {
+  label: string
+  tone?: 'info' | 'success'
+}
+
+export function Badge({ label, tone = 'info' }: BadgeProps) {
+  return &lt;span className={`badge badge-${tone}`}&gt;{label}&lt;/span&gt;
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>tone</code> is a union of two words (Lesson 2.2), optional, with the default <code>'info'</code>. Inside the component its type is <code>'info' | 'success'</code>, so the template literal can only ever produce <code>badge-info</code> or <code>badge-success</code>, the two classes the CSS defines.</li>
+                        <li>No <code>children</code>: a badge shows one short label, so a <code>label</code> string is the honest API. TypeScript will refuse <code>&lt;Badge&gt;...&lt;/Badge&gt;</code>, which keeps badges short.</li>
+                        <li>No <code>import</code> line at all: the props are plain strings, and TSX needs no React import (Lesson 3.1).</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: SitePicture and SiteCard <span class="step-time">(12 min)</span></h3>
+                    <p>The picture first. Create <code>src/components/SitePicture.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SitePicture.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SitePicture.tsx"><code class="language-tsx">import type { Site } from '../api/types.ts'
+
+interface SitePictureProps {
+  image: Site['image']
+}
+
+export function SitePicture({ image }: SitePictureProps) {
+  return (
+    &lt;img
+      className="site-picture"
+      src={image.url}
+      alt={image.alt}
+      width={image.width}
+      height={image.height}
+      loading="lazy"
+    /&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>image: Site['image']</code> asks for just the picture object. Event pages in later lessons can show a site's picture without handing over the whole site.</li>
+                        <li>The alt text comes from the data: the API describes each illustration ("A wide sandy beach below tall bluffs..."), because these pictures carry information, unlike the decorative logo. <code>width</code> and <code>height</code> let the browser reserve the space before the file arrives; the CSS then scales the picture to the card. <code>loading="lazy"</code> waits to download pictures until they are about to scroll into view.</li>
+                        <li>Writing a JSX element over several lines, one attribute per line, is normal when there are many attributes.</li>
+                    </ul>
+                    <p>Now the card that puts it together. Create <code>src/components/SiteCard.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/SiteCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/SiteCard.tsx"><code class="language-tsx">import type { Site } from '../api/types.ts'
+import { Badge } from './Badge.tsx'
+import { Card } from './Card.tsx'
+import { SitePicture } from './SitePicture.tsx'
+
+interface SiteCardProps {
+  site: Site
+}
+
+export function SiteCard({ site }: SiteCardProps) {
+  return (
+    &lt;Card title={site.name}&gt;
+      &lt;SitePicture image={site.image} /&gt;
+      &lt;p className="badges"&gt;
+        &lt;Badge label={site.town} /&gt;
+        &lt;Badge label={site.terrain} /&gt;
+        &lt;Badge
+          label={site.accessible ? 'Step-free route' : 'No step-free route'}
+          tone={site.accessible ? 'success' : 'info'}
+        /&gt;
+      &lt;/p&gt;
+      &lt;p&gt;{site.description}&lt;/p&gt;
+      &lt;p className="muted"&gt;Parking: {site.parking}&lt;/p&gt;
+    &lt;/Card&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>This is composition in one screen of code. <code>SiteCard</code> knows about sites; <code>Card</code>, <code>Badge</code> and <code>SitePicture</code> do not. <code>SiteCard</code> passes <code>site.name</code> as the card's title and everything between <code>&lt;Card&gt;</code> and <code>&lt;/Card&gt;</code> as its children. The step-free badge picks its label and its tone with the <code>? :</code> operator from Lesson 3.1: green for "Step-free route", the default color otherwise. <code>site.terrain</code> shows the API's word as it is (Lesson 3.3 gives every value a friendlier label with a lookup table).</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: SitesPage, and a way to reach it <span class="step-time">(10 min)</span></h3>
+                    <p>Create <code>src/pages/SitesPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/SitesPage.tsx"><code class="language-tsx">import { SiteCard } from '../components/SiteCard.tsx'
+import { sites } from '../data/sites.ts'
+
+export function SitesPage() {
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Beach sites&lt;/h1&gt;
+      &lt;p className="lead"&gt;Six stretches of coast the crew looks after.&lt;/p&gt;
+      &lt;div className="card-grid"&gt;
+        {sites.map((site) =&gt; (
+          &lt;SiteCard key={site.id} site={site} /&gt;
+        ))}
+      &lt;/div&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p><code>sites.map(...)</code> turns the array of six sites into an array of six <code>SiteCard</code> elements, and React draws an array by drawing each item (Lesson 3.1). TypeScript infers that <code>site</code> is a <code>Site</code>, because <code>sites</code> is a <code>Site[]</code>, so <code>site={site}</code> matches <code>SiteCardProps</code> without a single annotation. <code>key</code> is one of React's own props, the <code>IntrinsicAttributes</code> again: it gives each card in the list a stable name, and it never reaches your component. Lesson 3.3 is all about lists and keys; if you leave <code>key</code> out, <code>npm run lint</code> warns <code>Missing "key" prop for element in iterator</code>.</p>
+                    <p>How do you get to the page? The header's <strong>Sites</strong> link loads <code>/sites</code>, but the app shows the home page for every address until React Router arrives in Lesson 6.1. Until then, a small temporary trick in <code>src/App.tsx</code> is enough. Replace the file:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx"><code class="language-tsx">import { AppLayout } from './components/AppLayout.tsx'
+import { HomePage } from './pages/HomePage.tsx'
+import { SitesPage } from './pages/SitesPage.tsx'
+
+// Temporary, until React Router arrives in Lesson 6.1: the header's links load the whole
+// page again, so reading the address once, when the app starts, is enough to pick a page.
+const path = window.location.pathname
+
+export function App() {
+  return &lt;AppLayout&gt;{path === '/sites' ? &lt;SitesPage /&gt; : &lt;HomePage /&gt;}&lt;/AppLayout&gt;
+}</code></pre>
+                    </div>
+                    <p>The header's links are ordinary links, so clicking one loads the whole app again at the new address. Reading <code>window.location.pathname</code> once, when the file loads, is therefore enough, and it keeps <code>App</code> pure the same way the footer's year did in Lesson 3.1. The <code>? :</code> picks which page goes into <code>AppLayout</code>'s children. Click <strong>Sites</strong> (or the home card's link):</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_08/08-sites-page.png" alt="The Beach sites page of Shoreline Crew HQ in a desktop browser. Under the heading Beach sites and the line Six stretches of coast the crew looks after, three white cards sit side by side: Pelican Point Beach, Driftwood Cove and Sandpiper Flats. Each card has the site name as a heading, an illustration of the beach, rounded badges for the town, the terrain and the step-free route (green when there is one), a description and a gray parking line." width="1100" height="688" loading="lazy">
+                        <figcaption>Six <code>SiteCard</code>s from one typed <code>Site[]</code>. Each card is a <code>Card</code> holding a <code>SitePicture</code>, three <code>Badge</code>s and two paragraphs as its children; the green badge is the <code>success</code> tone.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 7: Check it everywhere, and break it <span class="step-time">(8 min)</span></h3>
+                    <p>Make the window narrow or use the device toolbar, and switch to dark mode (both as in Lesson 3.1). Tab through the page: the skip link, the header links, then the home card's link on <code>/</code>.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_08/08-sites-phone-dark.png" alt="The Beach sites page on a phone-sized screen in dark mode. The cards stack in one column on a dark navy page; the first card, Pelican Point Beach, has a slightly lighter navy background, the beach illustration and its badges: Port Marisol and sand in pale seafoam, Step-free route in green." width="390" height="760" loading="lazy">
+                        <figcaption>The same components at 390 pixels in dark mode: the grid drops to one column, and the card's <code>--surface</code> and <code>--border</code> colors switch with the theme.</figcaption>
+                    </figure>
+                    <p>Then break it once each, running <code>npx tsc -b</code> and undoing each change:</p>
+                    <ol>
+                        <li>In <code>SiteCard.tsx</code>, change <code>&lt;SitePicture image={site.image} /&gt;</code> to <code>&lt;SitePicture /&gt;</code>.</li>
+                        <li>In <code>AppLayout.tsx</code>, delete the line <code>{children}</code>.</li>
+                    </ol>
+                    <div class="card card-output">
+                        <h4>Expected output (1: the image prop missing)</h4>
+                        <pre><code>src/components/SiteCard.tsx:13:8 - error TS2741: Property 'image' is missing in type '{}' but required in type 'SitePictureProps'.
+
+13       &lt;SitePicture /&gt;
+          ~~~~~~~~~~~
+
+  src/components/SitePicture.tsx:4:3 - 'image' is declared here.
+    4   image: Site['image']
+        ~~~~~
+
+
+Found 1 error in src/components/SiteCard.tsx:13</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (2: children never drawn)</h4>
+                        <pre><code>src/components/AppLayout.tsx:9:29 - error TS6133: 'children' is declared but its value is never read.
+
+9 export function AppLayout({ children }: AppLayoutProps) {
+                              ~~~~~~~~
+
+
+Found 1 error in src/components/AppLayout.tsx:9</code></pre>
+                    </div>
+                    <p>The first is TS2741 with the rule's location, as in the teaching section. The second is the unused-parameter check from Lesson 1.2 doing a job you might not expect: catching a layout that would have shown an empty page. Undo both, then run the full check:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run build)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 28 modules transformed.
+computing gzip size...
+dist/index.html                   0.46 kB │ gzip:  0.30 kB
+dist/assets/index-BLKdQNMo.css    2.13 kB │ gzip:  0.91 kB
+dist/assets/index-HTYCH0hu.js   227.49 kB │ gzip: 71.50 kB
+
+✓ built in 104ms</code></pre>
+                    </div>
+                    <p>28 modules instead of 22: five new components and the data file. (Times, sizes and hashes will differ.) <code>npm run lint</code> should end with "Found 0 warnings and 0 errors."</p>
+                    <p><strong>Your own project:</strong> pick the main kind of thing your Lesson 11.1 app will show (recipes, books, workouts...). Write its type as an interface, then sketch the card for it as a component tree like the diagram above: which general-purpose pieces (a <code>Card</code>, a <code>Badge</code>) could it share with the rest of the app, and which props would each one take?</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>AppLayout</code> takes <code>children: ReactNode</code> and <code>App</code> passes the page between its tags</li>
+                        <li>☐ <code>src/data/sites.ts</code> holds the six sites from <code>GET /api/sites</code>, typed <code>Site[]</code>, and I saw TS2322 for <code>"beach"</code></li>
+                        <li>☐ <code>Card</code> (title + children), <code>Badge</code> (label + optional tone), <code>SitePicture</code> (<code>Site['image']</code>) and <code>SiteCard</code> (<code>site: Site</code>) are in <code>src/components/</code></li>
+                        <li>☐ <code>/sites</code> shows six cards with pictures, badges, descriptions and parking, and the home page shows the "Our beach sites" card</li>
+                        <li>☐ The page works at phone size and in dark mode, with the API running</li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> all pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time). Work in <code>src/Scratch.tsx</code>, check with <code>npx tsc -b</code>, and delete the file afterwards.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: A contact line for organizers</h3>
+                    <p>Write a <code>ContactLine</code> component that draws a list item like "Luis Romero: 555-0102". It takes a <code>volunteer</code> prop with just the <code>name</code> and <code>phone</code> of a <code>Volunteer</code> (remember that <code>phone</code> is <code>string | null</code>), and an optional <code>fallback</code> text shown when there is no phone, which defaults to "No phone on file". Then write an <code>Organizers</code> component that draws three of them in a <code>&lt;ul&gt;</code>: one with a phone, one without, and one without a phone and with the fallback "Email only".</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Type the prop with <code>Pick&lt;Volunteer, 'name' | 'phone'&gt;</code> so a small hand-made object fits, and use <code>??</code> from Lesson 2.2 to fall back when <code>phone</code> is <code>null</code>. Import <code>Volunteer</code> with <code>import type</code> from <code>./api/types.ts</code> (Scratch.tsx sits in <code>src</code>).</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import type { Volunteer } from './api/types.ts'
+
+interface ContactLineProps {
+  volunteer: Pick&lt;Volunteer, 'name' | 'phone'&gt;
+  fallback?: string
+}
+
+function ContactLine({ volunteer, fallback = 'No phone on file' }: ContactLineProps) {
+  return (
+    &lt;li&gt;
+      {volunteer.name}: {volunteer.phone ?? fallback}
+    &lt;/li&gt;
+  )
+}
+
+export function Organizers() {
+  return (
+    &lt;ul&gt;
+      &lt;ContactLine volunteer={{ name: 'Luis Romero', phone: '555-0102' }} /&gt;
+      &lt;ContactLine volunteer={{ name: 'Hannah Becker', phone: null }} /&gt;
+      &lt;ContactLine volunteer={{ name: 'Amara Diallo', phone: null }} fallback="Email only" /&gt;
+    &lt;/ul&gt;
+  )
+}</code></pre>
+                        <p>The object literals inside <code>volunteer={{ ... }}</code> are checked against the <code>Pick</code>: leave out <code>phone</code> and TypeScript reports it missing, because <code>null</code> ("we know there is no phone") and missing are different things. <code>??</code> only falls back for <code>null</code> and <code>undefined</code>, so an empty string would still show as empty, which is what you want for data you did not expect.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Read the errors, fix the featured site</h3>
+                    <p>A teammate wants a "featured site" box built from today's components, but it does not pass the check. Put it in <code>src/Scratch.tsx</code>, run <code>npx tsc -b</code>, and fix every error without changing <code>Card</code>, <code>Badge</code> or <code>SitePicture</code>. The card's title should be the site's name, and "Wear sturdy shoes." should still appear on the page.</p>
+                    <pre data-snippet><code class="language-tsx">import type { Site } from './api/types.ts'
+import { Badge } from './components/Badge.tsx'
+import { Card } from './components/Card.tsx'
+import { SitePicture } from './components/SitePicture.tsx'
+
+interface FeaturedSiteProps {
+  site: Site
+}
+
+export function FeaturedSite({ site }: FeaturedSiteProps) {
+  return (
+    &lt;Card&gt;
+      &lt;SitePicture image={site} /&gt;
+      &lt;Badge label="Gloves required" tone="warning" /&gt;
+      &lt;Badge label="Rocky"&gt;Wear sturdy shoes&lt;/Badge&gt;
+    &lt;/Card&gt;
+  )
+}</code></pre>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Four errors, one per line inside the <code>return</code>. For each one, ask "what does the component's props interface say?"</p>
+                        <div class="card card-output">
+                            <h4>Expected output (npx tsc -b)</h4>
+                            <pre><code>src/Scratch.tsx:12:6 - error TS2741: Property 'title' is missing in type '{ children: Element[]; }' but required in type 'CardProps'.
+
+12     &lt;Card&gt;
+        ~~~~
+
+  src/components/Card.tsx:4:3 - 'title' is declared here.
+    4   title: string
+        ~~~~~
+
+src/Scratch.tsx:13:20 - error TS2739: Type 'Site' is missing the following properties from type '{ url: string; alt: string; width: number; height: number; }': url, alt, width, height
+
+13       &lt;SitePicture image={site} /&gt;
+                      ~~~~~
+
+  src/components/SitePicture.tsx:4:3 - The expected type comes from property 'image' which is declared here on type 'IntrinsicAttributes &amp; SitePictureProps'
+    4   image: Site['image']
+        ~~~~~
+
+src/Scratch.tsx:14:38 - error TS2322: Type '"warning"' is not assignable to type '"info" | "success" | undefined'.
+
+14       &lt;Badge label="Gloves required" tone="warning" /&gt;
+                                        ~~~~
+
+  src/components/Badge.tsx:3:3 - The expected type comes from property 'tone' which is declared here on type 'IntrinsicAttributes &amp; BadgeProps'
+    3   tone?: 'info' | 'success'
+        ~~~~
+
+src/Scratch.tsx:15:8 - error TS2322: Type '{ label: string; children: string; }' is not assignable to type 'IntrinsicAttributes &amp; BadgeProps'.
+  Property 'children' does not exist on type 'IntrinsicAttributes &amp; BadgeProps'.
+
+15       &lt;Badge label="Rocky"&gt;Wear sturdy shoes&lt;/Badge&gt;
+          ~~~~~
+
+
+Found 4 errors in the same file, starting at: src/Scratch.tsx:12</code></pre>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import type { Site } from './api/types.ts'
+import { Badge } from './components/Badge.tsx'
+import { Card } from './components/Card.tsx'
+import { SitePicture } from './components/SitePicture.tsx'
+
+interface FeaturedSiteProps {
+  site: Site
+}
+
+export function FeaturedSite({ site }: FeaturedSiteProps) {
+  return (
+    &lt;Card title={site.name}&gt;
+      &lt;SitePicture image={site.image} /&gt;
+      &lt;Badge label="Gloves required" /&gt;
+      &lt;Badge label="Rocky" /&gt;
+      &lt;p&gt;Wear sturdy shoes.&lt;/p&gt;
+    &lt;/Card&gt;
+  )
+}</code></pre>
+                        <p><code>Card</code> requires a <code>title</code> (TS2741). <code>SitePicture</code> wants the image, not the whole site: TS2739 lists the four properties a <code>Site</code> lacks, because the expected type is <code>Site['image']</code>. <code>Badge</code> has no <code>'warning'</code> tone (leave it out for the default, or use <code>'success'</code>), and it has no <code>children</code>, so the sentence becomes a paragraph of the card's own children.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: A Callout for the sites page (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 20 minutes).</em></p>
+                    <p>Build a <code>Callout</code> component in <code>src/components/Callout.tsx</code>: an <code>&lt;aside&gt;</code> with a heading from a required <code>title</code>, any <code>children</code>, and an optional <code>tone</code> of <code>'info'</code> or <code>'warning'</code> (default <code>'info'</code>) that sets a colored border on the left. Put one on the sites page, under the lead paragraph, reminding organizers that the pictures come from shoreline-api. Style it in <code>index.css</code> with the brand colors only, check it in dark mode, and keep the checks passing.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>Badge</code> has the tone pattern and <code>Card</code> has the children pattern: <code>Callout</code> combines them. A border color is not text, so Sunrise works for the warning border in both modes.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/Callout.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import type { ReactNode } from 'react'
+
+interface CalloutProps {
+  title: string
+  children: ReactNode
+  tone?: 'info' | 'warning'
+}
+
+export function Callout({ title, children, tone = 'info' }: CalloutProps) {
+  return (
+    &lt;aside className={`callout callout-${tone}`}&gt;
+      &lt;h2&gt;{title}&lt;/h2&gt;
+      {children}
+    &lt;/aside&gt;
+  )
+}</code></pre>
+                        </div>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/SitesPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import { Callout } from '../components/Callout.tsx'
+import { SiteCard } from '../components/SiteCard.tsx'
+import { sites } from '../data/sites.ts'
+
+export function SitesPage() {
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Beach sites&lt;/h1&gt;
+      &lt;p className="lead"&gt;Six stretches of coast the crew looks after.&lt;/p&gt;
+      &lt;Callout title="Where the pictures come from" tone="warning"&gt;
+        &lt;p&gt;The site pictures are served by shoreline-api. Keep it running while you work.&lt;/p&gt;
+      &lt;/Callout&gt;
+      &lt;div className="card-grid"&gt;
+        {sites.map((site) =&gt; (
+          &lt;SiteCard key={site.id} site={site} /&gt;
+        ))}
+      &lt;/div&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                        </div>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/index.css (at the end)</div>
+                            <pre data-snippet><code class="language-css">
+.callout {
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  border-left: 0.375rem solid var(--sea-teal);
+  background: var(--surface);
+}
+
+.callout h2 {
+  margin-top: 0;
+  font-size: 1.125rem;
+}
+
+.callout-warning {
+  border-left-color: var(--sunrise);
+}</code></pre>
+                        </div>
+                        <p><code>&lt;aside&gt;</code> marks content that is related but not the main thing, and screen readers announce it as complementary. The course's own code keeps the sites page without the callout; keep yours if you like it.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>SitesPage</code> draws <code>&lt;Badge label="sand" /&gt;</code>. How does React call <code>Badge</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Look at the compiled output from the first section. How many arguments did SiteName get?">
+                                A) <code>Badge('sand')</code>, one argument per attribute
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Props are passed in, not looked up. Where did name and town come from in SiteName?">
+                                B) <code>Badge()</code>, and the component reads <code>label</code> from the page
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="All attributes are collected into one props object, and the component receives it as its single argument. Destructuring in the parameter list unpacks it, just like an options object in Lesson 2.3.">
+                                C) <code>Badge({ label: 'sand' })</code>, with one object holding every attribute
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Components are functions React calls. What does it pass them?">
+                                D) React does not call it; <code>Badge</code> is copied into the page as HTML
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> <code>npx tsc -b</code> reports: <code>Property 'title' is missing in type '{ children: Element[]; }' but required in type 'CardProps'</code>. What happened?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="A Card was used with content between its tags (which became children) but without the required title attribute. The fix is in the place that uses Card: add a title.">
+                                A) A <code>&lt;Card&gt;</code> was used with content inside it but no <code>title</code> attribute
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The message mentions children only as something that was passed. Which property is missing?">
+                                B) <code>Card</code> does not accept children, so they must be removed
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Making the prop optional would hide the mistake. What does the caller need to add?">
+                                C) <code>CardProps</code> must mark <code>title</code> as optional with <code>?</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> <code>Badge</code>'s props say <code>tone?: 'info' | 'success'</code>, and the component starts <code>function Badge({ label, tone = 'info' }: BadgeProps)</code>. What is the type of <code>tone</code> inside the component?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The union of two words survives. Is it narrower than string?">
+                                A) <code>string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is what callers may pass. What does the default do to undefined?">
+                                B) <code>'info' | 'success' | undefined</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The default is only used when the prop is left out. Can a caller still pass success?">
+                                C) <code>'info'</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The default fills in the value when the prop is left out, so undefined is gone inside the component, and the union of the two words stays. That is why the template literal can only produce badge-info or badge-success.">
+                                D) <code>'info' | 'success'</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> A <code>Card</code> should hold paragraphs, links, pictures, other components or plain text between its tags. Which type fits its <code>children</code> prop?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="A paragraph element is not a string. What would TypeScript say about the home page's card?">
+                                A) <code>string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="ReactNode is React's union of everything it can draw: elements, strings, numbers, arrays of nodes and the values that draw nothing. It is the usual type for children.">
+                                B) <code>ReactNode</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="HTMLElement is a real DOM element in the browser, not something a component returns. What did React's declaration file call anything it can draw?">
+                                C) <code>HTMLElement</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> <code>SitePicture</code> declares <code>image: Site['image']</code>. What does <code>Site['image']</code> mean?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="An indexed access type names the type of one property of another type. Here it is the object with url, alt, width and height, and it follows the API's type if that ever changes.">
+                                A) The type of the <code>image</code> property of <code>Site</code>: an object with <code>url</code>, <code>alt</code>, <code>width</code> and <code>height</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="This is written in a type position, after the colon. Does it read a value at run time?">
+                                B) The image of the first site in the data, read when the app starts
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Brackets in a type are not an array here. Which property name is in quotes?">
+                                C) An array of every site's image
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Interface or type for props?</summary>
+                    <p>Either works. The course follows the convention from Lesson 2.2: <code>interface</code> for object shapes, so props are <code>interface SomethingProps</code>, named after the component and placed right above it. For a tiny one-off, an inline type is fine too: <code>function SiteTitle({ site }: { site: Site })</code>.</p>
+                </details>
+                <details>
+                    <summary>What about <code>PropsWithChildren</code>?</summary>
+                    <p>React's types include a helper that adds an optional <code>children</code> to any props type:</p>
+                    <pre data-snippet><code class="language-ts">type PropsWithChildren&lt;P = unknown&gt; = P &amp; { children?: ReactNode | undefined };</code></pre>
+                    <p>You will see <code>PropsWithChildren&lt;CardProps&gt;</code> in other code bases, and it is fine. The course writes <code>children: ReactNode</code> in the interface instead, because it is easier to read and lets you decide whether children are <em>required</em>: a <code>Card</code> or a layout with nothing inside is a mistake worth catching.</p>
+                </details>
+                <details>
+                    <summary>Old code uses <code>Component.defaultProps</code>. Should I?</summary>
+                    <p>No. Before default values in destructuring were common, components declared their defaults like this:</p>
+                    <pre data-snippet data-legacy><code class="language-tsx">interface TideTimeProps {
+  time: string
+  label?: string
+}
+
+export function TideTime({ time, label }: TideTimeProps) {
+  return (
+    &lt;p&gt;
+      {label}: {time}
+    &lt;/p&gt;
+  )
+}
+
+TideTime.defaultProps = { label: 'Low tide' }</code></pre>
+                    <p>TypeScript and oxlint accept it without a word, but React 19 ignores <code>defaultProps</code> on function components written in TSX. Rendered on the course's React version, <code>&lt;TideTime time="06:40" /&gt;</code> gives:</p>
+                    <div class="card card-output">
+                        <h4>Output (React 19.3, rendered to HTML)</h4>
+                        <pre><code>&lt;p&gt;: 06:40&lt;/p&gt;</code></pre>
+                    </div>
+                    <p>No "Low tide". Use defaults in the destructuring, as the whole course does. When you update old code, move each <code>defaultProps</code> entry into the parameter list.</p>
+                </details>
+                <details>
+                    <summary>Should a component take the whole object or separate props?</summary>
+                    <p>Ask what the component is about. <code>SiteCard</code> shows a site, so <code>site: Site</code> is the clearest contract, and it keeps working when the card later shows one more property. <code>Badge</code> shows a word on any page, so it takes a <code>label</code>, not a site. Passing a whole object to a general-purpose component ties it to one kind of data; splitting a domain object into ten separate props makes every use long and easy to get wrong.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Make <code>Card</code> accept every attribute a <code>&lt;section&gt;</code> accepts, so a page can give one card an <code>id</code> or an <code>aria-label</code>. Look up <code>ComponentProps</code> in React's types: <code>interface CardProps extends ComponentProps&lt;'section'&gt;</code> brings in all of them, including <code>children</code>. Then collect the extra props with a rest parameter (<code>{ title, children, ...rest }</code>) and spread them onto the section (<code>&lt;section className="card" {...rest}&gt;</code>). Which props should the card still control itself, and what happens if a caller passes a <code>className</code>? Lesson 5.4 takes this idea further with a polymorphic <code>Button</code>.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Draw the sites page's component tree from memory and write each component's props next to it, with their types. Then answer in two or three sentences: why does <code>Badge</code> take a <code>label</code> and not a <code>site</code>, while <code>SiteCard</code> takes the whole <code>site</code>?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li><strong>Props</strong> are one object React passes to your component: destructure it in the parameter list and describe it with an interface, as with Lesson 2.3's options objects</li>
+                        <li>TypeScript checks every use: TS2741 for a missing prop, TS2322 for an unknown prop or a wrong type, each pointing back at the interface</li>
+                        <li>Optional props use <code>?</code> plus a default in the destructuring; inside the component the default removes <code>undefined</code>. No <code>defaultProps</code></li>
+                        <li><code>children: ReactNode</code> lets a component wrap any content; composing small components beats a growing list of props</li>
+                        <li>Props reuse the API's types: <code>site: Site</code>, a part with <code>Site['image']</code>, a few properties with <code>Pick</code></li>
+                        <li>Props are read-only: work out new values instead of changing them (oxlint's <code>react(immutability)</code>)</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up prop patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Review interfaces, unions and utility types</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Read React's guide to props</td><td><a href="https://react.dev/learn/passing-props-to-a-component" target="_blank" rel="noopener">React: Passing Props to a Component</a></td></tr>
+                            <tr><td>Read TypeScript's page on indexed access types</td><td><a href="https://www.typescriptlang.org/docs/handbook/2/indexed-access-types.html" target="_blank" rel="noopener">TypeScript Handbook: Indexed Access Types</a></td></tr>
+                            <tr><td>See how React's documentation types props and children</td><td><a href="https://react.dev/learn/typescript" target="_blank" rel="noopener">React: Using TypeScript</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You typed props with interfaces and read every kind of prop error TypeScript gives</li>
+                        <li>You used optional props with defaults, and saw why old <code>defaultProps</code> code no longer works</li>
+                        <li>You gave <code>AppLayout</code> its children, so it can hold every page the HQ will have</li>
+                        <li>You built four reusable components and composed them into a card</li>
+                        <li>You built the HQ's first data-driven screen, checked by the API's own <code>Site</code> type down to the pasted JSON</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Today you met <code>map</code> and <code>key</code> in passing. In <a href="lesson_09.html"><strong>Lesson 3.3: Lists and Conditional Rendering</strong></a> they get the attention they deserve: the HQ's cleanup events as cards, what keys really do, empty states, showing parts of the page only when they apply, and letting a discriminated union decide what a component draws, with a label for every event status that TypeScript keeps complete.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass in <code>shoreline-hq</code>, and delete <code>src/Scratch.tsx</code></li>
+                    <li>Visit <code>/sites</code> once more with the API stopped and notice what happens to the pictures: Lesson 4.1 is about handling exactly that</li>
+                    <li>Keep your own app's type and card sketch for Lesson 11.1</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Props, children, composition, indexed access types: that is a lot of new vocabulary for one lesson, and it is fine if deciding "whole object or separate props?" still feels like guesswork. Component design is a skill that grows with every component you write and every time a teammate (or future you) uses one. The red underlines you met today were TypeScript making a promise: every component you write can tell its users exactly how to use it. Keep reading the messages from the bottom up, and keep going.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_07.html" class="prev-lesson">← Previous: Components and TSX</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_09.html" class="next-lesson">Next: Lists and Conditional Rendering →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

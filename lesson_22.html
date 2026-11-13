@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Put Shoreline Crew HQ's filters in the address with useSearchParams, build an organizers' crew page with a nested route and an Outlet, keep the page number and search on every link, and type route parameters and links honestly in React Router 8 data mode. React + TypeScript: Build a Modern Web App Lesson 6.2.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Search Params, Nested Routes and Typed Navigation - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>🔗 Lesson 6.2: Search Params, Nested Routes and Typed Navigation</h1>
+                <p class="lead">At the end of the last lesson you searched the events page for "pelican" and reloaded: the search was gone. The router knows which page you are on, but not what you were looking at on it. Today the address carries that too. The events filters move into the address, so a filtered list survives a reload, works with Back and can be sent to another organizer. Then the HQ gets the page its header has been missing since Lesson 6.1: the crew list, with a search, a skill filter and page numbers in the address, and each volunteer's details in a nested route beside the list. Along the way you will see what React Router 8 can and cannot check for you when you build a link.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Decide which state belongs in the address and which belongs in components</li>
+                        <li>Read search params with <code>useSearchParams</code> and turn their <code>string | null</code> values into your own types with a type predicate</li>
+                        <li>Change search params without losing the others, and choose between a new history entry and <code>replace</code> (plus <code>flushSync</code> for a text box)</li>
+                        <li>Nest routes so a child page renders inside its parent's <code>&lt;Outlet /&gt;</code>, with an index route for "nothing chosen yet"</li>
+                        <li>Build relative links that keep the current search, and page through a list with links instead of buttons</li>
+                        <li>Type route parameters with <code>useParams&lt;'name'&gt;()</code> and explain what <code>href()</code> and <code>generatePath()</code> check in data mode</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_21.html">Lesson 6.1: React Router 8</a> (your <code>shoreline-hq</code> with the router, the layout route and <code>NavLink</code>s)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> Events filters in the address, small typed helpers for search params, a <code>Pagination</code> component, and the organizers' Volunteers page with a nested route for each volunteer</li>
+                    <li><span class="meta-label">🧩 Stack</span> React Router 8.5, React 19.3, TypeScript 7.0, Vite 8.3, oxlint 1.93, Node 24 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code and the browser, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-22-start.zip">lesson-22-start.zip</a> · Finished code: <a href="downloads/lesson-22-end.zip">lesson-22-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#url-state" class="toc-link">The Address Is State Too</a></li>
+                        <li><a href="#reading" class="toc-link">Reading Search Params</a></li>
+                        <li><a href="#writing" class="toc-link">Writing Search Params</a></li>
+                        <li><a href="#nested" class="toc-link">Nested Routes and Outlets</a></li>
+                        <li><a href="#typed" class="toc-link">Typed Navigation</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Filters in the Address and the Crew Page</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="url-state" class="lesson-section">
+                <h2>🗺️ The Address Is State Too</h2>
+                <p>Since Lesson 3.4 the events page has kept its search text and status filter in <code>useState</code>. Component state lives in the memory of one browser tab. Reload, and it starts from its default again; copy the address to another organizer, and they get the unfiltered list; press Back after changing the status, and you leave the page instead of undoing the change. For a filter, all three are wrong. People expect a filtered list to be something they can keep and pass on.</p>
+                <p>An address has room for this. Everything after the <code>?</code> is the <strong>query string</strong>, a list of name and value pairs called <strong>search params</strong> (or query parameters):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Part of <code>http://localhost:5173/events?q=pelican&amp;status=completed</code></th><th>What it is</th><th>Who reads it</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>/events</code></td><td>The path</td><td>The router, to choose the page (Lesson 6.1)</td></tr>
+                            <tr><td><code>?q=pelican&amp;status=completed</code></td><td>The query string: two search params, joined by <code>&amp;</code></td><td>The page, to decide what to show</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>💡 Mental model: the notice on the harbor board</h3>
+                    <p>When the crew wants everyone looking at the same thing, they do not tell each person separately; they pin a notice at the harbor: "Saturday, Pelican Point, completed cleanups only". Anyone who reads the notice, today or next week, sees the same view. State in <code>useState</code> is what one person remembers. State in the address is the notice: whoever opens the link, reloads it or comes back to it with Back reads the same thing.</p>
+                </div>
+
+                <p>Not everything belongs on the notice. A useful test: would someone want to bookmark it or send it?</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Good in the address</th><th>Better in components</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Search text and filters (the events search, a skill)</td><td>Whether a dialog is open, what is being typed into a form</td></tr>
+                            <tr><td>The page number of a long list</td><td>Hover and focus, animations, a "Show details" toggle</td></tr>
+                            <tr><td>Sorting, the selected tab of a report</td><td>Check-in marks before they are saved (the desk's reducer)</td></tr>
+                            <tr><td>Which item is open (better still as a path: <code>/volunteers/v16</code>)</td><td>Anything secret: passwords, tokens, personal data. Addresses end up in browser history, server logs and screenshots</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Why this matters: "send me the link" is how teams share what they are looking at, and an app whose filters survive a reload simply feels trustworthy. It also removes a class of bugs, because there is one place the filters live instead of a copy in state that can disagree with the address.</p>
+            </section>
+
+            <section id="reading" class="lesson-section">
+                <h2>🔎 Reading Search Params</h2>
+                <p>Browsers already have a class for query strings, <code>URLSearchParams</code>. It is not part of React or React Router, so what you learn here also works in plain scripts and in Node:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Method</th><th>On <code>?q=pelican&amp;status=completed</code></th><th>Type</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>params.get('q')</code></td><td><code>'pelican'</code></td><td><code>string | null</code> (<code>null</code> when the name is missing)</td></tr>
+                            <tr><td><code>params.has('page')</code></td><td><code>false</code></td><td><code>boolean</code></td></tr>
+                            <tr><td><code>params.getAll('skill')</code></td><td><code>[]</code> (useful when a name repeats: <code>?skill=a&amp;skill=b</code>)</td><td><code>string[]</code></td></tr>
+                            <tr><td><code>params.set('q', 'jetty')</code> / <code>params.delete('q')</code></td><td>Change the object itself</td><td><code>void</code></td></tr>
+                            <tr><td><code>params.toString()</code></td><td><code>'q=pelican&amp;status=completed'</code> (no <code>?</code>; spaces become <code>+</code>)</td><td><code>string</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>React Router hands you the current ones with a Hook that looks like <code>useState</code>: <code>const [searchParams, setSearchParams] = useSearchParams()</code>. The first item is a <code>URLSearchParams</code>; the second changes the address (the next section). Unlike <code>useState</code>, the value lives in the address, so a reload, a shared link or the Back button all give the page the same value.</p>
+
+                <h3>Every value is a string, or missing</h3>
+                <p>The events page wants a <code>StatusFilter</code> (<code>EventStatus | 'all'</code>, from Lesson 3.4). The address can only offer text. Try the obvious line:</p>
+                <pre data-snippet><code class="language-tsx">import { useSearchParams } from 'react-router'
+import type { StatusFilter } from './components/EventFilters.tsx'
+
+export function StatusLine() {
+  const [searchParams] = useSearchParams()
+  const status: StatusFilter = searchParams.get('status') ?? 'all'
+  return &lt;p&gt;Status: {status}&lt;/p&gt;
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:6:9 - error TS2322: Type 'string' is not assignable to type 'StatusFilter'.
+
+6   const status: StatusFilter = searchParams.get('status') ?? 'all'
+          ~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:6</code></pre>
+                </div>
+                <p>TypeScript is right to refuse. <code>get</code> returns <code>string | null</code>; <code>?? 'all'</code> removes the <code>null</code> but leaves <code>string</code>, and nothing stops someone from typing <code>?status=banana</code> into the address bar. Treat the address like any other input from outside the app, the way Lesson 2.4 treated the API's JSON: check it, then trust it. You already have the checks. <code>isEventStatus</code> is a type predicate (<code>value is EventStatus</code>), so one small generic function can read any parameter whose allowed values have a predicate:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/utils/searchParams.ts</div>
+                    <pre data-src="shoreline-hq/src/utils/searchParams.ts" data-match="excerpt"><code class="language-ts">// The part of the address after the ?: every value is a string (or missing), whatever we hoped
+
+/** One search parameter, if it is one of the values we allow; undefined when it is missing or wrong */
+export function readParam&lt;T extends string&gt;(
+  params: URLSearchParams,
+  name: string,
+  isT: (value: string) =&gt; value is T,
+): T | undefined {
+  const value = params.get(name)
+  return value !== null &amp;&amp; isT(value) ? value : undefined
+}</code></pre>
+                </div>
+                <p>TypeScript infers <code>T</code> from the predicate you pass: with <code>isEventStatus</code> the result is <code>EventStatus | undefined</code>, with <code>isSkill</code> it is <code>Skill | undefined</code>. Then <code>?? 'all'</code> supplies the default, and the line compiles because every possible value is now a <code>StatusFilter</code>:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="excerpt"><code class="language-tsx">  const query = searchParams.get('q') ?? ''
+  const status: StatusFilter = readParam(searchParams, 'status', isEventStatus) ?? 'all'</code></pre>
+                </div>
+                <p>Measured: opening <code>/events?status=banana</code> showed "All statuses" in the menu and all 15 cleanups, and the only request to the API was <code>/events?perPage=50</code>. The bad value never left the page. A page number gets the same treatment in <code>readPageNumber</code>: anything that is not a whole number above 0 means page 1.</p>
+            </section>
+
+            <section id="writing" class="lesson-section">
+                <h2>✍️ Writing Search Params</h2>
+                <p><code>setSearchParams</code> takes the new search params (an object, a string or a <code>URLSearchParams</code>), or a function that receives a <strong>copy</strong> of the current ones and returns the next. It then navigates to the same path with the new query string. A second argument holds the navigation options.</p>
+                <p>Changing one filter must keep the others: choosing a status must not forget the search. So the HQ always starts from the current params and changes one name. A small helper does that, and removes the name when the value is empty, so defaults stay out of the address (<code>/events</code>, not <code>/events?q=&amp;status=all</code>):</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/utils/searchParams.ts</div>
+                    <pre data-src="shoreline-hq/src/utils/searchParams.ts" data-match="excerpt"><code class="language-ts">/** A copy of params with one value set; an empty value removes the parameter */
+export function withParam(params: URLSearchParams, name: string, value: string): URLSearchParams {
+  const next = new URLSearchParams(params)
+  if (value === '') {
+    next.delete(name)
+  } else {
+    next.set(name, value)
+  }
+  return next
+}</code></pre>
+                </div>
+                <p>It copies with <code>new URLSearchParams(params)</code> instead of calling <code>set</code> on the object from the Hook. That object is the router's view of the current address; changing it changes nothing on screen (React never hears about it), the same "copy, don't mutate" rule as React state.</p>
+
+                <h3>A new history entry, or replace the current one?</h3>
+                <p>Every navigation adds an entry to the browser's history unless you pass <code>replace: true</code>. Which you want depends on what people would expect Back to do:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Change</th><th>Option</th><th>Back then…</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Choosing a status, the next page of a list</td><td>(default: push)</td><td>Undoes the change. Measured: from <code>?q=pelican&amp;status=completed</code>, Back went to <code>?q=pelican</code>, with the menu on "All statuses" and "pelican" still in the box</td></tr>
+                            <tr><td>Typing a search, letter by letter</td><td><code>replace: true</code></td><td>Skips the letters. Measured: typing "pelican" added 0 history entries; the first letter even replaced the plain <code>/events</code> entry, so Back from the search went to the page before Events</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mermaid">
+graph TD
+    A["Typing or a menu"] --> B["setSearchParams"]
+    B --> C["New address: ?q=pelican"]
+    C --> D["useSearchParams"]
+    D --> E["readParam: typed filters"]
+    E --> F["useApi key: /events?q=…"]
+                </div>
+                <p>The arrows go in one direction. The page never stores the filters; it reads them from the address on every render and asks the address to change. That is the same idea as a controlled input (Lesson 3.4), with the address as the state.</p>
+
+                <h3>Router updates are low priority: flushSync for the search box</h3>
+                <p>React Router 8 applies its state changes inside React's <code>startTransition</code>, which marks them as "can wait". For a click on a link that is exactly right. For a text box whose value comes from the address, it is not: React shows the old value until the transition lands, and the browser loses track of where you were typing. The Common Mistakes section has the measurements. The fix is the <code>flushSync: true</code> option, which applies that one update straight away (it needs <code>RouterProvider</code> from <code>react-router/dom</code>, which the HQ already uses):</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="excerpt"><code class="language-tsx">// Typing: replace the history entry (Back skips the letters), and update the box right away
+function setQuery(next: string) {
+  setSearchParams((current) =&gt; withParam(current, 'q', next), {
+    replace: true,
+    flushSync: true,
+  })
+}</code></pre>
+                </div>
+                <p>Two things did not need to change. The search still reaches the API through <code>useDebouncedValue</code> (Lesson 4.2), so typing "pelican" still sends one request, not seven. And <code>AppLayout</code>'s focus effect from Lesson 6.1 runs only when the <em>path</em> changes, so the focus stays in the search box while the query string changes (measured: the active element was still <code>#event-search</code> after typing).</p>
+            </section>
+
+            <section id="nested" class="lesson-section">
+                <h2>🪆 Nested Routes and Outlets</h2>
+                <p>In Lesson 6.1 every page was a child of the layout route, rendered at <code>AppLayout</code>'s <code>&lt;Outlet /&gt;</code>. Any route can have children, not just the layout. The crew page uses that: <code>/volunteers</code> shows the search and the list, and <code>/volunteers/v16</code> shows the same search and list <em>plus</em> one person's details. Instead of two pages that both draw the list, the details become a child route of the list page:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                    <pre data-src="shoreline-hq/src/App.tsx" data-match="excerpt"><code class="language-tsx">{
+  path: 'volunteers',
+  element: &lt;VolunteersPage /&gt;,
+  // Nested routes: they render inside VolunteersPage, at its &lt;Outlet /&gt;
+  children: [
+    { index: true, element: &lt;p&gt;Pick a name from the list to see their details.&lt;/p&gt; },
+    { path: ':volunteerId', element: &lt;VolunteerPage /&gt; },
+  ],
+},</code></pre>
+                </div>
+                <p><code>VolunteersPage</code> renders <code>&lt;Outlet /&gt;</code> where the details go. On <code>/volunteers</code> the index child fills it with a short hint (an index route is "the page at the parent's own address", here "nobody chosen yet"); on <code>/volunteers/v16</code> the <code>:volunteerId</code> child fills it with <code>VolunteerPage</code>. The child's path is relative, like every child path: <code>':volunteerId'</code> inside <code>'volunteers'</code> matches <code>/volunteers/v16</code>.</p>
+
+                <div class="mermaid">
+graph TD
+    A["/volunteers/v16?page=2"] --> B["AppLayout: header, footer"]
+    B --> C["VolunteersPage: search, list"]
+    C --> D["Outlet: VolunteerPage v16"]
+                </div>
+
+                <p>Two consequences are worth seeing in the browser. Moving from one volunteer to another keeps <code>VolunteersPage</code> mounted, so its list does not load again: measured, clicking Lily Tran sent one request, <code>/volunteers/v16</code>, and nothing for the list. And the header's Volunteers <code>NavLink</code> stays current, because <code>/volunteers/v16</code> is below <code>/volunteers</code>.</p>
+
+                <h3>Relative links, and keeping the search on them</h3>
+                <p>Links resolve relative to the route that renders them, not to the address in the bar. Inside <code>VolunteersPage</code>, <code>&lt;NavLink to="v16"&gt;</code> means "child <code>v16</code> of this route", so it points to <code>/volunteers/v16</code> whether the address is <code>/volunteers</code> or <code>/volunteers/v20</code>. That is what makes nested pages easy to move: the list never spells out its own path.</p>
+                <p>A path is not the whole address, though. A link with only a path drops the query string, and on page 2 of the list that sends people back to page 1 (Common Mistakes, measured). The <code>to</code> prop also takes an object with <code>pathname</code> and <code>search</code>, so the list passes its current search along:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                    <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx" data-match="excerpt"><code class="language-tsx">// Each name links to the nested route; the ?search goes along, so the list stays as it is
+function renderVolunteer(volunteer: Volunteer) {
+  return (
+    &lt;NavLink to={{ pathname: volunteer.id, search: searchParams.toString() }}&gt;
+      {volunteer.name}
+    &lt;/NavLink&gt;
+  )
+}</code></pre>
+                </div>
+                <p>It is a <code>NavLink</code> on purpose: on <code>/volunteers/v16</code> it gives Lily Tran's link <code>aria-current="page"</code>, which the page's CSS makes bold, so everyone can tell whose card is open. The <code>Pagination</code> links do the opposite trick: <code>to={{ search: … }}</code> with no <code>pathname</code> keeps the current path and changes only the query, so <strong>Next page</strong> from <code>/volunteers/v16?page=2</code> went to <code>/volunteers/v16?page=3</code> (measured). The card stays open while you page through the list.</p>
+
+                <div class="card card-danger">
+                    <h3>🛑 Hiding a page is not protecting it</h3>
+                    <p>The crew list has phone numbers and email addresses, so <code>VolunteersPage</code> shows it only to organizers, and the header shows the Volunteers link only to them. That is good manners, not security: anyone can type <code>/volunteers</code>. The real guard is the API. Measured: <code>GET /api/volunteers</code> without a token answered 401 "Sign in first.", and with Theo's volunteer token 403 "Only organizers can do that." Lesson 6.3 turns the page into a protected route that sends people to the sign-in page; the API's answer stays the part that keeps the data safe.</p>
+                </div>
+            </section>
+
+            <section id="typed" class="lesson-section">
+                <h2>🧭 Typed Navigation</h2>
+                <p>Lesson 6.1 ended with a question: can TypeScript catch a typo in an address? Three tools are worth knowing, and they check different things.</p>
+
+                <h3>1. Name the parameters you read: <code>useParams&lt;'volunteerId'&gt;()</code></h3>
+                <p><code>useParams()</code> without a type argument returns <code>Readonly&lt;Params&lt;string&gt;&gt;</code>: any name at all is allowed, each <code>string | undefined</code>. Pass the name you expect, and other names become errors:</p>
+                <pre data-snippet><code class="language-tsx">import { useParams } from 'react-router'
+
+export function Untyped() {
+  const { volunterId } = useParams() // typo: still compiles, always undefined
+  return &lt;p&gt;{volunterId}&lt;/p&gt;
+}
+
+export function Typed() {
+  const { volunterId } = useParams&lt;'volunteerId'&gt;()
+  return &lt;p&gt;{volunterId}&lt;/p&gt;
+}</code></pre>
+                <figure class="screenshot">
+                    <img src="images/lesson_22/22-useparams-typo.png" alt="A terminal in shoreline-hq. npx tsc -b reports one error in src/Scratch.tsx line 9: TS2339, Property volunterId does not exist on type Readonly Params of volunteerId, with the misspelled name underlined. Found 1 error. The untyped useParams call on line 4, with the same typo, is not reported." width="1083" height="239" loading="lazy">
+                    <figcaption>Two components, the same typo. Only the one that names its parameter with <code>useParams&lt;'volunteerId'&gt;()</code> gets an error; the untyped call compiles and would quietly read <code>undefined</code>.</figcaption>
+                </figure>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:9:11 - error TS2339: Property 'volunterId' does not exist on type 'Readonly&lt;Params&lt;"volunteerId"&gt;&gt;'.
+
+9   const { volunterId } = useParams&lt;'volunteerId'&gt;()
+            ~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:9</code></pre>
+                </div>
+                <p>Line 4 has the same typo and no error: it would read <code>undefined</code> forever. The value is still <code>string | undefined</code> (TypeScript still cannot see which route rendered the component), so the HQ's pages keep their narrowing check. The type argument is a promise you make, "this component sits under a route with <code>:volunteerId</code>", and TypeScript holds every line of the component to it.</p>
+
+                <h3>2. <code>href()</code>: typed in framework mode only</h3>
+                <p>React Router 8 exports <code>href(path, params)</code>, and its documentation shows it catching typos. That checking needs a list of every route, which React Router <em>generates</em> in framework mode (the routes file plus the Vite plugin from Lesson 6.1's mode table). In data mode nobody generates that list, so <code>href</code> accepts any string. Measured in the HQ:</p>
+                <pre data-snippet><code class="language-tsx">import { generatePath, href } from 'react-router'
+
+// href(): checked only in framework mode, where React Router generates the list of routes
+export const typoInPath = href('/volunters/:volunteerId', { volunteerId: 'v04' })
+export const missingValue = href('/volunteers/:volunteerId')
+
+// generatePath(): reads the parameter names from the pattern you pass
+export const fine = generatePath('/volunteers/:volunteerId', { volunteerId: 'v04' })
+export const typoInName = generatePath('/volunteers/:volunteerId', { volunterId: 'v04' })</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output</h4>
+                    <pre><code>src/Scratch.tsx:9:68 - error TS2741: Property 'volunteerId' is missing in type '{ volunterId: string; }' but required in type '{ [x: string]: string | null | undefined; volunteerId: string; }'.
+
+9 export const typoInName = generatePath('/volunteers/:volunteerId', { volunterId: 'v04' })
+                                                                     ~~~~~~~~~~~~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:9</code></pre>
+                </div>
+                <p>One error, and it is on line 9 (<code>generatePath</code>, below). Lines 4 and 5 compile: a misspelled path and a missing value both pass. At run time the first one returned <code>/volunters/v04</code>, a link to "Page not found", and the second threw "Path '/volunteers/:volunteerId' requires param 'volunteerId' but it was not provided". So in the HQ, <code>href()</code> adds no safety; do not let its name convince you otherwise.</p>
+
+                <h3>3. <code>generatePath()</code>: reads the names from the pattern</h3>
+                <p><code>generatePath('/volunteers/:volunteerId', { volunteerId })</code> works in every mode. Its type reads the parameter names out of the string you pass (with template literal types: generics that take a string apart, a step past Lesson 2.3), so a misspelled <em>name</em> is the TS2741 above. It also encodes the value for a path segment: <code>'v 04'</code> became <code>v%2004</code>. It cannot know whether the <em>path</em> exists in your router; only one list of routes can know that.</p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Tool</th><th>Catches a misspelled parameter name</th><th>Catches a path that is not a route</th><th>In the HQ</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>useParams&lt;'volunteerId'&gt;()</code></td><td>Yes, where you read it</td><td>No</td><td><code>VolunteerPage</code>, <code>EventPage</code></td></tr>
+                            <tr><td><code>generatePath(pattern, params)</code></td><td>Yes, where you build a link</td><td>No</td><td>Optional (FAQ: a <code>paths</code> module)</td></tr>
+                            <tr><td><code>href(path, params)</code></td><td>Only in framework mode</td><td>Only in framework mode</td><td>Not used</td></tr>
+                            <tr><td>Relative links (<code>to={volunteer.id}</code>)</td><td>Nothing to misspell</td><td>Resolved against the route that renders the link</td><td>The crew list</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Being honest about what a type checks is a skill in itself. A name that sounds safe is not a guarantee; a quick experiment like the one above (a deliberate typo, then <code>npx tsc -b</code>) tells you in a minute what a library really promises.</p>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A search box that eats letters</h3>
+                    <p>Leave out <code>flushSync: true</code> and everything compiles and lints cleanly. Measured on the dev server without it: typing "pelcan", moving the cursor three places left and typing "i" gave "pelican" with the cursor thrown to the end (position 7 instead of 4), and typing "jetty rocks" quickly left "jet oks" in the box and in the address. Letters typed while a transition was still on its way were lost. With the option back, the same runs gave the cursor at position 4 and the whole "jetty rocks". A select menu or a link is fine without it; any text box whose value comes from the address needs it.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A link that drops the search</h3>
+                    <p>With <code>&lt;NavLink to={volunteer.id}&gt;</code> (a path only), measured: on page 2 of the crew, clicking Lily Tran opened her card at <code>/volunteers/v16</code>, and the list jumped back to "Page 1 of 3", where Lily is not even listed. The same happens to a search or a skill filter. When a page keeps its state in the query string, every link inside it has to decide what to do with that query: here, pass it on with <code>{ pathname, search }</code>.</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Forgetting the Outlet</h3>
+                    <p>Remove <code>&lt;Outlet /&gt;</code> from <code>VolunteersPage</code>, and <code>npx tsc -b</code> and <code>npm run lint</code> still pass. Measured: clicking Aisha Rahman changed the address to <code>/volunteers/v20</code> and made her name bold, but no card appeared, no request for her went to the API, and the Console stayed empty. The router matched the child route; there was simply nowhere to draw it. When a nested page "does nothing", check its parent for the <code>&lt;Outlet /&gt;</code> first. (There is exactly one outlet per route; React Router has no named outlets.)</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Trusting the address</h3>
+                    <p>The quick fix for the TS2322 in "Reading Search Params" is <code>searchParams.get('status') as StatusFilter</code>. It compiles, and it is a lie: <code>?status=banana</code> would then reach the API and the select menu as if it were a status. An <code>as</code> tells TypeScript to stop checking; a type predicate does the check. Keep <code>as</code> for the rare case where you know more than the compiler, and never for text that comes from outside the app.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Filters in the Address and the Crew Page</h2>
+                <p>You will add small helpers for search params, move the events filters into the address, teach the API client about volunteers, and build the Volunteers page with a nested route for each person. Start shoreline-api (<code>node server.ts</code> in <code>shoreline-api</code>) and the dev server (<code>npm run dev</code> in <code>shoreline-hq</code>) in two terminals. No new packages today.</p>
+
+                <div class="card">
+                    <h3>Step 1: Helpers for search params <span class="step-time">(8 min)</span></h3>
+                    <p>Create <code>src/utils/searchParams.ts</code> with the three functions from the teaching sections. Each one is short; together they mean no page ever reads a raw <code>string | null</code> or edits the router's own params object.</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/searchParams.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/searchParams.ts"><code class="language-ts">// The part of the address after the ?: every value is a string (or missing), whatever we hoped
+
+/** One search parameter, if it is one of the values we allow; undefined when it is missing or wrong */
+export function readParam&lt;T extends string&gt;(
+  params: URLSearchParams,
+  name: string,
+  isT: (value: string) =&gt; value is T,
+): T | undefined {
+  const value = params.get(name)
+  return value !== null &amp;&amp; isT(value) ? value : undefined
+}
+
+/** The ?page= number: 1 when it is missing or is not a whole number above 0 */
+export function readPageNumber(params: URLSearchParams): number {
+  const page = Number(params.get('page'))
+  return Number.isInteger(page) &amp;&amp; page &gt; 0 ? page : 1
+}
+
+/** A copy of params with one value set; an empty value removes the parameter */
+export function withParam(params: URLSearchParams, name: string, value: string): URLSearchParams {
+  const next = new URLSearchParams(params)
+  if (value === '') {
+    next.delete(name)
+  } else {
+    next.set(name, value)
+  }
+  return next
+}</code></pre>
+                    </div>
+                    <p><code>readPageNumber</code> leans on <code>Number(null)</code> being <code>0</code>: a missing <code>page</code> fails the <code>page &gt; 0</code> test and becomes 1, and so do <code>?page=zero</code> (<code>NaN</code>) and <code>?page=2.5</code>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: The events filters move into the address <span class="step-time">(12 min)</span></h3>
+                    <p>In <code>src/pages/EventsPage.tsx</code>, the two <code>useState</code>s become reads from the address, and three small functions write to it. <code>EventFilters</code> does not change at all: it still receives <code>query</code>, <code>status</code> and callbacks, and does not care where they live. Change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">-import { useEffect, useRef, useState } from 'react'
+-import { Link } from 'react-router'
+-import { getEvents, getSites } from '../api/client.ts'
++import { useEffect, useRef } from 'react'
++import { Link, useSearchParams } from 'react-router'
++import { getEvents, getSites, isEventStatus } from '../api/client.ts'
+ // ...
+ import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
++import { readParam, withParam } from '../utils/searchParams.ts'
+ import styles from './Page.module.css'
+ // ...
+ export function EventsPage() {
+   const { isOrganizer } = useAuth()
+-  const [query, setQuery] = useState('')
+-  const [status, setStatus] = useState&lt;StatusFilter&gt;('all')
++  // The filters live in the address: /events?q=pelican&amp;status=completed
++  const [searchParams, setSearchParams] = useSearchParams()
++  const query = searchParams.get('q') ?? ''
++  const status: StatusFilter = readParam(searchParams, 'status', isEventStatus) ?? 'all'
+   const searchRef = useRef&lt;HTMLInputElement&gt;(null)
+ // ...
+   const events = useApi(`/events?${eventsQuery}`, (signal) =&gt; getEvents(eventsQuery, signal))
+
++  // Typing: replace the history entry (Back skips the letters), and update the box right away
++  function setQuery(next: string) {
++    setSearchParams((current) =&gt; withParam(current, 'q', next), {
++      replace: true,
++      flushSync: true,
++    })
++  }
++
++  // A status is a new entry: Back undoes it
++  function setStatus(next: StatusFilter) {
++    setSearchParams((current) =&gt; withParam(current, 'status', next === 'all' ? '' : next))
++  }
++
+   function clearFilters() {
+-    setQuery('')
+-    setStatus('all')
++    setSearchParams({})
+     // The Clear filters button is about to disappear: keep the focus somewhere useful</code></pre>
+                    </div>
+                    <p>The new functions are called <code>setQuery</code> and <code>setStatus</code>, the names the old state setters had, so the JSX that passes them to <code>EventFilters</code> stays exactly as it was. <code>setSearchParams({})</code> clears everything in one navigation. Now try it, and watch the address bar:</p>
+                    <ul>
+                        <li>Search for <code>pelican</code>: the address becomes <code>/events?q=pelican</code> and "Found 3 cleanups" appears. Choose <strong>Completed</strong>: <code>/events?q=pelican&amp;status=completed</code>, 2 cleanups.</li>
+                        <li>Reload. Same box, same menu, same 2 cleanups. Copy the address into a new tab: the same again.</li>
+                        <li>Press Back once: the menu returns to "All statuses", "pelican" stays. Forward brings Completed back. No full page load happened (the header never flickers).</li>
+                        <li>Edit the address to <code>/events?status=banana</code>: All statuses, 15 cleanups.</li>
+                    </ul>
+                    <figure class="screenshot">
+                        <img src="images/lesson_22/22-events-url.png" alt="The Cleanup events page of Shoreline Crew HQ opened from the address slash events question mark q equals pelican and status equals completed. The search box, outlined in red, already says pelican and the Status menu says Completed; below, Found 2 cleanups: 0 coming up, 2 in the log, with Pelican Point Beach Sweep and Sunset Stairs Cleanup under Past cleanups." width="1100" height="481" loading="lazy">
+                        <figcaption>Nobody typed anything here: the page read <code>q</code> and <code>status</code> from the address. Bookmark it, share it or reload it, and the same cleanups come back.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Volunteers in the API client <span class="step-time">(10 min)</span></h3>
+                    <p>The crew lives at <code>GET /api/volunteers</code> (organizers only; <code>q</code>, <code>skill</code> and <code>page</code> filters, 10 per page) and <code>GET /api/volunteers/:id</code>. The client gets a guard for a <code>Volunteer</code>, an exported <code>isSkill</code> for the skill filter, two functions, and a kinder message for 404 answers. Change these lines in <code>src/api/client.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/api/client.ts</div>
+                        <pre data-src="shoreline-hq/src/api/client.ts" data-match="diff"><code class="language-diff-ts diff-highlight">-// Shoreline Crew HQ's API client (Lessons 2.4, 4.1, 5.2 and 5.4).
++// Shoreline Crew HQ's API client (Lessons 2.4, 4.1, 5.2, 5.4 and 6.2).
+ // ...
+   User,
++  Volunteer,
+ } from './types.ts'
+ // ...
+ const skills: Skill[] = [
+   'first-aid', 'boat-handling', 'heavy-lifting', 'photography', 'data-recording', 'team-lead',
+ ]
++
++export function isSkill(value: unknown): value is Skill {
++  return skills.some((skill) =&gt; skill === value)
++}
++
++/** One person on the crew, as GET /api/volunteers sends them (organizers only) */
++function isVolunteer(value: unknown): value is Volunteer {
++  return (
++    isRecord(value) &amp;&amp;
++    typeof value.id === 'string' &amp;&amp;
++    typeof value.name === 'string' &amp;&amp;
++    typeof value.email === 'string' &amp;&amp;
++    (value.phone === null || typeof value.phone === 'string') &amp;&amp;
++    roles.some((role) =&gt; role === value.role) &amp;&amp;
++    Array.isArray(value.skills) &amp;&amp;
++    value.skills.every(isSkill) &amp;&amp;
++    typeof value.joinedOn === 'string' &amp;&amp;
++    typeof value.hoursLogged === 'number'
++  )
++}
+ // ...
+   if (error instanceof ApiError &amp;&amp; error.status === 401) {
+     return 'Your sign-in has ended. Sign out, then sign in again.'
+   }
++  if (error instanceof ApiError &amp;&amp; error.status === 404) {
++    return 'Nothing was found at this address. Check the link.'
++  }
+   if (error instanceof ApiError) {
+ // ...
++/** The crew, one page at a time; query is a search string such as 'skill=first-aid&amp;page=2' */
++export function getVolunteers(query: string, signal?: AbortSignal): Promise&lt;Page&lt;Volunteer&gt;&gt; {
++  return readPage(`/volunteers?${query}`, isVolunteer, signal)
++}
++
++/** One person. An unknown id is an ApiError with status 404. */
++export function getVolunteer(id: string, signal?: AbortSignal): Promise&lt;Volunteer&gt; {
++  return getJSON(`/volunteers/${encodeURIComponent(id)}`, isVolunteer, signal)
++}
++
+ /** POST /api/auth/sign-in. A wrong email or password is an ApiError with status 401. */</code></pre>
+                    </div>
+                    <p><code>value.skills.every(isSkill)</code> passes the predicate itself as the callback: <code>every</code> calls it with each item, exactly like <code>isListOf</code> does. <code>getVolunteers</code> reuses Lesson 4.1's <code>readPage</code>, so the page numbers come from the response headers for free. Then create <code>src/utils/skills.ts</code>, the labels the API also lists at <code>GET /api/meta</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/skills.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/skills.ts"><code class="language-ts">import type { Skill } from '../api/types.ts'
+
+// The API's names for each skill (GET /api/meta lists the same labels)
+export const skillLabels: Record&lt;Skill, string&gt; = {
+  'first-aid': 'First aid',
+  'boat-handling': 'Boat handling',
+  'heavy-lifting': 'Heavy lifting',
+  photography: 'Photography',
+  'data-recording': 'Data recording',
+  'team-lead': 'Team lead',
+}</code></pre>
+                    </div>
+                    <p>A <code>Record&lt;Skill, string&gt;</code> again (Lesson 3.3's lookup table): if the API ever gains a seventh skill and you update <code>types.ts</code>, TypeScript points at this object until it has a label.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: A Pagination component <span class="step-time">(7 min)</span></h3>
+                    <p>Pages are links, not buttons. A link can be opened in a new tab, bookmarked and announced as a link, and Back works with no extra code. Create <code>src/components/Pagination.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Pagination.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Pagination.tsx"><code class="language-tsx">import { Link, useSearchParams } from 'react-router'
+import type { PageInfo } from '../api/types.ts'
+import { withParam } from '../utils/searchParams.ts'
+import styles from './Pagination.module.css'
+
+interface PaginationProps {
+  page: PageInfo
+  /** Names the navigation landmark: "Pages of volunteers" */
+  label: string
+}
+
+// Previous and Next are links to the same address with another ?page=, so each page can be shared
+export function Pagination({ page, label }: PaginationProps) {
+  const [searchParams] = useSearchParams()
+
+  if (page.totalPages &lt;= 1) return null
+
+  // Page 1 is the default: it needs no ?page= at all
+  function linkTo(pageNumber: number) {
+    const value = pageNumber === 1 ? '' : String(pageNumber)
+    return { search: withParam(searchParams, 'page', value).toString() }
+  }
+
+  return (
+    &lt;nav className={styles.pagination} aria-label={label}&gt;
+      {page.page &gt; 1 &amp;&amp; &lt;Link to={linkTo(page.page - 1)}&gt;← Previous page&lt;/Link&gt;}
+      &lt;span&gt;
+        Page {page.page} of {page.totalPages}
+      &lt;/span&gt;
+      {page.page &lt; page.totalPages &amp;&amp; &lt;Link to={linkTo(page.page + 1)}&gt;Next page →&lt;/Link&gt;}
+    &lt;/nav&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>And <code>src/components/Pagination.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Pagination.module.css</div>
+                        <pre data-src="shoreline-hq/src/components/Pagination.module.css"><code class="language-css">.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+  margin-top: 1.5rem;
+}</code></pre>
+                    </div>
+                    <p><code>PageInfo</code> is the API's own type (<code>page</code>, <code>perPage</code>, <code>total</code>, <code>totalPages</code>), the one <code>readPage</code> already fills. The <code>label</code> prop names the <code>&lt;nav&gt;</code> landmark, so screen reader users who jump between landmarks hear which navigation this is ("Pages of volunteers") instead of a second unnamed one next to the header's "Main".</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: The Volunteers page <span class="step-time">(15 min)</span></h3>
+                    <p>Create <code>src/pages/VolunteersPage.tsx</code>. It has two components: <code>VolunteersPage</code> decides who may see the crew, and <code>CrewList</code> (only rendered for organizers) holds the Hooks, the filters, the list and the outlet.</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.tsx"><code class="language-tsx">import type { ChangeEvent } from 'react'
+import { Link, NavLink, Outlet, useSearchParams } from 'react-router'
+import { getVolunteers, isSkill } from '../api/client.ts'
+import type { Skill, Volunteer } from '../api/types.ts'
+import { useAuth } from '../auth/AuthContext.ts'
+import { DataList } from '../components/DataList.tsx'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { Pagination } from '../components/Pagination.tsx'
+import { useApi } from '../hooks/useApi.ts'
+import { useDebouncedValue } from '../hooks/useDebouncedValue.ts'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import { readPageNumber, readParam, withParam } from '../utils/searchParams.ts'
+import { skillLabels } from '../utils/skills.ts'
+import formStyles from '../components/Form.module.css'
+import styles from './VolunteersPage.module.css'
+
+type SkillFilter = Skill | 'all'
+
+// The crew list: search, skill and page all live in the address (?q=&amp;skill=&amp;page=)
+function CrewList() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const query = searchParams.get('q') ?? ''
+  const skill: SkillFilter = readParam(searchParams, 'skill', isSkill) ?? 'all'
+  const pageNumber = readPageNumber(searchParams)
+
+  const search = useDebouncedValue(query.trim(), 300)
+  const params = new URLSearchParams({ page: String(pageNumber) })
+  if (search !== '') params.set('q', search)
+  if (skill !== 'all') params.set('skill', skill)
+  const volunteersQuery = params.toString()
+  const volunteers = useApi(`/volunteers?${volunteersQuery}`, (signal) =&gt;
+    getVolunteers(volunteersQuery, signal),
+  )
+
+  // A new search or skill starts again on page 1 (typing works as on the events page)
+  function changeFilter(name: 'q' | 'skill', value: string) {
+    const typing = name === 'q'
+    setSearchParams(
+      (current) =&gt; {
+        const next = withParam(current, name, value)
+        next.delete('page')
+        return next
+      },
+      { replace: typing, flushSync: typing },
+    )
+  }
+
+  function handleSkillChange(event: ChangeEvent&lt;HTMLSelectElement&gt;) {
+    const value = event.target.value
+    changeFilter('skill', isSkill(value) ? value : '')
+  }
+
+  // Each name links to the nested route; the ?search goes along, so the list stays as it is
+  function renderVolunteer(volunteer: Volunteer) {
+    return (
+      &lt;NavLink to={{ pathname: volunteer.id, search: searchParams.toString() }}&gt;
+        {volunteer.name}
+      &lt;/NavLink&gt;
+    )
+  }
+
+  return (
+    &lt;&gt;
+      &lt;search className={styles.filters}&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="volunteer-search"&gt;Search by name or email&lt;/label&gt;
+          &lt;input
+            id="volunteer-search"
+            type="search"
+            value={query}
+            onChange={(event) =&gt; changeFilter('q', event.target.value)}
+          /&gt;
+        &lt;/div&gt;
+        &lt;div className={formStyles.field}&gt;
+          &lt;label htmlFor="volunteer-skill"&gt;Skill&lt;/label&gt;
+          &lt;select id="volunteer-skill" value={skill} onChange={handleSkillChange}&gt;
+            &lt;option value="all"&gt;Any skill&lt;/option&gt;
+            {Object.entries(skillLabels).map(([id, label]) =&gt; (
+              &lt;option key={id} value={id}&gt;
+                {label}
+              &lt;/option&gt;
+            ))}
+          &lt;/select&gt;
+        &lt;/div&gt;
+      &lt;/search&gt;
+      &lt;div className={styles.layout}&gt;
+        {/* The nested route renders here: a hint, or one volunteer's details */}
+        &lt;Outlet /&gt;
+        &lt;div&gt;
+          {volunteers.state.kind === 'ready' ? (
+            &lt;&gt;
+              &lt;p role="status"&gt;
+                Found {volunteers.state.data.page.total}{' '}
+                {volunteers.state.data.page.total === 1 ? 'person' : 'people'}.
+              &lt;/p&gt;
+              &lt;DataList
+                items={volunteers.state.data.items}
+                getKey={(volunteer) =&gt; volunteer.id}
+                renderItem={renderVolunteer}
+                emptyMessage="Nobody on the crew matches your search."
+                layout="plain"
+              /&gt;
+              &lt;Pagination page={volunteers.state.data.page} label="Pages of volunteers" /&gt;
+            &lt;/&gt;
+          ) : (
+            &lt;LoadStatus state={volunteers.state} what="the crew" onRetry={volunteers.reload} /&gt;
+          )}
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/&gt;
+  )
+}
+
+export function VolunteersPage() {
+  const { isOrganizer } = useAuth()
+  useDocumentTitle('Volunteers')
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Volunteers&lt;/h1&gt;
+      {isOrganizer ? (
+        &lt;CrewList /&gt;
+      ) : (
+        &lt;p&gt;
+          The crew list has everyone's contact details, so only organizers can see it.{' '}
+          &lt;Link to="/sign-in"&gt;Sign in&lt;/Link&gt; with an organizer account.
+        &lt;/p&gt;
+      )}
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <p>Read it top to bottom with the earlier sections in mind:</p>
+                    <ul>
+                        <li>The three values come from the address, through the Step 1 helpers. <code>skill</code> is a <code>SkillFilter</code>, so the <code>&lt;select&gt;</code> can show "Any skill" for <code>'all'</code>.</li>
+                        <li>The API request is built from the address the same way as on the events page, with the debounced search. The query string is also the <code>useApi</code> key, so a new page or filter loads new data.</li>
+                        <li><code>changeFilter</code> deletes <code>page</code>: a new search starts on page 1 (page 3 of a search that has one page would be empty). The name is typed <code>'q' | 'skill'</code>, so a typo such as <code>'skil'</code> is a compile error.</li>
+                        <li>The split into two components is the Rules of Hooks at work (Lesson 4.2): an early "not an organizer" return above the Hooks would be an error, so the check lives in the parent and the Hooks in the child.</li>
+                    </ul>
+                    <p>Create <code>src/pages/VolunteersPage.module.css</code>. The grid puts the outlet (the chosen person) and the list side by side when there is room; on a phone they stack, person first:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteersPage.module.css</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteersPage.module.css"><code class="language-css">.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+/* The chosen volunteer and the list side by side when there is room; on a phone the volunteer comes first */
+.layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* The volunteer you are looking at */
+.layout a[aria-current='page'] {
+  font-weight: 700;
+}</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: The nested route, the header link and typed params <span class="step-time">(10 min)</span></h3>
+                    <p>Create the child page, <code>src/pages/VolunteerPage.tsx</code> (singular):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteerPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteerPage.tsx"><code class="language-tsx">import { useParams } from 'react-router'
+import { getVolunteer } from '../api/client.ts'
+import type { Volunteer } from '../api/types.ts'
+import { Card } from '../components/Card.tsx'
+import { LoadStatus } from '../components/LoadStatus.tsx'
+import { useApi } from '../hooks/useApi.ts'
+import { formatDate } from '../utils/format.ts'
+import { skillLabels } from '../utils/skills.ts'
+import styles from './VolunteerPage.module.css'
+
+interface VolunteerDetailsProps {
+  volunteer: Volunteer
+}
+
+function VolunteerDetails({ volunteer }: VolunteerDetailsProps) {
+  const skills = volunteer.skills.map((skill) =&gt; skillLabels[skill])
+  return (
+    &lt;Card title={volunteer.name}&gt;
+      &lt;dl className={styles.details}&gt;
+        &lt;dt&gt;Email&lt;/dt&gt;
+        &lt;dd&gt;
+          &lt;a href={`mailto:${volunteer.email}`}&gt;{volunteer.email}&lt;/a&gt;
+        &lt;/dd&gt;
+        &lt;dt&gt;Phone&lt;/dt&gt;
+        &lt;dd&gt;{volunteer.phone ?? 'Not given'}&lt;/dd&gt;
+        &lt;dt&gt;Role&lt;/dt&gt;
+        &lt;dd&gt;{volunteer.role === 'organizer' ? 'Organizer' : 'Volunteer'}&lt;/dd&gt;
+        &lt;dt&gt;Skills&lt;/dt&gt;
+        &lt;dd&gt;{skills.length &gt; 0 ? skills.join(', ') : 'None listed yet'}&lt;/dd&gt;
+        &lt;dt&gt;Joined&lt;/dt&gt;
+        &lt;dd&gt;
+          &lt;time dateTime={volunteer.joinedOn}&gt;{formatDate(volunteer.joinedOn)}&lt;/time&gt;
+        &lt;/dd&gt;
+        &lt;dt&gt;Hours at cleanups&lt;/dt&gt;
+        &lt;dd&gt;{volunteer.hoursLogged}&lt;/dd&gt;
+      &lt;/dl&gt;
+    &lt;/Card&gt;
+  )
+}
+
+// The child route volunteers/:volunteerId: it shows up in VolunteersPage's &lt;Outlet /&gt;
+export function VolunteerPage() {
+  // Naming the parameter: a typo such as volunterId is now a type error
+  const { volunteerId } = useParams&lt;'volunteerId'&gt;()
+  if (volunteerId === undefined) {
+    throw new Error('VolunteerPage needs a route with a :volunteerId parameter')
+  }
+  const volunteer = useApi(`/volunteers/${volunteerId}`, (signal) =&gt;
+    getVolunteer(volunteerId, signal),
+  )
+
+  if (volunteer.state.kind !== 'ready') {
+    return &lt;LoadStatus state={volunteer.state} what="this volunteer" onRetry={volunteer.reload} /&gt;
+  }
+  return &lt;VolunteerDetails volunteer={volunteer.state.data} /&gt;
+}</code></pre>
+                    </div>
+                    <p>and its <code>src/pages/VolunteerPage.module.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/VolunteerPage.module.css</div>
+                        <pre data-src="shoreline-hq/src/pages/VolunteerPage.module.css"><code class="language-css">/* Label above value: easy to scan, and it fits a phone */
+.details dt {
+  font-weight: 700;
+}
+
+.details dd {
+  margin: 0 0 0.75rem;
+}</code></pre>
+                    </div>
+                    <p>A description list (<code>&lt;dl&gt;</code>) is the right element for label and value pairs, and screen readers announce it as a list. <code>volunteer.phone ?? 'Not given'</code> handles the <code>string | null</code> from the API (every third person has no phone in the sample data). Now add the routes in <code>src/App.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/App.tsx</div>
+                        <pre data-src="shoreline-hq/src/App.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { SitesPage } from './pages/SitesPage.tsx'
++import { VolunteerPage } from './pages/VolunteerPage.tsx'
++import { VolunteersPage } from './pages/VolunteersPage.tsx'
+ // ...
+           { path: 'sites', element: &lt;SitesPage /&gt; },
++          {
++            path: 'volunteers',
++            element: &lt;VolunteersPage /&gt;,
++            // Nested routes: they render inside VolunteersPage, at its &lt;Outlet /&gt;
++            children: [
++              { index: true, element: &lt;p&gt;Pick a name from the list to see their details.&lt;/p&gt; },
++              { path: ':volunteerId', element: &lt;VolunteerPage /&gt; },
++            ],
++          },
+           { path: 'sign-in', element: &lt;SignInPage /&gt; },</code></pre>
+                    </div>
+                    <p>An <code>element</code> can be any JSX, so the hint needs no component of its own. Then the header link comes back, for organizers only (Lesson 6.1 promised it would return with its page). In <code>src/components/Header.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/Header.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/Header.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import logoUrl from '../assets/logo.svg'
++import { useAuth } from '../auth/AuthContext.ts'
+ import styles from './Header.module.css'
+ import { UserMenu } from './UserMenu.tsx'
+
+ export function Header() {
++  const { isOrganizer } = useAuth()
++
+   return (
+ // ...
+           &lt;li&gt;&lt;NavLink to="/sites"&gt;Sites&lt;/NavLink&gt;&lt;/li&gt;
++          {isOrganizer &amp;&amp; &lt;li&gt;&lt;NavLink to="/volunteers"&gt;Volunteers&lt;/NavLink&gt;&lt;/li&gt;}
+         &lt;/ul&gt;</code></pre>
+                    </div>
+                    <p>Last, give <code>EventPage</code> the same typed parameter as <code>VolunteerPage</code>. In <code>src/pages/EventPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> export function EventPage() {
+-  const { eventId } = useParams()
++  const { eventId } = useParams&lt;'eventId'&gt;()</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 7: Try it as three people <span class="step-time">(5 min)</span></h3>
+                    <p>Signed out, open <code>/volunteers</code>: the header has no Volunteers link, and the page explains why there is no list (and asks the API for nothing). Sign in as Theo (<code>theo.nakamura@example.com</code>, a volunteer): still no link. Sign out and sign in as Maya:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_22/22-volunteers-guest.png" alt="Shoreline Crew HQ at slash volunteers, signed out. The header shows only Events and Sites. The page says Volunteers, then: The crew list has everyone&#x27;s contact details, so only organizers can see it. Sign in with an organizer account. Sign in is a link." width="1100" height="284" loading="lazy">
+                        <figcaption>Signed out (or signed in as a volunteer), the page explains itself and asks the API for nothing. The API would refuse anyway: hiding a page is not security.</figcaption>
+                    </figure>
+                    <ul>
+                        <li><strong>Volunteers</strong> in the header: "Found 24 people.", the first ten names A to J, "Page 1 of 3", and the hint in place of a card.</li>
+                        <li><strong>Next page →</strong>, then <strong>Lily Tran</strong>: the address is <code>/volunteers/v16?page=2</code>, her card shows, her name is bold, the list stays on page 2.</li>
+                        <li>Back twice: Lily's card goes, then page 1 again. Type <code>ma</code> in the search, then choose <strong>First aid</strong>: Amara Diallo and Maya Okafor, at <code>/volunteers?q=ma&amp;skill=first-aid</code>.</li>
+                        <li>Edit the address to <code>/volunteers/v99</code>: "Could not load this volunteer. Nothing was found at this address. Check the link."</li>
+                    </ul>
+                    <figure class="screenshot">
+                        <img src="images/lesson_22/22-volunteers-detail.png" alt="The Volunteers page signed in as Maya Okafor, at the address slash volunteers slash v16 question mark page equals 2. Under the search box and the Skill menu, a card for Lily Tran, outlined in red, lists her email, phone, role Volunteer, skill Photography, the day she joined and her hours. To the right, Found 24 people and ten names from Kwame Asante to Samuel Osei, with Lily Tran in bold, and the links Previous page, Page 2 of 3, Next page." width="1100" height="688" loading="lazy">
+                        <figcaption>One address, two routes: <code>volunteers</code> draws the search, the list and the pages; its child <code>:volunteerId</code> fills the <code>&lt;Outlet /&gt;</code> with Lily's card. <code>?page=2</code> rode along on the link, so the list did not jump back to page 1.</figcaption>
+                    </figure>
+                    <figure class="screenshot">
+                        <img src="images/lesson_22/22-volunteers-phone.png" alt="The Volunteers page on a phone in dark mode. Under the header, the search box and the Skill menu come first, then Amara Diallo&#x27;s card with her email, phone, skills First aid and Heavy lifting, down to her hours at cleanups; the list of names follows further down." width="390" height="844" loading="lazy">
+                        <figcaption>On a narrow screen the two parts stack, the chosen person first, so a tap on a name shows the card without scrolling down past the list.</figcaption>
+                    </figure>
+                    <p>Finish with the checks the HQ always passes:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 lint
+&gt; oxlint
+
+Found 0 warnings and 0 errors.
+Finished in 15ms on 56 files with 150 rules using 20 threads.
+
+&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 178 modules transformed.
+computing gzip size...
+dist/index.html                                            0.46 kB │ gzip:   0.30 kB
+dist/assets/outfit-latin-ext-wght-normal-DdQaqQDo.woff2   14.80 kB
+dist/assets/outfit-latin-wght-normal-Bc-8i84L.woff2       32.29 kB
+dist/assets/index-Ci91B_5U.css                             8.03 kB │ gzip:   2.52 kB
+dist/assets/index-CYefWx60.js                            383.33 kB │ gzip: 121.20 kB
+
+✓ built in 1.04s</code></pre>
+                    </div>
+                    <p><code>npx tsc -b</code> prints nothing when all is well. The JavaScript grew by about 9 kB (373.80 kB in Lesson 6.1), for two pages, a component and the helpers; your hashes and timings will differ.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>Searching and choosing a status on the events page change the address; a reload or a copied address shows the same list, and Back undoes a status change</li>
+                        <li>Typing in either search box keeps every letter and the cursor where you put it</li>
+                        <li>Organizers see Volunteers in the header; guests and volunteers see no link and no list on <code>/volunteers</code></li>
+                        <li>The crew list pages with links, and its search and skill filter live in the address (a new filter starts on page 1)</li>
+                        <li>Clicking a name opens that person's card beside the list without losing the page or the search, and their name is marked as current</li>
+                        <li><code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass with no errors or warnings</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> list the views of your Lesson 11.1 app that someone might want to share or bookmark (a search, a filter, a page, a selected item) and write the address each one should have. Mark which parts are paths (<code>/things/:id</code>) and which are search params.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 14 minutes together, included in the lesson time). Exercise 3 is an optional stretch, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: Predict the address</h3>
+                    <p>Start signed in as Maya on <code>/volunteers</code>. Before each action, write down the address you expect; then do it and compare. (a) <strong>Next page →</strong>. (b) Click Kwame Asante. (c) <strong>Next page →</strong> again. (d) Type <code>ma</code> in the search. (e) Back.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Name links keep the search and change the path; page links keep the path and change the search; typing replaces the current history entry and drops <code>page</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>(a) <code>/volunteers?page=2</code>. (b) <code>/volunteers/v09?page=2</code>. (c) <code>/volunteers/v09?page=3</code>: Kwame's card stays open while the list shows page 3. (d) <code>/volunteers/v09?q=ma</code>: the page number is gone and the card stays. (e) Typing replaced the entry from (c), so Back goes to (b), <code>/volunteers/v09?page=2</code>. If (e) surprised you, that is <code>replace</code> doing its job: the letters you typed never became places to go back to.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: A Close link for the card</h3>
+                    <p>Add a <strong>Close</strong> link under the volunteer's card that goes back to the list at <code>/volunteers</code>, keeping the page and the search. Do not write <code>/volunteers</code> anywhere in <code>VolunteerPage</code>.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>In a route's links, <code>..</code> means "the parent route". <code>useLocation()</code> gives you the current <code>search</code> (with its <code>?</code>), which <code>to={{ pathname, search }}</code> accepts as it is.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import { Link, useLocation, useParams } from 'react-router'
+// ...
+// The child route volunteers/:volunteerId: it shows up in VolunteersPage's &lt;Outlet /&gt;
+export function VolunteerPage() {
+  // Naming the parameter: a typo such as volunterId is now a type error
+  const { volunteerId } = useParams&lt;'volunteerId'&gt;()
+  if (volunteerId === undefined) {
+    throw new Error('VolunteerPage needs a route with a :volunteerId parameter')
+  }
+  const volunteer = useApi(`/volunteers/${volunteerId}`, (signal) =&gt;
+    getVolunteer(volunteerId, signal),
+  )
+
+  const { search } = useLocation()
+
+  return (
+    &lt;div&gt;
+      {volunteer.state.kind === 'ready' ? (
+        &lt;VolunteerDetails volunteer={volunteer.state.data} /&gt;
+      ) : (
+        &lt;LoadStatus state={volunteer.state} what="this volunteer" onRetry={volunteer.reload} /&gt;
+      )}
+      {/* .. is the parent route (/volunteers); the search keeps the list as it was */}
+      &lt;Link to={{ pathname: '..', search }}&gt;Close&lt;/Link&gt;
+    &lt;/div&gt;
+  )
+}</code></pre>
+                        <p>Measured: from <code>/volunteers/v11?page=2</code> (Ravi Patel), <strong>Close</strong> went to <code>/volunteers?page=2</code>, with the hint back and the list still on page 2. Because <code>..</code> is relative to the route, the page would keep working if the crew moved to <code>/crew</code>. The course's code continues without this change.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): A page that is not there</h3>
+                    <p>Optional stretch, not counted in the lesson time. Open <code>/volunteers?page=9</code>: "Nobody on the crew matches your search." and "Page 9 of 3", which is confusing. Make <code>Pagination</code> say so when the page is past the end, with a link to the last page.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Compare <code>page.page</code> with <code>page.totalPages</code>, and reuse <code>linkTo</code> for the link.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">// Page 1 is the default: it needs no ?page= at all
+function linkTo(pageNumber: number) {
+  const value = pageNumber === 1 ? '' : String(pageNumber)
+  return { search: withParam(searchParams, 'page', value).toString() }
+}
+
+// An old link or a typed address can ask for a page that no longer exists
+if (page.page &gt; page.totalPages &amp;&amp; page.totalPages &gt; 0) {
+  return (
+    &lt;p&gt;
+      There is no page {page.page}.{' '}
+      &lt;Link to={linkTo(page.totalPages)}&gt;Go to page {page.totalPages}, the last one&lt;/Link&gt;
+    &lt;/p&gt;
+  )
+}</code></pre>
+                        <p>Measured: <code>/volunteers?page=9</code> showed "There is no page 9." and the link went to <code>/volunteers?page=3</code> (the last four names, Sofia Lindgren to Zoe Castillo). It type-checks and lints cleanly. Not in the course's code. A different design would quietly redirect to the last page; Lesson 6.3's loaders can do that before anything renders.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> On the events page you type <code>pelican</code>, then choose <strong>Completed</strong>, then press Back once. What is the address?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Back undoes one history entry. Did the status change add one, and did the typing?">
+                                A) <code>/events</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The status change pushed a new entry, so Back removes it. The typing replaced entries instead of adding them, so the search stays and the menu shows All statuses again.">
+                                B) <code>/events?q=pelican</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Typing uses replace: true. Do the letters become places to go back to?">
+                                C) <code>/events?q=pelica</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Back never stays on the same entry. Which entry came before this one?">
+                                D) <code>/events?q=pelican&amp;status=completed</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> What is the type of <code>searchParams.get('status')</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Can TypeScript know which values someone typed into the address bar?">
+                                A) <code>StatusFilter</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="What does get return when the name is not in the address at all?">
+                                B) <code>string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="That is what useParams gives for a parameter. URLSearchParams is a browser class with its own convention for missing values.">
+                                C) <code>string | undefined</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="URLSearchParams.get returns the text of the first value with that name, or null when there is none. The HQ narrows it with readParam and a type predicate before using it as a StatusFilter.">
+                                D) <code>string | null</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> On <code>/volunteers/v16</code>, where does <code>VolunteerPage</code> appear on screen?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The :volunteerId route is a child of the volunteers route, so it renders at the Outlet inside VolunteersPage. The search, the list and the layout stay mounted around it.">
+                                A) At the <code>&lt;Outlet /&gt;</code> inside <code>VolunteersPage</code>, beside the list
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Look at where the route sits in the route list: whose children are its siblings?">
+                                B) At <code>AppLayout</code>'s <code>&lt;Outlet /&gt;</code>, in place of <code>VolunteersPage</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Routes render where an Outlet is. What did the measurement show without one?">
+                                C) Wherever React Router finds room at the end of the page
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> In the HQ (data mode), you write <code>href('/volunters/:volunteerId', { volunteerId: 'v04' })</code>. What does <code>npx tsc -b</code> report?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="To know that a path is wrong, TypeScript needs the list of all paths. Who writes that list, and in which mode?">
+                                A) That <code>'/volunters/:volunteerId'</code> is not one of the app's routes
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The parameter name in the pattern and in the object match here. Look at the path itself.">
+                                B) That <code>volunteerId</code> is missing
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="href only checks paths against the route list that framework mode generates. In data mode it accepts any string, so the typo compiles and the link leads to Page not found. The measurement showed exactly that.">
+                                C) Nothing: in data mode <code>href</code> accepts any path, so the link would lead to "Page not found"
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> Why does the events search box call <code>setSearchParams</code> with <code>flushSync: true</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="React Router applies its updates as transitions, which can wait. A text box whose value comes from the address then shows a stale value for a moment, so the cursor jumps and fast letters are lost. flushSync applies that one update immediately.">
+                                A) Router updates run as low-priority transitions; without it the box lost letters and the cursor jumped to the end
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The search still goes through useDebouncedValue. Which option controls history, and which one controls timing?">
+                                B) So that each letter becomes its own history entry
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Count the requests: the debounce decides that, not the router.">
+                                C) So the API receives a request for every letter
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The focus effect from Lesson 6.1 watches only the path. Did the path change?">
+                                D) To stop the layout from moving the focus to the main content
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Why not keep the search in <code>useState</code> and copy it into the address?</summary>
+                    <p>Then there are two copies that can disagree, and you must keep them in sync in both directions: state to address when typing, address to state when someone presses Back or opens a link. Each direction is an effect, and each effect is a place for bugs. Reading straight from the address has one copy. The price is the <code>flushSync</code> option on the text box, which is cheaper than two effects.</p>
+                </details>
+                <details>
+                    <summary>Can I put an array or an object in the address?</summary>
+                    <p>Arrays, yes: repeat the name (<code>?skill=first-aid&amp;skill=photography</code>), write with <code>append</code> and read with <code>getAll</code>. Objects are better spread over several plain names (<code>?from=…&amp;to=…</code>) than squeezed into JSON, which makes long, unreadable, easy-to-break addresses. Keep the address short enough to read aloud; it is part of your app's interface.</p>
+                </details>
+                <details>
+                    <summary>Should the child route get its data from the parent instead of fetching it again?</summary>
+                    <p>It could: <code>&lt;Outlet context={value} /&gt;</code> hands a value to whatever child renders there, and the child reads it with <code>useOutletContext&lt;T&gt;()</code> (TypeScript cannot check that the parent really passed a <code>T</code>, so wrap it in a typed Hook if you use it). The HQ fetches in <code>VolunteerPage</code> because the list holds only one page of the crew: someone opening <code>/volunteers/v16</code> from a bookmark might be on page 1 while Lily is on page 2. The child that fetches its own data works from any address.</p>
+                </details>
+                <details>
+                    <summary>Is there a way to keep all the HQ's addresses in one place?</summary>
+                    <p>Yes. Some teams keep a small module of path builders, each made with <code>generatePath</code> so parameter names are checked, and use it for every link. This version type-checks and lints cleanly in the HQ:</p>
+                    <pre data-snippet><code class="language-ts">import { generatePath } from 'react-router'
+
+// Every address the HQ links to, in one place
+export const paths = {
+  events: '/events',
+  newEvent: '/events/new',
+  event: (eventId: string) =&gt; generatePath('/events/:eventId', { eventId }),
+  volunteers: '/volunteers',
+  volunteer: (volunteerId: string) =&gt; generatePath('/volunteers/:volunteerId', { volunteerId }),
+} as const
+
+// &lt;Link to={paths.event(event.id)}&gt;  instead of  &lt;Link to={`/events/${event.id}`}&gt;</code></pre>
+                    <p>A typo in a <em>name</em> then fails in one place, and moving a page means changing one line. It still cannot prove that <code>/events/:eventId</code> is in the route list; only framework mode's generated types do that. For an app the size of the HQ, relative links and typed <code>useParams</code> carry most of the benefit, so the course's code does not add this module (the Going Further challenge does).</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Create <code>src/paths.ts</code> from the FAQ and use it for every link that has a parameter (<code>EventCard</code>'s title link is the first). Then misspell <code>eventId</code> inside it and run <code>npx tsc -b</code>: one error, in one file, instead of a broken link somewhere in the app. Bonus: add <code>volunteers(search?: string)</code> that builds <code>/volunteers?…</code> from a <code>URLSearchParams</code>, and decide whether that is clearer than the <code>{ pathname, search }</code> objects you wrote today.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Take one address from today, such as <code>/volunteers/v16?q=ma&amp;page=2</code>, and label every part: which route matches which segment, which component reads which parameter, and what each one becomes in TypeScript. Then write one sentence about a time a type "sounded safe" and was not (today's <code>href</code>, or one from your own experience).</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>State that people want to keep, share or go Back to (filters, search, page numbers, the open item) belongs in the address; private or temporary state stays in components</li>
+                        <li><code>useSearchParams</code> returns a <code>URLSearchParams</code> and a setter; every value is <code>string | null</code>, so narrow it with a type predicate instead of an <code>as</code></li>
+                        <li>Change one name on a copy of the current params, leave defaults out of the address, push for choices and <code>replace</code> for typing, and add <code>flushSync</code> for a text box</li>
+                        <li>A route's <code>children</code> render at that route's <code>&lt;Outlet /&gt;</code>; an index child covers "nothing chosen yet"; the parent stays mounted while children change</li>
+                        <li>Links resolve relative to their route; pass <code>{ pathname, search }</code> to keep the query, and <code>{ search }</code> to keep the path</li>
+                        <li><code>useParams&lt;'name'&gt;()</code> and <code>generatePath</code> check parameter names; <code>href()</code> checks only in framework mode</li>
+                        <li>Hiding a page from some users is courtesy; the API's 401 and 403 are the protection</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up React patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Check the volunteers endpoints and their filters</td><td><a href="api.html">The shoreline-api reference</a></td></tr>
+                            <tr><td>Read about the browser's query string class</td><td><a href="https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams" target="_blank" rel="noopener">MDN: URLSearchParams</a></td></tr>
+                            <tr><td>Read React Router's documentation (choose data mode)</td><td><a href="https://reactrouter.com/" target="_blank" rel="noopener">reactrouter.com</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>The events filters survive reloads, work with Back and can be shared as a link</li>
+                        <li>You turned untrusted text from the address into typed values with one small generic helper</li>
+                        <li>The HQ has its crew page, with search, a skill filter and pages, all in the address</li>
+                        <li>You built your first nested route: a detail panel inside a list page, with the current person marked</li>
+                        <li>You tested what React Router's types really check, instead of trusting a function's name</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>Every page in the HQ still renders first and fetches afterwards, so it flashes "Loading…" and Back cannot restore the scroll position of a list that is not there yet. In <a href="lesson_23.html"><strong>Lesson 6.3: Data Loading and Protected Routes</strong></a> routes load their data before they render, with loaders and actions, and the Volunteers page and the planning form become protected routes that send people to the sign-in page and back again.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass</li>
+                    <li>Signed out, open <code>/events/new</code> by typing the address. The planning form appears for anyone: notice that, it is next lesson's problem</li>
+                    <li>Keep your list of shareable addresses for your Lesson 11.1 plan</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Today had a few moments where the obvious line was wrong: a <code>get</code> that does not return your type, a search box that lost letters, a function called <code>href</code> that checks nothing in this mode. Each time, the fix came from looking closely: reading the error, measuring the behavior, testing the claim. That habit is worth more than any single API, and you are building it lesson by lesson. If nested routes still feel slippery, draw the route tree once more and trace one address through it; it clicks with practice.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_21.html" class="prev-lesson">← Previous: React Router 8</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_23.html" class="next-lesson">Next: Data Loading and Protected Routes →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

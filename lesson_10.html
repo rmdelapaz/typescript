@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Give components memory with useState, type state and event handlers, update state without mutating it, lift shared state to the closest common parent and derive everything else. Add search and a status filter to Shoreline Crew HQ's events page. React + TypeScript: Build a Modern Web App Lesson 3.4.">
+    <meta name="author" content="Ray de la Paz">
+    <title>State and Events - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+            <header>
+                <h1>🎛️ Lesson 3.4: State and Events</h1>
+                <p class="lead">Until now, Shoreline Crew HQ has been a beautifully typed poster: it draws the data it was given and then sits still. Today it starts to listen. You will give components a memory with <code>useState</code>, answer clicks and keystrokes with typed event handlers, and learn the two questions that decide where every piece of state belongs. By the end, organizers can search the events page and filter it by status, and every card can open its own details.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Explain why a plain variable cannot remember anything between renders, and give a component state with <code>useState</code></li>
+                        <li>Handle clicks, typing and menu changes with typed event handlers such as <code>ChangeEvent&lt;HTMLInputElement&gt;</code>, and pass a function instead of calling it</li>
+                        <li>Choose when <code>useState&lt;T&gt;</code> needs a type argument: unions, empty arrays and "nothing yet" values</li>
+                        <li>Update state from a snapshot or with an updater function, and copy objects and arrays instead of changing them</li>
+                        <li>Lift shared state to the closest common parent, pass it down as props with callback props for changes, and derive everything else</li>
+                        <li>Add search, a status filter and per-card details to the HQ's events page, plus readable dates with a <code>formatDate</code> helper</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 150 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_09.html">Lesson 3.3: Lists and Conditional Rendering</a> (your <code>shoreline-hq</code> with the events page)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A search box, a status filter and a "Clear filters" button for the events page, a live count of what is showing, "Show details" on every event card, and dates people can read</li>
+                    <li><span class="meta-label">🧩 Stack</span> React 19.3, TypeScript 7.0, Vite 8.3 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api and the dev server running in two terminals</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-10-start.zip">lesson-10-start.zip</a> · Finished code: <a href="downloads/lesson-10-end.zip">lesson-10-end.zip</a>. Each folder has a README with the commands to run it. Copy <code>.env.example</code> to <code>.env.local</code> in <code>shoreline-hq</code> before <code>npm run dev</code>.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#state" class="toc-link">Giving a Component a Memory</a></li>
+                        <li><a href="#events" class="toc-link">Typed Event Handlers</a></li>
+                        <li><a href="#typing-state" class="toc-link">When useState Needs a Type</a></li>
+                        <li><a href="#updating" class="toc-link">Updating State the React Way</a></li>
+                        <li><a href="#lifting" class="toc-link">Where State Lives: Lifting and Deriving</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: Search and Filters for the Events Page</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="state" class="lesson-section">
+                <h2>🧠 Giving a Component a Memory</h2>
+                <p>A component is a function React calls whenever it needs to know what the screen should look like. That is why everything you have built so far is still: the function runs, returns elements, and is done. To count check-ins at the welcome table, a component would have to <em>remember</em> a number between one run and the next. Create <code>src/Scratch.tsx</code> in <code>shoreline-hq</code> (your experiment file for this lesson) and try the obvious approach, a plain variable:</p>
+                <pre data-snippet><code class="language-tsx">export function CheckInCounter() {
+  let checkedIn = 0
+
+  function handleClick() {
+    checkedIn = checkedIn + 1
+    console.log(checkedIn)
+  }
+
+  return (
+    &lt;&gt;
+      &lt;p&gt;{checkedIn} checked in&lt;/p&gt;
+      &lt;button type="button" onClick={handleClick}&gt;
+        Check in one more
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p><code>npx tsc -b</code> is happy: the types are fine. Rendered in the browser and clicked three times, the console prints <code>1</code>, <code>2</code> and <code>3</code>, but the page still says <strong>0 checked in</strong>. Two things went wrong. Changing a variable does not tell React anything, so nothing is drawn again. And even if something else made React draw this component again, the function would start from the top and run <code>let checkedIn = 0</code>. Local variables live for one render, and are gone after it.</p>
+                <p>The linter already knows this pattern. <code>npm run lint</code> prints two warnings; the first one:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npm run lint, first warning)</h4>
+                    <pre><code>  ⚠ react(immutability): Cannot reassign variable after render completes
+   ╭─[src/Scratch.tsx:5:5]
+ 1 │ export function CheckInCounter() {
+ 2 │   let checkedIn = 0
+   ·       ────┬────
+   ·           ╰── `checkedIn` is declared here
+ 3 │
+ 4 │   function handleClick() {
+ 5 │     checkedIn = checkedIn + 1
+   ·     ────┬────
+   ·         ╰── Cannot reassign `checkedIn` after render completes
+ 6 │     console.log(checkedIn)
+   ╰────
+  help: Reassigning `checkedIn` after render has completed can cause inconsistent behavior on subsequent renders. Consider using state instead
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/immutability
+...
+Found 2 warnings and 0 errors.</code></pre>
+                </div>
+                <p>"Consider using state instead" is exactly the fix. <strong>State</strong> is data React keeps for a component between renders. You ask for it with the <code>useState</code> Hook:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+export function CheckInCounter() {
+  const [checkedIn, setCheckedIn] = useState(0)
+
+  return (
+    &lt;&gt;
+      &lt;p&gt;{checkedIn} checked in&lt;/p&gt;
+      &lt;button type="button" onClick={() =&gt; setCheckedIn(checkedIn + 1)}&gt;
+        Check in one more
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p>Clicked three times, this one says <strong>3 checked in</strong>. Read the important line from the right:</p>
+                <ul>
+                    <li><code>useState(0)</code> asks React for a piece of state whose first value is <code>0</code>.</li>
+                    <li>It returns a pair, which you unpack with array destructuring: the <strong>current value</strong> (<code>checkedIn</code>) and a <strong>setter</strong> (<code>setCheckedIn</code>). The names are yours; the convention is <code>thing</code> and <code>setThing</code>.</li>
+                    <li>Calling the setter does two things: React stores the new value, and it schedules a <strong>re-render</strong>. On that next render, <code>useState(0)</code> returns the stored value instead of <code>0</code>; the initial value is only used the very first time.</li>
+                </ul>
+                <p>TypeScript inferred everything from the <code>0</code>. Hover over the two names in VS Code: <code>checkedIn</code> is a <code>number</code> and <code>setCheckedIn</code> is a <code>Dispatch&lt;SetStateAction&lt;number&gt;&gt;</code>, React's name for "a function you call with a new number (or with a function that works one out, as you will see shortly)".</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the roster on the clipboard</h4>
+                    <p>At a cleanup, the organizer at the welcome table keeps a clipboard. Volunteers come and go, the organizer walks off for coffee and comes back, but the clipboard still says who has checked in. State is that clipboard: React holds it for your component, hands you what it says each time the component is drawn (<code>checkedIn</code>), and gives you one pen to change it (<code>setCheckedIn</code>). Writing on your palm (a local variable) does not count: it washes off at the next render.</p>
+                </div>
+                <div class="mermaid">
+graph TD
+    A["Click: Check in one more"] --> B["setCheckedIn(1)"]
+    B --> C["React stores 1"]
+    C --> D["React calls the component again"]
+    D --> E["useState returns 1"]
+    E --> F["React updates the page"]
+</div>
+                <h3>The Rules of Hooks</h3>
+                <p>Functions whose names start with <code>use</code> are <strong>Hooks</strong>. React tells your component's state apart by the <em>order</em> in which Hooks are called during a render: the first <code>useState</code> call gets the first stored value, the second gets the second. So two rules keep that order the same every time:</p>
+                <ol>
+                    <li>Call Hooks at the top level of a component, before any early <code>return</code>, never inside an <code>if</code>, a loop or a nested function.</li>
+                    <li>Call Hooks only from components (or from your own Hooks, Lesson 4.2), never from plain functions.</li>
+                </ol>
+                <p>You do not have to memorize them: the template's <code>.oxlintrc.json</code> turns on <code>react/rules-of-hooks</code> as an <em>error</em>, and you will see its message in the Common Mistakes.</p>
+                <div class="card card-info">
+                    <h4>💡 Why this matters</h4>
+                    <p>Every interactive screen you will build, in any React job, is state plus events: a search box, a "remember me" checkbox, an open menu, a shopping cart. The questions this lesson trains (what is the state, who owns it, what can be worked out from it) are the ones senior developers ask in design reviews, and most "it shows the wrong thing" bugs come from getting one of them wrong.</p>
+                </div>
+            </section>
+
+            <section id="events" class="lesson-section">
+                <h2>🖱️ Typed Event Handlers</h2>
+                <p>You have already handed React a function to call later: <code>onClick={() =&gt; setCheckedIn(checkedIn + 1)}</code>. Event props are named in camelCase (<code>onClick</code>, <code>onChange</code>, <code>onKeyDown</code>, <code>onFocus</code>, <code>onBlur</code>), and their value is a <strong>function</strong>, not a string of code as in old HTML. React calls it when the event happens and passes it an event object. Here is a search box with a named handler:</p>
+                <pre data-snippet><code class="language-tsx">import { useState, type ChangeEvent } from 'react'
+
+export function SearchBox() {
+  const [query, setQuery] = useState('')
+
+  function handleChange(event: ChangeEvent&lt;HTMLInputElement&gt;) {
+    setQuery(event.target.value)
+  }
+
+  return (
+    &lt;&gt;
+      &lt;label htmlFor="search"&gt;Search&lt;/label&gt;
+      &lt;input id="search" value={query} onChange={handleChange} /&gt;
+      &lt;p&gt;Searching for: {query}&lt;/p&gt;
+      &lt;button type="button" onClick={() =&gt; setQuery('')}&gt;
+        Clear
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p>Three things to notice:</p>
+                <ul>
+                    <li><code>onChange={handleChange}</code> passes the function itself. Writing <code>handleChange()</code> would call it immediately, while drawing; the Common Mistakes show what that does.</li>
+                    <li>The handler's parameter is typed <code>ChangeEvent&lt;HTMLInputElement&gt;</code>, imported with <code>type</code> from <code>react</code>. The type argument says which element fired the event, so <code>event.target</code> is an <code>HTMLInputElement</code> and <code>event.target.value</code> is a <code>string</code>.</li>
+                    <li>React's <code>onChange</code> fires on <em>every keystroke</em>, not only when the field loses focus as the browser's own <code>change</code> event does. That is what makes live search possible.</li>
+                </ul>
+                <h3>Inline handlers get their types for free</h3>
+                <p>The Clear button's handler is an arrow function written right in the prop. You did not annotate anything, and you do not need to: this is the contextual typing from Lesson 2.3. TypeScript knows what <code>onClick</code> and <code>onChange</code> on these elements expect, so a callback written in place gets its parameter type from there. Hover over <code>event</code> in <code>onChange={(event) =&gt; setQuery(event.target.value)}</code> and VS Code shows <code>ChangeEvent&lt;HTMLInputElement, HTMLInputElement&gt;</code>.</p>
+                <p>A <em>named</em> function is written somewhere else, so it has no context. Leave its parameter unannotated and TypeScript refuses to guess:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b, <code>function handleChange(event) {</code>)</h4>
+                    <pre><code>src/Scratch.tsx:6:25 - error TS7006: Parameter 'event' implicitly has an 'any' type.
+
+6   function handleChange(event) {
+                          ~~~~~
+
+
+Found 1 error in src/Scratch.tsx:6</code></pre>
+                </div>
+                <p>TS7006 is the same message you met with untyped parameters in Lesson 2.1. The course's habit: inline arrows for one-liners (types come free), named handlers with an annotated event when the handler does more. And if you annotate the wrong element, the message tells you exactly which events do not fit:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b, <code>ChangeEvent&lt;HTMLSelectElement&gt;</code> on an input, trimmed)</h4>
+                    <pre><code>src/Scratch.tsx:13:40 - error TS2322: Type '(event: ChangeEvent&lt;HTMLSelectElement, Element&gt;) =&gt; void' is not assignable to type 'ChangeEventHandler&lt;HTMLInputElement, HTMLInputElement&gt;'.
+  Types of parameters 'event' and 'event' are incompatible.
+    Type 'ChangeEvent&lt;HTMLInputElement, HTMLInputElement&gt;' is not assignable to type 'ChangeEvent&lt;HTMLSelectElement, Element&gt;'.
+      Type 'HTMLInputElement' is missing the following properties from type 'HTMLSelectElement': length, options, selectedIndex, selectedOptions, and 4 more.
+
+13       &lt;input id="search" value={query} onChange={handleChange} /&gt;
+                                          ~~~~~~~~
+...</code></pre>
+                </div>
+                <p>Read it from the bottom up: an input element is not a select element (it lacks <code>options</code>, <code>selectedIndex</code> and more), so a handler for select changes cannot handle input changes.</p>
+                <h3>The event types you will use most</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Prop</th><th>Element</th><th>Handler parameter type</th><th>What you usually read</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>onChange</code></td><td>text, search, number, date input</td><td><code>ChangeEvent&lt;HTMLInputElement&gt;</code></td><td><code>event.target.value</code> (always a <code>string</code>)</td></tr>
+                            <tr><td><code>onChange</code></td><td>checkbox input</td><td><code>ChangeEvent&lt;HTMLInputElement&gt;</code></td><td><code>event.target.checked</code> (a <code>boolean</code>)</td></tr>
+                            <tr><td><code>onChange</code></td><td><code>&lt;select&gt;</code></td><td><code>ChangeEvent&lt;HTMLSelectElement&gt;</code></td><td><code>event.target.value</code> (a <code>string</code>)</td></tr>
+                            <tr><td><code>onChange</code></td><td><code>&lt;textarea&gt;</code></td><td><code>ChangeEvent&lt;HTMLTextAreaElement&gt;</code></td><td><code>event.target.value</code></td></tr>
+                            <tr><td><code>onClick</code></td><td><code>&lt;button&gt;</code></td><td><code>MouseEvent&lt;HTMLButtonElement&gt;</code></td><td>often nothing: <code>() =&gt; ...</code></td></tr>
+                            <tr><td><code>onKeyDown</code></td><td>any focusable element</td><td><code>KeyboardEvent&lt;HTMLInputElement&gt;</code> (or the element)</td><td><code>event.key</code>, such as <code>'Escape'</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>These are React's own types, imported from <code>react</code> (<code>import type { ChangeEvent, MouseEvent } from 'react'</code>), not the DOM's global <code>MouseEvent</code>. React wraps each browser event in a <em>synthetic event</em> that works the same in every browser; the original is still there as <code>event.nativeEvent</code> if you ever need it. Forms and their submit events are Lesson 3.5's subject.</p>
+                <div class="card card-info">
+                    <h4>🧩 Version note: two type arguments on ChangeEvent</h4>
+                    <p>With <code>@types/react</code> 19.3, hovers and error messages show <code>ChangeEvent&lt;HTMLInputElement, HTMLInputElement&gt;</code>: the second argument describes <code>event.target</code>. You only ever need to write the first one, and articles written before this change show only one.</p>
+                </div>
+            </section>
+
+            <section id="typing-state" class="lesson-section">
+                <h2>🏷️ When useState Needs a Type</h2>
+                <p><code>useState</code> is a generic function, like the <code>first&lt;T&gt;</code> you wrote in Lesson 2.3: its declaration is <code>useState&lt;S&gt;(initialState: S)</code>, and TypeScript usually infers <code>S</code> from the initial value. <code>useState('')</code> is <code>string</code> state, <code>useState(0)</code> is <code>number</code>, <code>useState(false)</code> is <code>boolean</code>. Inference falls short in three situations.</p>
+                <h3>1. The state is one of a few words</h3>
+                <p>The events page's status filter can be <code>'all'</code> or one of the four <code>EventStatus</code> words. Let inference handle it and this compiles without a murmur:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+export function StatusPicker() {
+  const [status, setStatus] = useState('all')
+
+  return (
+    &lt;button type="button" onClick={() =&gt; setStatus('finished')}&gt;
+      Showing: {status}
+    &lt;/button&gt;
+  )
+}</code></pre>
+                <p><code>'finished'</code> is not a status, but <code>useState('all')</code> made the state a plain <code>string</code>, so any string is welcome. (A <code>let</code> widens a literal the same way, Lesson 2.1.) Write the union as a type argument and TypeScript holds every update to it:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+import type { EventStatus } from './api/types.ts'
+
+type StatusFilter = EventStatus | 'all'
+
+export function StatusPicker() {
+  const [status, setStatus] = useState&lt;StatusFilter&gt;('all')
+
+  return (
+    &lt;button type="button" onClick={() =&gt; setStatus('finished')}&gt;
+      Showing: {status}
+    &lt;/button&gt;
+  )
+}</code></pre>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b)</h4>
+                    <pre><code>src/Scratch.tsx:10:52 - error TS2345: Argument of type '"finished"' is not assignable to parameter of type 'SetStateAction&lt;StatusFilter&gt;'.
+
+10     &lt;button type="button" onClick={() =&gt; setStatus('finished')}&gt;
+                                                      ~~~~~~~~~~
+
+
+Found 1 error in src/Scratch.tsx:10</code></pre>
+                </div>
+                <p><code>SetStateAction&lt;StatusFilter&gt;</code> is what the setter accepts: a <code>StatusFilter</code>, or a function that returns one. This is the <code>useState&lt;T&gt;</code> Lesson 2.3 promised.</p>
+                <h3>2. The state starts as an empty array</h3>
+                <p>An empty array tells TypeScript nothing about what will go in it. <code>useState([])</code> infers <code>never[]</code>, an array that can hold nothing at all, and the first time you add an id:</p>
+                <div class="card card-output">
+                    <h4>Expected output (npx tsc -b, <code>useState([])</code>, first error)</h4>
+                    <pre><code>src/Scratch.tsx:7:55 - error TS2322: Type 'string' is not assignable to type 'never'.
+
+7     &lt;button type="button" onClick={() =&gt; setSavedIds([...savedIds, 'e08'])}&gt;
+                                                        ~~~~~~~~~~~</code></pre>
+                </div>
+                <p>Say what the array will hold: <code>useState&lt;string[]&gt;([])</code>.</p>
+                <h3>3. The state starts as "nothing yet"</h3>
+                <p>A selected event does not exist until someone selects one. <code>useState(null)</code> would infer the type <code>null</code> forever; write both possibilities: <code>useState&lt;CleanupEvent | null&gt;(null)</code>. Then TypeScript makes you check for <code>null</code> before reading <code>.title</code>, as in Lesson 3.3's conditional rendering. All four kinds side by side:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+import type { CleanupEvent, EventStatus } from './api/types.ts'
+
+type StatusFilter = EventStatus | 'all'
+
+export function StateExamples() {
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState&lt;StatusFilter&gt;('all')
+  const [savedIds, setSavedIds] = useState&lt;string[]&gt;([])
+  const [selected, setSelected] = useState&lt;CleanupEvent | null&gt;(null)
+
+  return (
+    &lt;&gt;
+      &lt;input aria-label="Search" value={query} onChange={(event) =&gt; setQuery(event.target.value)} /&gt;
+      &lt;button type="button" onClick={() =&gt; setStatus('completed')}&gt;
+        {status}
+      &lt;/button&gt;
+      &lt;button type="button" onClick={() =&gt; setSavedIds([...savedIds, 'e08'])}&gt;
+        {savedIds.length} saved
+      &lt;/button&gt;
+      &lt;button type="button" onClick={() =&gt; setSelected(null)}&gt;
+        {selected ? selected.title : 'Nothing selected'}
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Initial value</th><th>Write</th><th>State type</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A string, number or boolean</td><td><code>useState('')</code></td><td>inferred: <code>string</code></td></tr>
+                            <tr><td>One word of a union</td><td><code>useState&lt;StatusFilter&gt;('all')</code></td><td><code>StatusFilter</code></td></tr>
+                            <tr><td>An empty array</td><td><code>useState&lt;string[]&gt;([])</code></td><td><code>string[]</code></td></tr>
+                            <tr><td>Nothing yet</td><td><code>useState&lt;CleanupEvent | null&gt;(null)</code></td><td><code>CleanupEvent | null</code></td></tr>
+                            <tr><td>An object of a known shape</td><td><code>useState&lt;Filters&gt;({ ... })</code></td><td><code>Filters</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Annotate the edges, as in Lesson 2.1: the type argument is the edge of the state, and everything that reads it inherits the type.</p>
+            </section>
+
+            <section id="updating" class="lesson-section">
+                <h2>🔁 Updating State the React Way</h2>
+                <h3>Each render sees a snapshot</h3>
+                <p>The value <code>useState</code> hands you is a snapshot of the state <em>for this render</em>. Calling the setter does not change your variable; it asks for a new render in which <code>useState</code> returns the new value. That leads to a classic surprise:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+export function BagCounter() {
+  const [bags, setBags] = useState(0)
+
+  function addThreeWrong() {
+    setBags(bags + 1)
+    setBags(bags + 1)
+    setBags(bags + 1)
+  }
+
+  function addThree() {
+    setBags((current) =&gt; current + 1)
+    setBags((current) =&gt; current + 1)
+    setBags((current) =&gt; current + 1)
+  }
+
+  return (
+    &lt;&gt;
+      &lt;p&gt;Bags: {bags}&lt;/p&gt;
+      &lt;button type="button" onClick={addThreeWrong}&gt;
+        Add 3 (wrong)
+      &lt;/button&gt;
+      &lt;button type="button" onClick={addThree}&gt;
+        Add 3
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p>Starting from 0, a click on <strong>Add 3 (wrong)</strong> shows <strong>Bags: 1</strong>. All three calls read the same snapshot, <code>bags</code> is <code>0</code> in all of them, so all three say "make it 1". A click on <strong>Add 3</strong> then shows <strong>Bags: 4</strong>: each call passes an <strong>updater function</strong>, and React runs them one after another, feeding each one the result of the previous one (1 + 1, 2 + 1, 3 + 1).</p>
+                <p>The rule of thumb: when the new value depends on the old one, pass a function: <code>setBags((current) =&gt; current + 1)</code>, <code>setShowDetails((shown) =&gt; !shown)</code>. TypeScript types <code>current</code> from the state, so there is nothing to annotate. When the new value does not depend on the old one (<code>setQuery('')</code>, <code>setStatus('all')</code>), pass the value.</p>
+                <h3>Objects and arrays: copy, don't change</h3>
+                <p>React decides whether anything changed by comparing the old and new value with <code>Object.is</code>: for objects and arrays, "is it the same object?". If you change an array in place and hand the same array back, React sees the same array and does nothing:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+export function SavedEvents() {
+  const [savedIds, setSavedIds] = useState&lt;string[]&gt;([])
+
+  function save(id: string) {
+    savedIds.push(id)
+    setSavedIds(savedIds)
+  }
+
+  return (
+    &lt;button type="button" onClick={() =&gt; save('e08')}&gt;
+      {savedIds.length} saved
+    &lt;/button&gt;
+  )
+}</code></pre>
+                <p>Clicked three times, the button still says <strong>0 saved</strong>, although the array now holds three ids. <code>npx tsc -b</code> and <code>npm run lint</code> both pass this code without a word, so this is a habit to build, not something a tool will catch for you. Make a <em>new</em> array or object instead, with the same non-mutating tools as in Lesson 3.3:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+interface Filters {
+  query: string
+  onlyOpen: boolean
+}
+
+export function CopyExamples() {
+  const [savedIds, setSavedIds] = useState&lt;string[]&gt;([])
+  const [filters, setFilters] = useState&lt;Filters&gt;({ query: '', onlyOpen: false })
+
+  function save(id: string) {
+    setSavedIds([...savedIds, id]) // a new array with one more id
+  }
+
+  function unsave(id: string) {
+    setSavedIds(savedIds.filter((savedId) =&gt; savedId !== id)) // a new array without it
+  }
+
+  function setQuery(query: string) {
+    setFilters({ ...filters, query }) // a new object: every old property, one replaced
+  }
+
+  return (
+    &lt;&gt;
+      &lt;input aria-label="Search" value={filters.query} onChange={(event) =&gt; setQuery(event.target.value)} /&gt;
+      &lt;button type="button" onClick={() =&gt; save('e08')}&gt;
+        Save ({savedIds.length})
+      &lt;/button&gt;
+      &lt;button type="button" onClick={() =&gt; unsave('e08')}&gt;
+        Unsave
+      &lt;/button&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You want to…</th><th>Not this (changes the old value)</th><th>This (makes a new one)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Add to an array</td><td><code>ids.push(id)</code></td><td><code>[...ids, id]</code></td></tr>
+                            <tr><td>Remove from an array</td><td><code>ids.splice(i, 1)</code></td><td><code>ids.filter((x) =&gt; x !== id)</code></td></tr>
+                            <tr><td>Sort or reverse</td><td><code>list.sort()</code>, <code>list.reverse()</code></td><td><code>list.toSorted()</code>, <code>list.toReversed()</code></td></tr>
+                            <tr><td>Change one property</td><td><code>filters.query = q</code></td><td><code>{ ...filters, query: q }</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="lifting" class="lesson-section">
+                <h2>⬆️ Where State Lives: Lifting and Deriving</h2>
+                <p>The project's search box lives in a new <code>EventFilters</code> component, but the lists that must change live in <code>EventsPage</code>'s <code>EventList</code>s. Sibling components cannot reach into each other; data in React flows down, through props. So the state goes to the <strong>closest common parent</strong> of everything that reads it, here <code>EventsPage</code>, and the search box becomes a <strong>controlled component</strong>: it shows the <code>value</code> it is given and reports changes through a <strong>callback prop</strong>, a function prop like the <code>onSelect: (siteId: string) =&gt; void</code> Lesson 3.2 described. Moving state up like this is called <strong>lifting state up</strong>.</p>
+                <div class="mermaid">
+graph TD
+    P["EventsPage: query, status"] -->|"query, status"| F["EventFilters"]
+    F -->|"onQueryChange('jetty')"| P
+    P -->|"filtered events"| L["EventList"]
+    L --> C["EventCard: showDetails"]
+</div>
+                <p>The data makes a round trip: a keystroke goes <em>up</em> through a callback, the parent updates its state, and the new value comes back <em>down</em> as props to everyone who needs it. Notice <code>EventCard</code> at the bottom: whether one card's details are open matters to nobody else, so that state stays inside the card. Two questions place every piece of state:</p>
+                <ol>
+                    <li><strong>Can it be worked out from something you already have?</strong> Then it is not state. Work it out during render (a <em>derived value</em>).</li>
+                    <li><strong>Who reads it and who changes it?</strong> Put it in the closest component above all of them, and no higher.</li>
+                </ol>
+                <h3>Derive, don't store</h3>
+                <p>Question 1 is the one that bites. It is tempting to keep the filtered list in state too and update it whenever the search changes:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+import { events } from './data/events.ts'
+
+export function EventSearch() {
+  const [query, setQuery] = useState('')
+  const [visible, setVisible] = useState(events)
+
+  function handleChange(value: string) {
+    setQuery(value)
+    setVisible(events.filter((event) =&gt; event.title.toLowerCase().includes(query)))
+  }
+
+  return (
+    &lt;&gt;
+      &lt;input aria-label="Search" value={query} onChange={(event) =&gt; handleChange(event.target.value)} /&gt;
+      &lt;p&gt;Matches: {visible.length}&lt;/p&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p>It compiles and lints cleanly, and it is wrong. Type <code>cove</code> one letter at a time and watch the count:</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>You have typed</th><th>Stored list says</th><th>Derived list says</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>c</code></td><td>Matches: 15</td><td>Matches: 11</td></tr>
+                            <tr><td><code>co</code></td><td>Matches: 11</td><td>Matches: 2</td></tr>
+                            <tr><td><code>cov</code></td><td>Matches: 2</td><td>Matches: 1</td></tr>
+                            <tr><td><code>cove</code></td><td>Matches: 1</td><td>Matches: 1</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>The stored list is always one keystroke behind, because <code>handleChange</code> filters with <code>query</code> from the <em>current snapshot</em>, the value before this keystroke. The fix is not a cleverer update; it is less state. Keep only what the user chose and work the list out on every render:</p>
+                <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+import { events } from './data/events.ts'
+
+export function EventSearch() {
+  const [query, setQuery] = useState('')
+  const visible = events.filter((event) =&gt; event.title.toLowerCase().includes(query))
+
+  return (
+    &lt;&gt;
+      &lt;input aria-label="Search" value={query} onChange={(event) =&gt; setQuery(event.target.value)} /&gt;
+      &lt;p&gt;Matches: {visible.length}&lt;/p&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                <p>Now there is one source of truth, <code>query</code>, and the list can never disagree with it. Filtering 15 cleanups (or a few thousand) on every render is fast; Lesson 5.3 shows how to measure before you reach for anything cleverer.</p>
+                <div class="card card-info">
+                    <h4>💡 Mental model: the meeting point</h4>
+                    <p>Two teams working different ends of the beach cannot shout to each other, so they agree on a meeting point with the organizer. The organizer (the parent) holds the plan (the state); each team gets its instructions (props) and radios back what changed (callbacks). And nobody writes "the number of bags so far" on a second clipboard: they count the bags in the pile when someone asks.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+                <div class="card card-warning">
+                    <h4>⚠️ Calling the handler instead of passing it</h4>
+                    <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+export function DetailsToggle() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    &lt;&gt;
+      &lt;button type="button" onClick={setOpen(!open)}&gt;
+        Show details
+      &lt;/button&gt;
+      {open &amp;&amp; &lt;p&gt;Gloves and bags are provided.&lt;/p&gt;}
+    &lt;/&gt;
+  )
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b, trimmed)</h4>
+                        <pre><code>src/Scratch.tsx:8:29 - error TS2322: Type 'void' is not assignable to type 'MouseEventHandler&lt;HTMLButtonElement&gt; | undefined'.
+
+8       &lt;button type="button" onClick={setOpen(!open)}&gt;
+                              ~~~~~~~
+...</code></pre>
+                    </div>
+                    <p><code>setOpen(!open)</code> runs while the button is being drawn and returns nothing (<code>void</code>), and nothing is not a click handler. If you run it anyway (the dev server does not type-check), setting state during render causes another render, which sets state again, and React stops with:</p>
+                    <div class="card card-output">
+                        <h4>Browser console (dev server)</h4>
+                        <pre><code>Too many re-renders. React limits the number of renders to prevent an infinite loop.</code></pre>
+                    </div>
+                    <p>Pass a function: <code>onClick={() =&gt; setOpen(!open)}</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ A Hook after an early return</h4>
+                    <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+export function EventNote({ editable }: { editable: boolean }) {
+  if (!editable) {
+    return null
+  }
+  const [note, setNote] = useState('')
+  return &lt;textarea aria-label="Note" value={note} onChange={(event) =&gt; setNote(event.target.value)} /&gt;
+}</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run lint)</h4>
+                        <pre><code>  × react-hooks(rules-of-hooks): React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render.
+   ╭─[src/Scratch.tsx:7:27]
+ 6 │   }
+ 7 │   const [note, setNote] = useState('')
+   ·                           ──────┬─────
+   ·                                 ╰── This Hook call is not reachable on every render path.
+ 8 │   return &lt;textarea aria-label="Note" value={note} onChange={(event) =&gt; setNote(event.target.value)} /&gt;
+   ╰────
+  help: Move the Hook call before the condition, or call it unconditionally and branch inside the Hook/effect instead.
+
+Found 0 warnings and 1 error.</code></pre>
+                    </div>
+                    <p>The early return means <code>useState</code> runs on some renders and not on others, so React's count of Hooks would shift. This one is an <em>error</em> (×), not a warning. Move the Hook above the <code>if</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ A <code>value</code> with no <code>onChange</code></h4>
+                    <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+export function SearchBox() {
+  const [query] = useState('cove')
+
+  return &lt;input aria-label="Search" value={query} /&gt;
+}</code></pre>
+                    <p>Both tools pass it, and the field ignores every keystroke: it is controlled by a value nothing ever changes. React says so in the console:</p>
+                    <div class="card card-output">
+                        <h4>Browser console (dev server)</h4>
+                        <pre><code>You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use `defaultValue`. Otherwise, set either `onChange` or `readOnly`.</code></pre>
+                    </div>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Changing state in place</h4>
+                    <p><code>savedIds.push(id)</code> followed by <code>setSavedIds(savedIds)</code> hands React the same array, so nothing redraws, and no tool warns you. Make a new one: <code>setSavedIds([...savedIds, id])</code>.</p>
+                </div>
+                <div class="card card-warning">
+                    <h4>⚠️ Storing what you can work out</h4>
+                    <p>A filtered list, a count, a "is anything filtered?" flag: if it can be computed from state and props, compute it during render. Stored copies fall out of date.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: Search and Filters for the Events Page</h2>
+                <p>With 15 cleanups on one page, organizers already scroll. Today they get a search box and a status filter, a line that says how many cleanups are showing, a <strong>Clear filters</strong> button that only appears when something is filtered, and a <strong>Show details</strong> button on every card. First, a promise from Lesson 3.3: dates people can read.</p>
+                <p>Start both servers (<code>node server.ts</code> in <code>shoreline-api</code>, <code>npm run dev</code> in <code>shoreline-hq</code>) and keep <code>http://localhost:5173/events</code> open. Delete <code>src/Scratch.tsx</code> if you still have it.</p>
+
+                <div class="card">
+                    <h3>Step 1: Dates people can read <span class="step-time">(6 min)</span></h3>
+                    <p>The cards show dates the way the API sends them, <code>YYYY-MM-DD</code>. Organizers read a weekday and a month name much faster. The browser's <code>Intl.DateTimeFormat</code> does the formatting; the one thing to get right is the time zone. Create <code>src/utils/format.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/format.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/format.ts"><code class="language-ts">import type { DateString } from '../api/types.ts'
+
+// Made once, used for every date: weekday, month name, day and year
+const dateFormat = new Intl.DateTimeFormat('en-US', {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+})
+
+// The API's dates are days on the crew's calendar ("YYYY-MM-DD"). JavaScript reads a date
+// alone as midnight UTC, which is still the day before on the US west coast; with a time
+// and no time zone it reads the local midnight instead.
+export function formatDate(date: DateString): string {
+  return dateFormat.format(new Date(`${date}T00:00`))
+}</code></pre>
+                    </div>
+                    <p>The comment is the important part. Here is the same day formatted both ways on a computer set to US Pacific time:</p>
+                    <pre data-snippet><code class="language-ts">const day = '2026-11-15'
+const fmt = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+console.log(fmt.format(new Date(day)))
+console.log(fmt.format(new Date(`${day}T00:00`)))</code></pre>
+                    <div class="card card-output">
+                        <h4>Output (Node, US Pacific time)</h4>
+                        <pre><code>Sat, Nov 14, 2026
+Sun, Nov 15, 2026</code></pre>
+                    </div>
+                    <p>The first line is a day early: <code>new Date('YYYY-MM-DD')</code> means midnight UTC, which is still the previous evening in Port Marisol. Adding <code>T00:00</code> without a time zone means midnight wherever the browser is. The formatter is created once at module level because the options never change. Now use it. In <code>src/components/EventCard.tsx</code>, change these lines:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx"> import { getAvailability } from '../utils/availability.ts'
++import { formatDate } from '../utils/format.ts'
+ import { SpotsLine } from './SpotsLine.tsx'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx" data-match="diff"><code class="language-diff-tsx">       &lt;p&gt;
+-        &lt;time dateTime={event.date}&gt;{event.date}&lt;/time&gt;, {event.startTime} to {event.endTime}
++        &lt;time dateTime={event.date}&gt;{formatDate(event.date)}&lt;/time&gt;, {event.startTime} to{' '}
++        {event.endTime}
+       &lt;/p&gt;</code></pre>
+                    </div>
+                    <p>The <code>dateTime</code> attribute keeps the machine-readable date for browsers and assistive technology; only the visible text changes. Do the same on the home page's "Next cleanup" card in <code>src/pages/HomePage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx"> import { events } from '../data/events.ts'
++import { formatDate } from '../utils/format.ts'</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/HomePage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/HomePage.tsx" data-match="diff"><code class="language-diff-tsx">             &lt;p&gt;
+-              {nextCleanup.title}, &lt;time dateTime={nextCleanup.date}&gt;{nextCleanup.date}&lt;/time&gt; at{' '}
++              {nextCleanup.title},{' '}
++              &lt;time dateTime={nextCleanup.date}&gt;{formatDate(nextCleanup.date)}&lt;/time&gt; at{' '}
+               {nextCleanup.startTime}.</code></pre>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: EventFilters, a controlled component <span class="step-time">(12 min)</span></h3>
+                    <p>The filters own no state: they show the values they are given and report changes. Create <code>src/components/EventFilters.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventFilters.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventFilters.tsx"><code class="language-tsx">import type { ChangeEvent } from 'react'
+import { isEventStatus } from '../api/client.ts'
+import type { EventStatus } from '../api/types.ts'
+
+export type StatusFilter = EventStatus | 'all'
+
+interface EventFiltersProps {
+  query: string
+  status: StatusFilter
+  onQueryChange: (query: string) =&gt; void
+  onStatusChange: (status: StatusFilter) =&gt; void
+  onClear: () =&gt; void
+}
+
+export function EventFilters({
+  query,
+  status,
+  onQueryChange,
+  onStatusChange,
+  onClear,
+}: EventFiltersProps) {
+  const filtering = query !== '' || status !== 'all'
+
+  // A &lt;select&gt; hands over a string: check it is one of ours before passing it up
+  function handleStatusChange(event: ChangeEvent&lt;HTMLSelectElement&gt;) {
+    const value = event.target.value
+    onStatusChange(isEventStatus(value) ? value : 'all')
+  }
+
+  return (
+    &lt;search className="filters"&gt;
+      &lt;div className="field"&gt;
+        &lt;label htmlFor="event-search"&gt;Search cleanups&lt;/label&gt;
+        &lt;input
+          id="event-search"
+          type="search"
+          value={query}
+          onChange={(event) =&gt; onQueryChange(event.target.value)}
+        /&gt;
+      &lt;/div&gt;
+      &lt;div className="field"&gt;
+        &lt;label htmlFor="event-status"&gt;Status&lt;/label&gt;
+        &lt;select id="event-status" value={status} onChange={handleStatusChange}&gt;
+          &lt;option value="all"&gt;All statuses&lt;/option&gt;
+          &lt;option value="scheduled"&gt;Scheduled&lt;/option&gt;
+          &lt;option value="completed"&gt;Completed&lt;/option&gt;
+          &lt;option value="cancelled"&gt;Cancelled&lt;/option&gt;
+          &lt;option value="draft"&gt;Draft&lt;/option&gt;
+        &lt;/select&gt;
+      &lt;/div&gt;
+      {filtering &amp;&amp; (
+        &lt;button type="button" className="button-secondary" onClick={onClear}&gt;
+          Clear filters
+        &lt;/button&gt;
+      )}
+    &lt;/search&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>StatusFilter</code> is the union the filter can hold: every <code>EventStatus</code> plus <code>'all'</code>. It is exported for <code>EventsPage</code>; exporting a type from a component file is fine (Lesson 3.3's FAQ).</li>
+                        <li>Three callback props, typed with the function types from Lesson 2.3. <code>onClear</code> takes nothing and returns nothing: <code>() =&gt; void</code>.</li>
+                        <li>The search input uses an inline handler: <code>event</code> is typed for free, and <code>event.target.value</code> is the <code>string</code> the prop wants.</li>
+                        <li><code>filtering</code> is a derived value: the Clear button appears only when there is something to clear (<code>&amp;&amp;</code> with a real boolean, Lesson 3.3).</li>
+                        <li>Every field has a <code>&lt;label htmlFor&gt;</code> matching its <code>id</code>, so clicking the label focuses the field and screen readers announce its name. The <code>&lt;search&gt;</code> element marks the area as a search landmark (current versions of the major browsers support it); <code>type="search"</code> gives the input a clear button in some browsers.</li>
+                    </ul>
+                    <p>Look at <code>handleStatusChange</code>. A <code>&lt;select&gt;</code> hands over a <code>string</code>, whatever its options say. Pass it straight up with <code>onStatusChange(event.target.value)</code> and TypeScript objects:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_10/10-select-error.png" alt="A terminal in shoreline-hq. npx tsc -b reports one error in src/components/EventFilters.tsx line 26: TS2345, Argument of type string is not assignable to parameter of type StatusFilter, with the call onStatusChange(value) underlined." width="1100" height="211" loading="lazy">
+                        <figcaption>A <code>&lt;select&gt;</code> always hands over a <code>string</code>. The prop wants a <code>StatusFilter</code>, so TypeScript asks you to prove the string is one of the five words first.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (npx tsc -b)</h4>
+                        <pre><code>src/components/EventFilters.tsx:26:20 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'StatusFilter'.
+
+26     onStatusChange(value)
+                      ~~~~~
+
+
+Found 1 error in src/components/EventFilters.tsx:26</code></pre>
+                    </div>
+                    <p>This is where Lesson 2.4's <code>isEventStatus</code> guard earns its keep: <code>isEventStatus(value) ? value : 'all'</code> narrows the string to an <code>EventStatus</code> when it is one, and falls back to <code>'all'</code> otherwise (which is what the first option means anyway). No <code>as</code>, no trust: if someone edits an option's <code>value</code> to a word the API does not know, the filter quietly shows everything instead of nothing. Then add the styles for fields and buttons at the end of <code>src/index.css</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/index.css</div>
+                        <pre data-src="shoreline-hq/src/index.css" data-match="excerpt"><code class="language-css">/* Filters and buttons (Lesson 3.4) */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.field input,
+.field select {
+  min-width: 14rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--text-muted);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+
+.button-secondary {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--link);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--link);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}</code></pre>
+                    </div>
+                    <p>The fields use the page's <code>--surface</code>, <code>--text</code> and <code>--text-muted</code> tokens, so they follow dark mode. Lesson 3.6 adds proper focus styles and moves these rules into CSS Modules.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: State in EventsPage, everything else derived <span class="step-time">(14 min)</span></h3>
+                    <p><code>EventsPage</code> is the closest common parent of the filters and the lists, so the state goes here. Replace <code>src/pages/EventsPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/EventsPage.tsx"><code class="language-tsx">import { useState } from 'react'
+import type { CleanupEvent } from '../api/types.ts'
+import { EventFilters, type StatusFilter } from '../components/EventFilters.tsx'
+import { EventList } from '../components/EventList.tsx'
+import { events } from '../data/events.ts'
+
+function matchesFilters(event: CleanupEvent, search: string, status: StatusFilter): boolean {
+  const statusMatches = status === 'all' || event.status === status
+  const text = `${event.title} ${event.description}`.toLowerCase()
+  return statusMatches &amp;&amp; text.includes(search)
+}
+
+export function EventsPage() {
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState&lt;StatusFilter&gt;('all')
+
+  // Derived values: worked out from state on every render, never stored
+  const search = query.trim().toLowerCase()
+  const visible = events.filter((event) =&gt; matchesFilters(event, search, status))
+  const upcoming = visible.filter((event) =&gt; event.status === 'scheduled')
+  const drafts = visible.filter((event) =&gt; event.status === 'draft')
+  const past = visible
+    .filter((event) =&gt; event.status === 'completed' || event.status === 'cancelled')
+    .toReversed()
+  const filtering = search !== '' || status !== 'all'
+  const noMatches = 'No cleanups here match your filters.'
+
+  function clearFilters() {
+    setQuery('')
+    setStatus('all')
+  }
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Cleanup events&lt;/h1&gt;
+      &lt;EventFilters
+        query={query}
+        status={status}
+        onQueryChange={setQuery}
+        onStatusChange={setStatus}
+        onClear={clearFilters}
+      /&gt;
+      &lt;p className="lead" role="status"&gt;
+        Showing {visible.length} of {events.length}: {upcoming.length} coming up,{' '}
+        {past.length} in the log.
+      &lt;/p&gt;
+      &lt;h2&gt;Coming up&lt;/h2&gt;
+      &lt;EventList events={upcoming} emptyMessage={filtering ? noMatches : 'Nothing scheduled yet.'} /&gt;
+      &lt;h2&gt;Drafts&lt;/h2&gt;
+      &lt;EventList
+        events={drafts}
+        emptyMessage={filtering ? noMatches : 'No drafts waiting to be published.'}
+      /&gt;
+      &lt;h2&gt;Past cleanups&lt;/h2&gt;
+      &lt;EventList events={past} emptyMessage={filtering ? noMatches : 'No cleanups in the log yet.'} /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong>Two pieces of state</strong>, the two things a person chose: <code>query</code> (inferred <code>string</code>) and <code>status</code> (<code>useState&lt;StatusFilter&gt;</code>, because inference would widen <code>'all'</code> to <code>string</code>).</li>
+                        <li><strong>Everything else is derived</strong>: <code>search</code> (trimmed, lowercase), <code>visible</code>, the three lists, <code>filtering</code>, the count line. None of it is stored, so none of it can be out of date. <code>matchesFilters</code> is a plain function above the component: it uses no state, so it does not need to live inside.</li>
+                        <li><code>onQueryChange={setQuery}</code> passes the setter itself. It fits the prop's type: a <code>Dispatch&lt;SetStateAction&lt;string&gt;&gt;</code> accepts a <code>string</code> and returns nothing, which is all <code>(query: string) =&gt; void</code> asks for.</li>
+                        <li><code>clearFilters</code> sets two pieces of state in one handler. React batches them: one re-render, not two.</li>
+                        <li><code>role="status"</code> makes the count line a polite <em>live region</em>: screen readers announce "Showing 2 of 15..." after someone types, so a person who cannot see the lists change still knows what happened.</li>
+                        <li>Each empty list says "No cleanups here match your filters." while filtering, and its usual sentence otherwise: the same <code>EventList</code>, given a different message.</li>
+                    </ul>
+                    <p>Type <code>jetty</code> into the search box:</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_10/10-filter-search.png" alt="The Cleanup events page with jetty typed in the Search cleanups box. Next to it the Status menu says All statuses and a Clear filters button has appeared. The line below reads Showing 2 of 15: 1 coming up, 1 in the log. Coming up shows one card, Jetty Rocks Deep Clean, with its date written out with the weekday and the month name, its spots line and a Show details link-style button." width="1100" height="688" loading="lazy">
+                        <figcaption>Every keystroke updates <code>query</code> in <code>EventsPage</code>; the three lists, the count line and the Clear button are all worked out from it on the next render.</figcaption>
+                    </figure>
+                    <p>Pick <strong>Completed</strong> in the status menu, then <strong>Clear filters</strong>: the field, the menu and all three lists go back to where they started, because they are all drawn from the same two pieces of state. (The <strong>Draft</strong> option finds nothing yet: the public list has no drafts until organizers sign in, in Lesson 5.2.)</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: State that belongs to one card <span class="step-time">(8 min)</span></h3>
+                    <p>Whether one card's details are open matters to that card alone, so the state goes inside <code>EventCard</code>. Replace <code>src/components/EventCard.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/components/EventCard.tsx</div>
+                        <pre data-src="shoreline-hq/src/components/EventCard.tsx"><code class="language-tsx">import { useState } from 'react'
+import type { CleanupEvent } from '../api/types.ts'
+import { sites } from '../data/sites.ts'
+import { getAvailability } from '../utils/availability.ts'
+import { formatDate } from '../utils/format.ts'
+import { SpotsLine } from './SpotsLine.tsx'
+import { StatusBadge } from './StatusBadge.tsx'
+
+interface EventCardProps {
+  event: CleanupEvent
+}
+
+export function EventCard({ event }: EventCardProps) {
+  const [showDetails, setShowDetails] = useState(false)
+  const site = sites.find((s) =&gt; s.id === event.siteId)
+
+  return (
+    &lt;article className="card event-card"&gt;
+      &lt;h3&gt;{event.title}&lt;/h3&gt;
+      &lt;p className="badges"&gt;
+        &lt;StatusBadge status={event.status} /&gt;
+      &lt;/p&gt;
+      &lt;p&gt;
+        &lt;time dateTime={event.date}&gt;{formatDate(event.date)}&lt;/time&gt;, {event.startTime} to{' '}
+        {event.endTime}
+      &lt;/p&gt;
+      &lt;p&gt;{site ? site.name : 'Site to be confirmed'}: {event.meetingPoint}&lt;/p&gt;
+      &lt;SpotsLine availability={getAvailability(event)} capacity={event.capacity} /&gt;
+      {event.suppliesProvided.length &gt; 0 &amp;&amp; (
+        &lt;p className="muted"&gt;We bring: {event.suppliesProvided.join(', ')}&lt;/p&gt;
+      )}
+      &lt;button
+        type="button"
+        className="button-link"
+        aria-expanded={showDetails}
+        onClick={() =&gt; setShowDetails((shown) =&gt; !shown)}
+      &gt;
+        {showDetails ? 'Hide details' : 'Show details'}
+      &lt;/button&gt;
+      {showDetails &amp;&amp; &lt;p&gt;{event.description}&lt;/p&gt;}
+    &lt;/article&gt;
+  )
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><code>useState(false)</code> is called at the top of the component, before anything else, as the rules of Hooks require.</li>
+                        <li>The toggle uses an updater function, <code>(shown) =&gt; !shown</code>, because the new value depends on the old one.</li>
+                        <li>It is a real <code>&lt;button type="button"&gt;</code> (keyboard and screen reader support for free) styled to look like a link, and <code>aria-expanded</code> tells assistive technology whether the details are showing. TypeScript accepts the boolean: the attribute's type is <code>Booleanish</code>.</li>
+                    </ul>
+                    <figure class="screenshot">
+                        <img src="images/lesson_10/10-details-open.png" alt="The Weekend Cove Cleanup card with its details open: under the title, the Scheduled badge, the date, the meeting point, the bold line Full: new sign-ups join the waiting list and the We bring line, a Hide details link-style button is followed by the event&#x27;s description: We work the tide line from the stairs to the north rocks." width="312" height="565" loading="lazy">
+                        <figcaption>Each <code>EventCard</code> has its own <code>showDetails</code> state. The button tells screen readers whether the details are open with <code>aria-expanded</code>.</figcaption>
+                    </figure>
+                    <p>Each of the 15 cards has its own <code>showDetails</code>: React keeps one piece of state per component <em>instance</em>, and it tells the instances apart by their place in the tree and their <code>key</code>. Open the details of the first card under "Coming up", then type <code>cove</code>: that card disappears from the list, and the Weekend Cove Cleanup card that moves to the first place is still closed, because its state belongs to <code>key="e08"</code>, not to "first in the list". Exercise 2 shows what index keys would do here.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Check it everywhere, and break it <span class="step-time">(10 min)</span></h3>
+                    <p>Check <code>/events</code> at phone size and in dark mode. Then use the page with the keyboard only: <kbd>Tab</kbd> to the search box, type, <kbd>Tab</kbd> to the menu and change it with the arrow keys, <kbd>Tab</kbd> on to <strong>Clear filters</strong> and press <kbd>Enter</kbd>.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_10/10-filter-phone-dark.png" alt="The events page on a phone-sized screen in dark mode. The search box and the Status menu, set to Completed, stack in one column above a Clear filters button and the line Showing 6 of 15: 0 coming up, 6 in the log. Below, Coming up shows a dashed box: No cleanups here match your filters." width="390" height="760" loading="lazy">
+                        <figcaption>The same filters at 390 pixels in dark mode: the fields wrap to one column.</figcaption>
+                    </figure>
+                    <p>Then break it once each, running <code>npx tsc -b</code> and undoing each change:</p>
+                    <ol>
+                        <li>In <code>EventsPage.tsx</code>, change <code>useState&lt;StatusFilter&gt;('all')</code> to <code>useState('all')</code>.</li>
+                        <li>In <code>EventCard.tsx</code>, change the button's <code>onClick</code> to <code>onClick={setShowDetails(!showDetails)}</code>.</li>
+                    </ol>
+                    <div class="card card-output">
+                        <h4>Expected output (1: the status state widened to string)</h4>
+                        <pre><code>src/pages/EventsPage.tsx:19:74 - error TS2345: Argument of type 'string' is not assignable to parameter of type 'StatusFilter'.
+
+19   const visible = events.filter((event) =&gt; matchesFilters(event, search, status))
+                                                                            ~~~~~~
+
+src/pages/EventsPage.tsx:38:9 - error TS2322: Type 'string' is not assignable to type 'StatusFilter'.
+
+38         status={status}
+           ~~~~~~
+
+  src/components/EventFilters.tsx:9:3 - The expected type comes from property 'status' which is declared here on type 'IntrinsicAttributes &amp; EventFiltersProps'
+    9   status: StatusFilter
+        ~~~~~~
+
+
+Found 2 errors in the same file, starting at: src/pages/EventsPage.tsx:19</code></pre>
+                    </div>
+                    <div class="card card-output">
+                        <h4>Expected output (2: calling the setter while drawing, trimmed)</h4>
+                        <pre><code>src/components/EventCard.tsx:36:9 - error TS2322: Type 'void' is not assignable to type 'MouseEventHandler&lt;HTMLButtonElement&gt; | undefined'.
+
+36         onClick={setShowDetails(!showDetails)}
+           ~~~~~~~
+...</code></pre>
+                    </div>
+                    <p>The first one is worth a second look. Without the type argument, <code>status</code> is a <code>string</code>, and TypeScript reports it twice: where <code>matchesFilters</code> wants a <code>StatusFilter</code>, and where <code>EventFilters</code> does. The mistake is on line 15; the errors appear where the wider type is used. When an error points at a line that looks right, follow the type back to where it was made. Undo both, then run the full check:</p>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npm run build</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (npm run build)</h4>
+                        <pre><code>&gt; shoreline-hq@0.0.0 build
+&gt; tsc -b &amp;&amp; vite build
+
+vite v8.3.8 building client environment for production...
+✓ 37 modules transformed.
+computing gzip size...
+dist/index.html                   0.46 kB │ gzip:  0.30 kB
+dist/assets/index-CBUQaRWs.css    3.22 kB │ gzip:  1.16 kB
+dist/assets/index-CZ5dIZue.js   238.54 kB │ gzip: 74.05 kB
+
+✓ built in 115ms</code></pre>
+                    </div>
+                    <p>37 modules instead of 35: <code>EventFilters</code> and <code>format.ts</code>. (Times, sizes and hashes will differ.)</p>
+                    <p><strong>Your own project:</strong> for the main screen of your Lesson 11.1 app, list every piece of state it needs (what the user typed, picked or opened) and, next to each one, the component that should own it. Then list three values on that screen you will <em>derive</em> instead of storing.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li>☐ <code>src/utils/format.ts</code> formats dates with <code>formatDate</code>, and the cards and the home page use it</li>
+                        <li>☐ <code>EventFilters</code> is a controlled component with typed callback props, and the status menu narrows its string with <code>isEventStatus</code></li>
+                        <li>☐ <code>EventsPage</code> holds <code>query</code> and <code>status</code> in state, and derives the lists, the count line and the empty messages</li>
+                        <li>☐ <strong>Clear filters</strong> appears only while filtering and resets both fields</li>
+                        <li>☐ Every card opens and closes its own details, with <code>aria-expanded</code></li>
+                        <li>☐ <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> all pass, and <code>src/Scratch.tsx</code> is deleted</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercises 1 and 2 are part of the lesson (about 15 minutes together, included in the lesson time).</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: A bag tally</h3>
+                    <p>On cleanup day, organizers count bags as they come off the beach. In <code>src/Scratch.tsx</code>, write a <code>BagTally</code> component that takes a <code>label</code> prop and shows the label as a heading, "N so far", and three buttons: <strong>Add one</strong>, <strong>Remove one</strong> (disabled at 0, so the count never goes below zero) and <strong>Reset</strong>. Show two tallies, "Trash bags" and "Recycling bags", and render them by temporarily returning them from <code>CurrentPage</code> in <code>App.tsx</code>. Does adding to one change the other?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p><code>useState(0)</code> infers <code>number</code>. Adding and removing depend on the old count, so use updater functions. A button's <code>disabled</code> prop takes a boolean.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+
+interface BagTallyProps {
+  label: string
+}
+
+function BagTally({ label }: BagTallyProps) {
+  const [count, setCount] = useState(0)
+
+  return (
+    &lt;section&gt;
+      &lt;h2&gt;{label}&lt;/h2&gt;
+      &lt;p&gt;{count} so far&lt;/p&gt;
+      &lt;button type="button" onClick={() =&gt; setCount((current) =&gt; current + 1)}&gt;
+        Add one
+      &lt;/button&gt;
+      &lt;button
+        type="button"
+        disabled={count === 0}
+        onClick={() =&gt; setCount((current) =&gt; Math.max(0, current - 1))}
+      &gt;
+        Remove one
+      &lt;/button&gt;
+      &lt;button type="button" onClick={() =&gt; setCount(0)}&gt;
+        Reset
+      &lt;/button&gt;
+    &lt;/section&gt;
+  )
+}
+
+export function Tallies() {
+  return (
+    &lt;&gt;
+      &lt;BagTally label="Trash bags" /&gt;
+      &lt;BagTally label="Recycling bags" /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                        <p><strong>Remove one</strong> starts out disabled; after two adds and one remove the trash tally says "1 so far" while the recycling tally still says "0 so far". Each <code>&lt;BagTally&gt;</code> is its own instance with its own state, even though they come from the same function. <code>Math.max</code> is a second guard behind <code>disabled</code>. Put <code>App.tsx</code> back and delete <code>Scratch.tsx</code> when you are done.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Keys decide whose state it is</h3>
+                    <p>Lesson 3.3 warned that index keys put state on the wrong item once rows have state. Now they do. In <code>EventList.tsx</code>, change the <code>map</code> to <code>events.map((event, index) =&gt; (</code> and the key to <code>&lt;li key={index}&gt;</code>. Run <code>npx tsc -b</code> and <code>npm run lint</code> (both pass). Then on <code>/events</code>: open the details of the first card under "Coming up", type <code>cove</code> in the search box, and look at the first card. Explain what you see, then put <code>key={event.id}</code> back.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Which card is first after the search? And which <code>key</code> does the open state belong to: an event, or a position?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <p>After the search, the first card is Weekend Cove Cleanup, and it shows <strong>Hide details</strong> with its description open, although you never clicked it. With <code>key={index}</code>, React sees "item 0 is still here, with new props": it keeps the component at position 0, including its <code>showDetails</code> state, and gives it Weekend Cove's data. With <code>key={event.id}</code>, the Tide Pool card (its key gone from the list) is removed with its state, and Weekend Cove's card keeps its own, closed state. Neither tool can catch this: only the data's own id says which item is which.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3: Only cleanups with spots left (Stretch)</h3>
+                    <p><em>Optional stretch, not counted in the lesson time (about 20 minutes).</em></p>
+                    <p>Add a checkbox to the filters, "Only cleanups with spots left", that hides every event whose <code>getAvailability(event).kind</code> is not <code>'open'</code>. The checked state lives in <code>EventsPage</code>, <strong>Clear filters</strong> also unchecks it, and the button appears while it is checked.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>A checkbox reports <code>event.target.checked</code>, a <code>boolean</code>, so <code>useState(false)</code> needs no type argument. A checkbox's <code>&lt;label&gt;</code> can wrap the input instead of using <code>htmlFor</code>. Add two props to <code>EventFiltersProps</code>, and one more condition to <code>visible</code> and to both <code>filtering</code> values.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/components/EventFilters.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import type { ChangeEvent } from 'react'
+import { isEventStatus } from '../api/client.ts'
+import type { EventStatus } from '../api/types.ts'
+
+export type StatusFilter = EventStatus | 'all'
+
+interface EventFiltersProps {
+  query: string
+  status: StatusFilter
+  onQueryChange: (query: string) =&gt; void
+  onStatusChange: (status: StatusFilter) =&gt; void
+  onlyOpen: boolean
+  onOnlyOpenChange: (onlyOpen: boolean) =&gt; void
+  onClear: () =&gt; void
+}
+
+export function EventFilters({
+  query,
+  status,
+  onQueryChange,
+  onStatusChange,
+  onlyOpen,
+  onOnlyOpenChange,
+  onClear,
+}: EventFiltersProps) {
+  const filtering = query !== '' || status !== 'all' || onlyOpen
+
+  // A &lt;select&gt; hands over a string: check it is one of ours before passing it up
+  function handleStatusChange(event: ChangeEvent&lt;HTMLSelectElement&gt;) {
+    const value = event.target.value
+    onStatusChange(isEventStatus(value) ? value : 'all')
+  }
+
+  return (
+    &lt;search className="filters"&gt;
+      &lt;div className="field"&gt;
+        &lt;label htmlFor="event-search"&gt;Search cleanups&lt;/label&gt;
+        &lt;input
+          id="event-search"
+          type="search"
+          value={query}
+          onChange={(event) =&gt; onQueryChange(event.target.value)}
+        /&gt;
+      &lt;/div&gt;
+      &lt;div className="field"&gt;
+        &lt;label htmlFor="event-status"&gt;Status&lt;/label&gt;
+        &lt;select id="event-status" value={status} onChange={handleStatusChange}&gt;
+          &lt;option value="all"&gt;All statuses&lt;/option&gt;
+          &lt;option value="scheduled"&gt;Scheduled&lt;/option&gt;
+          &lt;option value="completed"&gt;Completed&lt;/option&gt;
+          &lt;option value="cancelled"&gt;Cancelled&lt;/option&gt;
+          &lt;option value="draft"&gt;Draft&lt;/option&gt;
+        &lt;/select&gt;
+      &lt;/div&gt;
+      &lt;label&gt;
+        &lt;input
+          type="checkbox"
+          checked={onlyOpen}
+          onChange={(event) =&gt; onOnlyOpenChange(event.target.checked)}
+        /&gt;
+        Only cleanups with spots left
+      &lt;/label&gt;
+      {filtering &amp;&amp; (
+        &lt;button type="button" className="button-secondary" onClick={onClear}&gt;
+          Clear filters
+        &lt;/button&gt;
+      )}
+    &lt;/search&gt;
+  )
+}</code></pre>
+                        </div>
+                        <div class="code-file">
+                            <div class="code-filename">shoreline-hq/src/pages/EventsPage.tsx</div>
+                            <pre data-snippet><code class="language-tsx">import { useState } from 'react'
+import type { CleanupEvent } from '../api/types.ts'
+import { EventFilters, type StatusFilter } from '../components/EventFilters.tsx'
+import { EventList } from '../components/EventList.tsx'
+import { events } from '../data/events.ts'
+import { getAvailability } from '../utils/availability.ts'
+
+function matchesFilters(event: CleanupEvent, search: string, status: StatusFilter): boolean {
+  const statusMatches = status === 'all' || event.status === status
+  const text = `${event.title} ${event.description}`.toLowerCase()
+  return statusMatches &amp;&amp; text.includes(search)
+}
+
+export function EventsPage() {
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState&lt;StatusFilter&gt;('all')
+  const [onlyOpen, setOnlyOpen] = useState(false)
+
+  // Derived values: worked out from state on every render, never stored
+  const search = query.trim().toLowerCase()
+  const visible = events.filter(
+    (event) =&gt;
+      matchesFilters(event, search, status) &amp;&amp;
+      (!onlyOpen || getAvailability(event).kind === 'open'),
+  )
+  const upcoming = visible.filter((event) =&gt; event.status === 'scheduled')
+  const drafts = visible.filter((event) =&gt; event.status === 'draft')
+  const past = visible
+    .filter((event) =&gt; event.status === 'completed' || event.status === 'cancelled')
+    .toReversed()
+  const filtering = search !== '' || status !== 'all' || onlyOpen
+  const noMatches = 'No cleanups here match your filters.'
+
+  function clearFilters() {
+    setQuery('')
+    setStatus('all')
+    setOnlyOpen(false)
+  }
+
+  return (
+    &lt;&gt;
+      &lt;h1&gt;Cleanup events&lt;/h1&gt;
+      &lt;EventFilters
+        query={query}
+        status={status}
+        onQueryChange={setQuery}
+        onStatusChange={setStatus}
+        onlyOpen={onlyOpen}
+        onOnlyOpenChange={setOnlyOpen}
+        onClear={clearFilters}
+      /&gt;
+      &lt;p className="lead" role="status"&gt;
+        Showing {visible.length} of {events.length}: {upcoming.length} coming up,{' '}
+        {past.length} in the log.
+      &lt;/p&gt;
+      &lt;h2&gt;Coming up&lt;/h2&gt;
+      &lt;EventList events={upcoming} emptyMessage={filtering ? noMatches : 'Nothing scheduled yet.'} /&gt;
+      &lt;h2&gt;Drafts&lt;/h2&gt;
+      &lt;EventList
+        events={drafts}
+        emptyMessage={filtering ? noMatches : 'No drafts waiting to be published.'}
+      /&gt;
+      &lt;h2&gt;Past cleanups&lt;/h2&gt;
+      &lt;EventList events={past} emptyMessage={filtering ? noMatches : 'No cleanups in the log yet.'} /&gt;
+    &lt;/&gt;
+  )
+}</code></pre>
+                        </div>
+                        <p>With the box checked, only the open, scheduled cleanups remain: the full Weekend Cove Cleanup and everything in the past disappear. The course's own code continues without this filter; Lesson 6.2 moves the filters into the address bar.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>bags</code> is <code>0</code>. A click handler calls <code>setBags(bags + 1)</code> three times in a row. What does the page show after the click?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Every call reads bags from the same render. What is bags in all three?">
+                                A) 3
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Setting state does schedule a new render. What value does it ask for?">
+                                B) 0, because state cannot change inside a handler
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="All three calls read the snapshot of this render, where bags is 0, so each asks for 1. Updater functions that add one to the current value would chain and give 3.">
+                                C) 1
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="tsc accepts calling a setter several times. What does each call ask for?">
+                                D) A TypeScript error
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> In <code>handleStatusChange(event: ChangeEvent&lt;HTMLSelectElement&gt;)</code>, what is the type of <code>event.target.value</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The DOM gives every select value as a string, whatever the options say. That is why EventFilters checks it with isEventStatus before passing it up as a StatusFilter.">
+                                A) <code>string</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="TypeScript cannot read the option elements you wrote. What did tsc say when the value was passed straight up?">
+                                B) <code>StatusFilter</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The menu has an all option too, and TypeScript does not look at the options. What does the DOM type say?">
+                                C) <code>EventStatus</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The element type is known from the type argument. Which property type does HTMLSelectElement declare for value?">
+                                D) <code>unknown</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> <code>EventFilters</code> changes the search text and three <code>EventList</code>s show the results. All of them are inside <code>EventsPage</code>. Where should <code>query</code> live?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Siblings cannot read each other's state. How would the lists get the text?">
+                                A) In <code>EventFilters</code>, where the typing happens
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="There are three lists, and none of them changes the text. Who else needs it?">
+                                B) In each <code>EventList</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Two copies of the same fact can disagree. How many sources of truth do you want?">
+                                C) In both <code>EventFilters</code> and <code>EventsPage</code>, kept in sync
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="EventsPage is the closest common parent of everything that reads or changes query. It passes the value down as props and a callback for changes, and derives the lists from it.">
+                                D) In <code>EventsPage</code>, the closest common parent
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> What is the type of <code>savedIds</code> after <code>const [savedIds, setSavedIds] = useState([])</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Nothing in an empty array says string. What can TypeScript infer from no elements at all?">
+                                A) <code>string[]</code>
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="An empty array literal gives TypeScript nothing to go on, so the state is never[] and adding any id is a TS2322 error. Write useState with a type argument, such as an array of string.">
+                                B) <code>never[]</code>
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Strict mode avoids silent any. Which error did adding e08 produce?">
+                                C) <code>any[]</code>
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> What happens with <code>&lt;button onClick={setOpen(true)}&gt;</code>?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="setOpen(true) runs while the button is drawn and returns void, which is not a MouseEventHandler (TS2322). Run anyway, it sets state during render, again and again, until React stops with Too many re-renders.">
+                                A) <code>npx tsc -b</code> reports TS2322, and in the browser React stops with "Too many re-renders"
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Look at the parentheses. When does setOpen(true) run?">
+                                B) The details open when the button is clicked
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Setting state causes a render. What does that render do again?">
+                                C) The details open once when the page loads, and the button does nothing
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>I call <code>setQuery('cove')</code> and log <code>query</code> on the next line. Why is it still the old value?</summary>
+                    <p>Because <code>query</code> is this render's snapshot, a <code>const</code> that never changes. The setter asks for a <em>new</em> render, and in that render <code>query</code> will be <code>'cove'</code>. If you need the new value right away in the same handler, you already have it: it is the value you passed to the setter.</p>
+                </details>
+                <details>
+                    <summary>One <code>useState</code> with an object, or several?</summary>
+                    <p>Several, when the values change independently, as <code>query</code> and <code>status</code> do: each setter is simple and nothing needs copying. An object (with <code>{ ...filters, query }</code> updates) when the values always change together, like the parts of an address. When updates start to follow rules ("check in only if not cancelled"), Lesson 5.1's <code>useReducer</code> is the better tool.</p>
+                </details>
+                <details>
+                    <summary>A tutorial types its change handler as <code>React.FormEvent</code>. Is that wrong?</summary>
+                    <p>It is old. This compiles today:</p>
+                    <pre data-snippet data-legacy><code class="language-tsx">import { useState, type FormEvent } from 'react'
+
+export function OldSearchBox() {
+  const [query, setQuery] = useState('')
+
+  function handleChange(event: FormEvent&lt;HTMLInputElement&gt;) {
+    setQuery(event.currentTarget.value)
+  }
+
+  return &lt;input aria-label="Search" value={query} onChange={handleChange} /&gt;
+}</code></pre>
+                    <p>but <code>@types/react</code> 19.3 marks <code>FormEvent</code> as deprecated ("FormEvent doesn't actually exist"), so VS Code draws a line through it. Use <code>ChangeEvent&lt;HTMLInputElement&gt;</code> for changes; submit events are Lesson 3.5's business.</p>
+                </details>
+                <details>
+                    <summary>Why does <code>EventFilters</code> not keep its own state? It would be simpler.</summary>
+                    <p>Simpler for <code>EventFilters</code>, impossible for the page: the lists, the count line and the Clear button all need the same two values. A component that only shows what it is given and reports changes (a controlled component) is also easy to reuse and to test: a test can render <code>EventFilters</code> with nothing but props (Module 9 tests other components exactly this way).</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Add a "Sort by" menu to the filters with three choices: soonest first, latest first, and title A to Z. Model the choice as a union (<code>type SortOrder = 'soonest' | 'latest' | 'title'</code>), keep it in <code>EventsPage</code> with <code>useState&lt;SortOrder&gt;</code>, narrow the menu's string with a small type guard of your own (Lesson 2.4), and sort <code>visible</code> with <code>toSorted</code> and <code>localeCompare</code>. Should the past list still be reversed when someone asks for "latest first"? Decide, and write down why.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Draw the events page's component tree from memory and mark, for every piece of state, where it lives and why there and not higher or lower. Then explain in two sentences, to someone who has never seen React, why the stored filtered list was always one keystroke behind.</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li>Local variables last one render; <code>useState</code> keeps a value between renders, and calling its setter schedules a re-render</li>
+                        <li>Hooks run at the top level of a component, in the same order every render; oxlint's <code>rules-of-hooks</code> reports the rest as an error</li>
+                        <li>Event props take a function: pass <code>handleChange</code> or <code>() =&gt; ...</code>, never call it in the prop. Inline handlers are typed for you; named ones take <code>ChangeEvent&lt;HTMLInputElement&gt;</code> and friends</li>
+                        <li>Give <code>useState</code> a type argument for unions, empty arrays and "nothing yet": <code>useState&lt;StatusFilter&gt;('all')</code>, <code>useState&lt;string[]&gt;([])</code>, <code>useState&lt;CleanupEvent | null&gt;(null)</code></li>
+                        <li>Each render sees a snapshot: use updater functions when the new value depends on the old one, and make new arrays and objects instead of changing them</li>
+                        <li>State lives in the closest common parent of everything that reads or changes it; children get values as props and report changes through callback props. Whatever can be computed is derived, never stored</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Look up state and event patterns quickly</td><td><a href="react-cheat-sheet.html">React Cheat Sheet</a></td></tr>
+                            <tr><td>Review generics and function types</td><td><a href="typescript-cheat-sheet.html">TypeScript Cheat Sheet</a></td></tr>
+                            <tr><td>Read React's guide to state as a snapshot</td><td><a href="https://react.dev/learn/state-as-a-snapshot" target="_blank" rel="noopener">React: State as a Snapshot</a></td></tr>
+                            <tr><td>Read React's guide to sharing state</td><td><a href="https://react.dev/learn/sharing-state-between-components" target="_blank" rel="noopener">React: Sharing State Between Components</a></td></tr>
+                            <tr><td>Read React's TypeScript notes on events and Hooks</td><td><a href="https://react.dev/learn/typescript" target="_blank" rel="noopener">React: Using TypeScript</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You gave components a memory and saw exactly why a plain variable cannot be one</li>
+                        <li>You typed event handlers and state, and read the errors that keep them honest</li>
+                        <li>You found the one-keystroke-behind bug and fixed it by storing less</li>
+                        <li>You lifted the events page's filters into their closest common parent and derived everything else</li>
+                        <li>Organizers can now search, filter, clear and open details, with readable dates and a live count for screen readers</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The search box was your first form field. In <a href="lesson_11.html"><strong>Lesson 3.5: Forms and Actions</strong></a> organizers get a whole form to plan a new cleanup: controlled and uncontrolled inputs, React 19's form actions with <code>useActionState</code>, and error messages people understand.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code> and <code>npm run build</code> pass in <code>shoreline-hq</code>, and that <code>src/Scratch.tsx</code> is gone</li>
+                    <li>Try the events page with the keyboard only, once more, in dark mode</li>
+                    <li>Keep your own app's state list from the project for Lesson 11.1</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>State is where React stops being "HTML with variables" and starts being its own way of thinking, and almost everyone finds the snapshot idea strange the first time. If the "one keystroke behind" table made you frown, good: that frown is the moment the model is being rebuilt. Draw the round trip (event up, state changes, props down) a few times this week. It will not feel natural yet, and by Module 5 you will catch these bugs in other people's code before they run it.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_09.html" class="prev-lesson">← Previous: Lists and Conditional Rendering</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_11.html" class="next-lesson">Next: Forms and Actions →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>

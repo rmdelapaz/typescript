@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Read what Vite 8 builds, measure the JavaScript a guest really downloads, look inside the bundle with a treemap, split Shoreline Crew HQ with React Router lazy routes and Rolldown's codeSplitting groups, add a CSV export, and guard it all with a size budget test. React + TypeScript: Build a Modern Web App Lesson 10.1.">
+    <meta name="author" content="Ray de la Paz">
+    <title>Performance and the Build - React + TypeScript: Build a Modern Web App</title>
+    <script src="js/theme-init.js"></script>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        window.__mermaid = mermaid;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',                  /* themeVariables only apply to the base theme */
+            darkMode: isDark,
+            themeVariables: isDark
+                ? { primaryColor: '#16233a', primaryTextColor: '#e2e8f0', primaryBorderColor: '#9cc7ff', lineColor: '#94a3b8', secondaryColor: '#16233a', tertiaryColor: '#0b1626', background: '#0b1626', mainBkg: '#16233a', textColor: '#e2e8f0' }
+                : { primaryColor: '#eef4fb', primaryTextColor: '#16233a', primaryBorderColor: '#2563a8', lineColor: '#64748b', secondaryColor: '#f6f8fb', tertiaryColor: '#f1f5f9', background: '#ffffff', mainBkg: '#eef4fb', textColor: '#16233a' }
+        });
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
+
+    <div class="progress-indicator" role="progressbar" aria-label="Page scroll progress">
+        <div class="progress-bar"></div>
+    </div>
+
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">React + TypeScript: Build a Modern Web App</a>
+            <button id="mobile-menu-toggle" class="mobile-menu-toggle" aria-expanded="false" aria-controls="nav-links">☰</button>
+            <div class="nav-links" id="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#modules">All Modules</a>
+                <span class="nav-divider"></span>
+                <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+                <a href="https://rays-home.netlify.app/contact">Contact</a>
+                <button id="theme-toggle" aria-label="Toggle dark/light mode">🌙</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="main-content">
+        <div class="container">
+
+            <header>
+                <h1>📦 Lesson 10.1: Performance and the Build</h1>
+                <p class="lead">Since Lesson 8.1 every build has ended with the same yellow warning, and your e2e runs have printed it too. Today you deal with it properly. You read what Vite actually produces, measure what a guest downloads (the whole HQ, organizer forms included, 581.69 kB of JavaScript just to see the home page), look inside that file, and then split it so each visitor gets the code their visit needs. Module 10 is about shipping, and a fast first visit is part of what you ship.</p>
+
+                <div class="card card-info">
+                    <h2>🎯 Learning Objectives</h2>
+                    <p>By the end of this lesson, you will be able to:</p>
+                    <ul>
+                        <li>Read Vite 8's build output (chunks, sizes, gzip, hashed names) and explain what its 500 kB warning is telling you</li>
+                        <li>Measure the JavaScript a visitor downloads, and find what is inside a bundle with a treemap</li>
+                        <li>Split a React Router app with typed <code>lazy</code> routes, and use <code>React.lazy</code> with <code>Suspense</code> for a component</li>
+                        <li>Shape the build's files with Rolldown's <code>codeSplitting</code> groups for better caching, without pulling lazy code back in</li>
+                        <li>Protect the result with an end-to-end size budget, and add a typed, safe CSV export to the Impact page</li>
+                    </ul>
+                </div>
+
+                <ul class="lesson-meta">
+                    <li><span class="meta-label">⏱️ Time</span> 145 minutes</li>
+                    <li><span class="meta-label">📋 Prerequisites</span> <a href="lesson_31.html">Lesson 9.3: End-to-End and Accessibility Tests</a> (your <code>shoreline-hq</code> with 46 Vitest and 19 Playwright tests)</li>
+                    <li><span class="meta-label">🛠️ You will build</span> A split Shoreline Crew HQ: lazy organizer pages and Impact page, a cached <code>vendor</code> file and a <code>forms</code> file only organizers load, a bundle treemap, a CSV export of the monthly totals, and a JavaScript budget test</li>
+                    <li><span class="meta-label">🧩 Stack</span> Vite 8.3 (Rolldown 1.2), React Router 8.5, rollup-plugin-visualizer 7.1, Playwright 1.65, React 19.3, TypeScript 7.0 (the versions this lesson was checked with)</li>
+                    <li><span class="meta-label">🧭 Where you work</span> <code>shoreline-hq</code> in VS Code, with shoreline-api running in a second terminal</li>
+                </ul>
+            </header>
+
+            <div class="card card-info">
+                <h4>📦 Code for this lesson</h4>
+                <p>Starting code: <a href="downloads/lesson-32-start.zip">lesson-32-start.zip</a> · Finished code: <a href="downloads/lesson-32-end.zip">lesson-32-end.zip</a>. Each folder has a README with the commands to run it.</p>
+            </div>
+
+            <details class="card toc-card" open>
+                <summary aria-label="Toggle table of contents">
+                    <span class="toc-icon" aria-hidden="true">📑</span>
+                    <span class="toc-label">In This Lesson</span>
+                    <span class="toc-chevron" aria-hidden="true">▾</span>
+                </summary>
+                <nav aria-label="Table of Contents">
+                    <ol>
+                        <li><a href="#build" class="toc-link">What the Build Makes</a></li>
+                        <li><a href="#measure" class="toc-link">Measure What a Visitor Downloads</a></li>
+                        <li><a href="#analyze" class="toc-link">Look Inside the Bundle</a></li>
+                        <li><a href="#lazy-routes" class="toc-link">Lazy Routes: Split by Who Needs It</a></li>
+                        <li><a href="#react-lazy" class="toc-link">React.lazy for a Component</a></li>
+                        <li><a href="#chunks" class="toc-link">Shaping Files with codeSplitting Groups</a></li>
+                        <li><a href="#mistakes" class="toc-link">Common Mistakes</a></li>
+                        <li><a href="#project" class="toc-link">Project: A Lighter HQ</a></li>
+                        <li><a href="#exercises" class="toc-link">Hands-on Exercises</a></li>
+                        <li><a href="#quiz" class="toc-link">Quick Quiz</a></li>
+                        <li><a href="#faq" class="toc-link">Common Questions</a></li>
+                        <li><a href="#journal" class="toc-link">Learning Journal</a></li>
+                        <li><a href="#summary" class="toc-link">Lesson Summary</a></li>
+                    </ol>
+                </nav>
+            </details>
+
+            <section id="build" class="lesson-section">
+                <h2>🏗️ What the Build Makes</h2>
+                <p>Since Lesson 1.2, <code>npm run build</code> has meant <code>tsc -b &amp;&amp; vite build</code>. The first half only checks types; it produces nothing. The second half is where your app becomes files a browser can load. Vite 8 hands that work to <strong>Rolldown</strong>, its bundler: it starts at <code>index.html</code>, follows every <code>import</code> from <code>main.tsx</code> through your components into <code>node_modules</code>, strips the types, drops code nothing uses (tree shaking), minifies what is left and writes the result to <code>dist/</code>. Here is the end of the HQ's build at the start of this lesson:</p>
+                <div class="card card-output">
+                    <h4>Expected output (shortened, from <code>npm run build</code>)</h4>
+                    <pre><code>✓ 352 modules transformed.
+...
+dist/assets/index-B-Vm3u1y.js                            581.69 kB │ gzip: 182.31 kB
+...
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.31s</code></pre>
+                </div>
+                <ul>
+                    <li><strong>One JavaScript file</strong>, <code>index-<em>hash</em>.js</code>: React, React DOM, React Router, TanStack Query, Zustand, React Hook Form, Zod and every one of your components, minified into a single file. The hash in its name changes whenever its content changes, so a browser can keep it cached forever and still never use an old copy after you deploy.</li>
+                    <li><strong>Two sizes.</strong> The first is the file on disk. The <code>gzip</code> size is roughly what travels over the network when the server compresses it, as most hosts do. Both matter: the network carries the smaller number, but the phone still has to parse and run the bigger one.</li>
+                    <li><strong>The warning</strong> is Vite's rule of thumb: one chunk over 500 kB (after minifying, before compression) usually means everyone downloads code they do not need. It suggests <code>import()</code> and <code>codeSplitting</code>, which is exactly this lesson. It is a warning, not an error: the build still worked.</li>
+                </ul>
+                <div class="card card-info">
+                    <h3>💡 Mental model: packing the crew van</h3>
+                    <p>Right now the HQ is a crew that loads every piece of gear into the van for every trip: the check-in clipboards, the kayaks for the harbor cleanup, the scales for weighing bags, even when the trip is "drive past the beach and look at the schedule". Code splitting is packing a basic kit that goes on every trip, plus labeled boxes that are fetched when a job needs them. The work is deciding what goes in which box, and the labels have to be good enough that the right box arrives in time.</p>
+                </div>
+                <p>Why the fuss about bytes? JavaScript is the most expensive thing a page can download: after the transfer, the browser has to parse it, compile it and run it before the page responds, and on a mid-range phone that work takes noticeably longer than on your laptop. A picture of the same size only has to be decoded. Smaller JavaScript for the first visit is one of the few performance wins that helps every visitor, on every device.</p>
+            </section>
+
+            <section id="measure" class="lesson-section">
+                <h2>📏 Measure What a Visitor Downloads</h2>
+                <p>The build table lists files. What you care about is what each kind of visitor actually downloads, and that is a measurement, like the render counts in Lesson 5.3. In the browser, open the developer tools (<kbd>F12</kbd>, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd>; <kbd>⌘ Cmd</kbd>+<kbd>Option</kbd>+<kbd>I</kbd> on a Mac), choose the <strong>Network</strong> tab, tick <strong>Disable cache</strong>, filter to <strong>JS</strong> and reload. Each row is one file; the bar at the bottom adds them up, both as "transferred" (compressed on the way) and as "resources" (the size the build table prints). Use <code>npm run preview</code> for this, never the dev server: in development Vite serves hundreds of separate unbundled modules, which tells you nothing about the build.</p>
+                <p>The course measured the same thing with Playwright in Chromium against <code>vite preview</code>, for four kinds of visits (sizes as the build table prints them, before compression):</p>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Visit</th><th>JavaScript files</th><th>kB</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>A guest opens the home page</td><td>1</td><td>581.69</td></tr>
+                            <tr><td>A guest clicks through Events, Sites, Impact and one cleanup</td><td>1</td><td>581.69</td></tr>
+                            <tr><td>Maya opens Plan a cleanup</td><td>1</td><td>581.69</td></tr>
+                            <tr><td>Maya opens every organizer page</td><td>1</td><td>581.69</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Everyone pays the same: the guest who only checks the next cleanup's date downloads the edit form, the impact report form and the libraries behind them. Lesson 8.1 measured Zod alone at about 103 kB minified, and Lesson 8.1's decision to keep the API's response checks out of Zod was made for exactly this lesson: the form libraries could be left behind for guests. Keep this table; you will fill the "after" column in Step 7.</p>
+            </section>
+
+            <section id="analyze" class="lesson-section">
+                <h2>🔍 Look Inside the Bundle</h2>
+                <p>Before you cut anything, look. A <strong>bundle analyzer</strong> draws the build as a treemap: one rectangle per file, divided into a box per package and per module, each box's area matching its size. <code>rollup-plugin-visualizer</code> is the long-standing choice and supports Rolldown, so it works with Vite 8 (Step 2 sets it up so that it only runs when you ask for it). This is the HQ at the start of the lesson:</p>
+                <figure class="screenshot">
+                    <img src="images/lesson_32/32-treemap.png" alt="The bundle visualizer&#x27;s treemap in a browser: one big rectangle for the file assets/index.js, divided into boxes per package and file. The largest box is react-dom&#x27;s client code, taking about two fifths of the area; react-router, react-hook-form, zod and TanStack Query&#x27;s query-core fill most of the rest, and the HQ&#x27;s own src folder is a small block of many little boxes." width="1100" height="688" loading="lazy">
+                    <figcaption>The whole HQ in one file, drawn to scale: React DOM, React Router, React Hook Form and Zod are the big boxes, and every visitor downloads all of them.</figcaption>
+                </figure>
+                <p>Three things to read in any treemap:</p>
+                <ol>
+                    <li><strong>The biggest boxes.</strong> React DOM is about two fifths of everything. That one is the price of using React and stays. React Router and TanStack Query are needed on every page too.</li>
+                    <li><strong>Who needs each box.</strong> React Hook Form and Zod are big, and only three organizer pages use them. That is the code to move out of the way.</li>
+                    <li><strong>Surprises.</strong> A library you did not know you used, the same package twice, a whole icon set for three icons. The HQ has none, thanks to choices made along the way (a hand-written chart, no date library).</li>
+                </ol>
+                <p>The sizes in the treemap are measured before minification, so they are bigger than the build table's numbers. Use the treemap for proportions and "what is in here?", and the build table for the real file sizes.</p>
+            </section>
+
+            <section id="lazy-routes" class="lesson-section">
+                <h2>✂️ Lazy Routes: Split by Who Needs It</h2>
+                <p>The tool that splits code is JavaScript's own <strong>dynamic import</strong>. A normal <code>import</code> at the top of a file is static: the bundler puts that module in the same file as its importer. <code>import('./pages/NewEventPage.tsx')</code> is a function call that returns a <code>Promise</code> of the module, and Rolldown answers it with a separate file, downloaded the first time the call runs. TypeScript knows the module's exports, so the promise is fully typed.</p>
+                <p>React Router 8's data routers take that call through a route's <code>lazy</code> property: an async function that returns the parts of the route that can wait, here the page component.</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/src/routes.tsx</div>
+                    <pre data-src="shoreline-hq/src/routes.tsx" data-match="excerpt"><code class="language-tsx">{
+  path: 'events/new',
+  lazy: async () =&gt; {
+    const { NewEventPage } = await import('./pages/NewEventPage.tsx')
+    return { Component: NewEventPage }
+  },
+},</code></pre>
+                </div>
+                <ul>
+                    <li><strong><code>Component</code>, not <code>element</code>.</strong> The function hands over the component itself, and the router creates the element when it renders the route. Returning <code>{ element: &lt;NewEventPage /&gt; }</code> works as well; handing over the component is the shorter habit.</li>
+                    <li><strong>The import must stay the only one.</strong> If any file that every page loads still imports <code>NewEventPage</code> statically, Rolldown keeps it in the main file and the split silently does nothing. That is why Step 3 deletes the old <code>import</code> lines.</li>
+                    <li><strong>Types.</strong> <code>lazy</code> is checked against <code>RouteObject</code>: return <code>{ Componnt: … }</code> with a typo and <code>tsc -b</code> reports it. You cannot return a <code>path</code> or <code>children</code> from it either: what the route matches must be known before its code arrives.</li>
+                </ul>
+                <p>The best part is what the router does with it. When a person clicks a link, it starts the route's loaders <em>and</em> downloads the route's file at the same time, and shows the page when both are done (the "Loading…" pill from Lesson 6.3 covers the wait):</p>
+                <div class="mermaid">
+graph TD
+    A["Click: Impact"] --> B["Router matches /impact"]
+    B --> C["impactLoader: GET /api/impact"]
+    B --> D["lazy: ImpactPage file"]
+    C --> E["Render ImpactPage"]
+    D --> E
+                </div>
+                <p>Measured (a Playwright check in the course's verification, Chromium against <code>vite preview</code>): the Impact page's file was requested before the <code>/api/impact</code> answer arrived. No waiting in line.</p>
+                <div class="card card-warning">
+                    <h4>⚠️ Splitting is for speed, not for secrets</h4>
+                    <p>Because the router fetches the file while the loaders run, a guest who opens a shared link such as <code>/events/e08/edit</code> downloads the edit page's file (and the form libraries) while <code>organizersOnly</code> decides, and then sees the sign-in page. Measured: 557.32 kB in 7 files for that visit. That is fine, because nothing in front-end code is secret: anyone can read every file the build produces. The guards decide what a person <em>sees</em>, and shoreline-api decides what anyone may <em>do</em>. Never put a secret, a key or a "hidden" admin feature in the app and rely on splitting to protect it.</p>
+                </div>
+            </section>
+
+            <section id="react-lazy" class="lesson-section">
+                <h2>🧩 React.lazy for a Component</h2>
+                <p>Not every heavy part of a page is a route. React's own <code>lazy</code> loads a <em>component</em> the first time it renders, and a <code>&lt;Suspense&gt;</code> boundary (Lesson 4.4) shows a fallback until its file arrives:</p>
+                <pre data-snippet><code class="language-tsx">import { useSuspenseQuery } from '@tanstack/react-query'
+import { lazy, Suspense } from 'react'
+// ...
+// The chart's code arrives in its own file, the first time the page draws it.
+// React.lazy wants a module with a default export, so name the one this file exports.
+const ImpactChart = lazy(async () =&gt; {
+  const { ImpactChart } = await import('../components/ImpactChart.tsx')
+  return { default: ImpactChart }
+})
+// ...
+&lt;Card title="Weight collected by month"&gt;
+  &lt;Suspense fallback={&lt;p role="status"&gt;Loading the chart…&lt;/p&gt;}&gt;
+    &lt;ImpactChart months={impact.byMonth} /&gt;
+  &lt;/Suspense&gt;</code></pre>
+                <ul>
+                    <li><code>React.lazy</code> expects a promise of a module with a <strong>default export</strong>. The HQ uses named exports, so the function imports the module and hands back <code>{ default: ImpactChart }</code>. Inside, the destructured <code>ImpactChart</code> is the real component; the outer one is the lazy wrapper with the same props type.</li>
+                    <li>Call <code>lazy</code> at the top level of a file, never inside a component: a new lazy component on every render would load and reset again and again.</li>
+                    <li>The difference from route <code>lazy</code> is <em>when</em> the download starts: only when React renders the component, after the page's data has arrived. That is a waterfall (data, then code), and Exercise 1 measures it.</li>
+                </ul>
+                <p>When do you need it in a data-router app? For a heavy widget inside a page that is already loaded: a charting library, a rich-text editor, a map, a dialog that few people open. For whole pages, the route's <code>lazy</code> is the better fit. In apps without a data router (and in most older tutorials) you will see <code>React.lazy</code> used for every page with one big <code>&lt;Suspense&gt;</code> around the routes; it works, with the waterfall.</p>
+            </section>
+
+            <section id="chunks" class="lesson-section">
+                <h2>📦 Shaping Files with codeSplitting Groups</h2>
+                <p>Dynamic imports decide <em>when</em> code loads. Rolldown's <code>output.codeSplitting</code> option decides <em>which file</em> a module lands in. Each <strong>group</strong> has a <code>name</code> and a <code>test</code> (a string, a regular expression or a function on the module's path), and every module that passes the test goes into the file with that name. The HQ uses two:</p>
+                <div class="code-file">
+                    <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                    <pre data-src="shoreline-hq/vite.config.ts" data-match="excerpt"><code class="language-ts">build: {
+  rolldownOptions: {
+    output: {
+      codeSplitting: {
+        groups: [
+          {
+            // What every page needs: one file that stays cached when only the HQ's own code changes
+            name: 'vendor',
+            test: /node_modules[\\/](react|react-dom|scheduler|react-router|@tanstack|zustand)[\\/]/,
+          },
+          {
+            // Only the organizer forms import these, so only they load this file
+            name: 'forms',
+            test: /node_modules[\\/](zod|react-hook-form|@hookform)[\\/]/,
+          },
+        ],
+      },
+    },
+  },
+},</code></pre>
+                </div>
+                <ul>
+                    <li><strong><code>vendor</code></strong> collects the libraries every page needs. The bytes do not change, but the <em>caching</em> does: when you fix a typo in the HQ, only the small <code>index</code> file gets a new name, and a returning organizer's browser reuses the 356 kB <code>vendor</code> file it already has. Step 5 measures it.</li>
+                    <li><strong><code>forms</code></strong> gives Zod and React Hook Form one clearly named file. Without it, Rolldown names shared files after a module inside them, and the HQ's form libraries came out as <code>schemas-…js</code> and <code>zod-…js</code>, where the one called <code>zod</code> held React Hook Form (Step 3). A name you choose is one you can test (Step 6).</li>
+                    <li><strong>A group does not change when its file loads.</strong> <code>forms</code> is still only imported by the lazy organizer pages, so only they load it. But a group that catches a module the main file needs makes the main file load the whole group: Common Mistakes shows a one-line "vendor" group that quietly sends Zod to every guest again.</li>
+                    <li><code>[\\/]</code> matches both <code>/</code> and <code>\</code>, so the same test works on Windows paths.</li>
+                </ul>
+                <div class="card card-info">
+                    <h4>🧩 Version note: <code>manualChunks</code> in older tutorials</h4>
+                    <p>Tutorials written for Vite 7 and earlier (which bundled with Rollup) split vendors with <code>build.rollupOptions.output.manualChunks: { vendor: ['react', 'react-dom'] }</code>. In Vite 8, <code>rollupOptions</code> is a deprecated alias of <code>rolldownOptions</code>, Rolldown supports only the <em>function</em> form of <code>manualChunks</code> and marks that deprecated too, and the object form fails (Common Mistakes). Use <code>codeSplitting.groups</code>.</p>
+                </div>
+            </section>
+
+            <section id="mistakes" class="lesson-section">
+                <h2>⚠️ Common Mistakes</h2>
+
+                <div class="card card-warning">
+                    <h3>⚠️ Silencing the warning instead of reading it</h3>
+                    <p><code>build.chunkSizeWarningLimit: 1000</code> in <code>vite.config.ts</code> makes the yellow text go away and changes nothing a visitor downloads. Raise the limit only after you have looked at the treemap and decided the big file is right (an app that really needs a large library on every page). Even then, keep it a little above your current size, so the warning means "something new and big just arrived".</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ The old <code>manualChunks</code> object</h3>
+                    <pre data-snippet><code class="language-ts">build: {
+  rollupOptions: {
+    output: {
+      manualChunks: {
+        vendor: ['react', 'react-dom', 'react-router'],
+      },
+    },
+  },
+},</code></pre>
+                    <p>Copied from an older tutorial, measured with <code>npx tsc -b</code> (the last lines of the error, which are the ones to read):</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>vite.config.ts:8:29 - error TS2769: No overload matches this call.
+...
+                  Types of property 'manualChunks' are incompatible.
+                    Type '{ vendor: string[]; }' is not assignable to type 'ManualChunksFunction'.
+                      Type '{ vendor: string[]; }' provides no match for the signature '(moduleId: string, meta: { getModuleInfo: (moduleId: string) =&gt; ModuleInfo | null; }): string | NullValue&lt;void&gt;'.</code></pre>
+                    </div>
+                    <p>and <code>npx vite build</code> stops with Rolldown's own message:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>Warning: Invalid output options (1 issue found)
+- For the "manualChunks". Invalid type: Expected Function but received Object.
+...
+✗ Build failed in 1.22s
+...
+TypeError: manualChunks is not a function</code></pre>
+                    </div>
+                    <p>TypeScript read the config as you wrote it and found that <code>manualChunks</code> must be a function now. Move the idea to <code>codeSplitting.groups</code> as in "Shaping Files".</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ A "vendor" group that catches everything</h3>
+                    <pre data-snippet><code class="language-ts">{ name: 'vendor', test: /node_modules[\\/]/ },</code></pre>
+                    <p>One line, and every package lands in one file. Measured with the lazy routes still in place:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened, from <code>npx vite build</code>)</h4>
+                        <pre><code>dist/assets/index-CDLAbaOo.js                             62.72 kB │ gzip:  21.37 kB
+...
+dist/assets/vendor-CUGVkuZG.js                           483.56 kB │ gzip: 149.12 kB</code></pre>
+                    </div>
+                    <p>The organizer pages are still lazy, but Zod and React Hook Form now live in <code>vendor</code>, which the main file needs for React, so every guest downloads them again. No <code>forms</code> file exists, so a test that only looked for that name would pass. Step 6's budget test also counts bytes, and caught it:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened, from <code>npx playwright test e2e/bundle.spec.ts</code>)</h4>
+                        <pre><code>    Error: expect(received).toBeLessThan(expected)
+
+    Expected: &lt; 440000
+    Received:   551230</code></pre>
+                    </div>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ <code>React.lazy</code> with a named export</h3>
+                    <pre data-snippet><code class="language-tsx">const ImpactChart = lazy(() =&gt; import('../components/ImpactChart.tsx'))</code></pre>
+                    <p>Measured with <code>npx tsc -b</code>:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>src/pages/ImpactPage.tsx:14:32 - error TS2322: Type 'Promise&lt;typeof import("/Users/you/shoreline/shoreline-hq/src/components/ImpactChart")&gt;' is not assignable to type 'Promise&lt;{ default: ComponentType&lt;any&gt;; }&gt;'.
+  Property 'default' is missing in type 'typeof import("/Users/you/shoreline/shoreline-hq/src/components/ImpactChart")' but required in type '{ default: ComponentType&lt;any&gt;; }'.
+
+14 const ImpactChart = lazy(() =&gt; import('../components/ImpactChart.tsx'))
+                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~</code></pre>
+                    </div>
+                    <p>Read the bottom line: the module has an <code>ImpactChart</code> export, and <code>lazy</code> wants a <code>default</code>. Return <code>{ default: ImpactChart }</code> from your own async function, as in "React.lazy for a Component". (Adding <code>export default</code> to the component file also works; the HQ keeps one style of export.)</p>
+                </div>
+
+                <div class="card card-warning">
+                    <h3>⚠️ The object form of <code>lazy</code> and shared routes</h3>
+                    <p>React Router's documentation also shows an object form, one function per property: <code>lazy: { Component: async () =&gt; (await import('./pages/EditEventPage.tsx')).EditEventPage }</code>. It works in the browser. Measured with React Router 8.5.1 in the HQ's tests, where every test builds a new memory router from the same <code>routes</code> array (Lesson 9.2):</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened, from <code>npx vitest run src/pages/EditEventPage.test.tsx</code>)</h4>
+                        <pre><code>     ✓ saves new details and shows the cleanup 262ms
+     × shows the form's own message and sends nothing 1011ms
+     × puts the API's message under the field when its rules say no 1006ms
+...
+TestingLibraryElementError: Unable to find a label with the text of: Title (5 to 80 characters)
+...
+      Tests  2 failed | 1 passed (3)</code></pre>
+                    </div>
+                    <p>The first test passes; the next ones find an empty page. After loading, the router clears the property it loaded from the <code>lazy</code> object, and that object is shared by every router made from the array, so the second router has nothing left to load. The function form (the one this lesson uses) does not share anything that way, and all 49 tests pass with it.</p>
+                </div>
+            </section>
+
+            <section id="project" class="lesson-section">
+                <h2>🛠️ Project: A Lighter HQ</h2>
+                <p>Step 1 records the starting point, Step 2 draws the treemap, Steps 3 to 5 split the build, add the CSV export and shape the files, Step 6 turns the result into a test, and Step 7 measures again. Keep shoreline-api running in its own terminal.</p>
+
+                <div class="card">
+                    <h3>Step 1: The starting point <span class="step-time">(8 min)</span></h3>
+                    <p>Build the HQ and keep the numbers (you noted them after Lesson 9.3 too):</p>
+                    <pre class="terminal"><code class="language-bash">npm run build</code></pre>
+                    <p>You should see the table and warning from "What the Build Makes": one JavaScript file of about 581.69 kB. Then run <code>npm run preview</code>, open <code>http://localhost:4173</code>, and look at the Network tab as described in "Measure What a Visitor Downloads": one JavaScript file on the home page, and no new one when you click through the pages, because there is nothing else to load. Write the size in your notes next to "guest, home page". Stop the preview with <kbd>Ctrl</kbd>+<kbd>C</kbd>.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 2: A treemap on request <span class="step-time">(10 min)</span></h3>
+                    <p>Install the analyzer as a development dependency:</p>
+                    <pre class="terminal"><code class="language-bash">npm install --save-dev rollup-plugin-visualizer</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code>added 14 packages, and audited 211 packages in 814ms
+
+58 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities</code></pre>
+                    </div>
+                    <p>The course was checked with version 7.1.3. You only want the analysis when you ask for it, so the plugin runs in a build <strong>mode</strong> of its own. Vite's <code>defineConfig</code> also accepts a function that receives the mode; change these lines in <code>vite.config.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                        <pre data-src="shoreline-hq/vite.config.ts" data-match="diff"><code class="language-diff-ts diff-highlight"> import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+ import babel from '@rolldown/plugin-babel'
++import { visualizer } from 'rollup-plugin-visualizer'
+ import { defineConfig } from 'vite'
+ 
+ // https://vite.dev/config/
+-export default defineConfig({
++export default defineConfig(({ mode }) =&gt; ({
+   plugins: [
+     react(),
+     // The React Compiler: works out what each component can reuse between renders
+     babel({ presets: [reactCompilerPreset()] }),
++    // `npm run analyze` only: a map of every chunk and what is inside it (dist/stats.html)
++    mode === 'analyze' &amp;&amp; visualizer({ filename: 'dist/stats.html', gzipSize: true }),
+   ],</code></pre>
+                    </div>
+                    <p>and the closing <code>})</code> at the end of the file becomes <code>}))</code>. <code>mode === 'analyze' &amp;&amp; visualizer(…)</code> is <code>false</code> in every other mode, and Vite skips <code>false</code> in the plugin list; TypeScript is happy with it because the plugin list's type allows <code>false</code>. Now a script in <code>package.json</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/package.json</div>
+                        <pre data-src="shoreline-hq/package.json" data-match="diff"><code class="language-diff-json diff-highlight">     "dev": "vite",
+     "build": "tsc -b &amp;&amp; vite build",
++    "analyze": "vite build --mode analyze",
+     "lint": "oxlint",
+     "preview": "vite preview",</code></pre>
+                    </div>
+                    <pre class="terminal"><code class="language-bash">npm run analyze
+npm run preview</code></pre>
+                    <p>The analyze build prints the same table (and the same warning) and also writes <code>dist/stats.html</code>; open <code>http://localhost:4173/stats.html</code> and you see the treemap from "Look Inside the Bundle". Hover a box for its sizes, click one to zoom in. Find React Hook Form and Zod, and say out loud who needs them. A normal <code>npm run build</code> empties <code>dist/</code> first, so the report never ships with your app.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 3: Lazy organizer pages <span class="step-time">(15 min)</span></h3>
+                    <p>Replace <code>src/routes.tsx</code> with this version. Six page imports at the top are gone; the six routes get a <code>lazy</code> function instead of an <code>element</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/routes.tsx</div>
+                        <pre data-src="shoreline-hq/src/routes.tsx"><code class="language-tsx">// Every address the HQ knows, and the page it shows there. App.tsx gives these routes to the
+// browser's router; the tests give the same ones to a router in memory (Lesson 9.2).
+// Pages with `lazy` are separate files in the build: downloaded the first time someone opens them.
+import type { RouteObject } from 'react-router'
+import { guestsOnly, onlyWhenThePathChanges, organizersOnly } from './auth/guards.ts'
+import { signInAction } from './auth/signInAction.ts'
+import { AppLayout } from './components/AppLayout.tsx'
+import { ErrorPage } from './pages/ErrorPage.tsx'
+import { EventPage } from './pages/EventPage.tsx'
+import { EventsPage } from './pages/EventsPage.tsx'
+import { HomePage } from './pages/HomePage.tsx'
+import {
+  editEventLoader,
+  eventLoader,
+  impactLoader,
+  impactReportLoader,
+  sitesLoader,
+} from './pages/loaders.ts'
+import { NotFoundPage } from './pages/NotFoundPage.tsx'
+import { SignInPage } from './pages/SignInPage.tsx'
+import { SitesPage } from './pages/SitesPage.tsx'
+
+export const routes: RouteObject[] = [
+  {
+    path: '/',
+    element: &lt;AppLayout /&gt;,
+    // Shown on the very first load while the first page's loaders fetch its data
+    hydrateFallbackElement: &lt;p role="status"&gt;Loading Shoreline Crew HQ…&lt;/p&gt;,
+    children: [
+      {
+        // A route without a path: it adds the error page and keeps the layout around it
+        errorElement: &lt;ErrorPage /&gt;,
+        children: [
+          { index: true, element: &lt;HomePage /&gt; },
+          { path: 'events', element: &lt;EventsPage /&gt; },
+          { path: 'events/:eventId', element: &lt;EventPage /&gt;, loader: eventLoader },
+          { path: 'sites', element: &lt;SitesPage /&gt;, loader: sitesLoader },
+          {
+            path: 'impact',
+            loader: impactLoader,
+            // The chart and the CSV export: most visitors never open this page
+            lazy: async () =&gt; {
+              const { ImpactPage } = await import('./pages/ImpactPage.tsx')
+              return { Component: ImpactPage }
+            },
+          },
+          { path: 'sign-in', element: &lt;SignInPage /&gt;, loader: guestsOnly, action: signInAction },
+          {
+            // Organizers only: this guard runs before any of these pages appears.
+            // Their code (and Zod and React Hook Form with it) stays out of the main bundle.
+            loader: organizersOnly,
+            shouldRevalidate: onlyWhenThePathChanges,
+            children: [
+              {
+                path: 'events/new',
+                lazy: async () =&gt; {
+                  const { NewEventPage } = await import('./pages/NewEventPage.tsx')
+                  return { Component: NewEventPage }
+                },
+              },
+              // A child loader runs in parallel with the guard's: editEventLoader checks again first
+              {
+                path: 'events/:eventId/edit',
+                loader: editEventLoader,
+                lazy: async () =&gt; {
+                  const { EditEventPage } = await import('./pages/EditEventPage.tsx')
+                  return { Component: EditEventPage }
+                },
+              },
+              {
+                path: 'events/:eventId/impact',
+                loader: impactReportLoader,
+                lazy: async () =&gt; {
+                  const { ImpactReportPage } = await import('./pages/ImpactReportPage.tsx')
+                  return { Component: ImpactReportPage }
+                },
+              },
+              {
+                path: 'volunteers',
+                lazy: async () =&gt; {
+                  const { VolunteersPage } = await import('./pages/VolunteersPage.tsx')
+                  return { Component: VolunteersPage }
+                },
+                // Nested routes: they render inside VolunteersPage, at its &lt;Outlet /&gt;
+                children: [
+                  { index: true, element: &lt;p&gt;Pick a name from the list to see their details.&lt;/p&gt; },
+                  {
+                    path: ':volunteerId',
+                    lazy: async () =&gt; {
+                      const { VolunteerPage } = await import('./pages/VolunteerPage.tsx')
+                      return { Component: VolunteerPage }
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          { path: '*', element: &lt;NotFoundPage /&gt; },
+        ],
+      },
+    ],
+  },
+]</code></pre>
+                    </div>
+                    <ul>
+                        <li>The five organizer pages are lazy, the three form pages and the two volunteer pages. The guard route around them stays exactly as it was: it still decides who may see them.</li>
+                        <li>The Impact page is lazy too: it is the one public page most visitors never open, and it carries the chart and, after Step 4, the CSV export. The home, events, cleanup, sites and sign-in pages are what nearly every visit uses, so they stay in the main file.</li>
+                        <li>Loaders stay static. They are small, and the router needs them right away; the guards in particular must never wait for a download.</li>
+                    </ul>
+                    <p>Run <code>npx tsc -b</code> and <code>npx vitest run</code> (all 46 tests pass: the tests use the same route array, and their <code>findBy</code> queries wait for the lazy pages), then build:</p>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened, from <code>npm run build</code>)</h4>
+                        <pre><code>dist/assets/skills-DUKoaWNL.js                             0.19 kB │ gzip:   0.15 kB
+dist/assets/eventForm-CQ-S3eBN.js                          0.64 kB │ gzip:   0.29 kB
+dist/assets/VolunteerPage-DVX5Hljb.js                      2.99 kB │ gzip:   1.37 kB
+dist/assets/ImpactPage-87T7yXE3.js                         3.47 kB │ gzip:   1.53 kB
+dist/assets/VolunteersPage-D7UNACnc.js                     3.99 kB │ gzip:   1.88 kB
+dist/assets/NewEventPage-Cr52s7xQ.js                       7.16 kB │ gzip:   2.95 kB
+dist/assets/EditEventPage-BHmqh-6o.js                      8.26 kB │ gzip:   3.49 kB
+dist/assets/ImpactReportPage-DvpdROyR.js                  11.77 kB │ gzip:   5.08 kB
+dist/assets/zod-5nNH51dj.js                               43.36 kB │ gzip:  14.91 kB
+dist/assets/queries-BNoIjay4.js                           50.03 kB │ gzip:  15.57 kB
+dist/assets/schemas-Bnx64Hq0.js                           85.44 kB │ gzip:  24.68 kB
+dist/assets/index-dItvpBVM.js                            369.11 kB │ gzip: 117.66 kB
+
+✓ built in 1.29s</code></pre>
+                    </div>
+                    <p>The warning is gone, and each lazy page has its own file. Rolldown also made a few shared files on its own and named each after a module inside it: <code>queries</code> holds code that both the main file and the Impact page use (TanStack Query among it), and the form libraries landed in <code>schemas</code> and <code>zod</code> (the one called <code>zod</code> holds React Hook Form). A guest now downloads <code>index</code> plus <code>queries</code>: 419.15 kB, measured. Step 5 replaces the guessed names with ones you choose.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 4: Export the monthly totals as CSV <span class="step-time">(15 min)</span></h3>
+                    <p>Organizers have asked since the Impact page appeared for a way to put its numbers in a spreadsheet for the town council. A <strong>CSV</strong> file (comma-separated values) is plain text that every spreadsheet opens: a heading line, then one line per row. Create <code>src/utils/csv.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/csv.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/csv.ts"><code class="language-ts">// Turning rows of data into a CSV file that spreadsheets open (Lesson 10.1)
+
+/** One column of the file: its heading, and how to read its value from a row */
+export interface CsvColumn&lt;Row&gt; {
+  heading: string
+  value: (row: Row) =&gt; string | number
+}
+
+// A text cell starting with = + - @ could run as a formula when the file is opened in a
+// spreadsheet ("CSV injection"): a ' in front makes the spreadsheet show it as plain text.
+function cell(value: string | number): string {
+  if (typeof value === 'number') return String(value)
+  const text = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value
+  // Commas, quotes and line breaks are allowed inside "…", with each " doubled
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
+}
+
+/** A heading line, then one line per row (CRLF line endings, as the CSV standard says) */
+export function toCsv&lt;Row&gt;(rows: readonly Row[], columns: readonly CsvColumn&lt;Row&gt;[]): string {
+  const lines = [
+    columns.map((column) =&gt; cell(column.heading)),
+    ...rows.map((row) =&gt; columns.map((column) =&gt; cell(column.value(row)))),
+  ]
+  return lines.map((line) =&gt; line.join(',')).join('\r\n') + '\r\n'
+}
+
+/** Hands the text to the browser as a file download */
+export function downloadCsv(fileName: string, csv: string): void {
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}</code></pre>
+                    </div>
+                    <ul>
+                        <li><strong>A generic type with a callback.</strong> <code>CsvColumn&lt;Row&gt;</code> describes one column for any row type; <code>toCsv&lt;Row&gt;</code> takes rows and columns of the <em>same</em> <code>Row</code>, so a column that reads a property the rows do not have is a type error (Lesson 2.3's generics, at work).</li>
+                        <li><strong>Quoting.</strong> A value with a comma, a quotation mark or a line break goes inside <code>"…"</code> with each <code>"</code> doubled, as the CSV format (RFC 4180) says. Lines end with <code>\r\n</code> for the same reason.</li>
+                        <li><strong>The download</strong> needs no server: a <code>Blob</code> holds the text, <code>URL.createObjectURL</code> gives it a temporary address, and a link with a <code>download</code> attribute that is clicked in code saves it under that file name.</li>
+                    </ul>
+                    <div class="card card-danger">
+                        <h4>🛑 CSV files can carry formulas</h4>
+                        <p>Spreadsheets treat a cell that starts with <code>=</code>, <code>+</code>, <code>-</code> or <code>@</code> as a formula. If a volunteer typed <code>=HYPERLINK("http://example.com","Click")</code> into a note and an organizer exported it, opening the file could run it. This is called <strong>CSV injection</strong> (or formula injection). <code>cell()</code> puts a <code>'</code> in front of such text, which spreadsheets show as plain text. Numbers are left alone, so <code>-1</code> stays a number. Today's export only has months and numbers, but <code>toCsv</code> will be reused for text, and safe by default is cheaper than remembering later.</p>
+                    </div>
+                    <p>Three unit tests pin those rules down. Create <code>src/utils/csv.test.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/utils/csv.test.ts</div>
+                        <pre data-src="shoreline-hq/src/utils/csv.test.ts"><code class="language-ts">import { describe, expect, it } from 'vitest'
+import { toCsv, type CsvColumn } from './csv.ts'
+
+interface Bag {
+  site: string
+  kg: number
+}
+
+const columns: CsvColumn&lt;Bag&gt;[] = [
+  { heading: 'Site', value: (bag) =&gt; bag.site },
+  { heading: 'Weight (kg)', value: (bag) =&gt; bag.kg },
+]
+
+describe('toCsv', () =&gt; {
+  it('writes a heading line and one line per row', () =&gt; {
+    expect(toCsv([{ site: 'North Jetty', kg: 12.5 }], columns)).toBe('Site,Weight (kg)\r\nNorth Jetty,12.5\r\n')
+  })
+
+  it('quotes commas and doubles quotation marks', () =&gt; {
+    expect(toCsv([{ site: 'Cove, "south" end', kg: 3 }], columns)).toContain('"Cove, ""south"" end",3')
+  })
+
+  it('stops text from running as a spreadsheet formula, but keeps negative numbers', () =&gt; {
+    const csv = toCsv([{ site: '=HYPERLINK("http://example.com")', kg: -1 }], columns)
+    expect(csv).toContain(`"'=HYPERLINK(""http://example.com"")",-1`)
+  })
+})</code></pre>
+                    </div>
+                    <p>Then the button on the Impact page. Change these lines in <code>src/pages/ImpactPage.tsx</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/ImpactPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/ImpactPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight"> import { useSuspenseQuery } from '@tanstack/react-query'
+ import { impactTotalsQuery } from '../api/queries.ts'
++import type { ImpactTotals } from '../api/types.ts'
++import { Button } from '../components/Button.tsx'
+ import { Card } from '../components/Card.tsx'
+ import { ImpactChart } from '../components/ImpactChart.tsx'
+ import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
++import { downloadCsv, toCsv, type CsvColumn } from '../utils/csv.ts'
+ import styles from './ImpactPage.module.css'
+ import pageStyles from './Page.module.css'
++
++// The columns of the monthly export: the row type comes from the API's ImpactTotals
++const monthColumns: CsvColumn&lt;ImpactTotals['byMonth'][number]&gt;[] = [
++  { heading: 'Month', value: (month) =&gt; month.month },
++  { heading: 'Cleanups', value: (month) =&gt; month.events },
++  { heading: 'Weight (kg)', value: (month) =&gt; month.weightKg },
++]
+ 
+ // The crew's dashboard: what every completed cleanup adds up to (impactLoader filled the cache)</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/ImpactPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/ImpactPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">   useDocumentTitle('Our impact')
+   const { data: impact } = useSuspenseQuery(impactTotalsQuery())
++
++  function downloadMonths() {
++    downloadCsv('shoreline-impact-by-month.csv', toCsv(impact.byMonth, monthColumns))
++  }
+ 
+   return (</code></pre>
+                    </div>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/src/pages/ImpactPage.tsx</div>
+                        <pre data-src="shoreline-hq/src/pages/ImpactPage.tsx" data-match="diff"><code class="language-diff-tsx diff-highlight">       &lt;Card title="Weight collected by month"&gt;
+         &lt;ImpactChart months={impact.byMonth} /&gt;
++        &lt;Button onClick={downloadMonths}&gt;Download as CSV&lt;/Button&gt;
+       &lt;/Card&gt;
+     &lt;/&gt;</code></pre>
+                    </div>
+                    <p><code>ImpactTotals['byMonth'][number]</code> is "one item of the API's <code>byMonth</code> list" (Lesson 7.1 used the same indexed access type for the chart), so the column callbacks know <code>month.month</code>, <code>month.events</code> and <code>month.weightKg</code>, and TypeScript infers <code>Row</code> when <code>toCsv</code> is called. Run the new tests:</p>
+                    <pre class="terminal"><code class="language-bash">npx vitest run src/utils/csv.test.ts</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output</h4>
+                        <pre><code> RUN  v5.1.0 /Users/you/shoreline/shoreline-hq
+
+ ✓ src/utils/csv.test.ts (3 tests) 10ms
+   ✓ toCsv (3)
+     ✓ writes a heading line and one line per row 3ms
+     ✓ quotes commas and doubles quotation marks 2ms
+     ✓ stops text from running as a spreadsheet formula, but keeps negative numbers 1ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  02:11:01
+   Duration  548ms (environment 64%, setup 27%, transform 6%, tests 2%, worker 1%)</code></pre>
+                    </div>
+                    <p>Build, preview, and try the button: the browser saves <code>shoreline-impact-by-month.csv</code>, which opens as a three-column table in any spreadsheet.</p>
+                    <figure class="screenshot">
+                        <img src="images/lesson_32/32-impact-csv.png" alt="The Shoreline Crew HQ Impact page in a browser: the heading Our impact, five totals in boxes (cleanups, volunteers, volunteer hours, bags, weight in kilograms), and a card titled Weight collected by month with a horizontal bar chart and, below it, a Download as CSV button outlined in red." width="1100" height="805" loading="lazy">
+                        <figcaption>The Impact page now arrives in its own file, and it hands the monthly totals to a spreadsheet.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="card">
+                    <h3>Step 5: Name the files that stay <span class="step-time">(8 min)</span></h3>
+                    <p>Add the <code>build</code> block from "Shaping Files" to <code>vite.config.ts</code>, between <code>plugins</code> and <code>test</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/vite.config.ts</div>
+                        <pre data-src="shoreline-hq/vite.config.ts" data-match="excerpt"><code class="language-ts">],
+build: {
+  rolldownOptions: {
+    output: {
+      codeSplitting: {
+        groups: [
+          {
+            // What every page needs: one file that stays cached when only the HQ's own code changes
+            name: 'vendor',
+            test: /node_modules[\\/](react|react-dom|scheduler|react-router|@tanstack|zustand)[\\/]/,
+          },
+          {
+            // Only the organizer forms import these, so only they load this file
+            name: 'forms',
+            test: /node_modules[\\/](zod|react-hook-form|@hookform)[\\/]/,
+          },
+        ],
+      },
+    },
+  },
+},
+// Vitest reads the same file, so tests run the code exactly as the app's build does</code></pre>
+                    </div>
+                    <pre class="terminal"><code class="language-bash">npm run build</code></pre>
+                    <figure class="screenshot">
+                        <img src="images/lesson_32/32-build-split.png" alt="A terminal in shoreline-hq running npm run build after the splitting. Vite lists many files: small page chunks such as VolunteerPage, NewEventPage, EditEventPage, ImpactPage and ImpactReportPage of a few kilobytes each, the forms chunk of about 127 kB, the index chunk of about 63 kB and the vendor chunk of about 356 kB. There is no warning about chunks larger than 500 kB." width="794" height="717" loading="lazy">
+                        <figcaption>After the splitting: the organizer pages, the Impact page and the form libraries each have their own file, and the 500 kB warning is gone.</figcaption>
+                    </figure>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>dist/assets/skills-DUKoaWNL.js                             0.19 kB │ gzip:   0.15 kB
+dist/assets/rolldown-runtime-WkwZ5CU-.js                   0.59 kB │ gzip:   0.36 kB
+dist/assets/eventForm-CQ-S3eBN.js                          0.64 kB │ gzip:   0.29 kB
+dist/assets/schemas-BC1Lz64Z.js                            1.93 kB │ gzip:   0.92 kB
+dist/assets/VolunteerPage-Crrpg-8D.js                      2.99 kB │ gzip:   1.36 kB
+dist/assets/VolunteersPage-LFyTH8eY.js                     3.99 kB │ gzip:   1.88 kB
+dist/assets/ImpactPage-Cr1P4Eqx.js                         4.34 kB │ gzip:   1.98 kB
+dist/assets/NewEventPage-CSRZuRfT.js                       7.24 kB │ gzip:   2.99 kB
+dist/assets/EditEventPage-BG482QVG.js                      8.27 kB │ gzip:   3.49 kB
+dist/assets/ImpactReportPage-CmM7DboM.js                  11.80 kB │ gzip:   5.13 kB
+dist/assets/index-BGWJtCEI.js                             62.72 kB │ gzip:  21.44 kB
+dist/assets/forms-wPpF5eqp.js                            127.33 kB │ gzip:  38.45 kB
+dist/assets/vendor-DenlHpDj.js                           355.82 kB │ gzip: 111.15 kB
+
+✓ built in 1.31s</code></pre>
+                    </div>
+                    <p>Zod and React Hook Form now share one <code>forms</code> file (the small <code>schemas</code> file that is left is the HQ's own <code>schemas.ts</code>), <code>queries</code> is gone because its library code moved to <code>vendor</code>, and a guest's visit is <code>index</code> (the HQ's own code) plus <code>vendor</code> plus a tiny <code>rolldown-runtime</code> file, the glue Rolldown adds so the files can share modules. Vite also adds <code>&lt;link rel="modulepreload"&gt;</code> lines for the last two to <code>dist/index.html</code>, so the browser fetches all three at once instead of one after another. Now the caching claim, measured: change the tagline in <code>src/pages/HomePage.tsx</code> for a moment, build, and compare the names (the course changed "cleaner" to "clean"):</p>
+                    <div class="card card-output">
+                        <h4>Expected output (the two lines that matter, from two builds)</h4>
+                        <pre><code># before the change
+dist/assets/index-BGWJtCEI.js                             62.72 kB │ gzip:  21.44 kB
+dist/assets/vendor-DenlHpDj.js                           355.82 kB │ gzip: 111.15 kB
+# after changing the tagline
+dist/assets/index-B0OsZI9M.js                             62.71 kB │ gzip:  21.44 kB
+dist/assets/vendor-DenlHpDj.js                           355.82 kB │ gzip: 111.15 kB</code></pre>
+                    </div>
+                    <p>Only <code>index</code> got a new name. After your fix, a returning visitor's browser downloads the new 63 kB <code>index</code> file and reuses the 356 kB <code>vendor</code> file from its cache. Put the tagline back.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 6: A budget the tests enforce <span class="step-time">(10 min)</span></h3>
+                    <p>Splitting is easy to undo by accident: one static import of an organizer page in a shared file and everything is back in the main file, with no error and no warning (the main file would still be under 500 kB). Lesson 9.3's Playwright suite is the safety net; give it a test that measures. Create <code>e2e/bundle.spec.ts</code>:</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/e2e/bundle.spec.ts</div>
+                        <pre data-src="shoreline-hq/e2e/bundle.spec.ts"><code class="language-ts">import { expect, test } from '@playwright/test'
+import { resetApi } from './helpers.ts'
+
+test.beforeEach(async ({ request }) =&gt; {
+  await resetApi(request)
+})
+
+test('a guest browsing the public pages stays within the JavaScript budget', async ({ page }) =&gt; {
+  // Every JavaScript file the HQ sends during this test, with its size in bytes
+  const scripts: Promise&lt;{ file: string; bytes: number }&gt;[] = []
+  page.on('response', (response) =&gt; {
+    const file = new URL(response.url()).pathname
+    if (file.startsWith('/assets/') &amp;&amp; file.endsWith('.js')) {
+      scripts.push(response.body().then((body) =&gt; ({ file, bytes: body.length })))
+    }
+  })
+
+  await page.goto('/')
+  const nav = page.getByRole('navigation', { name: 'Main' })
+  for (const [link, heading] of [
+    ['Events', 'Cleanup events'],
+    ['Sites', 'Beach sites'],
+    ['Impact', 'Our impact'],
+  ]) {
+    await nav.getByRole('link', { name: link }).click()
+    await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
+  }
+
+  const downloaded = await Promise.all(scripts)
+  // Zod and React Hook Form (the "forms" chunk) are for organizers only
+  expect(downloaded.filter((script) =&gt; script.file.startsWith('/assets/forms-'))).toEqual([])
+  // The budget: about 423 kB when this test was written, so a big new import shows up here
+  const total = downloaded.reduce((sum, script) =&gt; sum + script.bytes, 0)
+  expect(total).toBeLessThan(440_000)
+})</code></pre>
+                    </div>
+                    <ul>
+                        <li>Playwright's <code>response</code> event fires for every file the page receives. <code>response.body()</code> returns a <code>Promise</code>, so the test collects promises and awaits them all at the end.</li>
+                        <li>Two checks: no <code>forms</code> file (the name Step 5 chose), and a <strong>budget</strong>, the most JavaScript a guest's visit may use. About 423 kB today; 440 kB leaves room for normal growth, and anything bigger makes someone look. A budget fails on any cause, including ones you did not think of.</li>
+                        <li>The list of <code>[link, heading]</code> pairs needs no type annotation: TypeScript infers <code>string[][]</code>, and destructuring each pair in the <code>for…of</code> gives two strings.</li>
+                    </ul>
+                    <p>And a test for the export, at the end of <code>e2e/impact.spec.ts</code> (plus an <code>import { readFile } from 'node:fs/promises'</code> at the top):</p>
+                    <div class="code-file">
+                        <div class="code-filename">shoreline-hq/e2e/impact.spec.ts</div>
+                        <pre data-src="shoreline-hq/e2e/impact.spec.ts" data-match="diff"><code class="language-diff-ts diff-highlight">   await expect(page.getByRole('definition').filter({ hasText: 'kg' })).toHaveText('194.7 kg')
+ })
++
++test('the impact page hands out its monthly totals as a CSV file', async ({ page }) =&gt; {
++  await page.goto('/impact')
++  const downloading = page.waitForEvent('download')
++  await page.getByRole('button', { name: 'Download as CSV' }).click()
++  const download = await downloading
++  expect(download.suggestedFilename()).toBe('shoreline-impact-by-month.csv')
++
++  // Playwright saved the file: read it like a spreadsheet would
++  const [heading, ...months] = (await readFile(await download.path(), 'utf8')).trimEnd().split('\r\n')
++  expect(heading).toBe('Month,Cleanups,Weight (kg)')
++  expect(months.length).toBeGreaterThan(0)
++  for (const month of months) expect(month).toMatch(/^\d{4}-\d{2},\d+,[\d.]+$/)
++})</code></pre>
+                    </div>
+                    <p>Playwright catches the download, saves it, and the test reads the file like a spreadsheet would. The months and their totals depend on today's date in the sample data, so the test checks the shape of each line, never a fixed count. Now prove the budget test can fail: in <code>routes.tsx</code>, put back <code>import { NewEventPage } from './pages/NewEventPage.tsx'</code> and <code>{ path: 'events/new', element: &lt;NewEventPage /&gt; }</code> for a moment, and run it:</p>
+                    <pre class="terminal"><code class="language-bash">npx playwright test e2e/bundle.spec.ts</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened)</h4>
+                        <pre><code>    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 6
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "bytes": 127265,
+    +     "file": "/assets/forms-CY-JD-zP.js",
+    +   },
+...
+    &gt; 31 |   expect(downloaded.filter((script) =&gt; script.file.startsWith('/assets/forms-'))).toEqual([])
+         |                                                                                   ^</code></pre>
+                    </div>
+                    <p>One page made static, and every guest gets the forms file again, which the test names. Undo the change; the test passes.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Step 7: Everything, and measure again <span class="step-time">(5 min)</span></h3>
+                    <pre class="terminal"><code class="language-bash">npx tsc -b
+npm run lint
+npx vitest run
+npm run test:e2e</code></pre>
+                    <div class="card card-output">
+                        <h4>Expected output (shortened, from <code>npx vitest run</code> and <code>npm run test:e2e</code>)</h4>
+                        <pre><code> Test Files  13 passed (13)
+      Tests  49 passed (49)
+...
+Running 21 tests using 1 worker
+...
+  ✓  17 e2e/bundle.spec.ts:8:1 › a guest browsing the public pages stays within the JavaScript budget (299ms)
+...
+  ✓  20 e2e/impact.spec.ts:37:1 › the impact page hands out its monthly totals as a CSV file (148ms)
+...
+  21 passed (13.8s)</code></pre>
+                    </div>
+                    <p>Every journey from Lesson 9.3 still passes, which means every lazy page still loads its code and works: that is the safety net doing its job. The build inside the e2e run no longer prints the 500 kB warning. Then repeat Step 1's Network measurement. The course's numbers, measured the same way as before:</p>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Visit</th><th>Before: files / kB</th><th>After: files / kB</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>A guest opens the home page</td><td>1 / 581.69</td><td>3 / 419.14</td></tr>
+                                <tr><td>A guest clicks through Events, Sites, Impact and one cleanup</td><td>1 / 581.69</td><td>4 / 423.48</td></tr>
+                                <tr><td>Maya opens Plan a cleanup</td><td>1 / 581.69</td><td>7 / 556.29</td></tr>
+                                <tr><td>Maya opens every organizer page</td><td>1 / 581.69</td><td>11 / 580.55</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>A guest's first visit is 162.55 kB (28 percent) lighter, and organizers download about what they did before, spread over more files that arrive when they open each page. React itself is now most of what is left, which is the honest floor for a React app.</p>
+                </div>
+
+                <div class="card card-success">
+                    <h3>✅ Project Completion Checklist</h3>
+                    <ul>
+                        <li><code>npm run analyze</code> writes <code>dist/stats.html</code>, and you found the form libraries in the treemap</li>
+                        <li>The five organizer pages and the Impact page are <code>lazy</code> routes with typed <code>Component</code> imports, and no static import of them is left</li>
+                        <li><code>vite.config.ts</code> has <code>vendor</code> and <code>forms</code> groups, and the build prints no 500 kB warning</li>
+                        <li>The Impact page downloads the monthly totals as a CSV file built by the generic, formula-safe <code>toCsv</code></li>
+                        <li><code>e2e/bundle.spec.ts</code> enforces the guest budget, you watched it fail once, and all 49 Vitest and 21 Playwright tests pass</li>
+                        <li>Your notes have the before and after numbers for a guest's first visit</li>
+                    </ul>
+                </div>
+                <p><strong>Your own project:</strong> for the app you will plan in Lesson 11.1, write down who its visitors are and which screens only some of them use. Those screens are your first lazy routes, and the visitor who uses the fewest screens is the one your budget test should follow.</p>
+            </section>
+
+            <section id="exercises" class="lesson-section">
+                <h2>🏋️ Hands-on Exercises</h2>
+                <p>Exercise 1 is part of the lesson (about 7 minutes, included in the lesson time). Exercises 2 and 3 are optional stretches, not counted in the lesson time.</p>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 1: The chart on its own, measured</h3>
+                    <p>Load <code>ImpactChart</code> with <code>React.lazy</code> inside the Impact page, with a <code>&lt;Suspense&gt;</code> fallback "Loading the chart…". Build and find the chart's file in the table. Then decide with numbers: is a separate file worth it for this chart?</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Start from "React.lazy for a Component": remove the static import of <code>ImpactChart</code>, define the lazy one at the top level of <code>ImpactPage.tsx</code>, and wrap only the chart in <code>&lt;Suspense&gt;</code>, so the totals and the button never wait. To see the order of events, watch the Network tab: when is the chart's file requested, compared with <code>/api/impact</code>?</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">import { useSuspenseQuery } from '@tanstack/react-query'
+import { lazy, Suspense } from 'react'
+import { impactTotalsQuery } from '../api/queries.ts'
+import type { ImpactTotals } from '../api/types.ts'
+import { Button } from '../components/Button.tsx'
+import { Card } from '../components/Card.tsx'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.ts'
+import { downloadCsv, toCsv, type CsvColumn } from '../utils/csv.ts'
+import styles from './ImpactPage.module.css'
+import pageStyles from './Page.module.css'
+
+// The chart's code arrives in its own file, the first time the page draws it.
+// React.lazy wants a module with a default export, so name the one this file exports.
+const ImpactChart = lazy(async () =&gt; {
+  const { ImpactChart } = await import('../components/ImpactChart.tsx')
+  return { default: ImpactChart }
+})
+// ...
+&lt;Card title="Weight collected by month"&gt;
+  &lt;Suspense fallback={&lt;p role="status"&gt;Loading the chart…&lt;/p&gt;}&gt;
+    &lt;ImpactChart months={impact.byMonth} /&gt;
+  &lt;/Suspense&gt;
+  &lt;Button onClick={downloadMonths}&gt;Download as CSV&lt;/Button&gt;
+&lt;/Card&gt;</code></pre>
+                        <div class="card card-output">
+                            <h4>Expected output (shortened, from <code>npx vite build</code>)</h4>
+                            <pre><code>dist/assets/ImpactChart-BU9j6zNR.js                        1.31 kB │ gzip:   0.77 kB
+...
+dist/assets/ImpactPage-CT6dBY6l.js                         3.77 kB │ gzip:   1.68 kB</code></pre>
+                        </div>
+                        <p>Measured with a Playwright test (in the course's verification, not in the HQ): the chart's file is requested only after the <code>/api/impact</code> answer has arrived, the waterfall from "React.lazy for a Component". The verdict: the chart is a little over a kilobyte, it already arrives with the lazy Impact page, and splitting it again adds a second request after the data, plus a moment of "Loading the chart…". Not worth it here, so the HQ keeps the static import. With a charting library of 100 kB or more in that component, the same few lines would be a clear win. Measure, then decide.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 2: Weight by beach site (optional stretch)</h3>
+                    <p>Optional stretch, not counted in the lesson time. Add a second button, "Download by beach site", that exports <code>impact.bySite</code> with the site's <em>name</em> (not its id), the number of cleanups and the weight. Reuse <code>toCsv</code> with a new row type.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>The names live in the sites query. Let <code>impactLoader</code> put both queries in the cache with <code>Promise.all</code>, then read the sites with <code>useSuspenseQuery(sitesQuery())</code> in the page. The row type is <code>ImpactTotals['bySite'][number]</code>; <code>sites.find(…)?.name ?? row.siteId</code> falls back to the id if a site were ever missing.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-ts">export async function impactLoader() {
+  await Promise.all([
+    queryClient.query({ ...impactTotalsQuery(), staleTime: 'static' }),
+    queryClient.query({ ...sitesQuery(), staleTime: 'static' }),
+  ])
+  return null
+}</code></pre>
+                        <pre data-snippet><code class="language-tsx">const { data: impact } = useSuspenseQuery(impactTotalsQuery())
+const { data: sites } = useSuspenseQuery(sitesQuery())
+
+function downloadMonths() {
+  downloadCsv('shoreline-impact-by-month.csv', toCsv(impact.byMonth, monthColumns))
+}
+
+function downloadSites() {
+  const siteColumns: CsvColumn&lt;ImpactTotals['bySite'][number]&gt;[] = [
+    {
+      heading: 'Beach site',
+      value: (row) =&gt; sites.find((site) =&gt; site.id === row.siteId)?.name ?? row.siteId,
+    },
+    { heading: 'Cleanups', value: (row) =&gt; row.events },
+    { heading: 'Weight (kg)', value: (row) =&gt; row.weightKg },
+  ]
+  downloadCsv('shoreline-impact-by-site.csv', toCsv(impact.bySite, siteColumns))
+}
+// ...
+&lt;Card title="Weight collected by month"&gt;
+  &lt;ImpactChart months={impact.byMonth} /&gt;
+  &lt;Button onClick={downloadMonths}&gt;Download as CSV&lt;/Button&gt;{' '}
+  &lt;Button onClick={downloadSites}&gt;Download by beach site&lt;/Button&gt;
+&lt;/Card&gt;</code></pre>
+                        <p>Measured: type-checks, lints cleanly, and a Playwright test downloads <code>shoreline-impact-by-site.csv</code> with the heading <code>Beach site,Cleanups,Weight (kg)</code> and one line per site name. Not in the course's code.</p>
+                    </details>
+                </div>
+
+                <div class="card">
+                    <h3>🏋️ Exercise 3 (Stretch): Fetch the form before the click</h3>
+                    <p>Optional stretch, not counted in the lesson time. When Maya points at <strong>Plan a cleanup</strong> on the events page (or tabs to it), start downloading the form's file, so it is usually there by the time she clicks.</p>
+                    <details>
+                        <summary>💡 Hint</summary>
+                        <p>Call the same <code>import('./NewEventPage.tsx')</code> in <code>onPointerEnter</code> and <code>onFocus</code> handlers. Rolldown makes one file for one module, however many places import it, and the browser fetches it once. <code>void</code> in front of the call says "I start this promise on purpose and do not wait for it". Prove it in Playwright with <code>page.waitForRequest(…)</code> around <code>hover()</code>.</p>
+                    </details>
+                    <details>
+                        <summary>✅ Solution</summary>
+                        <pre data-snippet><code class="language-tsx">// The same import() as the route's lazy function: the browser fetches the file once
+function prefetchPlanForm() {
+  void import('./NewEventPage.tsx')
+}</code></pre>
+                        <pre data-snippet><code class="language-tsx">&lt;Button
+  as={Link}
+  to="/events/new"
+  variant="primary"
+  onPointerEnter={prefetchPlanForm}
+  onFocus={prefetchPlanForm}
+&gt;
+  Plan a cleanup
+&lt;/Button&gt;</code></pre>
+                        <pre data-snippet><code class="language-ts">test('pointing at Plan a cleanup starts downloading its code', async ({ page }) =&gt; {
+  await signIn(page)
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Events' }).click()
+  const planLink = page.getByRole('link', { name: 'Plan a cleanup' })
+  await expect(planLink).toBeVisible()
+
+  const formCode = page.waitForRequest((request) =&gt;
+    new URL(request.url()).pathname.startsWith('/assets/NewEventPage-'),
+  )
+  await planLink.hover()
+  await formCode
+  await planLink.click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Plan a cleanup' })).toBeVisible()
+})</code></pre>
+                        <p>Measured: type-checks, lints cleanly, and the test passes: the <code>NewEventPage</code> file is requested on hover, before the click. Not in the course's code.</p>
+                    </details>
+                </div>
+            </section>
+
+            <section id="quiz" class="lesson-section">
+                <h2>🎯 Quick Quiz</h2>
+                <div class="card quiz-container">
+                    <h3>🎯 Check Your Understanding</h3>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 1:</strong> <code>npm run build</code> prints "Some chunks are larger than 500 kB after minification". What is the best first step?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="That hides the message. Does any visitor download less afterwards?">
+                                A) Raise <code>build.chunkSizeWarningLimit</code> until the warning goes away
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The build worked. Is the warning about a broken build or about what visitors download?">
+                                B) Treat it as a failed build and roll back the last change
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="You do not know yet whether React is the problem. What would tell you?">
+                                C) Replace React with a smaller library
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="Measure first: the treemap shows what is inside the file and who needs each part. Then split what most visitors never use, as the HQ did with the organizer forms.">
+                                D) Look inside the bundle, then split out what most visitors do not need
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 2:</strong> A guest opens a shared link to <code>/events/e08/edit</code>. With the HQ's lazy routes, what happens?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="The router downloads a lazy route's file while its loaders run, so the edit page's file arrives while organizersOnly decides; then the guest sees Sign in. That is fine: front-end code is never secret, and the API protects the data.">
+                                A) The edit page's file is downloaded while the guard decides, then the guest is sent to sign in, which is fine because code is not secret
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The guard route is unchanged. Who decides what the guest sees?">
+                                B) The guest sees the edit form, because lazy pages skip the guard
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The course measured this visit. Did the edit page's file appear in the list?">
+                                C) Nothing is downloaded, because the guard runs before any file is requested
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 3:</strong> <code>lazy(() =&gt; import('../components/ImpactChart.tsx'))</code> gives a type error. Why?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="The chart is an ordinary component. What does the error say is missing?">
+                                A) Charts cannot be loaded lazily
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The file type-checks on its own. Which property does lazy look for in the module?">
+                                B) <code>ImpactChart.tsx</code> has its own type error
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="React.lazy wants a promise of a module whose default export is a component. ImpactChart.tsx only has a named export, so the function must return an object with default set to ImpactChart.">
+                                C) <code>React.lazy</code> needs a module with a default export, and <code>ImpactChart</code> is a named export
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 4:</strong> Why do React, React DOM, React Router and TanStack Query go into their own <code>vendor</code> group?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="false" data-hint="Step 5's two files add up to the same size as before. What changes when you deploy a fix?">
+                                A) It makes the JavaScript a guest downloads smaller
+                            </button>
+                            <button class="quiz-option" data-correct="true" data-explanation="The vendor file only changes when the libraries change, so its hashed name stays the same when you fix the HQ's own code, and returning visitors reuse it from their cache. Step 5 measured it.">
+                                B) Its file keeps its name when only the HQ's own code changes, so returning visitors reuse it from the cache
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="Groups describe files; they do not decide when code loads. What does decide that?">
+                                C) It makes those libraries load only on the pages that use them
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+
+                    <div class="quiz-question">
+                        <p><strong>Question 5:</strong> A teammate replaces the two groups with <code>{ name: 'vendor', test: /node_modules[\\/]/ }</code>. What does <code>e2e/bundle.spec.ts</code> report?</p>
+                        <div class="quiz-options">
+                            <button class="quiz-option" data-correct="true" data-explanation="Zod and React Hook Form move into vendor, which the main file needs for React, so every guest downloads them. No forms file exists, but the byte budget catches the extra kilobytes.">
+                                A) It fails on the budget: Zod and React Hook Form are now in the vendor file every page loads
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="There is indeed no forms file. Is that the only thing the test checks?">
+                                B) It passes, because no file is called forms any more
+                            </button>
+                            <button class="quiz-option" data-correct="false" data-hint="The build works with this config. Which test step would notice?">
+                                C) The build fails, so the test never runs
+                            </button>
+                        </div>
+                        <div class="quiz-feedback"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" class="lesson-section">
+                <h2>❓ Common Questions at This Stage</h2>
+
+                <details>
+                    <summary>Do the lazy pages make things slower for organizers?</summary>
+                    <p>A little, the first time each page opens: one more request, made at the same time as the page's data, so it usually costs a few milliseconds on a good connection and more on a slow one. In return the first visit is faster for everyone, and each file is cached after its first download. Measured: opening every organizer page downloads about what one big file did before (580.55 kB in 11 files, against 581.69 kB in one). Exercise 3 shows how to start a download before the click when it matters.</p>
+                </details>
+                <details>
+                    <summary>Why not make every page lazy?</summary>
+                    <p>You could, and some teams do. Each lazy page is one more request on its first visit, and the HQ's public pages are small (a few kilobytes each) and used on nearly every visit, so splitting them would add requests and save almost nothing. Split where the bytes are and where the audience is narrow: whole areas for one kind of user, and heavy libraries. The treemap tells you where that is.</p>
+                </details>
+                <details>
+                    <summary>What about Lighthouse and the Core Web Vitals?</summary>
+                    <p>Lighthouse (in Chrome's developer tools) loads a page as a slow phone would and scores it; the Core Web Vitals are three measurements Google uses for real visits: how fast the main content appears (LCP), how fast the page answers a tap or key press (INP), and how much the layout jumps (CLS). Less JavaScript on the first visit helps the first two. Lighthouse numbers on <code>localhost</code> are rough; run it against the deployed HQ after Lesson 10.2 for numbers that mean more, and compare runs rather than chasing one score.</p>
+                </details>
+                <details>
+                    <summary>Why does the course report sizes before compression?</summary>
+                    <p>Because that number is the same everywhere: on disk, in the build table and in what the browser has to parse and run. What travels over the network is smaller: even <code>vite preview</code> sends JavaScript compressed with gzip (measured), and many hosts use the even smaller Brotli. Chrome's Network tab shows both, as "transferred" (compressed) and "resources" (uncompressed) in the bar at the bottom. When you compare before and after, use the same kind of number on both sides.</p>
+                </details>
+                <details>
+                    <summary>Did the React Compiler from Lesson 5.3 make the bundle bigger?</summary>
+                    <p>Slightly: Lesson 5.3 measured about 18.5 kB more JavaScript for the compiled components and its small runtime. That cost sits in the <code>index</code> file and is paid for in fewer renders. This lesson does not change it; splitting is about which visitor downloads which code, not about how components render.</p>
+                </details>
+
+                <div class="card card-accent">
+                    <h3>🌟 Going Further: Bonus Challenge</h3>
+                    <p>Turn Vite's warning into your own budget. Set <code>build.chunkSizeWarningLimit</code> in <code>vite.config.ts</code> to a little above your largest file today (the <code>vendor</code> file, about 356 kB), then check what happens when you put one static import of <code>EditEventPage</code> back into <code>routes.tsx</code>. Which is the better guard, this warning or the e2e budget, and why might a team want both? Then try the visualizer's other views: <code>template: 'network'</code> answers "why is this module in this file?" by showing who imports it.</p>
+                </div>
+            </section>
+
+            <section id="journal" class="lesson-section">
+                <h2>📓 Learning Journal</h2>
+                <div class="card card-accent">
+                    <p>Take five to ten minutes and jot down:</p>
+                    <ul>
+                        <li><strong>Key concepts</strong> you learned today</li>
+                        <li><strong>Techniques that clicked</strong> (and the ones that have not, yet)</li>
+                        <li><strong>Questions or confusion</strong> to look up or bring to the next session</li>
+                        <li><strong>Ideas to try</strong> on your own</li>
+                        <li><strong>Progress and feelings</strong>: how did this lesson go for you?</li>
+                    </ul>
+                    <p><strong>✍️ This lesson's prompt:</strong> Write down your before and after numbers for a guest's first visit, and the one change that made the biggest difference. Then think of a website you use on your phone that feels slow: what do you guess is in its treemap, and which of its screens would you split out first? Finally, look back at Lesson 5.3 and today: both started with "measure first". Where did a measurement change what you would have done on a hunch?</p>
+                </div>
+            </section>
+
+            <section id="summary" class="lesson-section">
+                <h2>📝 Lesson Summary</h2>
+
+                <div class="card card-success">
+                    <h3>🎓 Key Takeaways</h3>
+                    <ul>
+                        <li><code>vite build</code> bundles from <code>index.html</code> with Rolldown: tree shaking, minifying, hashed file names; the table lists each file's size and gzip size, and the 500 kB warning means "everyone may be downloading code they do not need"</li>
+                        <li>Measure what each kind of visitor downloads (Network tab on <code>vite preview</code>), and look inside with a treemap before cutting</li>
+                        <li><code>import()</code> creates a separate file; React Router's <code>lazy</code> loads a route's component in parallel with its loaders; <code>React.lazy</code> + <code>Suspense</code> loads a component when it first renders (after the data, so a waterfall)</li>
+                        <li><code>codeSplitting.groups</code> decide which file a module lands in, not when it loads: a stable <code>vendor</code> file caches across deploys, and a catch-all group can pull lazy code back into every page</li>
+                        <li>Splitting is for speed, never for secrets; guards decide what people see and the API decides what they may do</li>
+                        <li>A size budget in an e2e test keeps the split from quietly coming undone; a CSV export escapes quotes and formulas by default</li>
+                    </ul>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>If you want to…</th><th>Go to</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Review measuring renders and the React Compiler</td><td><a href="lesson_19.html">Lesson 5.3: Rendering Performance</a></td></tr>
+                            <tr><td>Review loaders and the organizer guard</td><td><a href="lesson_23.html">Lesson 6.3: Data Loading and Protected Routes</a></td></tr>
+                            <tr><td>Review Playwright and the e2e setup</td><td><a href="lesson_31.html">Lesson 9.3: End-to-End and Accessibility Tests</a></td></tr>
+                            <tr><td>Read about every build option</td><td><a href="https://vite.dev/config/build-options" target="_blank" rel="noopener">vite.dev: Build Options</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card card-info">
+                    <h3>🏆 What You've Accomplished</h3>
+                    <ul>
+                        <li>You read a production build and a bundle treemap and found the code most visitors did not need</li>
+                        <li>A guest's first visit to the HQ is 28 percent lighter, and the 500 kB warning is gone for a reason, not hidden</li>
+                        <li>Organizer pages and the Impact page load on demand with typed lazy routes, and returning visitors keep a cached vendor file across deploys</li>
+                        <li>Organizers can take the monthly totals to a spreadsheet, safely</li>
+                        <li>A budget test makes sure nobody undoes it by accident</li>
+                    </ul>
+                </div>
+
+                <h3>🔭 Looking Ahead</h3>
+                <p>The HQ is ready to leave your laptop. In <a href="lesson_33.html"><strong>Lesson 10.2: Deploying</strong></a> you put it on a free static host, make deep links like <code>/events/e08</code> work there, deal with environments (a deployed HQ cannot reach the shoreline-api on your computer, so the lesson builds a demo version that runs the API's own code in the browser), and make GitHub run your type check, lint and tests on every change.</p>
+
+                <h3>📋 Before the Next Lesson</h3>
+                <ul>
+                    <li>Make sure <code>npx tsc -b</code>, <code>npm run lint</code>, <code>npx vitest run</code> (49) and <code>npm run test:e2e</code> (21) all pass, and <code>npm run build</code> prints no warning</li>
+                    <li>If you do not have one yet, create a free GitHub account; Lesson 10.2 uses it (you can sign up for the free Netlify plan with it too)</li>
+                    <li>Add your visitors-and-screens list to your Lesson 11.1 notes</li>
+                </ul>
+
+                <div class="card card-accent">
+                    <h3>🌱 Encouragement for the Journey</h3>
+                    <p>Performance work has a reputation for being dark magic. Today it was a measurement, a picture, three ideas (load later, load in parallel, cache longer) and a test that keeps the result. That is how it works on professional teams too: the people who are good at it are not the ones who know the most tricks, but the ones who measure before they change anything and check after. You just did that, on a real app, with real numbers.</p>
+                </div>
+            </section>
+
+            <nav class="lesson-nav" aria-label="Lesson Navigation">
+                <a href="lesson_31.html" class="prev-lesson">← Previous: End-to-End and Accessibility Tests</a>
+                <a href="index.html" class="home-link">🏠 Course Home</a>
+                <a href="lesson_33.html" class="next-lesson">Next: Deploying →</a>
+            </nav>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>&copy; 2026 Ray de la Paz. React + TypeScript: Build a Modern Web App. All rights reserved.</p>
+        <div class="footer-links">
+            <a href="https://rays-home.netlify.app/">Ray's House of Fun</a>
+            <a href="https://rays-home.netlify.app/contact">Contact</a>
+            <a href="#" id="print-button">Print Page</a>
+        </div>
+        <p><small>Press <kbd>?</kbd> for keyboard shortcuts</small></p>
+    </footer>
+
+    <script src="js/vendor/prism.min.js"></script>
+    <script src="js/clipboard.js"></script>
+    <script src="js/course-enhancements.js"></script>
+</body>
+</html>
